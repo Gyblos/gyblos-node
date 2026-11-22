@@ -1,6 +1,8 @@
 // Owns the typed chain index tables (#349) and their daily aggregates, matching migrations/0003,
 // 0004 and 0006 exactly (the schema test compares them). These declarations perform no I/O.
+import { eq } from 'drizzle-orm';
 import {
+  check,
   index,
   integer,
   primaryKey,
@@ -8,22 +10,37 @@ import {
   text,
 } from 'drizzle-orm/sqlite-core';
 
-import type { ChainAggregateScope, ChainInstructionKind } from './constants';
+import {
+  AGG_STATE_ID,
+  CHAIN_CURSOR_ID,
+  type ChainAggregateScope,
+  type ChainInstructionKind,
+} from './constants';
 
-export const chainCursor = sqliteTable('collector_chain_cursor', {
-  id: integer('id').primaryKey(),
-  newestSignature: text('newest_signature'),
-  gapUntil: text('gap_until'),
-  gapBefore: text('gap_before'),
-  gapFull: integer('gap_full').notNull(),
-  backfillBefore: text('backfill_before'),
-  backfillFull: integer('backfill_full').notNull(),
-  backfillDone: integer('backfill_done').notNull(),
-  updatedAt: integer('updated_at').notNull(),
-  newestSlot: integer('newest_slot'),
-  gapUntilSlot: integer('gap_until_slot'),
-  leaseUntil: integer('lease_until'),
-});
+export const chainCursor = sqliteTable(
+  'collector_chain_cursor',
+  {
+    id: integer('id').primaryKey(),
+    newestSignature: text('newest_signature'),
+    gapUntil: text('gap_until'),
+    gapBefore: text('gap_before'),
+    gapFull: integer('gap_full').notNull(),
+    backfillBefore: text('backfill_before'),
+    backfillFull: integer('backfill_full').notNull(),
+    backfillDone: integer('backfill_done').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+    newestSlot: integer('newest_slot'),
+    gapUntilSlot: integer('gap_until_slot'),
+    leaseUntil: integer('lease_until'),
+  },
+  // Inlined: drizzle-kit writes check expressions into migration SQL.
+  (table) => [
+    check(
+      'collector_chain_cursor_id',
+      eq(table.id, CHAIN_CURSOR_ID).inlineParams(),
+    ),
+  ],
+);
 
 export const chainTxs = sqliteTable(
   'collector_chain_txs',
@@ -117,11 +134,20 @@ export const chainProgramDaily = sqliteTable('collector_chain_program_daily', {
   updatedAt: integer('updated_at').notNull(),
 });
 
-export const aggChainState = sqliteTable('collector_agg_chain_state', {
-  id: integer('id').primaryKey(),
-  scannedAt: integer('scanned_at').notNull(),
-  formulaVersion: integer('formula_version').notNull(),
-});
+export const aggChainState = sqliteTable(
+  'collector_agg_chain_state',
+  {
+    id: integer('id').primaryKey(),
+    scannedAt: integer('scanned_at').notNull(),
+    formulaVersion: integer('formula_version').notNull(),
+  },
+  (table) => [
+    check(
+      'collector_agg_chain_state_id',
+      eq(table.id, AGG_STATE_ID).inlineParams(),
+    ),
+  ],
+);
 
 export const aggChainDirtyDays = sqliteTable('collector_agg_chain_dirty_days', {
   day: text('day').primaryKey(),

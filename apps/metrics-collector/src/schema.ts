@@ -1,6 +1,10 @@
-// Owns the collector's typed tables, keys and indexes, matching migrations/ exactly (a test compares
-// them). These declarations perform no client initialization or I/O.
+// Owns the collector's typed tables, keys, indexes and checks, matching migrations/ exactly (a test
+// compares them); drizzle-kit generates migrations from it. Historical D1 migrations retain physical
+// WITHOUT ROWID layout, which Drizzle cannot declare. These declarations perform no client
+// initialization or I/O.
+import { eq, sql } from 'drizzle-orm';
 import {
+  check,
   index,
   integer,
   primaryKey,
@@ -13,10 +17,14 @@ import type {
   PublicReceiptMerge,
   PublicReceiptStatus,
 } from '@gyblos/core/constants';
-import type { P2PRole } from '@gyblos/protocol/constants';
+import { PUBLIC_RECORD_LIMITS, type P2PRole } from '@gyblos/protocol/constants';
 import type { TelemetryEvent } from '@gyblos/protocol/telemetry';
 
 import type { EnvelopeKind } from './constants';
+
+const nodeIdCharacters =
+  PUBLIC_RECORD_LIMITS.publicKeyBytes *
+  PUBLIC_RECORD_LIMITS.hexCharactersPerByte;
 
 export const envelopes = sqliteTable(
   'collector_envelopes',
@@ -41,6 +49,12 @@ export const envelopes = sqliteTable(
   (table) => [
     unique().on(table.uploaderNodeId, table.nonce),
     index('collector_envelopes_by_received').on(table.receivedAt),
+    // Inlined: drizzle-kit writes check expressions into migration SQL, where a bound parameter
+    // would be a bare `?`.
+    check(
+      'collector_envelopes_uploader_node_id',
+      eq(sql`length(${table.uploaderNodeId})`, nodeIdCharacters).inlineParams(),
+    ),
   ],
 );
 

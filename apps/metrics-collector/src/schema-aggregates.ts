@@ -1,11 +1,15 @@
 // Owns the typed aggregate tables (#351), matching migrations/0002 exactly (the schema test compares
 // them). Every row is recomputed from raw rows; these declarations perform no I/O.
+import { eq } from 'drizzle-orm';
 import {
+  check,
   integer,
   primaryKey,
   sqliteTable,
   text,
 } from 'drizzle-orm/sqlite-core';
+
+import { AGG_STATE_ID } from './constants';
 
 // Additive receipt columns shared by the seller hourly, seller daily and network tables. Fresh
 // builders per table, as Drizzle requires.
@@ -43,11 +47,18 @@ function sellerModel() {
   };
 }
 
-export const aggState = sqliteTable('collector_agg_state', {
-  id: integer('id').primaryKey(),
-  scannedAt: integer('scanned_at').notNull(),
-  formulaVersion: integer('formula_version').notNull(),
-});
+export const aggState = sqliteTable(
+  'collector_agg_state',
+  {
+    id: integer('id').primaryKey(),
+    scannedAt: integer('scanned_at').notNull(),
+    formulaVersion: integer('formula_version').notNull(),
+  },
+  // Inlined: drizzle-kit writes check expressions into migration SQL.
+  (table) => [
+    check('collector_agg_state_id', eq(table.id, AGG_STATE_ID).inlineParams()),
+  ],
+);
 
 export const aggDirtyDays = sqliteTable('collector_agg_dirty_days', {
   day: text('day').primaryKey(),

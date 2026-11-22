@@ -1,10 +1,10 @@
 // Protects the collector's D1 cost model and schema: one read and one bounded batch per upload, with no
 // statement per receipt beyond chunking (no N+1), every statement under D1's bound-parameter limit,
-// and a typed ORM schema that matches the real migration.
+// and a typed ORM schema that matches the real migration, checks included.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { getTableConfig } from 'drizzle-orm/sqlite-core';
+import { getTableConfig, SQLiteSyncDialect } from 'drizzle-orm/sqlite-core';
 
 import { COLLECTOR_LIMITS } from '@gyblos/metrics-collector/constants';
 import * as schema from '@gyblos/metrics-collector/schema';
@@ -138,5 +138,32 @@ void test('the typed schema matches the migrated tables, keys and indexes', () =
       ),
       `${table.name} unique constraints`,
     );
+  }
+});
+
+void test('the typed schema preserves the migrated check constraints', () => {
+  const database = createCollectorD1();
+  const dialect = new SQLiteSyncDialect();
+  for (const table of Object.values(schema).map((item) =>
+    getTableConfig(item),
+  )) {
+    const [row] = database.rows(
+      `SELECT sql FROM sqlite_master WHERE type = 'table' AND name = '${table.name}'`,
+    );
+    assert.ok(row);
+    const normalize = (expression: string) =>
+      expression
+        .replaceAll(/["()\s]/g, '')
+        .replaceAll(`${table.name}.`, '')
+        .toLowerCase();
+    const actual = [
+      ...String(row.sql).matchAll(/CHECK\s*\(((?:[^()]|\([^()]*\))*)\)/gi),
+    ]
+      .map((match) => normalize(match[1] ?? ''))
+      .sort();
+    const declared = table.checks
+      .map((check) => normalize(dialect.sqlToQuery(check.value).sql))
+      .sort();
+    assert.deepEqual(declared, actual, table.name);
   }
 });
