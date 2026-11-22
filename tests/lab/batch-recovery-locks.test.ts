@@ -11,7 +11,6 @@ import { batchRecoveryCrash } from '../support/batch-recovery-crash';
 import {
   CRASH_ACTIONS,
   CRASH_CUTS,
-  CRASH_FAILURE,
   CRASH_LOCKS,
 } from '../support/channel-crash-constants';
 
@@ -47,9 +46,10 @@ void test('batch recovery leaves ambiguous lock owners, journal and balances int
         flag: 'wx',
         mode: 0o600,
       });
-    await assert.rejects(rig.start(CRASH_ACTIONS.WITHDRAW).result(), {
-      message: CRASH_FAILURE,
-    });
+    const result = await rig.start(CRASH_ACTIONS.WITHDRAW).result();
+    assert.equal(result.unavailable, true);
+    assert.equal(result.runtimeBlocked, true);
+    assert.equal(result.financial, null);
     assert.equal(await readFile(paths.lock, 'utf8'), owner);
     assert.deepEqual(await readFile(paths.state), state);
     assert.deepEqual(rig.signs(), signs);

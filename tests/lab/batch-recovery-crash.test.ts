@@ -70,8 +70,11 @@ for (const cut of [
     const child = rig.start(CRASH_ACTIONS.WITHDRAW, cut);
     t.after(() => child.kill());
     await child.reached();
+    const signedBeforeCrash = rig.signs();
     assert.equal(await child.kill(), 'SIGKILL');
     await rig.start(CRASH_ACTIONS.WITHDRAW).result();
+    if (cut === CRASH_CUTS.CLOSE_INFLIGHT || cut === CRASH_CUTS.REFUND_INFLIGHT)
+      assert.deepEqual(rig.signs(), signedBeforeCrash);
     await rig.start(CRASH_ACTIONS.WITHDRAW).result();
     if (!refund) rig.grace();
     const done = await rig.start(CRASH_ACTIONS.WITHDRAW).result();
@@ -100,18 +103,20 @@ void test('a second buyer crash during batch recovery preserves the original clo
   t.after(() => first.kill());
   await first.reached();
   assert.equal(await first.kill(), 'SIGKILL');
-  const path = batchSessionPathsIn(
+  const paths = batchSessionPathsIn(
     { GYBLOS_HOME: rig.financial.root },
     'buyer',
-  ).state;
-  const original = await readFile(path);
+  );
+  const original = await readFile(paths.state);
+  const oldOwner = await readFile(paths.lock, 'utf8');
   const signs = rig.signs();
   const sends = rig.financial.vm.sends();
   const second = rig.start(CRASH_ACTIONS.WITHDRAW, CRASH_CUTS.RECOVERY_LOCKED);
   t.after(() => second.kill());
   await second.reached();
+  assert.notEqual(await readFile(paths.lock, 'utf8'), oldOwner);
   assert.equal(await second.kill(), 'SIGKILL');
-  assert.deepEqual(await readFile(path), original);
+  assert.deepEqual(await readFile(paths.state), original);
   await rig.start(CRASH_ACTIONS.WITHDRAW).result();
   assert.deepEqual(rig.signs(), signs);
   assert.equal(rig.financial.vm.sends(), sends);
