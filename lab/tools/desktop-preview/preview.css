@@ -1413,7 +1413,7 @@ html .app.desktop-frame .preview-agents-entry {
       )
       border-box;
   box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 22%, transparent);
-  animation: pk-agents-border 4s linear infinite;
+  animation: pk-agents-border 2.5s linear infinite;
 }
 html .app.desktop-frame .preview-agents-entry:hover:not(:disabled) {
   --pk-agents-fill: color-mix(in srgb, var(--accent) 18%, var(--pk-side));
@@ -1431,7 +1431,6 @@ html .app.desktop-frame .preview-agents-entry:hover:not(:disabled) {
       border-box,
     linear-gradient(var(--accent), var(--accent)) border-box;
   box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 34%, transparent);
-  animation-duration: 2s;
 }
 @keyframes pk-agents-border {
   to {

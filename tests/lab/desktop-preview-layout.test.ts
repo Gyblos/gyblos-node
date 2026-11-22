@@ -90,7 +90,11 @@ void test('the title bar adds a conversation menu and a details panel for the ch
     css,
     /> \.preview-status-bar \{[^}]*border-start-(start|end)-radius/s,
   );
-  assert.match(css, /animation: pk-agents-border 4s linear infinite;/);
+  assert.match(css, /animation: pk-agents-border 2\.5s linear infinite;/);
+  assert.doesNotMatch(
+    css,
+    /\.preview-agents-entry:hover:not\(:disabled\) \{[^}]*animation/s,
+  );
   assert.match(
     css,
     /\.preview-chat-pin,\s*html \.app\.desktop-frame \.preview-chat-pin\[aria-pressed='true'\] \{\s*opacity: 1;/,
