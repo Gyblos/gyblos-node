@@ -280,19 +280,23 @@ muestra quién opera un vendedor. El índice ya debe conocer tu vendedor, igual 
 GitHub.
 
 ```sh
-gyblos seller name "My Seller"
+gyblos seller name "Mi Vendedor"
 gyblos seller name --status
 gyblos seller name --clear
 ```
 
 En un vendedor Docker, ejecútalos desde `~/gyblos-seller` con `docker compose exec seller` delante, por
-ejemplo `docker compose exec seller gyblos seller name "My Seller"`.
+ejemplo `docker compose exec seller gyblos seller name "Mi Vendedor"`.
 
-Un nombre tiene de 1 a 32 caracteres: letras y números de cualquier idioma, espacios y `-` `_` `.` `'`, con al
-menos una letra o un número. Se rechazan los emoji, los símbolos como las marcas de verificación, los
-caracteres invisibles y cualquier nombre que contenga `gyblos` (`NAME_INVALID` o `NAME_RESERVED`). El nombre
-es público: consulta [Datos y privacidad](/es/reference/data-and-privacy#nombre-del-vendedor). Todas las
-opciones están en la [referencia de la CLI](/es/reference/cli#nombre-del-vendedor).
+Un nombre tiene de 1 a 32 caracteres: letras y números, espacios y `-` `_` `.` `'`, con al menos una letra o
+un número. Se permiten tildes y otros signos después de una letra, así que funcionan nombres en hindi,
+tailandés, árabe, hebreo, yoruba y muchos otros idiomas, pero todas las letras deben ser de un mismo sistema
+de escritura. Se rechazan los emoji, los símbolos como las marcas de verificación, los caracteres invisibles
+y cualquier nombre que contenga `gyblos`, `verified`, `verificado`, `official` u `oficial` (`NAME_INVALID` o
+`NAME_RESERVED`, con una frase que dice qué parte falló). El índice puede tardar hasta 10 segundos en mostrar
+un nombre nuevo. El nombre es público, así que no pongas tu nombre legal, tu correo ni tu ubicación: consulta
+[Datos y privacidad](/es/reference/data-and-privacy#nombre-del-vendedor). Todas las opciones están en la
+[referencia de la CLI](/es/reference/cli#nombre-del-vendedor).
 
 ## Privacidad [#datos-del-comprador-y-privacidad-de-red]
 

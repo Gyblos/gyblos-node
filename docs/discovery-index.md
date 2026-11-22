@@ -235,7 +235,9 @@ Rate limits:
   - uptime: `?node=<NodeId>`, however the query was spelled;
   - GitHub claims: the route and the NodeId. A claim's new state can therefore
     take up to 10 seconds to show at a location that cached the old one.
-  - seller names: the route and the NodeId, with the same 10-second delay.
+  - seller names: the route and the NodeId. A new or cleared name can take up to
+    10 seconds to show at a location that cached the old answer; the CLI says so
+    when it sets a name.
 
   Invalid queries are rejected before the cache. Errors and publishes are never
   cached. Cached answers get the same CORS, `noindex` and `nosniff` headers as
@@ -378,17 +380,18 @@ is `400 INVALID_QUERY`):
   before migration `0007` is applied), every `github` is `null`, `truncated` is
   `true` and the route still answers. `name` is the seller's
   [display name](#seller-names), or `null` when it has none; it is self-chosen
-  and never verified. If the names read fails (for example before migration
-  `0009` is applied), every `name` is `null`, `truncated` is `true` and the
-  route still answers. No owner, contact, country or IP is returned.
+  and never verified. Names are read only for the NodeIds the page lists. If the
+  names read fails (for example before migration `0009` is applied), every
+  `name` is `null`, `truncated` is `true` and the route still answers. No owner,
+  contact, country or IP is returned.
 - **Order and size.** Online first, then by `lastSeenAt` (latest first), then by
   NodeId. `counts` cover every listed seller. The `nodes` list stops before the
   answer would exceed 1 MiB.
 - **Bounds.** Each source (active and revoked registrations, sightings, stored
-  catalogs, verified GitHub claims, seller names) is read up to `maxNodes` rows
-  by NodeId, and online models up to 20,000 rows. `truncated` is `true` when the
-  list stopped at the size limit or a source filled its cap, so sellers, counts
-  or models may be incomplete.
+  catalogs, verified GitHub claims) is read up to `maxNodes` rows by NodeId, and
+  online models up to 20,000 rows. `truncated` is `true` when the list stopped
+  at the size limit or a source filled its cap, so sellers, counts or models may
+  be incomplete.
 - **Cost.** One cache miss reads each source once. A NodeId's last sighting is
   its newest hourly uptime row, one primary-key lookup per tracked NodeId.
 - In open mode (`DISCOVERY_PUBLISH_ALLOWLIST="*"`) anyone can add entries by
@@ -576,12 +579,20 @@ mark. The name is a separate node-signed message (the
 `@gyblos/protocol/profile-claim`); it is never part of a public record or offer,
 so buyers and older nodes are unaffected.
 
-The rule (`parseSellerName`, shared by the CLI, the index and the client)
-applies NFKC, trims, collapses runs of spaces, and accepts 1 to 32 characters of
-Unicode letters, numbers, spaces and `-`, `_`, `.`, `'`, with at least one
-letter or number. Controls, format and bidi characters, zero-width and other
-invisible characters, combining marks, emoji and symbols (so no `✓` or `✅`) are
-refused, as is any name containing `gyblos` in any letter case.
+The rule (`parseSellerName`, shared by the CLI, the index and the client) is
+defined in the [profile claim](../packages/protocol/SPEC.md#profile-claim-v1).
+In short: NFKC, spaces collapsed and trimmed, 1 to 32 characters of letters,
+numbers, spaces and `-`, `_`, `.`, `'`, with at least one letter or number.
+Accents and other combining marks are allowed after a letter (at most 3 in a
+row), so names in scripts such as Devanagari, Thai, Arabic with harakat or
+Hebrew with niqqud can be spelled, but enclosing and overlay marks are not.
+Every letter must come from one writing system (Chinese characters may be mixed
+with Japanese kana, Korean Hangul or Bopomofo), so look-alike letters from
+another script cannot be mixed in. Controls, format and bidi characters,
+invisible characters, emoji, symbols (so no `✓` or `✅`), modifier letters,
+small capitals and check-like letters are refused, and so is any name whose
+skeleton (case, separators and look-alike digits ignored) contains `gyblos`,
+`verified`, `verificado`, `official` or `oficial`.
 
 `POST /v1/profile` takes
 `{"claim":{"schemaVersion":1,"nodeId":"…","name":"…","issuedAt":…},"signature":"<128 hex>"}`
@@ -593,27 +604,46 @@ strict claim shape, including a name already in the rule's form
 at most 5 seconds ahead (`400 INVALID_CLAIM`), at most 60 seconds old and newer
 than the stored name or clear (`409 STALE_CLAIM`); and, to set a name, a seller
 the index knows (an active registration or a stored catalog; otherwise
-`403 UNKNOWN_NODE`). It answers `200 {"ok":true,"name":"Ada Lovelace"}`.
+`403 UNKNOWN_NODE`). A NodeId whose name an operator holds (see
+[Removing a name](#removing-a-name)) gets `403 PROFILE_HELD`. It answers
+`200 {"ok":true,"name":"Ada Lovelace"}`.
 
 A clear (`"name": null`) replaces the name with a tombstone that keeps only the
 NodeId and `issuedAt`, so an older signed name cannot be replayed, and answers
 `200 {"ok":true,"name":null}`. Like a GitHub cancel, it needs no known seller,
 and from a NodeId with nothing stored that the index does not know it writes
+nothing. A clear from a NodeId whose name is held answers the same and changes
 nothing.
 
 `GET /v1/profile/<NodeId>` (lowercase NodeId, no query string; anything else is
 `400 INVALID_QUERY`) answers
 `{"nodeId":"…","name":"Ada Lovelace","issuedAt":1763078399000,"signature":"…"}`,
 so anyone can rebuild the `ProfileClaimV1` and check it with
-`verifyProfileClaim`. A NodeId without a name, or whose name was cleared, is
-`404 NOT_FOUND`. `/v1/network` carries each seller's `name`
-([Network](#network)). Without the profile store (no D1 binding) both routes
-answer `503 DISCOVERY_UNAVAILABLE`.
+`verifyProfileClaim`. A NodeId without a name, whose name was cleared or held,
+or that the index no longer knows (no active registration and no stored catalog,
+for example after a revocation) is `404 NOT_FOUND`. `/v1/network` carries each
+seller's `name` ([Network](#network)). Without the profile store (no D1 binding)
+both routes answer `503 DISCOVERY_UNAVAILABLE`.
+
+### Removing a name
+
+`pnpm index:seller-profiles [--remote]`
+(`apps/discovery-index/scripts/seller-profiles.ts`) lists stored names and held
+NodeIds: NodeId, name, whether it is held and `issuedAt`, newest first, at most
+1000 rows. `--hold <NodeId>` removes that seller's name and keeps a held
+tombstone: the index then refuses the seller's new names (`403 PROFILE_HELD`)
+until `--release <NodeId>`, which keeps the tombstone's `issuedAt` so an older
+signed name still cannot be replayed. It runs `wrangler d1 execute` like
+`pnpm index:github-claims`, against the local database, or the remote one with
+`--remote` (a maintainer action).
+
+### Stored names
 
 Table `discovery_seller_profiles` (migration `0009_seller_profiles.sql`), one
-row per NodeId: `node_id`, `name`, `issued_at` and `signature`; a tombstone has
-`name` and `signature` `NULL`. A stored name outside the rule fails closed
-(`503`). No IP or request data is stored or logged.
+row per NodeId: `node_id`, `name`, `issued_at`, `signature` and `held`; a
+tombstone has `name` and `signature` `NULL`, and a held one has `held` 1. A
+stored name outside the rule fails closed (`503`). No IP or request data is
+stored or logged.
 
 ## Storage
 
@@ -654,6 +684,7 @@ The only handwritten SQL expressions live in `src/sqlite-expressions.ts`:
 | `CASE`                   | No conditional builder; quota resets and uptime admission use it atomically.                                                    |
 | `length`                 | No scalar builder; the schema keeps the database text-length checks.                                                            |
 | Bitwise OR               | No bitwise builder; concurrent uptime observations combine slot bits in one write.                                              |
+| `json_each`              | No builder; the network read matches names to the NodeIds it lists in one statement, below D1's bound-parameter limit.          |
 | Scalar subquery          | No correlated subquery in a SELECT list; the network read takes each NodeId's newest uptime row by primary key.                 |
 
 Migrations, applied in order:
@@ -667,6 +698,7 @@ Migrations, applied in order:
 | `0005_node_publish_quota.sql` | The NodeId publish window and counter (publishing answers `503` without it).            |
 | `0006_presence_version.sql`   | Current presence release and attested sequence. Apply before rolling out the new index. |
 | `0007_github_claims.sql`      | Seller GitHub claims. Apply before deploying the claim routes and the cron trigger.     |
+| `0008_claim_signature.sql`    | The node signature of each GitHub claim, served by its GET route.                       |
 | `0009_seller_profiles.sql`    | Seller display names. Apply before deploying the profile routes.                        |
 
 Migrations are generated with drizzle-kit from `src/schema.ts`
@@ -675,9 +707,10 @@ Migrations are generated with drizzle-kit from `src/schema.ts`
 `0001`–`0007` were written by hand before drizzle-kit, are applied in production
 and stay byte-for-byte unchanged. `migrations/meta/` holds drizzle-kit's journal
 and snapshots. Its baseline, `0007_snapshot.json`, describes the schema after
-`0007` and its journal entry names `0007_github_claims`, so the next generated
-file is `0008_<change>.sql`. Wrangler applies `.sql` files only, records them by
-file name, and therefore applies only the new ones.
+`0007` and its journal entry names `0007_github_claims`; generated files start
+at `0008`, and each new one takes the next number in the journal. Wrangler
+applies `.sql` files only, records them by file name, and therefore applies only
+the new ones.
 
 Drizzle cannot declare the tables' `WITHOUT ROWID` layout, so tables created by
 generated migrations are ordinary rowid tables. A change SQLite cannot make with

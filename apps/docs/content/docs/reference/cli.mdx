@@ -150,15 +150,21 @@ NodeId. You choose it: the index doesn't verify it, and two sellers can use the 
 a check mark. Only [`seller verify github`](#verify-github) proves who runs a seller. The index must already
 know the seller, as for `seller verify github`.
 
-A name has 1 to 32 characters: letters and numbers in any language, spaces and `-` `_` `.` `'`, with at
-least one letter or number. Emoji, symbols such as check marks, and invisible characters are refused, and
-so is any name that contains `gyblos`. Extra spaces are removed. A refused name stops with `NAME_INVALID` or
-`NAME_RESERVED` before anything is sent. The node key signs the name and the command sends it to the
-index.
+A name has 1 to 32 characters: letters and numbers, spaces and `-` `_` `.` `'`, with at least one letter
+or number. Accents and other marks are allowed after a letter, so names in Hindi, Thai, Arabic, Hebrew,
+Yoruba and many other languages can be written, but all letters must come from one writing system (Chinese
+characters may be mixed with Japanese kana, Korean Hangul or Bopomofo). Emoji, symbols such as check marks,
+modifier and small capital letters, and invisible characters are refused, and so is any name that contains
+`gyblos`, `verified`, `verificado`, `official` or `oficial`, even written with digits, spaces or
+punctuation. Extra spaces are removed. A refused name stops with `NAME_INVALID` or `NAME_RESERVED` and says
+which part failed, before anything is sent. For a name that starts with `-`, put `--` before it:
+`gyblos seller name -- "-Lab"`. The node key signs the name and the command sends it to the index, which
+may take up to 10 seconds to show it.
 
 `--clear` removes the name; `--status` shows the name the index holds. Refusals from the index end with a
-static code in brackets, such as `DISCOVERY_UNKNOWN_NODE` (register or publish the seller first) or
-`DISCOVERY_STALE_CLAIM` (check the computer's clock). See
+static code in brackets, such as `DISCOVERY_UNKNOWN_NODE` (register or publish the seller first),
+`DISCOVERY_STALE_CLAIM` (turn on automatic time on the computer; the message shows how far off the clock is
+when the index reports its time) or `DISCOVERY_PROFILE_HELD` (an index operator removed the name). See
 [Data and privacy](/en/reference/data-and-privacy#seller-name) for what becomes public.
 
 ## seller init [#init-flags-for-a-native-checkout]

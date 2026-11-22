@@ -219,7 +219,9 @@ Un nombre público para tu vendedor es opcional. No se envía nada salvo que eje
 **Qué se vuelve público.** El índice publica el nombre en `GET /v1/profile/<NodeId>`, con tu NodeId, la hora
 en que tu nodo lo firmó y la firma, y lo muestra junto a tu vendedor en la lista de la red (`/v1/network`).
 Cualquiera puede leerlo. El nombre no está verificado y no es único: quien lo vea debe tomarlo como una
-etiqueta que elegiste, no como prueba de quién opera el vendedor. No pongas información privada en él.
+etiqueta que elegiste, no como prueba de quién opera el vendedor. No pongas tu nombre legal, tu correo ni tu
+ubicación. El nombre queda ligado a tu NodeId y, a través de él, al uptime público, los modelos y la wallet
+del dueño de tu vendedor, así que cualquiera puede relacionarlos.
 
 **Qué envía tu equipo.** El comando firma el nombre con la llave del nodo y lo envía al índice: tu NodeId, el
 nombre y la hora. `--status` le pide el nombre al índice por tu NodeId. No se guarda nada en tu equipo.
@@ -228,6 +230,10 @@ nombre y la hora. `--status` le pide el nombre al índice por tu NodeId. No se g
 responde `404` y el índice guarda solo tu NodeId y la hora firmada del borrado, así que nadie puede volver a
 enviar un nombre más viejo. Las copias que otros hicieron mientras era público quedan fuera del control de
 Gyblos.
+
+**Retiro por el operador.** El operador del índice puede quitar un nombre, por ejemplo uno que suplanta a
+alguien, e impedir que se vuelva a poner hasta que el operador lo permita; entonces el comando termina con
+`DISCOVERY_PROFILE_HELD`. El índice también deja de mostrar un nombre cuando ya no conoce tu vendedor.
 
 ## Solana devnet [#solana]
 

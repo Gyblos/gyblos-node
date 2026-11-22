@@ -283,10 +283,13 @@ gyblos seller name --clear
 For a Docker seller, run them from `~/gyblos-seller` with `docker compose exec seller` in front, for example
 `docker compose exec seller gyblos seller name "My Seller"`.
 
-A name has 1 to 32 characters: letters and numbers in any language, spaces and `-` `_` `.` `'`, with at least
-one letter or number. Emoji, symbols such as check marks, invisible characters and any name that contains
-`gyblos` are refused (`NAME_INVALID` or `NAME_RESERVED`). The name is public: see
-[Data and privacy](/en/reference/data-and-privacy#seller-name). Every option is in the
+A name has 1 to 32 characters: letters and numbers, spaces and `-` `_` `.` `'`, with at least one letter or
+number. Accents and other marks are allowed after a letter, so names in Hindi, Thai, Arabic, Hebrew, Yoruba
+and many other languages work, but all letters must come from one writing system. Emoji, symbols such as
+check marks, invisible characters and any name that contains `gyblos`, `verified`, `verificado`, `official`
+or `oficial` are refused (`NAME_INVALID` or `NAME_RESERVED`, with a sentence saying which part failed). The
+index may take up to 10 seconds to show a new name. The name is public, so don't put your legal name, email
+or location in it: see [Data and privacy](/en/reference/data-and-privacy#seller-name). Every option is in the
 [CLI reference](/en/reference/cli#seller-name).
 
 ## Privacy [#buyer-data-and-network-privacy]

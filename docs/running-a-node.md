@@ -529,24 +529,35 @@ pnpm gyblos seller name --status
 index lists beside its NodeId (`name` in `GET /v1/network`). The name is chosen
 by the seller: it is not verified and not unique, so it never proves who runs a
 seller; only [GitHub verification](#github-verification) does. Unquoted words
-are joined with one space. The command checks the name locally with the shared
-rule (`parseSellerName` in `@gyblos/protocol/profile-claim`): NFKC, trimmed,
-runs of spaces collapsed, 1 to 32 letters, numbers, spaces and `-`, `_`, `.`,
-`'`, with at least one letter or number; no emoji, symbols (such as check
-marks), controls or invisible characters, and nothing containing `gyblos` in any
-letter case. A refused name stops with `NAME_INVALID` or `NAME_RESERVED` before
-the key or the index is used.
+are joined with one space; put `--` before a name that starts with `-`
+(`pnpm gyblos seller name -- "-Lab"`). The command checks the name locally with
+the shared rule (`parseSellerName` in `@gyblos/protocol/profile-claim`, see
+[the profile claim](../packages/protocol/SPEC.md#profile-claim-v1)): 1 to 32
+letters, numbers, spaces and `-`, `_`, `.`, `'` after NFKC, with accents and
+other marks only after a letter, letters from one writing system, no emoji,
+symbols, modifier letters, small capitals or invisible characters, and no
+`gyblos`, `verified`, `verificado`, `official` or `oficial` even spelled with
+digits or separators. A refused name stops with `NAME_INVALID` or
+`NAME_RESERVED` and a sentence saying which part failed, before the key or the
+index is used. If the name holds `?` or U+FFFD, the message adds that the
+terminal probably did not send UTF-8 (on Windows, use Windows Terminal or
+PowerShell 7).
 
 It then signs the name with the node key and sends it to `discovery.url`
-([discovery-index.md](discovery-index.md#seller-names)). Setting a name needs a
-seller the index already knows, as for GitHub verification
-(`DISCOVERY_UNKNOWN_NODE` otherwise). `--clear` signs an empty name, so the
-index stops showing one. `--status` prints the name the index holds and when it
-was set, or that there is none. Index refusals end with the static code in
-brackets, such as `DISCOVERY_STALE_CLAIM` (check this computer's clock) or
-`DISCOVERY_RATE_LIMITED`. Nothing is stored locally. The command prints public
-identifiers only (NodeId, the name and the index origin), never a key or the
-home location. With Docker, run it as
+([discovery-index.md](discovery-index.md#seller-names)) and says the index may
+take up to 10 seconds to show it. Setting a name needs a seller the index
+already knows, as for GitHub verification (`DISCOVERY_UNKNOWN_NODE` otherwise).
+`--clear` signs an empty name, so the index stops showing one. `--status` prints
+the name the index holds and when it was set, or that there is none. Index
+refusals end with the static code in brackets. `DISCOVERY_STALE_CLAIM` means
+this computer's clock may be behind or a newer name was already sent;
+`DISCOVERY_CLAIM_REJECTED` mentions the clock only when it is more than 5
+seconds ahead of the index. When the index's answer has a `Date` header, clock
+messages add the gap in seconds. `DISCOVERY_PROFILE_HELD` means an index
+operator removed the name; `DISCOVERY_HTTP_STATUS` on an index without the route
+says it does not take seller names yet. Nothing is stored locally. The command
+prints public identifiers only (NodeId, the name and the index origin), never a
+key or the home location. With Docker, run it as
 `docker compose exec seller gyblos seller name "<name>"`.
 
 ### Docker
