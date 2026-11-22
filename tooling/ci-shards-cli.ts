@@ -1,6 +1,8 @@
 // Run one Linux CI shard using the same test globs and Node options as the full suite.
-import { spawnSync } from 'node:child_process';
 import { globSync, statSync } from 'node:fs';
+import { availableParallelism } from 'node:os';
+import { run } from 'node:test';
+import { spec } from 'node:test/reporters';
 
 import history from './ci-shard-durations.json' with { type: 'json' };
 import { assignShards } from './ci-shards';
@@ -16,20 +18,21 @@ if (
 ) {
   throw new Error('Expected shard index/count and test file patterns');
 }
-const files = globSync(patterns).filter((path) => statSync(path).isFile());
+const files = globSync(patterns, {
+  exclude: (name) => name === 'node_modules',
+}).filter((path) => statSync(path).isFile());
 if (!files.length) throw new Error('No test files matched the suite');
 const selected = assignShards(files, new Map(Object.entries(history)), count)[
   index - 1
 ];
 if (!selected) throw new Error('Invalid shard');
 if (selected.length) {
-  const result = spawnSync(
-    process.execPath,
-    ['--import', 'tsx', '--test', ...selected],
-    {
-      stdio: 'inherit',
-    },
-  );
-  if (result.error) throw result.error;
-  process.exitCode = result.status ?? 1;
+  const results = run({
+    files: selected,
+    concurrency: Math.max(1, availableParallelism() - 1),
+  });
+  results.on('test:summary', (summary) => {
+    if (!summary.success) process.exitCode = 1;
+  });
+  results.compose(spec).pipe(process.stdout);
 }

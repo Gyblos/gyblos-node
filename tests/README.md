@@ -23,6 +23,17 @@ node --import tsx --test --test-name-pattern "PATTERN" tests/iroh-transport.test
 Report passed, failed, cancelled and skipped counts for product, lab and tooling
 tests separately.
 
+## Linux CI shards
+
+Linux CI distributes the product and lab suites by historical duration. The
+workflow discovers files from the suite globs on each run. Within each suite, it
+assigns heavier files first to the shard with the lowest estimated load. After
+scheduling the measured files, new paths use the middle observed weight for
+their suite. Deleted paths drop out automatically. The weights in
+`tooling/ci-shard-durations.json` are median per-file process times in
+nanoseconds from comparable green Linux runs. Refresh them from file lifetimes
+including startup, since individual test cases can overlap.
+
 ## Layout
 
 Node finds test files by glob; there is no allowlist. Every case is a top-level
@@ -168,12 +179,3 @@ support, malformed provider output, interrupted terminals and disconnect
 cancellation without retry. Financial factories fail if called, and a fetch
 allowlist rejects any other I/O. It doesn't prove live agents, provider behavior
 or tokenizer billing.
-
-Linux CI distributes the product and lab suites by historical duration. The
-workflow discovers files from the suite globs on each run. Within each suite, it
-assigns heavier files first to the shard with the lowest estimated load. After
-scheduling the measured files, new paths use the middle observed weight for
-their suite. Deleted paths drop out automatically. The weights in
-`tooling/ci-shard-durations.json` are median per-file process times in
-nanoseconds from comparable green Linux runs. Refresh them from file lifetimes
-including startup, since individual test cases can overlap.
