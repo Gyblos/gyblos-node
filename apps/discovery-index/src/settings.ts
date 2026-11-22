@@ -8,6 +8,7 @@ import {
   type DiscoveryLimiters,
   type ResolvedLimiters,
 } from './limits';
+import type { SellerProfileStore } from './profile-store';
 import type { DiscoveryPublishers } from './publishers';
 import type { RegistrationStore } from './registration-store';
 import type { RegistryReader } from './registrations';
@@ -30,6 +31,7 @@ export interface DiscoveryIndexOptions {
   // /v1/identity/github answers 503; a missing store also makes its GET 503 and /v1/network list no claims.
   claims?: GithubClaimStore;
   gistFetch?: GistFetch;
+  profiles?: SellerProfileStore;
   // Response cache for GET /v1/sellers (the Worker passes caches.default). Missing means none.
   cache?: ResponseCache;
   now?: () => number;
@@ -63,6 +65,7 @@ export interface IndexSettings {
   registry: RegistryReader | undefined;
   claims: GithubClaimStore | undefined;
   gistFetch: GistFetch | undefined;
+  profiles: SellerProfileStore | undefined;
   cache: ResponseCache | undefined;
   records: RecordCounter;
   resolve: (url: string) => ResolvedLimiters | null;
@@ -85,6 +88,7 @@ export function settingsOf(options: DiscoveryIndexOptions): IndexSettings {
     registry: options.registry,
     claims: options.claims,
     gistFetch: options.gistFetch,
+    profiles: options.profiles,
     cache: options.cache,
     records: recordCounter(),
     resolve: limiterResolver(options.limiters ?? {}, development, now),

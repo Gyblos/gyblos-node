@@ -18,6 +18,8 @@
     "./github-claims": "./src/github-claims.ts",
     "./github-gist": "./src/github-gist.ts",
     "./network": "./src/network.ts",
+    "./profile-store": "./src/profile-store.ts",
+    "./profile-store-d1": "./src/profile-store-d1.ts",
     "./publishers": "./src/publishers.ts",
     "./registration-store": "./src/registration-store.ts",
     "./registration-store-d1": "./src/registration-store-d1.ts",

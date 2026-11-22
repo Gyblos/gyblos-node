@@ -15,6 +15,7 @@ import {
 } from './constants';
 import { indexFail } from './errors';
 import type { GithubClaimStore } from './github-claim-store';
+import type { SellerProfileStore } from './profile-store';
 import type { RegistrationStore } from './registration-store';
 import type { CatalogStatusRow, DiscoveryStorage } from './storage';
 import { reportedHour, type Sighting } from './uptime';
@@ -26,6 +27,12 @@ interface NetworkNode {
   lastSeenAt: number | null;
   models: string[];
   github: { account: string; gist: string } | null;
+  name: string | null;
+}
+
+export interface NetworkIdentity {
+  claims?: GithubClaimStore;
+  profiles?: SellerProfileStore;
 }
 
 const RANK: Record<NetworkState, number> = {
@@ -44,6 +51,7 @@ function nodeOf(
   sighting: Sighting | undefined,
   catalog: CatalogStatusRow | undefined,
   github: { account: string; gist: string } | undefined,
+  name: string | undefined,
 ): NetworkNode {
   const state = catalog?.online
     ? NETWORK_STATES.ONLINE
@@ -57,6 +65,7 @@ function nodeOf(
     lastSeenAt: sighting?.lastAt ?? null,
     models: catalog?.online ? catalog.models : [],
     github: github ? { account: github.account, gist: github.gist } : null,
+    name: name ?? null,
   };
 }
 
@@ -80,18 +89,29 @@ async function verifiedClaims(claims: GithubClaimStore | undefined) {
   }
 }
 
+async function sellerNames(profiles: SellerProfileStore | undefined) {
+  if (!profiles) return { rows: [], read: true };
+  try {
+    return { rows: await profiles.named(NETWORK.maxNodes), read: true };
+  } catch {
+    return { rows: [], read: false };
+  }
+}
+
 async function knownNodes(
   storage: DiscoveryStorage,
   registrations: RegistrationStore | undefined,
-  claims: GithubClaimStore | undefined,
+  { claims, profiles }: NetworkIdentity,
   now: number,
 ) {
-  const [registered, sightings, catalogs, github] = await Promise.all([
+  const [registered, sightings, catalogs, github, names] = await Promise.all([
     registrations?.registered(NETWORK.maxNodes) ?? { active: [], revoked: [] },
     storage.sightings(reportedHour(now), NETWORK.maxNodes),
     storage.catalogStatus(now, NETWORK.maxNodes, NETWORK.maxModelRows),
     verifiedClaims(claims),
+    sellerNames(profiles),
   ]);
+  const named = new Map(names.rows.map((row) => [row.nodeId, row.name]));
   const claimed = new Map(github.rows.map((row) => [row.nodeId, row]));
   const revoked = new Set(registered.revoked);
   const seen = new Map(sightings.map((row) => [row.nodeId, row]));
@@ -103,7 +123,13 @@ async function knownNodes(
   ]);
   const nodes = [...members]
     .map((nodeId) =>
-      nodeOf(nodeId, seen.get(nodeId), stored.get(nodeId), claimed.get(nodeId)),
+      nodeOf(
+        nodeId,
+        seen.get(nodeId),
+        stored.get(nodeId),
+        claimed.get(nodeId),
+        named.get(nodeId),
+      ),
     )
     .filter(
       (node) =>
@@ -115,6 +141,8 @@ async function knownNodes(
     catalogs.complete &&
     github.read &&
     github.rows.length < NETWORK.maxNodes &&
+    names.read &&
+    names.rows.length < NETWORK.maxNodes &&
     sightings.length < NETWORK.maxNodes &&
     registered.active.length < NETWORK.maxNodes &&
     registered.revoked.length < NETWORK.maxNodes;
@@ -128,14 +156,14 @@ const byteLength = (text: string) => new TextEncoder().encode(text).length;
 export async function networkPage(
   storage: DiscoveryStorage,
   registrations: RegistrationStore | undefined,
-  claims: GithubClaimStore | undefined,
+  identity: NetworkIdentity = {},
   now: number,
   maxBytes: number,
 ) {
   const { nodes, complete } = await knownNodes(
     storage,
     registrations,
-    claims,
+    identity,
     now,
   );
   const counts = { total: nodes.length, online: 0, offline: 0, unpublished: 0 };

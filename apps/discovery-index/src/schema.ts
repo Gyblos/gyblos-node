@@ -253,3 +253,22 @@ export const githubClaims = sqliteTable(
     ),
   ],
 );
+export const sellerProfiles = sqliteTable(
+  'discovery_seller_profiles',
+  {
+    nodeId: text('node_id').primaryKey(),
+    name: text('name'),
+    issuedAt: integer('issued_at').notNull(),
+    signature: text('signature'),
+  },
+  (table) => [
+    literalCheck(
+      'discovery_seller_profiles_node_id',
+      eq(textLength(table.nodeId), nodeIdCharacters),
+    ),
+    literalCheck(
+      'discovery_seller_profiles_tombstone',
+      sql`(${isNull(table.name)}) = (${isNull(table.signature)})`,
+    ),
+  ],
+);
