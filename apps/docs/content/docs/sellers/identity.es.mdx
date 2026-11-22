@@ -121,8 +121,8 @@ no aparezca en la lista, pero no cuentes con eso: registra el vendedor o mantenl
 partes: un gist de tu cuenta de GitHub con un archivo llamado `gyblos-proof.txt` que contiene la línea
 `gyblos-node=NODEID`, y una declaración firmada con la llave de tu nodo que nombra la cuenta y el gist. El
 índice de descubrimiento revisa la firma cuando recibe la declaración, y revisa el gist por su cuenta, sin
-ningún token de GitHub. Cualquiera puede revisar el gist, pero el índice no guarda ni publica la declaración
-firmada, así que la vista pública muestra el resultado del índice, no una firma que otros puedan comprobar.
+ningún token de GitHub. También sirve tu declaración firmada en `GET /v1/identity/github/<NodeId>`, para que
+cualquiera pueda revisar el gist y comprobar que tu nodo firmó la declaración, sin confiar en el índice.
 
 Una cuenta verificada es una etiqueta pública. No demuestra la calidad de tus respuestas ni el código que
 ejecuta tu vendedor. El nombre de tu cuenta de GitHub y el gist pasan a ser públicos: mira qué se comparte en

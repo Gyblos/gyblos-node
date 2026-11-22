@@ -119,8 +119,8 @@ but don't count on that: register the seller or keep it publishing. The link has
 gist owned by your GitHub account with a file named `gyblos-proof.txt` that contains the line
 `gyblos-node=NODEID`, and a claim signed by your node key that names the account and the gist. The
 discovery index checks the signature when it receives the claim, and checks the gist itself, with no GitHub
-token. Anyone can check the gist, but the index doesn't keep or publish the signed claim, so the public
-view shows the index's result, not a signature others can check.
+token. It also serves your signed claim at `GET /v1/identity/github/<NodeId>`, so anyone can check the gist
+and that your node signed the claim, without trusting the index.
 
 A verified account is a public label. It doesn't prove the quality of your answers or the code your seller
 runs. Your GitHub account name and gist become public: see what is shared in

@@ -8,6 +8,13 @@
       "when": 1795358869951,
       "tag": "0007_github_claims",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1795379697701,
+      "tag": "0008_claim_signature",
+      "breakpoints": true
     }
   ]
 }

@@ -495,16 +495,29 @@ else is `400 INVALID_QUERY`) answers:
   "state": "verified",
   "reason": null,
   "checkedAt": 1763078400000,
-  "verifiedAt": 1763078400000
+  "verifiedAt": 1763078400000,
+  "issuedAt": 1763078399000,
+  "signature": "…"
 }
 ```
 
 `checkedAt` is the last check attempt, including one where GitHub did not
 answer; `verifiedAt` is when the latest verified run began; it is kept after the
-claim turns `lost` and is `null` if the claim was never verified. The answer
-carries no signed claim or signature (they are not stored). A NodeId without a
-claim, or whose claim was cancelled, is `404 NOT_FOUND`. `/v1/network` carries
-the account and gist of every verified claim ([Network](#network)).
+claim turns `lost` and is `null` if the claim was never verified.
+
+`issuedAt` and `signature` are the stored claim's time and the node's hex
+Ed25519 signature over it, so anyone can rebuild the `IdentityClaimV1`
+(`schemaVersion` 1, `kind` `github`, with `nodeId`, `account`, `gist` and
+`issuedAt` from this answer) and check it, wrapped as `{ claim, signature }`,
+with `verifyIdentityClaim` instead of trusting the index. The index serves a
+signature only after checking it against the served claim; `signature` is `null`
+otherwise: a claim stored before migration `0008_claim_signature`, or one a
+Worker from before that migration rewrote after a rollback. The seller's next
+claim fills it, and a cancel written by such a Worker still reads as cancelled.
+
+A NodeId without a claim, or whose claim was cancelled, is `404 NOT_FOUND`.
+`/v1/network` carries the account and gist of every verified claim
+([Network](#network)).
 
 ### Recheck
 

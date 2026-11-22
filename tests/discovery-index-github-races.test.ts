@@ -17,6 +17,7 @@ import {
   claimHarness,
   claimStoreOf,
   GIST,
+  SIGNATURE,
 } from './support/github-claim-fixture';
 
 const NODE = '01'.repeat(32);
@@ -25,6 +26,7 @@ const row: GithubClaimRow = {
   account: ACCOUNT,
   gist: GIST,
   issuedAt: T0,
+  signature: SIGNATURE,
   state: 'pending',
   reason: null,
   checkedAt: null,

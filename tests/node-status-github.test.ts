@@ -35,6 +35,8 @@ void test('seller status --online shows the GitHub claim the index holds', () =>
       reason: null,
       checkedAt: 1,
       verifiedAt: 1,
+      issuedAt: 1,
+      signature: 'ab'.repeat(64),
     };
     const verified = await status(home, answer(view), ['--online']);
     assert.match(

@@ -55,6 +55,8 @@ export const view = (
   reason: null,
   checkedAt: NOW,
   verifiedAt: NOW,
+  issuedAt: NOW,
+  signature: 'ab'.repeat(64),
   ...patch,
 });
 

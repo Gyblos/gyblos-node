@@ -1,0 +1,1 @@
+ALTER TABLE `discovery_github_claims` ADD `signature` text;

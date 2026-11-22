@@ -2,6 +2,7 @@
 // claim back (GET /identity/github/<nodeId>). Signing belongs to the caller; this client only checks the
 // answers' shape. What the index reports is its own check of the gist, not proof on its own.
 import { HTTP_STATUS as CONFIG_HTTP_STATUS } from '@gyblos/config';
+import { CONTROL_LIMITS } from '@gyblos/protocol/constants';
 import {
   IDENTITY_CLAIM,
   type SignedIdentityClaim,
@@ -61,6 +62,8 @@ export interface GithubClaimView {
   reason: GithubClaimReason | null;
   checkedAt: number | null;
   verifiedAt: number | null;
+  issuedAt: number | null;
+  signature: string | null;
 }
 
 // 409 is a stale claim here, not a stale record.
@@ -170,7 +173,7 @@ export async function submitGithubClaim(
   return withDeadline(request, readAnswer);
 }
 
-const VIEW_KEYS = [
+const OLDER_VIEW_KEYS = [
   'nodeId',
   'account',
   'gist',
@@ -179,10 +182,20 @@ const VIEW_KEYS = [
   'checkedAt',
   'verifiedAt',
 ] as const;
+const VIEW_KEYS = [...OLDER_VIEW_KEYS, 'issuedAt', 'signature'] as const;
+const SIGNATURE_HEX = new RegExp(
+  `^[0-9a-f]{${CONTROL_LIMITS.signatureBytes * 2}}$`,
+);
+const signatureOf = (value: unknown): value is string | null =>
+  value === null || (typeof value === 'string' && SIGNATURE_HEX.test(value));
 
 function checkView(body: unknown, nodeId: string): GithubClaimView {
-  if (!isPlainObject(body, VIEW_KEYS)) return malformed();
+  if (!isPlainObject(body, OLDER_VIEW_KEYS) && !isPlainObject(body, VIEW_KEYS))
+    return malformed();
+  const older = !('issuedAt' in body);
   const { account, gist, checkedAt, verifiedAt } = body;
+  const issuedAt = older ? null : body.issuedAt;
+  const signature = older ? null : body.signature;
   const state = stateOf(body.state);
   const reason = body.reason === null ? null : reasonOf(body.reason);
   if (
@@ -192,10 +205,23 @@ function checkView(body: unknown, nodeId: string): GithubClaimView {
     !state ||
     reason === undefined ||
     !time(checkedAt) ||
-    !time(verifiedAt)
+    !time(verifiedAt) ||
+    (!older && issuedAt === null) ||
+    !time(issuedAt) ||
+    !signatureOf(signature)
   )
     return malformed();
-  return { nodeId, account, gist, state, reason, checkedAt, verifiedAt };
+  return {
+    nodeId,
+    account,
+    gist,
+    state,
+    reason,
+    checkedAt,
+    verifiedAt,
+    issuedAt,
+    signature,
+  };
 }
 
 // The NodeId's claim, or null when the index has none (or a cancelled one).
