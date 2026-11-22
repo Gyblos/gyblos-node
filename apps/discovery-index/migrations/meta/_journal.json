@@ -15,6 +15,13 @@
       "when": 1795379697701,
       "tag": "0008_claim_signature",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1795388794433,
+      "tag": "0009_seller_profiles",
+      "breakpoints": true
     }
   ]
 }

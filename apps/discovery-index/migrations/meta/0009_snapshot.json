@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "890f010c-1108-4884-9178-83fb44ac4545",
+  "id": "b78d8172-9477-4865-b1f8-a973dd7df707",
   "prevId": "7d79d715-03ef-4668-a9ac-7257dcdf3c2e",
   "tables": {
     "discovery_catalogs": {
@@ -555,6 +555,14 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "held": {
+          "name": "held",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         }
       },
       "indexes": {},
@@ -569,6 +577,14 @@
         "discovery_seller_profiles_tombstone": {
           "name": "discovery_seller_profiles_tombstone",
           "value": "(\"discovery_seller_profiles\".\"name\" is null) = (\"discovery_seller_profiles\".\"signature\" is null)"
+        },
+        "discovery_seller_profiles_held": {
+          "name": "discovery_seller_profiles_held",
+          "value": "\"discovery_seller_profiles\".\"held\" in (0, 1)"
+        },
+        "discovery_seller_profiles_held_empty": {
+          "name": "discovery_seller_profiles_held_empty",
+          "value": "(\"discovery_seller_profiles\".\"held\" = 0 or \"discovery_seller_profiles\".\"name\" is null)"
         }
       }
     },

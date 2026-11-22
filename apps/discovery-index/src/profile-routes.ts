@@ -72,7 +72,15 @@ export function profileRoutes(app: Hono<IndexEnv>, settings: IndexSettings) {
       const { origin } = new URL(context.req.url);
       return {
         key: `${origin}${INDEX_ROUTES.PROFILE}/${nodeId}`,
-        body: () => sellerProfilePage(profiles, nodeId),
+        body: () =>
+          sellerProfilePage(
+            {
+              profiles,
+              storage: context.get('storage'),
+              registrations: settings.registrations,
+            },
+            nodeId,
+          ),
       };
     }),
   );

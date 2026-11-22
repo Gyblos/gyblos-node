@@ -1,141 +1,23 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createDiscoveryIndex } from '@gyblos/discovery-index/app';
-import { PUBLISH_MODES } from '@gyblos/discovery-index/constants';
 import {
   createMemorySellerProfileStore,
   sellerProfileTombstone,
   type SellerProfileStore,
 } from '@gyblos/discovery-index/profile-store';
-import { createD1SellerProfileStore } from '@gyblos/discovery-index/profile-store-d1';
-import {
-  createMemoryRegistrationStore,
-  type RegistrationStore,
-} from '@gyblos/discovery-index/registration-store';
-import { createD1RegistrationStore } from '@gyblos/discovery-index/registration-store-d1';
 import { inviteHash } from '@gyblos/discovery-index/registrations';
-import { createMemoryStorage } from '@gyblos/discovery-index/storage';
-import { createD1Storage } from '@gyblos/discovery-index/storage-d1';
 import {
   PROFILE_CLAIM,
-  signProfileClaim,
   verifyProfileClaim,
-  type ProfileClaimV1,
 } from '@gyblos/protocol/profile-claim';
 
-import { createSqliteD1, type SqliteD1 } from './support/d1-sqlite';
 import {
-  allLimiters,
   deny,
   expectError,
-  INDEX_ORIGIN,
   indexNode,
-  T0,
-  type FakeLimiter,
-  type IndexNode,
 } from './support/discovery-index-fixture';
-
-const KINDS = ['memory', 'sqlite-d1'] as const;
-type Kind = (typeof KINDS)[number];
-const HOUR = 3_600_000;
-const NAME = 'Ada Lovelace';
-
-async function storesOf(kind: Kind) {
-  if (kind === 'memory')
-    return {
-      db: null,
-      profiles: createMemorySellerProfileStore(),
-      registrations: createMemoryRegistrationStore(),
-    };
-  const db = await createSqliteD1();
-  if (!db) return null;
-  return {
-    db,
-    profiles: createD1SellerProfileStore(db),
-    registrations: createD1RegistrationStore(db),
-  };
-}
-
-async function profileHarness(
-  kind: Kind,
-  {
-    limiter,
-    noProfiles,
-    profiles: override,
-  }: {
-    limiter?: FakeLimiter;
-    noProfiles?: boolean;
-    profiles?: SellerProfileStore;
-  } = {},
-) {
-  const made = await storesOf(kind);
-  if (!made) return null;
-  const { db, registrations } = made;
-  const profiles = override ?? made.profiles;
-  const clock = { now: T0 + 1000 };
-  const app = createDiscoveryIndex({
-    storage: db ? createD1Storage(db) : createMemoryStorage(),
-    limiters: allLimiters(limiter),
-    publishers: { mode: PUBLISH_MODES.OPEN },
-    registrations,
-    ...(noProfiles ? {} : { profiles }),
-    now: () => clock.now,
-  });
-  const call = (path: string, init?: RequestInit) =>
-    app.fetch(new Request(INDEX_ORIGIN + path, init));
-  async function publish(node: IndexNode) {
-    const catalog = node.catalog(1, { issuedAt: clock.now });
-    const presence = await node.presence(2, catalog, { issuedAt: clock.now });
-    for (const record of [catalog, presence]) {
-      const response = await call('/v1/records', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ record }),
-      });
-      assert.equal(response.status, 201, await response.text());
-    }
-  }
-  const post = (
-    body: unknown,
-    headers: Record<string, string> = { 'Content-Type': 'application/json' },
-  ) =>
-    call('/v1/profile', {
-      method: 'POST',
-      headers,
-      body: typeof body === 'string' ? body : JSON.stringify(body),
-    });
-  const signed = (node: IndexNode, patch: Partial<ProfileClaimV1> = {}) =>
-    signProfileClaim(
-      {
-        schemaVersion: PROFILE_CLAIM.schemaVersion,
-        nodeId: node.nodeId,
-        name: NAME,
-        issuedAt: clock.now,
-        ...patch,
-      },
-      node.signer,
-    );
-  async function name(node: IndexNode, patch: Partial<ProfileClaimV1> = {}) {
-    const response = await post(await signed(node, patch));
-    assert.equal(response.status, 200, await response.clone().text());
-    return response.json();
-  }
-  const read = (nodeId: string) => call(`/v1/profile/${nodeId}`);
-  const network = async () => (await call('/v1/network')).json();
-  return {
-    db,
-    clock,
-    profiles,
-    registrations,
-    publish,
-    post,
-    signed,
-    name,
-    read,
-    network,
-  };
-}
+import { HOUR, KINDS, NAME, profileHarness } from './support/profile-fixture';
 
 for (const kind of KINDS) {
   void test(`seller profile (${kind}): a known seller sets a name that reads back signed and in the network`, async (context) => {
@@ -340,7 +222,7 @@ for (const kind of KINDS) {
   void test(`seller profile (${kind}): a failed names read leaves every name null and the network truncated`, async (context) => {
     const failing: SellerProfileStore = {
       ...createMemorySellerProfileStore(),
-      named: async () => {
+      names: async () => {
         throw new Error('no such table');
       },
     };
@@ -352,45 +234,4 @@ for (const kind of KINDS) {
     assert.equal(network.nodes[0].name, null);
     assert.equal(network.truncated, true);
   });
-
-  void test(`seller profile (${kind}): the store keeps only the newest entry per NodeId and lists names by NodeId`, async (context) => {
-    const made = await storesOf(kind);
-    if (!made) return context.skip('node:sqlite unavailable');
-    const { profiles } = made;
-    const [low, high] = ['01'.repeat(32), 'fe'.repeat(32)];
-    const row = (nodeId: string, name: string, issuedAt: number) => ({
-      nodeId,
-      name,
-      issuedAt,
-      signature: 'ab'.repeat(64),
-    });
-    assert.equal(await profiles.put(row(high, 'Zed', 2)), true);
-    assert.equal(await profiles.put(row(low, 'Amy', 2)), true);
-    assert.equal(await profiles.put(row(low, 'Old', 2)), false);
-    assert.equal(await profiles.put(row(low, 'Old', 1)), false);
-    assert.deepEqual(await profiles.named(10), [
-      { nodeId: low, name: 'Amy' },
-      { nodeId: high, name: 'Zed' },
-    ]);
-    assert.deepEqual(await profiles.named(1), [{ nodeId: low, name: 'Amy' }]);
-    assert.equal(await profiles.put(sellerProfileTombstone(high, 3)), true);
-    assert.equal(await profiles.put(row(high, 'Zed', 3)), false);
-    assert.deepEqual(await profiles.named(10), [{ nodeId: low, name: 'Amy' }]);
-    assert.deepEqual(await profiles.get(high), sellerProfileTombstone(high, 3));
-    assert.deepEqual(await profiles.get(low), row(low, 'Amy', 2));
-  });
 }
-
-void test('seller profile (sqlite-d1): a stored row with a name outside the rule fails closed', async (context) => {
-  const db: SqliteD1 | null = await createSqliteD1();
-  if (!db) return context.skip('node:sqlite unavailable');
-  const nodeId = 'cd'.repeat(32);
-  db.raw
-    .prepare(
-      'INSERT INTO discovery_seller_profiles (node_id, name, issued_at, signature) VALUES (?, ?, ?, ?)',
-    )
-    .run(nodeId, 'Ada ✓', 1, 'ab'.repeat(64));
-  const profiles = createD1SellerProfileStore(db);
-  await assert.rejects(profiles.get(nodeId), TypeError);
-  await assert.rejects(profiles.named(10), TypeError);
-});

@@ -260,6 +260,7 @@ export const sellerProfiles = sqliteTable(
     name: text('name'),
     issuedAt: integer('issued_at').notNull(),
     signature: text('signature'),
+    held: integer('held').notNull().default(0),
   },
   (table) => [
     literalCheck(
@@ -269,6 +270,11 @@ export const sellerProfiles = sqliteTable(
     literalCheck(
       'discovery_seller_profiles_tombstone',
       sql`(${isNull(table.name)}) = (${isNull(table.signature)})`,
+    ),
+    literalCheck('discovery_seller_profiles_held', inArray(table.held, [0, 1])),
+    literalCheck(
+      'discovery_seller_profiles_held_empty',
+      sql`${or(eq(table.held, 0), isNull(table.name))}`,
     ),
   ],
 );

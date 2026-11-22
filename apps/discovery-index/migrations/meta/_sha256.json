@@ -6,5 +6,6 @@
   "0005_node_publish_quota.sql": "e3ff68db8e899c4df12eebb6dd18ae092f431a61f4b671280905edc6f3b2a7a1",
   "0006_presence_version.sql": "d516c6042b102d2e1a2401876fea113076f113e3a0a88d42223259236dbf44c1",
   "0007_github_claims.sql": "bbc78cb453a2520aa44a8f6e80b276ee440bb54637640d059b7734df2b126e05",
-  "0008_claim_signature.sql": "c69221ffdbf755dd1a5bb6cdda97ce3626df42a67149e0ca6b5564512afd90e9"
+  "0008_claim_signature.sql": "c69221ffdbf755dd1a5bb6cdda97ce3626df42a67149e0ca6b5564512afd90e9",
+  "0009_seller_profiles.sql": "8773b103e8f1d9341bb30cfd5ea736093fbd71c018a5e246ab9ca37df6d82eba"
 }

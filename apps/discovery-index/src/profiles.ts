@@ -43,6 +43,10 @@ export async function submitSellerProfile(
   const { profiles, now } = context;
   const { claim, signature } = await verifiedProfile(bytes, now);
   const stored = await profiles.get(claim.nodeId);
+  if (stored?.held) {
+    if (claim.name === null) return { name: null };
+    indexFail(INDEX_ERRORS.PROFILE_HELD);
+  }
   if (stored && stored.issuedAt >= claim.issuedAt)
     indexFail(INDEX_ERRORS.STALE_CLAIM);
   if (claim.name === null) {
@@ -62,6 +66,7 @@ export async function submitSellerProfile(
     name: claim.name,
     issuedAt: claim.issuedAt,
     signature,
+    held: false,
   });
   if (!written) indexFail(INDEX_ERRORS.STALE_CLAIM);
   return { name: claim.name };
@@ -78,11 +83,11 @@ export function parseProfilePath(url: string, nodeId: string | undefined) {
 }
 
 export async function sellerProfilePage(
-  profiles: SellerProfileStore,
+  context: Omit<SellerProfileContext, 'now'>,
   nodeId: string,
 ): Promise<string | null> {
-  const row = await profiles.get(nodeId);
-  if (!row || row.name === null) return null;
+  const row = await context.profiles.get(nodeId);
+  if (!row || row.name === null || !(await known(context, nodeId))) return null;
   const { name, issuedAt, signature } = row;
   return JSON.stringify({ nodeId, name, issuedAt, signature });
 }

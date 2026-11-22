@@ -10,6 +10,7 @@
   "exports": {
     "./admin": "./scripts/admin.ts",
     "./github-claims-admin": "./scripts/github-claims.ts",
+    "./seller-profiles-admin": "./scripts/seller-profiles.ts",
     "./wrangler-d1": "./scripts/wrangler-d1.ts",
     "./app": "./src/app.ts",
     "./constants": "./src/constants.ts",
