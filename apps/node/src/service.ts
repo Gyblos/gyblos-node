@@ -241,8 +241,10 @@ export function serviceLocation(
       path,
       disable: [['launchctl', 'bootout', `gui/${uid}`, path]],
       reload: [],
+      // bootout stops the agent gracefully (SIGTERM, as uninstall does); kickstart -k would kill it.
       restart: [
-        ['launchctl', 'kickstart', '-k', `gui/${uid}/${SERVICE.label}`],
+        ['launchctl', 'bootout', `gui/${uid}`, path],
+        ['launchctl', 'bootstrap', `gui/${uid}`, path],
       ],
     };
   }

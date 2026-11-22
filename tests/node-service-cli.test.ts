@@ -33,6 +33,7 @@ import {
 } from '@gyblos/node-app/service';
 import { parseEnvironmentFile } from '@gyblos/node-app/service-environment';
 import { waitForTaskStop } from '@gyblos/node-app/service-restart';
+import { taskScriptHome } from '@gyblos/node-app/service-windows';
 
 import {
   freeToml,
@@ -388,10 +389,14 @@ void test('restart keeps the installed unit and its limits; without a service it
     assert.equal(await readFile(path, 'utf8'), before);
   }));
 
-void test('each platform restarts its service in place: launchd kickstart, Windows graceful stop then run', () => {
+void test('each platform restarts its service in place: launchd bootout then bootstrap, Windows graceful stop then run', () => {
+  const plist = '/Users/synthetic/Library/LaunchAgents/com.gyblos.seller.plist';
   assert.deepEqual(
     serviceLocation(SERVICE_KINDS.LAUNCHD, '/Users/synthetic', 501).restart,
-    [['launchctl', 'kickstart', '-k', 'gui/501/com.gyblos.seller']],
+    [
+      ['launchctl', 'bootout', 'gui/501', plist],
+      ['launchctl', 'bootstrap', 'gui/501', plist],
+    ],
   );
   const task = serviceLocation(
     SERVICE_KINDS.SCHEDULED_TASK,
@@ -428,7 +433,7 @@ void test('Windows waits for the stopped task to end before running it again, wi
   );
 });
 
-void test('macOS restart bootstraps the agent again when kickstart finds it unloaded', () =>
+void test('macOS restart stops the agent gracefully with bootout, then bootstraps it, even when it was not loaded', () =>
   scenario({ free: true }, async (run) => {
     await readySeller(run);
     const { system, commands } = fakeSystem(run, 'darwin');
@@ -442,12 +447,27 @@ void test('macOS restart bootstraps the agent again when kickstart finds it unlo
     await writeFile(plist, '<plist/>');
     system.run = async (argv) => {
       commands.push([...argv]);
-      return argv[1] === 'kickstart' ? 1 : 0;
+      return argv[1] === 'bootout' ? 1 : 0;
     };
     const restarted = await service(run, ['restart'], system);
     assert.equal(restarted.code, 0, restarted.output);
     assert.deepEqual(commands, [
-      ['launchctl', 'kickstart', '-k', `gui/${system.uid}/com.gyblos.seller`],
+      ['launchctl', 'bootout', `gui/${system.uid}`, plist],
       ['launchctl', 'bootstrap', `gui/${system.uid}`, plist],
     ]);
+    assert.equal(
+      commands.some((command) => command.includes('kickstart')),
+      false,
+    );
   }));
+
+void test('Windows reads the seller home the installed task runs, not the invoking shell', () => {
+  const script = [
+    '@echo off',
+    'rem Gyblos seller service, started by the scheduled task Gyblos\\Seller-abc.',
+    '"C:\\Program Files\\Gyblos\\gyblos.exe" service-run --home "D:\\Seller" --config "D:\\Seller\\config.toml"',
+    '',
+  ].join('\r\n');
+  assert.equal(taskScriptHome(script), 'D:\\Seller');
+  assert.equal(taskScriptHome('@echo off\r\n'), undefined);
+});

@@ -42,7 +42,7 @@ import {
 import { readEnvironmentFile } from './service-environment';
 import { waitForTaskStop, windowsTaskRunning } from './service-restart';
 import { servicePipe, stopWindowsService } from './service-run';
-import { taskName } from './service-windows';
+import { installedTaskHome, taskName } from './service-windows';
 
 const HINTS: Readonly<Record<ServiceErrorCode, string>> = {
   [SERVICE_ERRORS.UNSAFE_PATH]:
@@ -168,6 +168,9 @@ function account(system: ServiceSystem): { kind: ServiceKind; uid: number } {
 // The seller home the service uses, absolute from where the command runs.
 const sellerHome = (output: ServiceOutput) =>
   resolve(output.cwd, homeLayout(output.env).root);
+// The home the installed Windows task runs, else this shell's.
+const taskHome = async (system: ServiceSystem, output: ServiceOutput) =>
+  (await installedTaskHome(system.accountHome)) ?? sellerHome(output);
 
 async function serviceInput(
   system: ServiceSystem,
@@ -304,7 +307,7 @@ async function uninstall(
   }
   // Windows: the supervisor stops the seller gracefully first; removing the task would not.
   if (kind === SERVICE_KINDS.SCHEDULED_TASK)
-    await system.stopWindowsService(sellerHome(output));
+    await system.stopWindowsService(await taskHome(system, output));
   // Stopping may fail when the service is already stopped; removal proceeds either way.
   for (const command of location.disable) await system.run(command);
   await rm(location.path);
@@ -332,7 +335,7 @@ async function restart(
     return;
   }
   if (kind === SERVICE_KINDS.SCHEDULED_TASK) {
-    await system.stopWindowsService(sellerHome(output));
+    await system.stopWindowsService(await taskHome(system, output));
     const task = taskName(system.accountHome);
     try {
       await waitForTaskStop(system, task);
@@ -341,19 +344,13 @@ async function restart(
       output.stderr(`schtasks /Run /TN "${task}"\n`);
       throw new ServiceError(SERVICE_ERRORS.RESTART_INCOMPLETE);
     }
-  }
-  // A launch agent that was booted out has nothing to kickstart: load it again from its plist.
-  if (
-    kind === SERVICE_KINDS.LAUNCHD &&
-    (await system.run(location.restart[0]!)) !== EXIT.ok
-  )
-    await runAll(
-      [['launchctl', 'bootstrap', `gui/${uid}`, location.path]],
-      system,
-      output,
-    );
-  else if (kind !== SERVICE_KINDS.LAUNCHD)
     await runAll(location.restart, system, output);
+  } else if (kind === SERVICE_KINDS.LAUNCHD) {
+    // bootout fails when the agent is not loaded; bootstrap loads it either way.
+    const [stop, ...start] = location.restart;
+    await system.run(stop!);
+    await runAll(start, system, output);
+  } else await runAll(location.restart, system, output);
   output.stdout(`Restarted: ${location.path}\n`);
 }
 
