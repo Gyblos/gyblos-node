@@ -1,5 +1,11 @@
 // Owns static naming/import/version checks; it must not start applications.
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import {
+  existsSync,
+  lstatSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+} from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -57,7 +63,19 @@ function isCommentBudgetRecord(
   );
 }
 
-const parsedCommentBudgets: unknown = JSON.parse(
+if (
+  realpathSync(COMMENT_BUDGET_PATH) !== COMMENT_BUDGET_PATH ||
+  !lstatSync(COMMENT_BUDGET_PATH).isFile()
+)
+  throw new Error('Invalid budget file.');
+function parseBudget(value: string): unknown {
+  try {
+    return JSON.parse(value);
+  } catch {
+    throw new Error('Invalid comment budget.');
+  }
+}
+const parsedCommentBudgets: unknown = parseBudget(
   readFileSync(COMMENT_BUDGET_PATH, 'utf8'),
 );
 if (!isCommentBudgetRecord(parsedCommentBudgets))

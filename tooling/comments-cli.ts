@@ -57,6 +57,7 @@ type CommentOptions = {
   blockMarkers: { start: string; end: string }[];
   hashMarker?: string;
   adjacentHash?: boolean;
+  powershell?: boolean;
   lineMarkers: string[];
 };
 type SourceCommentStats = { comments: number; lines: number };
@@ -120,7 +121,11 @@ function delimitedCommentRanges(
   while (index < text.length) {
     const character = text[index];
     if (quote.length > 0) {
-      if (character === '\\') {
+      if (
+        options.powershell
+          ? quote === '"' && character === '`'
+          : character === '\\'
+      ) {
         index += 2;
         continue;
       }
@@ -129,7 +134,7 @@ function delimitedCommentRanges(
         (quoteLength === 1 ||
           text.slice(index, index + quoteLength) === quote.repeat(quoteLength))
       ) {
-        if (quote === "'" && text[index + 1] === "'") {
+        if (quoteLength === 1 && quote === "'" && text[index + 1] === "'") {
           index += 2;
           continue;
         }
@@ -143,7 +148,7 @@ function delimitedCommentRanges(
     if (
       (character === "'" && !/[a-z0-9]/i.test(text[index - 1] ?? '')) ||
       character === '"' ||
-      character === '`'
+      (!options.powershell && character === '`')
     ) {
       quote = character;
       quoteLength =
@@ -214,6 +219,7 @@ function commentRanges(text: string, path: string): CommentRange[] {
     });
   if (extension === '.ps1')
     return delimitedCommentRanges(text, {
+      powershell: true,
       blockMarkers: [{ start: '<#', end: '#>' }],
       hashMarker: '#',
       lineMarkers: [],
@@ -265,7 +271,17 @@ function isBudgetRecord(value: unknown): value is BudgetRecord {
 }
 
 async function readBudgets(): Promise<BudgetRecord> {
-  const parsed: unknown = JSON.parse(await readFile(BUDGET_PATH, 'utf8'));
+  if (
+    (await realpath(BUDGET_PATH)) !== BUDGET_PATH ||
+    !lstatSync(BUDGET_PATH).isFile()
+  )
+    throw new Error('Invalid budget file.');
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(await readFile(BUDGET_PATH, 'utf8'));
+  } catch {
+    throw new Error('Invalid comment budget.');
+  }
   if (!isBudgetRecord(parsed))
     throw new Error('Source comment budget is invalid.');
   return parsed;
