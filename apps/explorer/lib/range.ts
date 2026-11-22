@@ -24,3 +24,11 @@ export function rangeQuery(
   const from = utcDay(end - (days - 1) * UNITS.msPerDay);
   return `?from=${from}&to=${utcDay(end)}`;
 }
+
+export function rangeHref(pathname: string, search: string, days: RangeDays) {
+  const query = new URLSearchParams(search);
+  query.delete(RANGE.param);
+  if (days !== RANGE.defaultDays) query.set(RANGE.param, String(days));
+  const next = query.toString();
+  return next ? `${pathname}?${next}` : pathname;
+}

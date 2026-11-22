@@ -1,8 +1,8 @@
 import { BadgeCheck } from 'lucide-react';
 import type { ReactNode } from 'react';
 
+import { gistUrl } from '../lib/config';
 import type { GithubAccount } from '../lib/network-status';
-import { gistUrl } from '../lib/seller-identity';
 import { Identicon } from './identicon';
 
 export function SellerCell({
@@ -20,14 +20,15 @@ export function SellerCell({
       <div className="min-w-0">
         {github ? (
           <a
-            className="flex items-center gap-1 font-sans text-ink hover:text-brand"
+            className="flex items-center gap-1 font-mono text-ink hover:text-brand"
             href={gistUrl(github)}
             title="GitHub account verified by the discovery index: open the proof gist"
           >
             <span>@{github.account}</span>
             <BadgeCheck
+              role="img"
               aria-label="Verified GitHub account"
-              className="size-3.5 shrink-0 text-brand"
+              className="size-3.5 shrink-0 text-signal"
             />
           </a>
         ) : null}

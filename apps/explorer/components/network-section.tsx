@@ -4,6 +4,7 @@
 import { Activity, BadgeCheck, Boxes, Server, Tag } from 'lucide-react';
 import Link from 'next/link';
 
+import { HOW_TO_VERIFY_URL } from '../lib/config';
 import { DISPLAY, IDENTITY, RANGE } from '../lib/constants';
 import type { DiscoverySnapshot, Seller } from '../lib/discovery';
 import { getDiscovery } from '../lib/discovery-render';
@@ -17,6 +18,7 @@ import {
 import { summarizeOffers, uptimeRatio } from '../lib/offers';
 import type { RangeDays } from '../lib/range';
 import {
+  emptySellersMessage,
   githubByNode,
   orderSellers,
   verifiedOnly,
@@ -54,7 +56,7 @@ export async function NetworkSection({
   if (snapshot.error) return <Unavailable title="Network" />;
   const summary = summarizeOffers(snapshot);
   const accounts = githubByNode(snapshot.network);
-  const ordered = orderSellers(snapshot.sellers);
+  const ordered = orderSellers(snapshot.sellers, snapshot.generatedAt);
   const shown = verified ? verifiedOnly(ordered, accounts) : ordered;
   return (
     <>
@@ -105,9 +107,13 @@ export async function NetworkSection({
         verified={verified}
         sellers={shown}
         accounts={accounts}
+        accountsKnown={!!snapshot.network && !snapshot.network.truncated}
       />
       {snapshot.network ? (
-        <NotOnlineTable network={snapshot.network} />
+        <NotOnlineTable
+          network={snapshot.network}
+          accounts={verified ? accounts : null}
+        />
       ) : (
         <p className="mt-2 text-xs text-dim">
           The index&apos;s network status could not be read: offline and not
@@ -149,11 +155,13 @@ function SellersBlock({
   verified,
   sellers,
   accounts,
+  accountsKnown,
 }: {
   days: RangeDays;
   verified: boolean;
   sellers: Seller[];
   accounts: Map<string, GithubAccount>;
+  accountsKnown: boolean;
 }) {
   return (
     <>
@@ -161,19 +169,22 @@ function SellersBlock({
         title="Sellers"
         meta={<VerifiedFilter days={days} verified={verified} />}
       />
-      <SellersTable sellers={sellers} accounts={accounts} verified={verified} />
+      <SellersTable
+        sellers={sellers}
+        accounts={accounts}
+        verified={verified}
+        accountsKnown={accountsKnown}
+      />
       <p className="mt-2 flex items-center gap-1 text-xs text-dim">
         <BadgeCheck
           aria-hidden="true"
-          className="size-3.5 shrink-0 text-brand"
+          className="size-3.5 shrink-0 text-signal"
         />
         <span>
-          The discovery index checked that this GitHub account published the
-          seller&apos;s NodeId. It says who runs the seller, not how good it is.{' '}
-          <a
-            className="text-muted hover:text-brand"
-            href={IDENTITY.howToVerifyUrl}
-          >
+          The discovery index checked that the named GitHub account published
+          the seller&apos;s NodeId. It links the seller to that account; it does
+          not identify a person and says nothing about quality.{' '}
+          <a className="text-muted hover:text-brand" href={HOW_TO_VERIFY_URL}>
             How to verify
           </a>
         </span>
@@ -223,10 +234,12 @@ function SellersTable({
   sellers,
   accounts,
   verified,
+  accountsKnown,
 }: {
   sellers: Seller[];
   accounts: Map<string, GithubAccount>;
   verified: boolean;
+  accountsKnown: boolean;
 }) {
   const head = [
     { label: 'Seller' },
@@ -238,17 +251,16 @@ function SellersTable({
     { label: 'Uptime 24 h · 7 d', right: true },
     { label: 'Online since' },
   ];
+  const empty = emptySellersMessage(sellers, verified, accountsKnown);
   return (
     <Table minWidth={DISPLAY.wideTable} head={head}>
-      {sellers.some((seller) => seller.models.length > 0) ? null : (
+      {empty ? (
         <tr>
           <td className={`${td} text-muted`} colSpan={head.length}>
-            {verified
-              ? 'No online seller has a verified GitHub account yet.'
-              : 'No offers from online sellers.'}
+            {empty}
           </td>
         </tr>
-      )}
+      ) : null}
       {sellers.flatMap((seller) =>
         seller.models.map((model) => (
           <tr
@@ -304,8 +316,16 @@ const STATE_LABELS: Record<Exclude<NetworkNode['state'], 'online'>, string> = {
 
 // Registered or recently seen sellers without a live presence now. Offline ones were seen before;
 // unpublished ones were never seen or withdrew their catalog.
-function NotOnlineTable({ network }: { network: NetworkStatus }) {
-  const nodes = notOnline(network);
+function NotOnlineTable({
+  network,
+  accounts,
+}: {
+  network: NetworkStatus;
+  accounts: Map<string, GithubAccount> | null;
+}) {
+  const nodes = notOnline(network).filter(
+    (node) => !accounts || accounts.has(node.nodeId),
+  );
   if (!nodes.length) return null;
   const { offline, unpublished } = network.counts;
   return (

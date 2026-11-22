@@ -106,12 +106,9 @@ export const LIVE = {
 } as const;
 
 export const IDENTITY = {
-  gistOrigin: 'https://gist.github.com',
-  githubOrigin: 'https://github.com',
-  howToVerifyUrl: 'https://docs.gyblos.com/en/sellers/identity#verify-github',
   verifiedParam: 'verified',
   verifiedValue: '1',
-  orderWindowDays: 7,
+  bandsPerUnit: 100,
   gridSize: 5,
   cellPx: 4,
   hashOffset: 2_166_136_261,
