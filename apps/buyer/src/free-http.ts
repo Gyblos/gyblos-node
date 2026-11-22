@@ -86,7 +86,7 @@ function declaredTooLarge(request: IncomingMessage) {
 function admit(
   request: IncomingMessage,
   response: ServerResponse,
-  settings: ChatSettings,
+  limit: number,
   active: number,
   desktopApi?: ChatApi,
 ): ChatApi | undefined {
@@ -97,7 +97,7 @@ function admit(
       ? FREE_BUYER_CODES.INVALID
       : declaredTooLarge(request)
         ? FREE_BUYER_CODES.TOO_LARGE
-        : active >= TRANSPORT_LIMITS.maxConcurrent
+        : active >= limit
           ? FREE_BUYER_CODES.BUSY
           : undefined;
   if (code === undefined) return api;
@@ -288,7 +288,11 @@ export function freeBuyerHandler(
       replyError(response, new FreeBuyerError(FREE_BUYER_CODES.INVALID));
       return;
     }
-    const api = admit(request, response, settings, active, localApi);
+    const limit =
+      settings.singlePaidChannel && caller.keyId
+        ? PAID_BUYER.singleChannelApiRequests
+        : TRANSPORT_LIMITS.maxConcurrent;
+    const api = admit(request, response, limit, active, localApi);
     if (!api) {
       if (response.statusCode >= HTTP_STATUS.badRequest) diagnostic.refused();
       return;

@@ -62,6 +62,7 @@ export type BuyerExecutionFactory = (context: {
     permission?: BuyerApiKeyOperation,
   ): Promise<ChatResult>;
   sellerChoice?: boolean;
+  singlePaidChannel?: boolean;
   preparePaidChat?: () => Promise<void>;
   reconcilePool?: () => Promise<void>;
   token?: string;
@@ -208,6 +209,7 @@ function buyerHttp(
         run(input, signal, undefined, model, permission),
       {
         sellerChoice: execution?.sellerChoice,
+        singlePaidChannel: execution?.singlePaidChannel,
         paidAuto: discovery?.paidAuto,
         selection: request.selection,
         maxTokens: request.maxTokens,

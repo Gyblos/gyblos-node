@@ -359,6 +359,7 @@ export async function startSessionQuoteRuntime(
   return {
     confirmUnchargedKey: manager.confirmUnchargedKey,
     sellerChoice: true,
+    singlePaidChannel: !router && prepared.config.request.maxAtomic !== '0',
     reconcilePool: router
       ? () => checkDesktopPool(manager, () => router.activeRequests() > 0)
       : undefined,

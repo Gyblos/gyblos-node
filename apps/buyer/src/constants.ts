@@ -178,6 +178,7 @@ export const PAID_WITHDRAW_CODES = {
 // A deposit ceiling of zero: a free quote, or a selection.json that buys nothing.
 export const isFreeAtomic = (maxAtomic: string) => maxAtomic === '0';
 export const PAID_BUYER = {
+  singleChannelApiRequests: 4,
   // The whole request, from selection to the seller's terminal.
   requestMs: BUYER_PAID_TIMEOUTS.requestMs,
   // Checking the settlement on chain and recording the outcome, once the terminal arrived.
