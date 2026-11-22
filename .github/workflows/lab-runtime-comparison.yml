@@ -1,7 +1,7 @@
-name: PR lab runtime comparison
+name: Canary22 lab comparison
 on:
   push:
-    branches: [codex/pr-lab-bun-comparison-n18]
+    branches: [codex/bench-lab-canary-20261122]
 permissions:
   contents: read
 jobs:
@@ -12,27 +12,39 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runtime: [node, bun]
+        runtime: [node, stable, canary]
         rep: [1, 2, 3]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+          ref: f3461b5ba26c015a78fcd996f965cc99ebc1ea4b
       - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: 24.22.1
           cache: pnpm
-      - if: matrix.runtime == 'bun'
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
-        with:
-          bun-version: 1.4.4
+      - name: Prepare pinned Bun
+        if: matrix.runtime != 'node'
+        working-directory: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          case '${{ matrix.runtime }}' in
+            stable) url='https://registry.npmjs.org/@oven/bun-linux-x64/-/bun-linux-x64-1.4.5.tgz'; digest='2165fd0442e8187014b4ca2791e49a35a6705f3464fa80f0e8c93e1c115777728760804d06c20646ea4c64f7203680db2692eeea00098c8a0854f66db75689d6';;
+            canary) url='https://registry.npmjs.org/@oven/bun-linux-x64/-/bun-linux-x64-1.4.5-canary.20261122.1.tgz'; digest='4580f353f7de5a9870692a845b7f06b7ce54c7c8ffc9965fd75debf75d648b123cc450b42a197704115e1d587f49687b168c8794b724baacb3046b2c897039f2';;
+          esac
+          mkdir bun-pinned
+          curl -fsSL --retry 3 "$url" -o bun-pinned/pkg.tgz
+          echo "$digest  bun-pinned/pkg.tgz" | sha512sum -c -
+          tar -xzf bun-pinned/pkg.tgz -C bun-pinned package/bin/bun
+          bun-pinned/package/bin/bun --revision
+          echo "$RUNNER_TEMP/bun-pinned/package/bin" >> "$GITHUB_PATH"
       - run: pnpm install --frozen-lockfile
       - name: Run PR lab shard on Node
         if: matrix.runtime == 'node'
         run: node --import tsx --test --test-shard=1/2 "tests/lab/**/*.test.ts"
       - name: Run identical shard files on Bun
-        if: matrix.runtime == 'bun'
+        if: matrix.runtime != 'node'
         run: |
           node --input-type=module -e "import {globSync} from 'node:fs'; console.log(JSON.stringify(globSync('tests/lab/**/*.test.ts').sort().filter((_, i) => i % 2 === 0)))" > "$RUNNER_TEMP/shard.json"
           export WORKERS=$(node -p "Math.max(1,require('node:os').availableParallelism()-1)")
