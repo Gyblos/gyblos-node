@@ -9,7 +9,7 @@ import { LOCAL_NODE_LABELS } from './constants';
 import { Modal } from './Modal';
 import { MotionPresence } from './Motion';
 import { NetworkStatus } from './NetworkStatus';
-import { openPreviewUpdate, TONE, usePreviewNetwork, usePreviewUpdate, type Tone } from './PreviewKit';
+import { openPreviewUpdate, TONE, usePreviewNetwork, usePreviewNewerVersion, type Tone } from './PreviewKit';
 import { Button } from './UI';
 import { useDesktopWallet } from './WalletState';
 
@@ -27,7 +27,7 @@ export function SystemStatus({ state, onRetry, onPayments }: { state: LocalNodeS
   const [open, setOpen] = useState(() => new URLSearchParams(location.search).get('review') === 'system-status');
   const wallet = useDesktopWallet();
   const network = usePreviewNetwork();
-  const update = usePreviewUpdate();
+  const update = usePreviewNewerVersion();
   const manage = { label: 'Manage', run: () => { setOpen(false); onPayments(); } };
   const checks: StatusCheck[] = [
     wallet.status === WALLET_STATUS.READY

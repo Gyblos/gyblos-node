@@ -1,6 +1,6 @@
 // Preview-only shared components: every mockup view composes these instead of route-local markup.
 import { ArrowCircleUp, CaretRight, Check, Copy, CreditCard, Info, Minus, PaypalLogo, Plus, Wallet, Warning } from '@phosphor-icons/react';
-import { useEffect, useMemo, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react';
 
 import { AGENT_TOOLS, type AgentTool } from '@gyblos/node/agent-setup-constants';
 
@@ -440,8 +440,13 @@ function subscribeUpdate(listener: () => void) {
 }
 const readUpdate = () => availableUpdate;
 /** One shared poll of the host update bridge (synthetic in the preview): the newer version, or null. */
-export function usePreviewUpdate(): string | null {
+function usePreviewUpdate(): string | null {
   return useSyncExternalStore(subscribeUpdate, readUpdate);
+}
+const NewerVersion = createContext<string | null>(null);
+/** The version newer than the installed one, as shown by the status bar; null when up to date. */
+export function usePreviewNewerVersion(): string | null {
+  return useContext(NewerVersion);
 }
 export function openPreviewUpdate() {
   window.dispatchEvent(new Event(PREVIEW_EVENT.UPDATE));
@@ -489,7 +494,7 @@ export function PreviewStatusBar({ status, version }: { status: ReactNode; versi
   return (
     <>
       <footer className="preview-status-bar" aria-label="App status">
-        {status}
+        <NewerVersion.Provider value={newer}>{status}</NewerVersion.Provider>
         <span className="preview-status-end">
           {newer && <PreviewUpdateButton version={newer} onClick={() => setOpen(true)} />}
           <span className="preview-version">Gyblos {version}</span>

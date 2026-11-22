@@ -26,6 +26,8 @@ void test('system status moves to a footer status bar with one checklist dialog'
   assert.match(status, /Sellers are checked when you send a message\./);
   assert.match(status, /openPreviewUpdate/);
   assert.match(status, /issues\[0\]\?\.summary/);
+  assert.match(status, /usePreviewNewerVersion\(\)/);
+  assert.doesNotMatch(status, /usePreviewUpdate/);
   assert.match(status, /summary: 'Wallet unavailable'/);
 });
 
@@ -39,6 +41,7 @@ void test('the status bar shows the version and an update button only when a new
   assert.match(kit, /DESKTOP_UPDATE\.OPEN/);
   assert.match(kit, /useSyncExternalStore\(subscribeUpdate, readUpdate\)/);
   assert.match(kit, /available && available !== version/);
+  assert.match(kit, /<NewerVersion\.Provider value=\{newer\}>/);
   const host = await read('host.ts');
   assert.match(host, /query\.get\('update'\) === 'available'/);
   assert.match(host, /desktopUpdate,/);
