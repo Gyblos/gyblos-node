@@ -1,5 +1,5 @@
 // Preview-only shared components: every mockup view composes these instead of route-local markup.
-import { ArrowCircleUp, CaretRight, Check, Copy, CreditCard, Info, Minus, PaypalLogo, Plus, Wallet, Warning } from '@phosphor-icons/react';
+import { ArrowCircleUp, CaretRight, Check, Copy, CreditCard, DotsThree, FunnelSimple, Info, MagnifyingGlass, Minus, PaypalLogo, PencilSimple, Plus, PushPin, Trash, Wallet, Warning, X } from '@phosphor-icons/react';
 import { createContext, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react';
 
 import { AGENT_TOOLS, type AgentTool } from '@gyblos/node/agent-setup-constants';
@@ -7,7 +7,10 @@ import { AGENT_TOOLS, type AgentTool } from '@gyblos/node/agent-setup-constants'
 import { DESKTOP_UPDATE } from '../constants';
 import { observeDesktopUpdates } from '../update-session';
 import { AddBuyerFunds } from './BuyerFunding';
-import { CopyField, FormActions } from './Form';
+import type { ChatController } from './chat-controller';
+import { Dropdown } from './Dropdown';
+import { CopyField, FormActions, FormField, FormInput } from './Form';
+import { Facts, Pair } from './Management';
 import { useDesktopWallet } from './WalletState';
 import { CODE_LANGUAGE, codeLanguageLabel, highlightCode, type CodeLanguage } from './code-highlight';
 import { BUTTON_VARIANT, UI_VIEW } from './constants';
@@ -18,7 +21,7 @@ import type { View } from './model-types';
 import { ServiceLogo } from './ServiceLogo';
 import { MotionPresence } from './Motion';
 import { TONE, type Tone } from './status-tone';
-import { Button, IconButton } from './UI';
+import { Button, IconButton, MenuItem, SearchField } from './UI';
 import { useUsdcApiKeys } from './useUsdcApiKeys';
 
 export { statusTone, TONE } from './status-tone';
@@ -388,6 +391,7 @@ type PreviewSettings = { freeFallback: boolean; showTestnet: boolean; sellerMode
 declare global {
   interface Window {
     previewSettings?: PreviewSettings;
+    previewChatSeed?: { ages: Record<string, number>; pinned: string[]; unread: string[] };
   }
 }
 const settingsListeners = new Set<() => void>();
@@ -703,13 +707,7 @@ export function PreviewConnectEntry() {
       className="preview-connect-entry"
       onClick={() => window.previewNavigate?.(UI_VIEW.CONNECT)}
     >
-      <span className="preview-connect-logos" aria-hidden="true">
-        {ENTRY_TOOLS.map((tool) => (
-          <span key={tool} className="preview-tool-logo">
-            <ServiceLogo service={tool} />
-          </span>
-        ))}
-      </span>
+      <PreviewAgentLogos />
       <span className="preview-connect-copy">
         <strong>Connect a dev tool</strong>
         <small>Use Gyblos models in OpenCode, Codex, Claude Code or Pi.</small>
@@ -783,5 +781,320 @@ export function AmountEditor({ id, label, value, onChange, unit, presets, empty,
       </div>
       <p id={id + '-help'} className={error ? 'preview-field-error' : 'ui-help-text'} role={error ? 'alert' : undefined}>{error || help}</p>
     </div>
+  );
+}
+
+/** Overlapping logos of the coding tools a Gyblos API key connects. */
+export function PreviewAgentLogos() {
+  return (
+    <span className="preview-connect-logos" aria-hidden="true">
+      {ENTRY_TOOLS.map((tool) => (
+        <span key={tool} className="preview-tool-logo">
+          <ServiceLogo service={tool} />
+        </span>
+      ))}
+    </span>
+  );
+}
+
+type ConversationState = { pinned: string[]; unread: string[]; titles: Record<string, string>; removed: string[] };
+let conversationState: ConversationState | undefined;
+const conversationListeners = new Set<() => void>();
+function readConversations(): ConversationState {
+  conversationState ??= {
+    pinned: window.previewChatSeed?.pinned ?? [],
+    unread: window.previewChatSeed?.unread ?? [],
+    titles: {},
+    removed: [],
+  };
+  return conversationState;
+}
+function updateConversations(change: (state: ConversationState) => Partial<ConversationState>) {
+  const state = readConversations();
+  conversationState = { ...state, ...change(state) };
+  conversationListeners.forEach((listener) => listener());
+}
+function subscribeConversations(listener: () => void) {
+  conversationListeners.add(listener);
+  return () => {
+    conversationListeners.delete(listener);
+  };
+}
+function usePreviewConversations() {
+  return useSyncExternalStore(subscribeConversations, readConversations);
+}
+const without = (list: string[], id: string) => list.filter((item) => item !== id);
+function togglePin(id: string) {
+  updateConversations((state) => ({ pinned: state.pinned.includes(id) ? without(state.pinned, id) : [...state.pinned, id] }));
+}
+function markUnread(id: string) {
+  updateConversations((state) => (state.unread.includes(id) ? {} : { unread: [...state.unread, id] }));
+}
+function markRead(id: string) {
+  updateConversations((state) => (state.unread.includes(id) ? { unread: without(state.unread, id) } : {}));
+}
+
+type ChatSessionItem = ReturnType<ChatController['getSnapshot']>['sessions'][number];
+function conversationTitle(session: ChatSessionItem, titles: Record<string, string>) {
+  return titles[session.id] ?? (session.messages.length ? session.title : session.draft.trim() || session.title);
+}
+const DAY_GROUPS = ['Today', 'Yesterday', 'Previous 7 days', 'Older'] as const;
+function dayGroup(days: number): (typeof DAY_GROUPS)[number] {
+  return days < 1 ? 'Today' : days < 2 ? 'Yesterday' : days < 8 ? 'Previous 7 days' : 'Older';
+}
+const CHAT_FILTERS = ['All chats', 'Unread', 'Pinned'] as const;
+type ChatFilter = (typeof CHAT_FILTERS)[number];
+
+/** Running spinner or unread dot beside a conversation title. */
+function PreviewChatState({ state }: { state: 'running' | 'unread' }) {
+  return (
+    <span
+      className="preview-chat-state"
+      data-state={state}
+      role="img"
+      aria-label={state === 'running' ? 'Answering' : 'New answer'}
+    />
+  );
+}
+
+/** Conversation panel beside the rail: new chat, connect agents, then pinned and dated conversations. */
+export function PreviewConversationPanel({ chat, view, collapsed, loading, onNewChat, onOpenChat, onConnect }: {
+  chat: ChatController;
+  view: View;
+  collapsed: boolean;
+  loading: boolean;
+  onNewChat(): void;
+  onOpenChat(id: string): void;
+  onConnect(): void;
+}) {
+  const { sessions, activeId } = useSyncExternalStore(chat.subscribe, chat.getSnapshot);
+  const state = usePreviewConversations();
+  const [searching, setSearching] = useState(false);
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState<ChatFilter>('All chats');
+  const running = useRef(new Set<string>());
+  useEffect(() => {
+    const now = new Set(sessions.filter((session) => session.run || session.paypalRun).map((session) => session.id));
+    for (const id of running.current) if (!now.has(id) && id !== activeId) markUnread(id);
+    running.current = now;
+  }, [sessions, activeId]);
+  useEffect(() => {
+    if (view === UI_VIEW.CHAT) markRead(activeId);
+  }, [activeId, view]);
+  const query = search.trim().toLowerCase();
+  const visible = sessions
+    .filter((session) => session.messages.length || session.draft.trim())
+    .filter((session) => !state.removed.includes(session.id))
+    .filter((session) => conversationTitle(session, state.titles).toLowerCase().includes(query))
+    .filter((session) =>
+      filter === 'Unread' ? state.unread.includes(session.id) : filter === 'Pinned' ? state.pinned.includes(session.id) : true,
+    )
+    .slice()
+    .reverse();
+  const ages = window.previewChatSeed?.ages ?? {};
+  const groups = [
+    { title: 'Pinned', items: visible.filter((session) => state.pinned.includes(session.id)) },
+    ...DAY_GROUPS.map((title) => ({
+      title,
+      items: visible.filter((session) => !state.pinned.includes(session.id) && dayGroup(ages[session.id] ?? 0) === title),
+    })),
+  ].filter((group) => group.items.length);
+  return (
+    <section className="preview-chat-panel" aria-label="Conversations" inert={collapsed} aria-hidden={collapsed || undefined}>
+      <Button className="ui-nav-row preview-new-chat" aria-label="New chat" disabled={loading} onClick={onNewChat}>
+        <Plus size={16} aria-hidden="true" />
+        <span>New chat</span>
+      </Button>
+      <Button className="ui-nav-row preview-agents-entry" aria-current={view === UI_VIEW.CONNECT ? 'page' : undefined} onClick={onConnect}>
+        <PreviewAgentLogos />
+        <span>Connect agents</span>
+      </Button>
+      <header className="preview-chat-panel-head">
+        <h2 className="ui-sidebar-section-title">Chats</h2>
+        <IconButton
+          label={searching ? 'Close search' : 'Search conversations'}
+          aria-pressed={searching}
+          onClick={() => {
+            setSearching(!searching);
+            setSearch('');
+          }}
+        >
+          {searching ? <X size={14} aria-hidden="true" /> : <MagnifyingGlass size={14} aria-hidden="true" />}
+        </IconButton>
+        <Dropdown
+          label={'Filter conversations: ' + filter}
+          iconOnly
+          className="preview-chat-filter"
+          trigger={<FunnelSimple size={14} weight={filter === 'All chats' ? 'regular' : 'fill'} aria-hidden="true" />}
+        >
+          {(close) =>
+            CHAT_FILTERS.map((option) => (
+              <MenuItem
+                key={option}
+                role="menuitemradio"
+                checked={option === filter}
+                label={option}
+                trailing={option === filter ? <Check size={14} aria-hidden="true" /> : undefined}
+                onClick={() => {
+                  setFilter(option);
+                  close();
+                }}
+              />
+            ))
+          }
+        </Dropdown>
+      </header>
+      {searching && (
+        <SearchField label="Search conversations" placeholder="Search conversations" value={search} onValueChange={setSearch} autoFocus />
+      )}
+      <div className="preview-chat-groups">
+        {groups.map((group) => (
+          <section key={group.title} aria-label={group.title}>
+            <h3 className="preview-chat-group-title">{group.title}</h3>
+            {group.items.map((session) => {
+              const status = session.run || session.paypalRun ? 'running' : state.unread.includes(session.id) ? 'unread' : null;
+              const pinned = state.pinned.includes(session.id);
+              return (
+                <div key={session.id} className="preview-chat-row">
+                  <Button
+                    className="ui-nav-row"
+                    disabled={loading}
+                    aria-current={view === UI_VIEW.CHAT && activeId === session.id ? 'page' : undefined}
+                    onClick={() => onOpenChat(session.id)}
+                  >
+                    <span>{conversationTitle(session, state.titles)}</span>
+                    {status && <PreviewChatState state={status} />}
+                  </Button>
+                  <IconButton
+                    className="preview-chat-pin"
+                    label={pinned ? 'Unpin conversation' : 'Pin conversation'}
+                    aria-pressed={pinned}
+                    onClick={() => togglePin(session.id)}
+                  >
+                    <PushPin size={14} weight={pinned ? 'fill' : 'regular'} aria-hidden="true" />
+                  </IconButton>
+                </div>
+              );
+            })}
+          </section>
+        ))}
+        {!groups.length && (
+          <p className="ui-help-text">
+            {loading ? 'Loading conversations…' : query || filter !== 'All chats' ? 'No conversations found.' : 'Your conversations will appear here.'}
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+const CONVERSATION_DIALOG = { RENAME: 'rename', DELETE: 'delete' } as const;
+type ConversationDialog = (typeof CONVERSATION_DIALOG)[keyof typeof CONVERSATION_DIALOG];
+
+/** Title bar menu for the open conversation: pin, rename, copy as Markdown, delete (preview-only state). */
+export function PreviewConversationMenu({ chat }: { chat: ChatController }) {
+  const { sessions, activeId } = useSyncExternalStore(chat.subscribe, chat.getSnapshot);
+  const state = usePreviewConversations();
+  const [dialog, setDialog] = useState<ConversationDialog | null>(null);
+  const [name, setName] = useState('');
+  const session = sessions.find((item) => item.id === activeId);
+  if (!session?.messages.length) return null;
+  const title = conversationTitle(session, state.titles);
+  const pinned = state.pinned.includes(session.id);
+  const remove = () => {
+    updateConversations((current) => ({ removed: [...current.removed, session.id], pinned: without(current.pinned, session.id) }));
+    const next = sessions
+      .filter((item) => item.id !== session.id && item.messages.length && !state.removed.includes(item.id))
+      .at(-1);
+    if (next) chat.openChat(next.id);
+    else chat.newChat(crypto.randomUUID());
+    setDialog(null);
+  };
+  return (
+    <>
+      <Dropdown label="Conversation actions" iconOnly className="preview-conversation-menu" trigger={<DotsThree size={16} weight="bold" aria-hidden="true" />}>
+        {(close) => (
+          <>
+            <MenuItem label={pinned ? 'Unpin' : 'Pin'} leading={<PushPin size={14} aria-hidden="true" />} onClick={() => { togglePin(session.id); close(); }} />
+            <MenuItem label="Rename…" leading={<PencilSimple size={14} aria-hidden="true" />} onClick={() => { setName(title); setDialog(CONVERSATION_DIALOG.RENAME); close(); }} />
+            <MenuItem
+              label="Copy as Markdown"
+              leading={<Copy size={14} aria-hidden="true" />}
+              onClick={() => {
+                const text = '# ' + title + '\n\n' + session.messages.map((message) => (message.role === 'user' ? '**You:** ' : '**Gyblos:** ') + message.text).join('\n\n');
+                void navigator.clipboard.writeText(text).catch(() => undefined);
+                close();
+              }}
+            />
+            <MenuItem label="Delete…" leading={<Trash size={14} aria-hidden="true" />} onClick={() => { setDialog(CONVERSATION_DIALOG.DELETE); close(); }} />
+          </>
+        )}
+      </Dropdown>
+      <MotionPresence>
+        {dialog === CONVERSATION_DIALOG.RENAME && (
+          <Modal title="Rename conversation" size="sm" close={() => setDialog(null)}>
+            <form
+              className="ui-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                const next = name.trim();
+                if (next) updateConversations((current) => ({ titles: { ...current.titles, [session.id]: next } }));
+                setDialog(null);
+              }}
+            >
+              <FormField label="Name" htmlFor="preview-conversation-name">
+                <FormInput id="preview-conversation-name" value={name} maxLength={80} autoFocus onChange={(event) => setName(event.target.value)} />
+              </FormField>
+              <FormActions>
+                <Button type="button" onClick={() => setDialog(null)}>Cancel</Button>
+                <Button type="submit" variant={BUTTON_VARIANT.PRIMARY} disabled={!name.trim()}>Save</Button>
+              </FormActions>
+            </form>
+          </Modal>
+        )}
+        {dialog === CONVERSATION_DIALOG.DELETE && (
+          <Modal title="Delete conversation?" description={'"' + title + '" will be removed from this device.'} size="sm" close={() => setDialog(null)}>
+            <FormActions>
+              <Button onClick={() => setDialog(null)}>Cancel</Button>
+              <Button variant={BUTTON_VARIANT.DANGER} onClick={remove}>Delete</Button>
+            </FormActions>
+          </Modal>
+        )}
+      </MotionPresence>
+    </>
+  );
+}
+
+/** Side panel with the open conversation's model, seller, tokens, spend and latency. */
+export function PreviewChatDetails({ chat, onClose }: { chat: ChatController; onClose(): void }) {
+  const { sessions, activeId } = useSyncExternalStore(chat.subscribe, chat.getSnapshot);
+  const session = sessions.find((item) => item.id === activeId);
+  const answers = session?.messages.filter((message) => message.role !== 'user' && message.metrics) ?? [];
+  const last = session?.messages.findLast((message) => message.role !== 'user');
+  const sum = (pick: (metrics: NonNullable<(typeof answers)[number]['metrics']>) => number | null | undefined) =>
+    answers.reduce((total, message) => total + (message.metrics ? pick(message.metrics) ?? 0 : 0), 0);
+  const latency = answers.length ? Math.round(sum((metrics) => metrics.responseMs) / answers.length) : null;
+  const spend = sum((metrics) => Number(metrics.cost?.amount ?? 0));
+  return (
+    <aside className="ui-context-panel preview-chat-details" aria-label="Conversation details">
+      <header className="ui-context-heading">
+        <h2>Details</h2>
+        <IconButton label="Close details" onClick={onClose}>
+          <X size={16} aria-hidden="true" />
+        </IconButton>
+      </header>
+      {!session?.messages.length ? (
+        <p className="ui-help-text">Send a message to see its model, seller and cost.</p>
+      ) : (
+        <Facts compact>
+          <Pair label="Model" value={last?.model.name ?? '—'} />
+          <Pair label="Seller" value={last?.model.free ? 'Community seller · Free' : 'Chosen by Auto'} />
+          <Pair label="Messages" value={String(session.messages.length)} />
+          <Pair label="Tokens" value={sum((metrics) => metrics.inputTokens).toLocaleString() + ' in · ' + sum((metrics) => metrics.outputTokens).toLocaleString() + ' out'} />
+          <Pair label="Spend" value={spend ? spend.toFixed(4) + ' USDC' : 'Free'} />
+          <Pair label="Avg. response" value={latency === null ? '—' : (latency / 1000).toFixed(1) + ' s'} />
+        </Facts>
+      )}
+    </aside>
   );
 }

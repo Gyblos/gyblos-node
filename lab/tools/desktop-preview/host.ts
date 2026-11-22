@@ -114,8 +114,10 @@ export function createPreviewHost(
       'Explore search ranking',
       'Outline a release checklist',
     );
+  const seeded: string[] = [];
   function exampleChat(title: string, receiptId: string) {
     const conversationId = conversations.getSnapshot().activeId;
+    seeded.push(conversationId);
     conversations.startPaypal(
       title,
       chatModel,
@@ -148,6 +150,18 @@ export function createPreviewHost(
     exampleChat(title, crypto.randomUUID());
     conversations.newChat(crypto.randomUUID());
   }
+  Object.assign(window, {
+    previewChatSeed: {
+      ages: Object.fromEntries(
+        seeded.map((id, index) => [
+          id,
+          [4, 1, 0, 2, 3, 5, 8, 12, 20][index] ?? 0,
+        ]),
+      ),
+      pinned: seeded.slice(0, 1),
+      unread: seeded.slice(2, 3),
+    },
+  });
   exampleChat('How can I use Gyblos in my coding tools?', 'preview-free-reply');
   let archive = projectChatArchive(conversations.getSnapshot());
 
