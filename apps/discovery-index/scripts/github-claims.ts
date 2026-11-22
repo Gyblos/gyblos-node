@@ -1,22 +1,16 @@
 // Owns the read-only operator view of seller GitHub claims (`pnpm index:github-claims`): who started a
 // claim and where it stands, from the local D1 (default) or the remote one (--remote). Drizzle compiles
 // the query for Wrangler; nothing is written, and tombstones (cancelled claims) are left out.
-import { execFileSync } from 'node:child_process';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
 import { asc, desc, eq, isNotNull } from 'drizzle-orm';
-import { SQLiteSyncDialect } from 'drizzle-orm/sqlite-core';
-import { drizzle } from 'drizzle-orm/sqlite-proxy';
 
 import { isMain } from '@gyblos/runtime';
 
 import { GITHUB_CLAIM_STATES, type GithubClaimState } from '../src/constants';
-import * as schema from '../src/schema';
+import { githubClaims as table } from '../src/schema';
+import { compileSql, wranglerD1 } from './wrangler-d1';
 
-const WRANGLER = 'wrangler@4.151.1';
-const DATABASE = 'gyblos-discovery';
 // Rows listed at most; the newest claims first within each state.
 const MAX_ROWS = 1000;
 const USAGE =
@@ -36,28 +30,22 @@ function stateOf(value: string | undefined): GithubClaimState | null {
 }
 
 export function githubClaimsSql(state: GithubClaimState | undefined) {
-  const database = drizzle(
-    async () => {
-      throw new TypeError('Admin queries must be compiled before execution.');
-    },
-    { schema },
+  return compileSql((database) =>
+    database
+      .select({
+        nodeId: table.nodeId,
+        account: table.account,
+        gist: table.gist,
+        state: table.state,
+        reason: table.reason,
+        issuedAt: table.issuedAt,
+        checkedAt: table.checkedAt,
+      })
+      .from(table)
+      .where(state ? eq(table.state, state) : isNotNull(table.state))
+      .orderBy(asc(table.state), desc(table.issuedAt))
+      .limit(MAX_ROWS),
   );
-  const table = schema.githubClaims;
-  const query = database
-    .select({
-      nodeId: table.nodeId,
-      account: table.account,
-      gist: table.gist,
-      state: table.state,
-      reason: table.reason,
-      issuedAt: table.issuedAt,
-      checkedAt: table.checkedAt,
-    })
-    .from(table)
-    .where(state ? eq(table.state, state) : isNotNull(table.state))
-    .orderBy(asc(table.state), desc(table.issuedAt))
-    .limit(MAX_ROWS);
-  return new SQLiteSyncDialect().sqlToQuery(query.getSQL().inlineParams()).sql;
 }
 
 const time = (value: unknown) =>
@@ -105,24 +93,10 @@ export function runGithubClaims(argv: readonly string[], io: ClaimsIo) {
 
 // `wrangler d1 execute --json` prints one result set per statement.
 function wranglerQuery(sql: string, remote: boolean): unknown[] {
-  const output = execFileSync(
-    'npx',
-    [
-      WRANGLER,
-      'd1',
-      'execute',
-      DATABASE,
-      remote ? '--remote' : '--local',
-      '--json',
-      '--command',
-      sql,
-    ],
-    {
-      cwd: resolve(dirname(fileURLToPath(import.meta.url)), '..'),
-      stdio: ['ignore', 'pipe', 'inherit'],
-      encoding: 'utf8',
-    },
-  );
+  const output = wranglerD1(sql, {
+    target: remote ? '--remote' : '--local',
+    json: true,
+  });
   const parsed: unknown = JSON.parse(output);
   const first: unknown = Array.isArray(parsed) ? parsed[0] : undefined;
   const results: unknown =

@@ -368,8 +368,9 @@ is `400 INVALID_QUERY`):
   `verified`, so a client can link the proof gist, and `null` otherwise; a
   `pending` or `lost` claim is read only through
   `GET /v1/identity/github/<NodeId>`. If the claims read fails (for example
-  before migration `0007` is applied), every `github` is `null` and the route
-  still answers. No owner, contact, country or IP is returned.
+  before migration `0007` is applied), every `github` is `null`, `truncated` is
+  `true` and the route still answers. No owner, contact, country or IP is
+  returned.
 - **Order and size.** Online first, then by `lastSeenAt` (latest first), then by
   NodeId. `counts` cover every listed seller. The `nodes` list stops before the
   answer would exceed 1 MiB.
@@ -498,8 +499,10 @@ batch: at most 25 claims whose next check is due, earliest first, one gist at a
 time. A check schedules the next one 6 hours later. A claim still `pending` and
 never verified 7 days after its `issuedAt` is no longer scheduled; it stays
 readable, and a new POST (a newer `issuedAt`) checks it again. A storage
-failure, such as a missing table, ends the run quietly; every write is
-conditional, so nothing stored is lost.
+failure, such as a missing table, ends the run and logs the single static line
+`DISCOVERY_GITHUB_RECHECK_FAILED` (no request, IP or claim data); every write is
+conditional, so nothing stored is lost. A malformed row is unscheduled and
+skipped, so it never blocks the batch.
 
 ### Operator view
 

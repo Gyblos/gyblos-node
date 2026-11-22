@@ -6,7 +6,7 @@
 // parameters; cached like a sellers page. Built only from records the index verified and from its own
 // registrations; no IP, contact, owner or country is returned. Each node also carries `github`: its
 // verified GitHub account and proof gist, or null; unproven claims are read only through GET
-// /v1/identity/github. A failed claims read leaves every `github` null instead of failing the route.
+// /v1/identity/github. A failed claims read leaves every `github` null and the page `truncated`.
 import {
   INDEX_ERRORS,
   NETWORK,
@@ -69,13 +69,14 @@ function compareNodes(left: NetworkNode, right: NetworkNode) {
 }
 
 // Verified claims, or none when the claims store is missing or its read fails (for example before
-// migration 0007 is applied): GitHub data is optional to this route.
+// migration 0007 is applied): GitHub data is optional to this route, but a failed read marks the page
+// incomplete (`truncated`).
 async function verifiedClaims(claims: GithubClaimStore | undefined) {
-  if (!claims) return [];
+  if (!claims) return { rows: [], read: true };
   try {
-    return await claims.verified(NETWORK.maxNodes);
+    return { rows: await claims.verified(NETWORK.maxNodes), read: true };
   } catch {
-    return [];
+    return { rows: [], read: false };
   }
 }
 
@@ -91,7 +92,7 @@ async function knownNodes(
     storage.catalogStatus(now, NETWORK.maxNodes, NETWORK.maxModelRows),
     verifiedClaims(claims),
   ]);
-  const claimed = new Map(github.map((row) => [row.nodeId, row]));
+  const claimed = new Map(github.rows.map((row) => [row.nodeId, row]));
   const revoked = new Set(registered.revoked);
   const seen = new Map(sightings.map((row) => [row.nodeId, row]));
   const stored = new Map(catalogs.rows.map((row) => [row.nodeId, row]));
@@ -112,7 +113,8 @@ async function knownNodes(
   // A source that filled its cap may have left sellers (or online models or claims) out of the answer.
   const complete =
     catalogs.complete &&
-    github.length < NETWORK.maxNodes &&
+    github.read &&
+    github.rows.length < NETWORK.maxNodes &&
     sightings.length < NETWORK.maxNodes &&
     registered.active.length < NETWORK.maxNodes &&
     registered.revoked.length < NETWORK.maxNodes;

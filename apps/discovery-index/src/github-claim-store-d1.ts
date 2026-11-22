@@ -130,6 +130,13 @@ function dueQuery(database: DiscoveryDatabase, now: number, limit: number) {
     .limit(limit);
 }
 
+function unscheduleQuery(database: DiscoveryDatabase, nodeId: unknown) {
+  return database
+    .update(githubClaims)
+    .set({ nextCheckAt: null })
+    .where(eq(githubClaims.nodeId, text(nodeId)));
+}
+
 // Writes a check only onto the same claim, and never over a check that started later.
 function recordQuery(
   database: DiscoveryDatabase,
@@ -182,10 +189,19 @@ export function createD1GithubClaimStore(client: D1Database): GithubClaimStore {
     async record(nodeId, issuedAt, check) {
       await recordQuery(database, nodeId, issuedAt, check);
     },
+    // A malformed row is unscheduled (next_check_at NULL) and skipped, so it cannot stay first forever.
     async due(now, limit) {
-      return (await dueQuery(database, now, limit))
-        .map(storedClaim)
-        .filter((entry): entry is GithubClaimRow => entry.state !== null);
+      const claims: GithubClaimRow[] = [];
+      for (const row of await dueQuery(database, now, limit)) {
+        let entry: StoredGithubClaim | null = null;
+        try {
+          entry = storedClaim(row);
+        } catch {
+          await unscheduleQuery(database, row.nodeId);
+        }
+        if (entry?.state) claims.push(entry);
+      }
+      return claims;
     },
     async verified(limit) {
       const rows = await database

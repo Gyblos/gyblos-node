@@ -298,6 +298,8 @@ export const GITHUB_CLAIM_REASONS = {
 export type GithubClaimReason =
   (typeof GITHUB_CLAIM_REASONS)[keyof typeof GITHUB_CLAIM_REASONS];
 // The reasons a stored claim can carry.
+// Log code of a scheduled GitHub claim recheck that failed; logged alone, with no request or claim data.
+export const GITHUB_RECHECK_FAILED = 'DISCOVERY_GITHUB_RECHECK_FAILED';
 export const STORED_GITHUB_CLAIM_REASONS = [
   GITHUB_CLAIM_REASONS.GIST_NOT_FOUND,
   GITHUB_CLAIM_REASONS.NODE_ID_MISSING,

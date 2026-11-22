@@ -16,6 +16,7 @@ import {
   DISCOVERY_LIMITERS,
   DISCOVERY_PUBLISH_ALLOWLIST_BINDING,
   DISCOVERY_SOLANA_RPC_BINDING,
+  GITHUB_RECHECK_FAILED,
 } from './constants';
 import { createD1GithubClaimStore } from './github-claim-store-d1';
 import { recheckGithubClaims } from './github-claims';
@@ -144,7 +145,8 @@ export function createWorker() {
 
 // The scheduled run rechecks one bounded batch of GitHub claims. Without a database it does nothing.
 // A storage failure (for example before migration 0007 is applied) ends the run quietly: every write
-// is conditional, so nothing already stored is lost, and the next run tries again.
+// is conditional, so nothing already stored is lost, and the next run tries again. The failure is
+// logged as one static code, so a stalled recheck is visible in the Worker logs.
 export async function scheduledRecheck(
   bindings: unknown,
   now: number,
@@ -159,6 +161,8 @@ export async function scheduledRecheck(
       now,
     );
   } catch {
+    // A static code only: no request, IP or claim data.
+    console.warn(GITHUB_RECHECK_FAILED);
     return 0;
   }
 }

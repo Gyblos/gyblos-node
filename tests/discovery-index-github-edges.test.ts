@@ -63,7 +63,7 @@ for (const kind of CLAIM_KINDS) {
   });
 }
 
-void test('github claim: /v1/network still answers, with no GitHub data, when the claims table is missing', async (context) => {
+void test('github claim: /v1/network still answers, with no GitHub data, marked incomplete, when the claims table is missing', async (context) => {
   const index = await claimHarness('sqlite-d1');
   if (!index?.db) return context.skip('node:sqlite unavailable');
   const node = indexNode();
@@ -74,6 +74,8 @@ void test('github claim: /v1/network still answers, with no GitHub data, when th
   const network = await response.json();
   assert.equal(network.nodes[0].nodeId, node.nodeId);
   assert.equal(network.nodes[0].github, null);
+  // Not complete: a cache keeps this page only as an incomplete one.
+  assert.equal(network.truncated, true);
   await expectError(
     await index.read(node.nodeId),
     503,
