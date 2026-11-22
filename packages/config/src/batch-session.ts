@@ -1,3 +1,10 @@
+const OPERATION_MS = 20 * 1000;
+const OPENING_CONFIRM_MS = 30 * 1000;
+// The seller's opening steps bounded by operationMs: verify the first deposit, observe, settle and verify
+// the opened voucher.
+const OPENING_OPERATIONS = 4;
+const OPEN_MARGIN_MS = 10 * 1000;
+
 // Operator defaults for capped client-signed batch sessions; thresholds never change a buyer's price.
 export const BATCH_SESSION_DEFAULTS = {
   millisecondsPerSecond: 1000,
@@ -6,11 +13,15 @@ export const BATCH_SESSION_DEFAULTS = {
   minSettlementAtomic: '10000',
   pollMs: 15 * 1000,
   openingRecheckMs: [0, 1000, 3000],
-  operationMs: 20 * 1000,
+  operationMs: OPERATION_MS,
   // After this seller sent a deposit, how long it keeps looking for the channel a slow RPC has not
   // shown yet, and how often, before answering unavailable.
-  openingConfirmMs: 30 * 1000,
+  openingConfirmMs: OPENING_CONFIRM_MS,
   openingConfirmPollMs: 2 * 1000,
+  // How long a buyer waits for OPEN: the seller's whole opening window and a margin for the transport.
+  // Dropping the connection earlier loses the reply to an opening the seller still completes.
+  openMs:
+    OPENING_OPERATIONS * OPERATION_MS + OPENING_CONFIRM_MS + OPEN_MARGIN_MS,
   maxOpeningConfirmMs: 120 * 1000,
   maxPendingOperations: 32,
   maxSessions: 16,

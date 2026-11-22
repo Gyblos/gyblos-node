@@ -242,14 +242,7 @@ export function parseBuyerSelectionConfig(
         : parseBuyerDiscoveryConfig(row.discovery);
     // Open discovery trusts no index claim: every seller it adds must prove a registered identity, so it
     // needs `identity`, and it may then start with no configured seller at all.
-    if (
-      (discovery?.open && row.identity === undefined) ||
-      (!sellers.length && !discovery?.open) ||
-      new Set(sellers.map((item) => item.nodeId)).size !== sellers.length
-    )
-      throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);
-    if (request.maxAtomic !== '0' && row.session === undefined)
-      throw new BuyerSelectionError(BUYER_SELECTION_CODES.SESSION_REQUIRED);
+    validateDiscovery(row, sellers, discovery, request);
     return {
       request,
       ...(models ? { models } : {}),
@@ -342,4 +335,25 @@ function optionalObject(
       ? optional.filter((key) => Object.hasOwn(value, key))
       : [];
   return controlObject(value, [...required, ...present]);
+}
+
+function validateDiscovery(
+  row: Record<string, unknown>,
+  sellers: StaticControlSeller[],
+  discovery: BuyerSelectionConfig['discovery'],
+  request: BuyerSelectionConfig['request'],
+) {
+  if (
+    (discovery?.open && row.identity === undefined) ||
+    (discovery?.paidAuto &&
+      (sellers.length > 0 || row.pinnedNodeId !== undefined)) ||
+    (!sellers.length && !discovery?.open) ||
+    new Set(sellers.map((item) => item.nodeId)).size !== sellers.length
+  )
+    throw new BuyerSelectionError(BUYER_SELECTION_CODES.INVALID);
+  if (
+    (request.maxAtomic !== '0' || discovery?.paidAuto) &&
+    row.session === undefined
+  )
+    throw new BuyerSelectionError(BUYER_SELECTION_CODES.SESSION_REQUIRED);
 }

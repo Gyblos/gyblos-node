@@ -11,6 +11,8 @@ import {
   finalizedRequestCharge,
   inspectBatchPool,
   inspectBatchSession,
+  poolAllowsSellerDeposit,
+  poolFundingPending,
   type BatchStoredSession,
 } from '@gyblos/payments-upto/batch-session';
 import type {
@@ -75,18 +77,7 @@ export async function channelFundingRemaining(
   });
   if (entries.length) {
     // A durable intent on any seller can block the whole pool until reconciled.
-    if (
-      entries.some(
-        (entry) =>
-          !entry.ready ||
-          !entry.stored ||
-          entry.uncertain ||
-          entry.requestId !== null ||
-          entry.stored.pending ||
-          entry.stored.recoverable,
-      )
-    )
-      return null;
+    if (entries.some(poolFundingPending)) return null;
     const match = entries.find(
       (entry) => entry.terms.sellerNodeId === seller.nodeId,
     );
@@ -104,6 +95,15 @@ export async function switchingCredit(
   seller: BuyerSellerChoice,
 ) {
   const pool = batchPoolPathsIn(environment);
+  if (policy.totalDepositAtomic && policy.depositAtomic) {
+    const allowed = await poolAllowsSellerDeposit(
+      pool,
+      seller.nodeId,
+      policy.totalDepositAtomic,
+      policy.depositAtomic,
+    );
+    return allowed ? null : { poolLimited: true as const };
+  }
   if ((await inspectBatchPool(pool, { includeLegacy: false })).length)
     return null;
   const root = await inspectBatchSession(pool.legacy);

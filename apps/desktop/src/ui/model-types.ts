@@ -5,6 +5,7 @@ export type ModelArtwork = { src: string; monochrome?: boolean };
 export type ChatModel = {
   id: string;
   offerId?: string;
+  automatic?: true;
   catalogId?: CatalogModelId;
   name: string;
   image: ModelArtwork;

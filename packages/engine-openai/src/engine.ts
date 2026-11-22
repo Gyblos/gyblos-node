@@ -1,4 +1,4 @@
-// OpenAI-compatible chat completions (vLLM, LM Studio, llama.cpp, OpenRouter, OpenAI) as the protocol
+// OpenAI-compatible chat completions (vLLM, LM Studio, llama.cpp, Ollama's /v1, OpenRouter, OpenAI) as the protocol
 // Engine port: one user message to the configured upstream model, streamed with the provider's usage.
 // Identity is the model name only. The optional API key travels only in the Authorization header of
 // requests to the offer's base URL, which never follow redirects. Failures follow the Engine port
@@ -59,6 +59,9 @@ export interface OpenAiEngineSettings {
   apiKey?: string;
   // True when the seller recounts this model's output with its pinned public tokenizer.
   recountable: boolean;
+  // Ask the server to keep a Qwen3 hybrid's thinking off, as the recount renders it. Only the seller's own
+  // local server gets the switch: a strict hosted provider could refuse an unknown field.
+  disableThinking?: boolean;
 }
 
 export interface OpenAiOptions {
@@ -230,6 +233,15 @@ async function generate(
             input.maxTokens,
           stream: true,
           stream_options: { include_usage: true },
+          // vLLM, SGLang and llama.cpp honor the template switch; Ollama's /v1 ignores it and turns thinking
+          // off from reasoning effort "none" instead. Each server ignores the other's field. LM Studio
+          // honors neither, so thinking must be off there (docs/configuration.md).
+          ...(settings.disableThinking
+            ? {
+                chat_template_kwargs: { enable_thinking: false },
+                reasoning: { effort: 'none' },
+              }
+            : {}),
         }),
         signal,
       },

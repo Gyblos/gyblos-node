@@ -6,8 +6,13 @@ import { test } from 'node:test';
 
 import { SOLANA_TESTNET_CAIP2 } from '@x402/svm';
 
+import {
+  executeApiKeySession,
+  reserveApiKey,
+} from '@gyblos/buyer/api-key-execution';
 import { PROTOCOL_FEE } from '@gyblos/config';
 import { batchSessionPathsIn } from '@gyblos/config/home';
+import { createBuyerApiKeys } from '@gyblos/node/buyer-api-keys';
 import { createBuyerSessionManager } from '@gyblos/node/buyer-session';
 import { startSellerSessions } from '@gyblos/node/seller-sessions';
 import {
@@ -94,6 +99,8 @@ void test('the managed buyer settles A before funding B and retains spent author
   const b = await startSeller('56'.repeat(32));
   const target = (id: string) => (id === base.sellerNodeId ? a : b);
   let permitted = true;
+  let failObservationAfter: number | undefined;
+  let failRenewal = false;
   const buyer = createBuyerSessionManager<typeof a.wire.destination>({
     endpoint: {
       id: a.wire.endpoint.id,
@@ -107,7 +114,24 @@ void test('the managed buyer settles A before funding B and retains spent author
       withdrawDelaySeconds: 900,
     },
     inspect: () => inspectBatchSession(buyerPaths),
-    backend: async () => backend,
+    backend: async () => ({
+      ...backend,
+      renew: (...args) => {
+        if (failRenewal) throw new Error('Synthetic uncertain replacement');
+        assert.ok(backend.renew);
+        return backend.renew(...args);
+      },
+      observe: async (id) => {
+        if (
+          failObservationAfter !== undefined &&
+          vm.sends() > failObservationAfter
+        )
+          throw new Error(
+            'Synthetic old channel settlement observation unavailable',
+          );
+        return backend.observe(id);
+      },
+    }),
     meter: a.offers.meter,
     now: () => now,
     verify: async () => {},
@@ -146,6 +170,45 @@ void test('the managed buyer settles A before funding B and retains spent author
   await assert.rejects(send(b, 2), { name: 'UnsentSellerBusyError' });
   assert.equal(vm.sends(), funded);
   permitted = true;
+  const keys = await createBuyerApiKeys({
+    files: { read: async () => undefined, write: async () => {} },
+    scope: { network: base.network, mint: base.mint, payer: base.buyer },
+  });
+  t.after(() => keys.close());
+  const key = await keys.create('Synthetic Auto buyer', '1000');
+  const operation = keys.operation(key.id);
+  const next = await b.offers.quote(7);
+  failObservationAfter = funded;
+  await reserveApiKey(operation, next);
+  await assert.rejects(
+    executeApiKeySession(operation, next.offer.nodeId, () =>
+      buyer.execute(next, b.offers.input, new AbortController().signal),
+    ),
+  );
+  assert.ok(vm.sends() > funded, 'the old settlement was sent');
+  assert.equal((await keys.snapshot()).keys[0]?.reservedAtomic, '0');
+  assert.equal(
+    (await inspectBatchSession(buyerPaths))?.snapshot.channelId,
+    first.snapshot.channelId,
+  );
+  assert.equal(b.offers.generations(), 0);
+  failObservationAfter = undefined;
+  failRenewal = true;
+  const uncertain = await b.offers.quote(8);
+  await reserveApiKey(operation, uncertain);
+  await assert.rejects(
+    executeApiKeySession(operation, uncertain.offer.nodeId, () =>
+      buyer.execute(uncertain, b.offers.input, new AbortController().signal),
+    ),
+    /uncertain replacement/,
+  );
+  operation.abandon();
+  assert.equal((await keys.snapshot()).blocked, true);
+  assert.equal(
+    (await keys.snapshot()).keys[0]?.reservedAtomic,
+    uncertain.offer.maxAtomic,
+  );
+  failRenewal = false;
   await send(b, 3);
   assert.equal((await inspectBatchSession(buyerPaths))?.priorSpentAtomic, '40');
   assert.equal(

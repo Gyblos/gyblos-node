@@ -16,6 +16,7 @@ export type ServiceKind = (typeof SERVICE_KINDS)[keyof typeof SERVICE_KINDS];
 export const SERVICE_COMMANDS = {
   INSTALL: 'install',
   UNINSTALL: 'uninstall',
+  RESTART: 'restart',
 } as const;
 export type ServiceCommand =
   (typeof SERVICE_COMMANDS)[keyof typeof SERVICE_COMMANDS];
@@ -29,6 +30,12 @@ const SERVICE_UMASK = 0o077;
 export const SERVICE = {
   unit: 'gyblos-seller.service',
   label: 'com.gyblos.seller',
+  // How long restart waits for a stopped Windows task to end, and how often restart checks any stopped
+  // service.
+  taskStopWaitMs: 30_000,
+  taskStopPollMs: 500,
+  // How long one launchctl status probe may take before it is cut off.
+  agentProbeMs: 5_000,
   description: 'Gyblos seller',
   // Relative to the repository, which is also the working directory so `--import tsx` resolves; the
   // daemon is its `start` command.
@@ -38,6 +45,9 @@ export const SERVICE = {
   launchAgentsDirectory: 'Library/LaunchAgents',
   // The daemon withdraws its listing and writes its public sequence after the first SIGINT.
   stopTimeoutSeconds: 120,
+  secondMs: 1000,
+  // Extra time a macOS restart allows beyond that for launchd to tear the agent down.
+  agentStopMarginSeconds: 15,
   restartSeconds: 10,
   // systemd gives up after this many failed starts within the interval instead of retrying forever.
   startLimitBurst: 5,
@@ -123,6 +133,8 @@ export const SERVICE_ERRORS = {
   ENVIRONMENT_INVALID: 'SERVICE_ENVIRONMENT_INVALID',
   ENVIRONMENT_RESERVED: 'SERVICE_ENVIRONMENT_RESERVED',
   ALREADY_INSTALLED: 'SERVICE_ALREADY_INSTALLED',
+  NOT_INSTALLED: 'SERVICE_NOT_INSTALLED',
+  RESTART_INCOMPLETE: 'SERVICE_RESTART_INCOMPLETE',
   DOCTOR_NOT_READY: 'SERVICE_DOCTOR_NOT_READY',
   COMMAND_FAILED: 'SERVICE_COMMAND_FAILED',
   EPHEMERAL_INSTALL: 'SERVICE_EPHEMERAL_INSTALL',

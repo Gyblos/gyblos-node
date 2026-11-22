@@ -9,12 +9,16 @@ import {
 
 import { batchPoolPathsIn, batchSessionPathsIn } from '@gyblos/config/home';
 import { buyerPaymentsUnresolved } from '@gyblos/node/buyer-chain';
+import { WITHDRAW_STEPS } from '@gyblos/payments-upto';
 import {
   createBatchBuyer,
   recoverBatchPool,
 } from '@gyblos/payments-upto/batch-session';
 import { matchBatchTerms } from '@gyblos/protocol/batch-channel';
-import type { PaymentSessionTerms } from '@gyblos/protocol/payment-session';
+import {
+  SESSION_CODES,
+  type PaymentSessionTerms,
+} from '@gyblos/protocol/payment-session';
 import { isMain } from '@gyblos/runtime';
 
 import {
@@ -118,6 +122,7 @@ async function execute(
   };
   const { rpc, payer } = ports(input, call);
   const before = await buyerPaymentsUnresolved();
+  let unavailable = false;
   let financial: CrashReply['financial'] = null;
   if (input.action === CRASH_ACTIONS.OPEN) {
     const buyer = await createBatchBuyer({
@@ -153,6 +158,14 @@ async function execute(
       now: () => input.now,
       sleep: async () => {},
     });
+    unavailable = results.some(
+      (row) =>
+        row.step === WITHDRAW_STEPS.FAILED &&
+        row.failure === SESSION_CODES.UNAVAILABLE &&
+        !row.confirmed &&
+        row.transaction === null &&
+        row.settlement === null,
+    );
     const settlement = results.find((item) => item.settlement)?.settlement;
     if (settlement)
       financial = {
@@ -162,6 +175,7 @@ async function execute(
   }
   const blocked = await buyerPaymentsUnresolved();
   return {
+    unavailable,
     runtimeBlockedBefore: before,
     entry: null,
     financial,

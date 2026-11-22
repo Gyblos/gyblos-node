@@ -48,7 +48,7 @@ const HINTS: Readonly<Record<FreeBuyerStartupReason, string>> = {
   [FREE_BUYER_STARTUP.PAID_NETWORK]:
     'paid mode is devnet only: role.json rpcUrl must serve devnet, and request.network and asset must match the role',
   [FREE_BUYER_STARTUP.PAID_MODEL]:
-    'paid mode recounts with the pinned public tokenizer; request.selection.modelId must be qwen3-0.6b',
+    'a Qwen3 model is bought recounted with its pinned tokenizer, never on declared usage; other models are bought only on declared usage',
   [FREE_BUYER_STARTUP.PAID_MODELS]:
     'this explicit paid entry serves only request.selection; remove models or use the automatic buyer',
   [FREE_BUYER_STARTUP.PAID_KEY]:

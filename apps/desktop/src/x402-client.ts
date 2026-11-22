@@ -4,12 +4,7 @@ import { randomUUID } from 'node:crypto';
 
 import { AGENT_SETUP_CODES, AgentSetupError } from '@gyblos/node/agent-setup';
 import { PAID_BUYER_CODES } from '@gyblos/node/constants';
-import { BATCH_CHANNEL } from '@gyblos/protocol/batch-channel';
-import {
-  BUYER_API,
-  type BuyerApiPolicy,
-  type BuyerSellerChoice,
-} from '@gyblos/protocol/buyer-api';
+import { BUYER_API, type BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 import type { BuyerApiKeyCommand } from '@gyblos/protocol/buyer-api-keys';
 import {
   FREE_CHAT_ROLES,
@@ -21,10 +16,16 @@ import { desktopBuyerFailure } from './buyer-error';
 import { requestBuyerApiKeys } from './usdc-api-client';
 import { X402Budget } from './x402-budget';
 import {
+  assertFreeBudget,
   buyerEndpoint,
+  policyForRoute,
+  policyForSeller,
   readJson,
+  reconcileBuyerPool,
+  sellerFields,
   validateChoice,
   waitForPaidBuyer,
+  type DesktopSellerChoice,
 } from './x402-http';
 import { DESKTOP_X402, PaidSellerLimitError, x402Policy } from './x402-model';
 import {
@@ -34,31 +35,16 @@ import {
 } from './x402-reply';
 import { readBuyerStream } from './x402-stream';
 
-export type DesktopSellerChoice =
-  BuyerSellerChoice | typeof OFFER_PRICING_KINDS.FREE;
-function policyForSeller(
-  policy: BuyerApiPolicy,
-  choice?: BuyerSellerChoice,
-): BuyerApiPolicy {
-  if (!choice) return policy;
-  return {
-    ...policy,
-    model: choice.modelId,
-    maxTokens: Math.min(
-      choice.contextTokens,
-      policy.maxTokens,
-      BATCH_CHANNEL.maxOutputTokens,
-    ),
-  };
-}
 export { buyerEndpoint } from './x402-http';
 export { parseBuyerReply } from './x402-reply';
+export type { DesktopSellerChoice } from './x402-http';
 export class X402Client {
   private connection: {
     url: URL;
     token: string;
     managed: boolean;
     preparesPaidChat: boolean;
+    reconcilesPool: boolean;
     policy: BuyerApiPolicy;
   } | null = null;
   private busy = false;
@@ -129,6 +115,9 @@ export class X402Client {
         token,
         managed,
         policy,
+        reconcilesPool:
+          response.headers.get(BUYER_API.RECONCILE_POOL_HEADER) ===
+          BUYER_API.RECONCILE_POOL_PATH,
         preparesPaidChat:
           response.headers.get(BUYER_API.PAID_PREPARATION_HEADER) ===
           BUYER_API.PAID_PREPARATION_PATH,
@@ -137,6 +126,15 @@ export class X402Client {
     } finally {
       this.busy = false;
     }
+  }
+  canCheckChannels() {
+    return this.connection?.reconcilesPool === true;
+  }
+  async reconcileReviewedPool(expected: BuyerApiPolicy) {
+    const connection = this.connection;
+    if (!connection?.reconcilesPool) return;
+    await reconcileBuyerPool(connection, expected, this.request);
+    if (this.connection !== connection) throw new Error('Unconfirmed payment');
   }
   manageApiKeys(command?: BuyerApiKeyCommand) {
     if (!this.connection || this.closed || (command && this.busy))
@@ -204,6 +202,7 @@ export class X402Client {
     prompt: string,
     onDelta?: (text: string) => void,
     choice?: DesktopSellerChoice,
+    route?: NonNullable<BuyerApiPolicy['autoRoutes']>[number],
   ) {
     if (this.busy || this.closed || !this.connection)
       return Promise.reject(new Error('Local buyer is unavailable'));
@@ -221,6 +220,7 @@ export class X402Client {
       controller.signal,
       onDelta,
       choice,
+      route,
     );
     this.pending = work;
     return work.finally(() => {
@@ -237,22 +237,17 @@ export class X402Client {
     external: AbortSignal,
     onDelta?: (text: string) => void,
     choice?: DesktopSellerChoice,
+    route?: NonNullable<BuyerApiPolicy['autoRoutes']>[number],
   ) {
     const current = await this.budget.summary();
     external.throwIfAborted();
     if (choice === OFFER_PRICING_KINDS.FREE) {
-      if (
-        !current.available ||
-        current.blocked ||
-        current.records.some((item) => item.id === id) ||
-        current.records.length >= DESKTOP_X402.MAX_RECORDS
-      )
-        throw new Error('Chat history is unavailable or needs review.');
+      assertFreeBudget(current, id);
       return this.executeReserved(
         connection,
         id,
         prompt,
-        { ...connection.policy, maxAtomic: '0' },
+        { ...policyForRoute(connection.policy, route), maxAtomic: '0' },
         external,
         onDelta,
         choice,
@@ -265,12 +260,13 @@ export class X402Client {
       throw new Error(
         'Buyer policy changed. Finish the previous budget before authorizing another.',
       );
-    validateChoice(choice, connection.policy, current);
+    const seller = typeof choice === 'object' ? choice : undefined;
+    validateChoice(choice, connection.policy, current, route?.modelId);
     await waitForPaidBuyer(
       connection,
       this.request,
       external,
-      choice?.expiresAt,
+      seller?.expiresAt,
     );
     const intent =
       choice && connection.managed && this.budget.opening
@@ -281,7 +277,11 @@ export class X402Client {
       choice ? connection.policy : undefined,
       intent,
     );
-    const policy = policyForSeller(reserved, choice);
+    const policy = policyForRoute(
+      policyForSeller(reserved, seller),
+      route,
+      choice === BUYER_API.AUTO,
+    );
     let sent = false;
     try {
       external.throwIfAborted();
@@ -338,9 +338,7 @@ export class X402Client {
           'if-match': '"' + policy.policyId + '"',
         },
         body: JSON.stringify({
-          ...(choice === OFFER_PRICING_KINDS.FREE
-            ? { [BUYER_API.FREE_ONLY_FIELD]: true }
-            : choice && { [BUYER_API.SELLER_CHOICE_FIELD]: choice }),
+          ...sellerFields(choice),
           ...(intent && { [BUYER_API.OPENING_INTENT_FIELD]: intent }),
           model: policy.model,
           messages: [{ role: FREE_CHAT_ROLES.USER, content: prompt }],
@@ -370,12 +368,21 @@ export class X402Client {
     const reply = parseBuyerReply(body, policy);
     if (choice === OFFER_PRICING_KINDS.FREE && !reply.free)
       throw new Error('The seller did not return a free response.');
-    if (choice && choice !== OFFER_PRICING_KINDS.FREE && !reply.sessionApproval)
+    if (
+      choice &&
+      choice !== OFFER_PRICING_KINDS.FREE &&
+      !(choice === BUYER_API.AUTO && reply.free) &&
+      !reply.sessionApproval
+    )
       throw new Error('Missing channel approval');
     const summary =
       choice === OFFER_PRICING_KINDS.FREE
         ? await this.budget.recordFree(id, policy)
-        : await this.budget.complete(id, reply, choice?.modelId);
+        : await this.budget.complete(
+            id,
+            reply,
+            typeof choice === 'object' ? choice.modelId : undefined,
+          );
     signal.throwIfAborted();
     const metrics = buyerReplyMetrics(reply, policy, responseMs);
     return { text: reply.text, model: policy.model, summary, metrics };

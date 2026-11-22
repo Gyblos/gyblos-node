@@ -2,6 +2,7 @@
 // logon, that runs `gyblos service-run` (service-run.ts) with no console window. Pure text, like
 // service.ts: the task's XML, where it is kept and the schtasks commands that register and remove it.
 import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { win32 } from 'node:path';
 
 import { SERVICE, SERVICE_ERRORS } from './constants';
@@ -36,6 +37,8 @@ export function taskLocation(accountHome: string) {
     files: [taskFile(accountHome, SERVICE.taskScript)],
     disable: [['schtasks.exe', '/Delete', '/TN', taskName(accountHome), '/F']],
     reload: [],
+    // After the supervisor stops the seller gracefully over its pipe (cli-service.ts).
+    restart: [['schtasks.exe', '/Run', '/TN', taskName(accountHome)]],
   };
 }
 
@@ -54,6 +57,27 @@ function taskScript(input: ServiceInput) {
     `"${input.launcher}" ${SERVICE.run} --home "${input.home}" --config "${input.config}"`,
     '',
   ].join('\r\n');
+}
+
+// The seller home the installed task runs: the --home its script passes the supervisor. Restart and
+// uninstall stop the supervisor through that home's pipe, whatever GYBLOS_HOME the invoking shell has.
+export function taskScriptHome(script: string): string | undefined {
+  const home = / --home "([^"]+)"/.exec(script)?.[1];
+  if (home === undefined) return undefined;
+  try {
+    return checkWindowsPath(home);
+  } catch {
+    return undefined;
+  }
+}
+export async function installedTaskHome(accountHome: string) {
+  try {
+    return taskScriptHome(
+      await readFile(taskFile(accountHome, SERVICE.taskScript), 'utf8'),
+    );
+  } catch {
+    return undefined;
+  }
 }
 
 // conhost --headless gives the seller a console without a window.

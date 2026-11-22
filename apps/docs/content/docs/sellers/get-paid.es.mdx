@@ -19,9 +19,11 @@ Los canales reutilizables admiten conversaciones con herramientas.
 ## Requisitos previos [#requisitos]
 
 - Un vendedor registrado ([Registra y publica](/es/sellers/register-publish)).
-- La oferta de **Qwen3 0.6B** del instalador. Un comprador tiene que poder recontar los tokens de un modelo con
-  precio usando su tokenizador público, y solo `qwen3:0.6b` cumple. Cualquier otro modelo con precio detiene
-  el inicio con `SELLER_PAID_METERING_UNRECOUNTED`.
+- Una oferta para cualquier modelo que sirva tu motor. Para los modelos Qwen3 (`qwen3:0.6b`, `1.7b`, `4b`,
+  `8b`, `14b`, `32b`, `30b-a3b`, `235b-a22b`), que comparten un tokenizador público, el comprador recuenta los
+  tokens. Para cualquier otro modelo se te paga el uso que informa tu
+  proveedor, y el comprador solo aprueba un cobro que quepa en el tamaño del texto: nunca más tokens que
+  bytes, ni más que el máximo de la respuesta. Un cobro mayor no se paga.
 - Las llaves de pago del vendedor, que crea el instalador: el **dueño** (`owner`) recibe tus USDC y el
   **pagador de comisiones** (`fee payer`) paga los costes de las transacciones. Qué hace cada llave y cómo
   respaldarlas está en [Identidad y copias de seguridad](/es/sellers/identity#llaves).

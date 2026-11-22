@@ -14,6 +14,7 @@ import { modelTokenizer } from './artifacts';
 import { NODE_ERROR_CODES } from './constants';
 import {
   REMOTE_READINESS,
+  upstreamModelName,
   type EngineFactory,
   type EngineReadinessPolicy,
   type SellerEngineOffer,
@@ -48,7 +49,7 @@ export const OPENAI_ENGINE_FACTORY: EngineFactory = {
   refuse,
   create: (offer, { fetch, environment }) => {
     const url = providerEngineUrl(offer.engine.url);
-    const { contextTokens, apiKeyEnv, upstreamModel } = offer.engine;
+    const { contextTokens, apiKeyEnv } = offer.engine;
     if (!url || contextTokens === undefined)
       throw new Error('OpenAI offer was not checked before creation.');
     const recounted = recountsWithPinnedTokenizer(offer.model);
@@ -57,9 +58,10 @@ export const OPENAI_ENGINE_FACTORY: EngineFactory = {
       engine: createOpenAiEngine(
         {
           base: offer.engine.url,
-          model: upstreamModel ?? offer.model.id,
+          model: upstreamModelName(offer),
           contextTokens,
           recountable: recounted,
+          disableThinking: recounted && isLocalEngineUrl(url),
           ...(apiKey ? { apiKey } : {}),
         },
         fetch,

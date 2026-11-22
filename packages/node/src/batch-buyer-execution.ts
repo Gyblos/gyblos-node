@@ -11,6 +11,7 @@ import {
   verifyBatchQuote,
   type BatchChannelResult,
 } from '@gyblos/protocol/batch-channel';
+import { CONTROL_METERING_MODES } from '@gyblos/protocol/constants';
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
 import type {
   FreeExecutionBuildInput,
@@ -29,6 +30,7 @@ import {
 import type { BatchDestination } from '@gyblos/transport-iroh/batch-client';
 
 import { runBuyerBlocks } from './batch-block-buyer';
+import { isBlockBuyer } from './batch-block-ports';
 import type { BuyerBatchContext } from './batch-buyer-types';
 import {
   publishBuyerSessionReceipt,
@@ -38,6 +40,7 @@ import { executeBatchBuyer } from './batch-session';
 import { verifyDecline } from './buyer-declined-request';
 import { recoverBuyerOpening } from './buyer-opening-retry';
 import { bounded } from './buyer-operation';
+import { declaredCharge, verifyDeclaredUsage } from './declared-usage';
 
 export function batchBuyerSnapshot(
   result: BatchChannelResult,
@@ -55,11 +58,19 @@ function verifiedCharge<Remote extends BatchDestination>(
 ) {
   let usage;
   try {
-    usage = verifyInferenceUsage(input, result, context.options.meter);
+    usage =
+      quote.offer.meteringMode === CONTROL_METERING_MODES.DECLARED
+        ? verifyDeclaredUsage(input, result)
+        : verifyInferenceUsage(input, result, context.options.meter);
   } catch {
     return batchFail(SESSION_CODES.UNVERIFIED);
   }
   const { inputTokens, outputTokens } = usage;
+  if (
+    outputTokens &&
+    quote.offer.meteringMode === CONTROL_METERING_MODES.DECLARED
+  )
+    return declaredCharge(usage, quote.offer);
   return outputTokens
     ? String(
         chargeV2(
@@ -95,12 +106,17 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
   onDelta?: (text: string) => Promise<void>,
 ) {
   const { options, terms, rpc, approve } = context;
-  if (context.blockMode && typeof options.meter.stablePrefix !== 'function')
-    return batchFail(PAID_EXECUTION_CODES.UNSUPPORTED);
   const quote = {
     offer: parseOfferV2(value.offer),
     signature: parseOfferSignatureV2(value.signature),
   };
+  // Blocks certify prefixes with the model's tokenizer; a declared offer has none, so it runs whole.
+  const declared = quote.offer.meteringMode === CONTROL_METERING_MODES.DECLARED;
+  if (declared && isBlockBuyer(options.buyer) && options.buyer.usesBlocks())
+    return batchFail(PAID_EXECUTION_CODES.UNSUPPORTED);
+  const blockMode = context.blockMode && !declared;
+  if (blockMode && typeof options.meter.stablePrefix !== 'function')
+    return batchFail(PAID_EXECUTION_CODES.UNSUPPORTED);
   const { input } = recountSessionInput(quote, data, context.options.meter);
   const verify = async (current: AbortSignal) => {
     current.throwIfAborted();
@@ -119,7 +135,7 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
     current.throwIfAborted();
   };
   await verify(signal);
-  if (!options.preparation?.consume(quote, terms, context.blockMode)) {
+  if (!options.preparation?.consume(quote, terms, blockMode)) {
     const prepared = await rpc(BATCH_METHODS.PREPARE, { quote, terms }, signal);
     if (!('terms' in prepared)) return batchFail(SESSION_CODES.BINDING);
     matchBatchTerms(prepared.terms, terms);
@@ -140,7 +156,7 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
   const request = buildBatchExecutionRequest(channelId, quote, input);
   const open = (payload: string) =>
     openVerified(context, request, verify, signal, payload);
-  if (context.blockMode) {
+  if (blockMode) {
     await verify(signal);
     await open(await options.buyer.open());
     signal.throwIfAborted();
@@ -240,6 +256,10 @@ async function openVerified<Remote extends BatchDestination>(
     verify,
     signal,
   );
+  // An opening may outlast the quote (openMs exceeds its lifetime): check it again before any payment is
+  // reserved, so an expired quote leaves the funded channel open for the next request instead of an
+  // interrupted reservation that recovery would close.
+  await verify(signal);
   await options.beforeInference?.(request.requestId, {
     requestId: request.requestId,
     channelId,

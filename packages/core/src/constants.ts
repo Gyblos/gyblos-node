@@ -8,6 +8,10 @@ export const TOLERANCE = { absoluteTokens: 2, relativePercent: 2 } as const;
 
 export const OFFER_ID = 'qwen3-0.6b-local-v1';
 
+// A declared offer has no public tokenizer to count its prompt before execution; its context and budget
+// checks use this typical UTF-8 bytes per token. The bill itself is bounded by bytes on delivery.
+export const DECLARED_ESTIMATE = { bytesPerToken: 4 } as const;
+
 // Longest issued-to-expiry window a buyer accepts; the seller signs offers with exactly this lifetime.
 export const OFFER_LIFETIME_MS = 4 * 60_000;
 

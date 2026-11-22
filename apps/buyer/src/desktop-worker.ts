@@ -1,6 +1,7 @@
 // Buyer-owned executable entry for a desktop utility process, built separately from the renderer.
 import { DEVNET_USDC } from '@gyblos/config';
 import { setupRole } from '@gyblos/node/roles';
+import { parseAutoPrices } from '@gyblos/protocol/buyer-api';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 
 import { startBuyer } from './buyer-startup';
@@ -30,6 +31,11 @@ export async function startBuyerWorker() {
             preparePaidTokenizer: true,
           }),
         process.argv[2],
+        process.argv[3] === undefined
+          ? undefined
+          : process.argv[3] === 'null'
+            ? null
+            : parseAutoPrices(JSON.parse(process.argv[3])),
       ),
     endpointToken,
     (code) => process.exit(code),

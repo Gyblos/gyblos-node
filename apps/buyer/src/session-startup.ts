@@ -27,10 +27,16 @@ import type { BuyerExecutionFactory } from './free-startup';
 import { onBuyerSelectionFailure } from './free-telemetry';
 import { requireBuyerIdentity } from './identity';
 import { routedRequest } from './model-routes';
-import { selectConfiguredThenOpen } from './quote-selection';
+import {
+  automaticPoolRoute,
+  openDiscoveryRequest,
+  selectAffordableAutoQuote,
+  selectConfiguredThenOpen,
+} from './quote-selection';
 import { classifyPaidError } from './session-errors';
 import { makeManager, type SessionState } from './session-manager';
 import {
+  checkDesktopPool,
   checkPaidSellerRequest,
   endpointToken,
   type BuyerStartupOptions,
@@ -108,6 +114,15 @@ function freeExecutionGuard(
     sending?.();
   };
 }
+async function preferChannel(
+  selectionRoute: SelectionRoute | undefined,
+  paidAuto: boolean | undefined,
+  previousSeller: () => Promise<string | undefined>,
+) {
+  return selectionRoute?.open && paidAuto && !selectionRoute.previousSeller
+    ? { ...selectionRoute, previousSeller: await previousSeller() }
+    : selectionRoute;
+}
 function sessionSelection(
   context: Context,
   options: Options,
@@ -116,6 +131,7 @@ function sessionSelection(
   input: Parameters<Awaited<ReturnType<BuyerExecutionFactory>>['execute']>[0],
   permission: Parameters<typeof reserveApiKey>[0],
   router: ReturnType<typeof sessionRouter> | undefined,
+  previousSeller: () => Promise<string | undefined>,
   choice?: BuyerSellerChoice,
 ): BuyerRoutePorts<ChatResult>['select'] {
   const { prepared, endpoint, relayOnly } = context;
@@ -131,7 +147,7 @@ function sessionSelection(
         request.maxAtomic === '0' ? request.priceCeilings : route.priceCeilings,
       ...(inferenceNeedsTools(input) ? { tools: true as const } : {}),
     };
-    const select = (
+    const select = async (
       candidate: typeof request,
       selectionRoute?: SelectionRoute,
     ) =>
@@ -147,7 +163,11 @@ function sessionSelection(
         excluded,
         current,
         candidate,
-        selectionRoute,
+        await preferChannel(
+          selectionRoute,
+          prepared.config.discovery?.paidAuto,
+          previousSeller,
+        ),
       );
     if (choice) {
       if (permission) return sessionFail(SESSION_CODES.BINDING);
@@ -172,7 +192,13 @@ function sessionSelection(
         return { ...winner, seller: chosen.seller };
       });
     }
-    if (router || route.pinnedNodeId) return select(policy, route);
+    if (router || route.pinnedNodeId)
+      return select(
+        prepared.config.discovery?.paidAuto
+          ? openDiscoveryRequest(policy, true)
+          : policy,
+        automaticPoolRoute(prepared.config, route),
+      );
     return selectConfiguredThenOpen(prepared.config, policy, current, select);
   };
 }
@@ -195,6 +221,39 @@ function freeSessionExecution(
       ),
     );
 }
+function executeSingleRoute(
+  ports: BuyerRoutePorts<ChatResult>,
+  dependencies: Context['dependencies'],
+  unresolved: ReturnType<typeof makeManager>['unresolved'],
+  request: Context['prepared']['config']['request'],
+  pinnedNodeId: string | undefined,
+  streaming: boolean,
+  selection: typeof request.selection | undefined,
+  signal: AbortSignal,
+) {
+  return executeBuyerQuote(
+    {
+      ...ports,
+      enter: dependencies.enter ?? (() => () => {}),
+      unresolved,
+      select: (excluded, current) =>
+        ports
+          .select(excluded, current, {
+            pinnedNodeId,
+            priceCeilings: request.priceCeilings,
+          })
+          .catch(
+            onBuyerSelectionFailure(
+              current,
+              dependencies,
+              streaming,
+              selection,
+            ),
+          ),
+    },
+    signal,
+  );
+}
 function sessionExecutor(
   context: Context,
   options: Options,
@@ -208,17 +267,28 @@ function sessionExecutor(
     const request = routedRequest(config.request, model);
     if (model?.sellerChoice && !permission && request.maxAtomic !== '0')
       await manager.prepareChoice(model.sellerChoice.expiresAt, signal);
+    const select = sessionSelection(
+      context,
+      options,
+      buyer,
+      request,
+      input,
+      permission,
+      router,
+      manager.previousSeller,
+      model?.sellerChoice,
+    );
     const ports: BuyerRoutePorts<ChatResult> = {
-      select: sessionSelection(
-        context,
-        options,
-        buyer,
-        request,
-        input,
-        permission,
-        router,
-        model?.sellerChoice,
-      ),
+      select:
+        config.discovery?.paidAuto && !model?.sellerChoice
+          ? (excluded, current, route) =>
+              selectAffordableAutoQuote(
+                excluded,
+                current,
+                (skip) => select(skip, current, route),
+                (quote) => manager.preflight(quote, input, current),
+              )
+          : select,
       free: freeSessionExecution(context, manager, input, permission, onDelta),
 
       paid: (winner, current, sending) => {
@@ -249,26 +319,14 @@ function sessionExecutor(
     const routed =
       router && !model?.sellerChoice
         ? await router.execute(ports, signal, routeScope(request))
-        : await executeBuyerQuote(
-            {
-              ...ports,
-              enter: context.dependencies.enter ?? (() => () => {}),
-              unresolved: manager.unresolved,
-              select: (excluded, current) =>
-                ports
-                  .select(excluded, current, {
-                    pinnedNodeId: config.pinnedNodeId,
-                    priceCeilings: request.priceCeilings,
-                  })
-                  .catch(
-                    onBuyerSelectionFailure(
-                      current,
-                      context.dependencies,
-                      Boolean(onDelta),
-                      model?.selection,
-                    ),
-                  ),
-            },
+        : await executeSingleRoute(
+            ports,
+            context.dependencies,
+            manager.unresolved,
+            request,
+            config.pinnedNodeId,
+            Boolean(onDelta),
+            model?.selection,
             signal,
           );
     return { ...routed.result, execution: routed.kind };
@@ -296,6 +354,9 @@ export async function startSessionQuoteRuntime(
   };
   return {
     sellerChoice: true,
+    reconcilePool: router
+      ? () => checkDesktopPool(manager, () => router.activeRequests() > 0)
+      : undefined,
     preparePaidChat:
       options.preparePaidTokenizer && prepared.config.request.maxAtomic !== '0'
         ? manager.preparePaidChat

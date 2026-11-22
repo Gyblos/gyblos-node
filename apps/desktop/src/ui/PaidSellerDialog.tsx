@@ -113,23 +113,19 @@ export function PaidSellerDialog(
   if (!policy) return <SellerTerms {...props} confirm={refresh} />;
   const remaining = funding?.channelRemainingAtomic;
   if (
-    funding?.replacementAtomic != null &&
-    BigInt(funding.replacementAtomic) <
-      BigInt(BATCH_SESSION_DEFAULTS.minDepositAtomic)
+    funding?.poolLimited ||
+    (funding?.replacementAtomic != null &&
+      BigInt(funding.replacementAtomic) <
+        BigInt(BATCH_SESSION_DEFAULTS.minDepositAtomic))
   )
-    return <MinimumDepositNotice close={props.close} />;
-  if (remaining === '0')
     return (
-      <Modal title="Channel balance used" close={props.close}>
-        <div className="ui-form">
-          <p>
-            This channel has used its deposit. Review its settlement in Payments
-            or check its balance again.
-          </p>
-          <Button onClick={refresh}>Refresh balance</Button>
-        </div>
-      </Modal>
+      <MinimumDepositNotice
+        close={props.close}
+        deposit={funding?.poolLimited ? policy.depositAtomic : undefined}
+      />
     );
+  if (remaining === '0')
+    return <UsedChannelNotice close={props.close} refresh={refresh} />;
   const hasEscrow =
     (remaining != null && BigInt(remaining) > 0n) || !!funding?.switchingAtomic;
   const balance = funding?.balanceAtomic;
@@ -297,14 +293,40 @@ function SellerRates({ model }: { model: CatalogModel }) {
     </details>
   );
 }
-function MinimumDepositNotice({ close }: { close: () => void }) {
+function MinimumDepositNotice({
+  close,
+  deposit,
+}: {
+  close: () => void;
+  deposit?: string;
+}) {
   return (
     <Modal title="Channel spending limit reached" close={close}>
       <p>
-        The remaining spending allowance is below the minimum deposit of{' '}
-        {fundingAmount(BATCH_SESSION_DEFAULTS.minDepositAtomic)} for a new
-        channel.
+        The remaining spending allowance is below the required deposit of{' '}
+        {fundingAmount(deposit ?? BATCH_SESSION_DEFAULTS.minDepositAtomic)} for
+        a new channel.
       </p>
+    </Modal>
+  );
+}
+
+function UsedChannelNotice({
+  close,
+  refresh,
+}: {
+  close(): void;
+  refresh(): void;
+}) {
+  return (
+    <Modal title="Channel balance used" close={close}>
+      <div className="ui-form">
+        <p>
+          This channel has used its deposit. Review its settlement in Payments
+          or check its balance again.
+        </p>
+        <Button onClick={refresh}>Refresh balance</Button>
+      </div>
     </Modal>
   );
 }

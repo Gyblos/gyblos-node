@@ -177,13 +177,15 @@ credentials or a query string; the other `identity` settings are in
 - `buyer:free` uses open sellers directly. The automatic buyer (`pnpm buyer`,
   `buyer:chat`, the desktop app) asks its configured sellers first at the
   request's own ceilings. When none can serve, or none is configured, it asks
-  the open network at zero price ceilings. A seller that already won and failed
-  this request is not asked again; configured sellers that only declined in the
-  first pass can be asked again in the open pass.
-- Paid requests and automatically chosen payment sessions use configured sellers
-  only. With open discovery, a payment session for a seller the user chose in
-  the desktop app may use an unconfigured seller; it still passes the identity
-  and discovery checks.
+  the open network at zero price ceilings by default. With paid Auto enabled, it
+  uses the configured unit price ceilings and request budget. A seller that
+  already won and failed this request is not asked again; configured sellers
+  that only declined in the first pass can be asked again in the open pass.
+- Paid Auto allows automatic payment sessions with identity-verified sellers
+  from the index. Older profiles keep free-only open discovery until the
+  operator enables paid Auto. With open discovery, a payment session for a
+  seller the user chose in the desktop app may use an unconfigured seller; it
+  still passes the identity and discovery checks.
 - Stats for open sellers live in memory only; `selection-stats.json` keeps the
   configured sellers alone.
 

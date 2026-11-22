@@ -66,7 +66,7 @@ const LEGACY_SELLER_FIELDS = ['buyer'] as const;
 // role.json as written: a seller with payment fields also carries `buyer` (its owner, unused) because
 // earlier releases read payment fields only as a set of four, so an older image the seller still runs
 // (an update that stopped before recreating it, or a rollback) keeps loading the role.
-export function saveRole(path: string, config: RoleConfig) {
+function saveRole(path: string, config: RoleConfig) {
   return saveJson(
     path,
     config.role === P2P_ROLES.SELLER && config.payTo !== undefined

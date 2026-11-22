@@ -72,8 +72,11 @@ the seller's fee payer signs what this RPC asks it to. Then restart the seller:
 
 - **Docker:** in the seller folder, `docker compose exec seller gyblos seller rpc set`, then
   `docker compose restart seller`.
-- **Native on macOS, Linux or Windows:** `gyblos seller rpc set`, then `gyblos seller service uninstall`
-  and `gyblos seller service install` (or stop `gyblos start` and run it again if you run it yourself).
+- **Native on macOS, Linux or Windows:** `gyblos seller rpc set`, then `gyblos seller service restart`,
+  which keeps the background service's settings. If you run `gyblos start` yourself, stop it and run it
+  again.
+
+On a terminal the command always asks for the URL. A script without one sets `GYBLOS_RPC_URL` instead.
 
 `gyblos seller rpc` shows the RPC in use, and `gyblos seller rpc reset` goes back to the public one.
 

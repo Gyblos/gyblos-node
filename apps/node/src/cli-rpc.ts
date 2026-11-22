@@ -30,11 +30,17 @@ export interface RpcCommandContext {
 }
 
 const USAGE =
-  'Usage: gyblos seller rpc          (shows the RPC this seller uses)\n       gyblos seller rpc set      (the URL from GYBLOS_RPC_URL, or asked for on a terminal)\n       gyblos seller rpc reset    (back to the public devnet RPC)\n';
+  'Usage: gyblos seller rpc          (shows the RPC this seller uses)\n       gyblos seller rpc set      (asked for on a terminal; scripts set GYBLOS_RPC_URL)\n       gyblos seller rpc reset    (back to the public devnet RPC)\n';
 const RESTART =
-  'Restart the seller to use it: Docker, `docker compose restart seller` where you installed it; background service, `gyblos seller service uninstall`, then `gyblos seller service install`; otherwise stop `gyblos start` and run it again.\n';
+  'Restart the seller to use it: Docker, `docker compose restart seller` where you installed it; background service, `gyblos seller service restart`, which keeps its settings; otherwise stop `gyblos start` and run it again.\n';
 const NO_SELLER =
   'gyblos seller rpc: no seller is set up in this home; run setup first.\n';
+const UNWRITABLE =
+  "gyblos seller rpc: this seller's role file cannot be written; nothing was changed.\n";
+const STALE_MESSAGE = `gyblos seller rpc set: ${NODE_ENVIRONMENT.rpcUrl} already uses this seller's RPC; run it on a terminal (for Docker, \`docker compose exec\` without -T) to be asked for the new one.
+`;
+// urlOf's answer when GYBLOS_RPC_URL is the saved RPC and no terminal can be asked.
+const STALE = Symbol('stale');
 const UNREADABLE =
   "gyblos seller rpc: this seller's role file cannot be read; nothing was changed.\n";
 const HELP = new Set(['--help', '-h']);
@@ -43,15 +49,25 @@ const LOCAL_HOSTS: ReadonlySet<string> = new Set(LOOPBACK_HOST_NAMES);
 const environment = (values: RpcCommandContext['env']) =>
   values as Record<string, string | undefined>;
 
-async function urlOf(context: RpcCommandContext) {
-  const given = context.env[NODE_ENVIRONMENT.rpcUrl];
-  if (given !== undefined) {
-    // Docker's seller.env may hold it from the first install: say which URL is used, without asking.
-    context.stdout(`Using ${NODE_ENVIRONMENT.rpcUrl}.\n`);
-    return given.trim();
+const sameUrl = (left: string, right: string) => {
+  try {
+    return new URL(left).href === new URL(right).href;
+  } catch {
+    return left === right;
   }
-  if (!context.prompt) return undefined;
-  return (await context.prompt('Solana devnet RPC URL: ')).trim();
+};
+
+// The new URL: asked on a terminal, always, since GYBLOS_RPC_URL may be the first install's value Docker's
+// seller.env keeps in the container. Without a terminal (a script), GYBLOS_RPC_URL, unless it is the RPC
+// already saved.
+async function urlOf(context: RpcCommandContext, current: string) {
+  if (context.prompt)
+    return (await context.prompt('Solana devnet RPC URL: ')).trim();
+  const given = context.env[NODE_ENVIRONMENT.rpcUrl]?.trim();
+  if (given === undefined) return undefined;
+  if (sameUrl(given, current)) return STALE;
+  context.stdout(`Using ${NODE_ENVIRONMENT.rpcUrl}.\n`);
+  return given;
 }
 
 async function save(context: RpcCommandContext, raw: string, check = true) {
@@ -82,7 +98,12 @@ async function save(context: RpcCommandContext, raw: string, check = true) {
     );
     return EXIT.failure;
   }
-  await setRoleRpcUrl(P2P_ROLES.SELLER, url, environment(context.env));
+  try {
+    await setRoleRpcUrl(P2P_ROLES.SELLER, url, environment(context.env));
+  } catch {
+    context.stderr(UNWRITABLE);
+    return EXIT.failure;
+  }
   context.stdout(`Saved: this seller now uses ${urlOrigin(url)}.\n${RESTART}`);
   return EXIT.ok;
 }
@@ -130,7 +151,11 @@ export async function rpcCommand(
   // The public RPC is the default every seller starts with: no need to reach it to go back to it.
   if (action === RPC_COMMANDS.RESET)
     return save(context, DEVNET_RPC_URL, false);
-  const url = await urlOf(context);
+  const url = await urlOf(context, role.rpcUrl);
+  if (url === STALE) {
+    context.stderr(STALE_MESSAGE);
+    return EXIT.failure;
+  }
   if (url === undefined) {
     context.stderr(
       `gyblos seller rpc set: set ${NODE_ENVIRONMENT.rpcUrl}, or run it on a terminal to be asked.\n`,

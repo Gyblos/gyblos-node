@@ -138,6 +138,7 @@ function sessionDestination(
 }
 function desktopPermissions(
   state: SessionState,
+  paidAuto: boolean,
 ): Pick<
   BuyerSessionOptions<ReturnType<typeof sellerAddress>>,
   'financialPermission' | 'switchingAllowed' | 'onDeclined' | 'beforeInference'
@@ -149,7 +150,7 @@ function desktopPermissions(
     },
     switchingAllowed: async () => {
       const intent = state.openingIntent?.getStore();
-      return !!intent && desktopOpening(process.env).armed(intent);
+      return intent ? desktopOpening(process.env).armed(intent) : paidAuto;
     },
     onDeclined: async () => {
       const intent = state.openingIntent?.getStore();
@@ -160,6 +161,19 @@ function desktopPermissions(
       if (intent) await desktopOpening(process.env).consume(intent, ref);
     },
   };
+}
+async function previousSeller(
+  total: string | undefined,
+  inspect: typeof inspectSingle,
+) {
+  if (total !== undefined) return undefined;
+  const stored = await inspect();
+  return stored && !batchSessionTerminal(stored)
+    ? stored.terms.sellerNodeId
+    : undefined;
+}
+function inspectSingle() {
+  return inspectBatchSession(batchSessionPathsIn(process.env, P2P_ROLES.BUYER));
 }
 export function makeManager(
   context: Context,
@@ -172,7 +186,7 @@ export function makeManager(
     typeof createBuyerSessionManager<ReturnType<typeof sellerAddress>>
   >[0] = {
     policy,
-    ...desktopPermissions(state),
+    ...desktopPermissions(state, prepared.config.discovery?.paidAuto === true),
     openingSupportsBlocks:
       (policy.totalDepositAtomic !== undefined
         ? options.pool
@@ -181,8 +195,7 @@ export function makeManager(
         : undefined,
     endpoint,
     now: Date.now,
-    inspect: () =>
-      inspectBatchSession(batchSessionPathsIn(process.env, P2P_ROLES.BUYER)),
+    inspect: inspectSingle,
     backend: async () => {
       return (options.batch ?? buyerSessionChain)(role);
     },
@@ -228,13 +241,17 @@ export function makeManager(
   );
   return {
     ...manager,
+    previousSeller: () =>
+      previousSeller(policy.totalDepositAtomic, common.inspect),
     preparePaidChat: async () => {
       await loadMeter();
     },
     prepareChoice: (expiresAt: number, signal: AbortSignal) =>
       prepareChosenMeter(expiresAt, loadMeter, signal),
     async preflight(...args: Parameters<typeof check>) {
-      state.meter = await check(...args);
+      // A declared quote loads no meter; keep the one a recounted quote loaded.
+      const meter = await check(...args);
+      if (meter) state.meter = meter;
     },
   };
 }

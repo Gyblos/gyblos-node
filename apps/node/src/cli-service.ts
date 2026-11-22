@@ -1,4 +1,4 @@
-// `gyblos seller service install|uninstall`: runs the seller in the background as the installing account,
+// `gyblos seller service install|uninstall|restart`: runs the seller in the background as the installing account,
 // under a systemd user unit (Linux), a launch agent (macOS) or a scheduled task with its supervisor
 // (Windows, packaged release only); never as root. Install first runs the offline
 // doctor with exactly the environment the service will have (seller.env, GYBLOS_HOME and GYBLOS_CONFIG), so
@@ -40,7 +40,14 @@ import {
   type ServiceInput,
 } from './service';
 import { readEnvironmentFile } from './service-environment';
+import {
+  launchAgentLoaded,
+  waitForAgentUnload,
+  waitForTaskStop,
+  windowsTaskRunning,
+} from './service-restart';
 import { servicePipe, stopWindowsService } from './service-run';
+import { installedTaskHome, taskName } from './service-windows';
 
 const HINTS: Readonly<Record<ServiceErrorCode, string>> = {
   [SERVICE_ERRORS.UNSAFE_PATH]:
@@ -60,6 +67,10 @@ const HINTS: Readonly<Record<ServiceErrorCode, string>> = {
     'the environment file may not set GYBLOS_HOME, GYBLOS_CONFIG, GYBLOS_CONTAINER, GYBLOS_PACKAGED, GYBLOS_LAUNCHER, PATH, HOME, shell variables (UID, IFS, BASH*, …) or NODE_*/LD_*/DYLD_*/TSX_*/OPENSSL_* variables',
   [SERVICE_ERRORS.ALREADY_INSTALLED]:
     'run `gyblos seller service uninstall` first',
+  [SERVICE_ERRORS.RESTART_INCOMPLETE]:
+    'the seller stopped but did not end in time to start again; run the command above, or `gyblos seller service restart` again',
+  [SERVICE_ERRORS.NOT_INSTALLED]:
+    'Not installed: no background service to restart; restart `gyblos start` yourself, or run `gyblos seller service install`',
   [SERVICE_ERRORS.DOCTOR_NOT_READY]:
     'the service sees only the environment file, GYBLOS_HOME and GYBLOS_CONFIG; fix the failures above',
   [SERVICE_ERRORS.EPHEMERAL_INSTALL]:
@@ -95,6 +106,10 @@ export interface ServiceSystem {
   // runs).
   windowsUser: () => Promise<string>;
   stopWindowsService: (home: string) => Promise<boolean>;
+  // Windows: whether Task Scheduler still reports the task running.
+  windowsTaskRunning: (task: string) => Promise<boolean>;
+  // macOS: whether launchd still has the agent (gui/<uid>/<label>) loaded.
+  launchAgentLoaded: (target: string) => Promise<boolean>;
 }
 
 export interface ServiceOptions {
@@ -137,6 +152,8 @@ export function defaultServiceSystem(
     run: runCommand,
     windowsUser: () => userSid(),
     stopWindowsService,
+    windowsTaskRunning,
+    launchAgentLoaded,
   };
 }
 
@@ -159,6 +176,9 @@ function account(system: ServiceSystem): { kind: ServiceKind; uid: number } {
 // The seller home the service uses, absolute from where the command runs.
 const sellerHome = (output: ServiceOutput) =>
   resolve(output.cwd, homeLayout(output.env).root);
+// The home the installed Windows task runs, else this shell's.
+const taskHome = async (system: ServiceSystem, output: ServiceOutput) =>
+  (await installedTaskHome(system.accountHome)) ?? sellerHome(output);
 
 async function serviceInput(
   system: ServiceSystem,
@@ -295,7 +315,7 @@ async function uninstall(
   }
   // Windows: the supervisor stops the seller gracefully first; removing the task would not.
   if (kind === SERVICE_KINDS.SCHEDULED_TASK)
-    await system.stopWindowsService(sellerHome(output));
+    await system.stopWindowsService(await taskHome(system, output));
   // Stopping may fail when the service is already stopped; removal proceeds either way.
   for (const command of location.disable) await system.run(command);
   await rm(location.path);
@@ -304,13 +324,59 @@ async function uninstall(
   output.stdout(`Removed: ${location.path}\n`);
 }
 
+// Restarts the installed service from its own definition, so its config path and limits stay; a new
+// setting such as the role's RPC takes effect. Windows stops the seller gracefully over the supervisor's
+// pipe first, as uninstall does.
+async function restart(
+  system: ServiceSystem,
+  options: ServiceOptions,
+  output: ServiceOutput,
+) {
+  const { kind, uid } = account(system);
+  const location = serviceLocation(kind, system.accountHome, uid);
+  if (!(await exists(location.path)))
+    throw new ServiceError(SERVICE_ERRORS.NOT_INSTALLED);
+  if (options.dryRun) {
+    output.stdout('Commands:\n');
+    for (const command of location.restart)
+      output.stdout(`  ${command.join(' ')}\n`);
+    return;
+  }
+  if (kind === SERVICE_KINDS.SCHEDULED_TASK) {
+    await system.stopWindowsService(await taskHome(system, output));
+    const task = taskName(system.accountHome);
+    try {
+      await waitForTaskStop(system, task);
+    } catch {
+      // A failed state query or a task that will not end: say how to start the stopped seller.
+      output.stderr(`schtasks /Run /TN "${task}"\n`);
+      throw new ServiceError(SERVICE_ERRORS.RESTART_INCOMPLETE);
+    }
+    await runAll(location.restart, system, output);
+  } else if (kind === SERVICE_KINDS.LAUNCHD) {
+    // bootout fails when the agent is not loaded; what counts is that it is gone before bootstrap.
+    const [stop, ...start] = location.restart;
+    await system.run(stop!);
+    try {
+      await waitForAgentUnload(system, `gui/${uid}/${SERVICE.label}`);
+      await runAll(start, system, output);
+    } catch {
+      // Service paths never contain quotes (UNSAFE_PATH), so single quotes keep a home with spaces whole.
+      output.stderr(`launchctl bootstrap gui/${uid} '${location.path}'\n`);
+      throw new ServiceError(SERVICE_ERRORS.RESTART_INCOMPLETE);
+    }
+  } else await runAll(location.restart, system, output);
+  output.stdout(`Restarted: ${location.path}\n`);
+}
+
 const COMMANDS = {
   [SERVICE_COMMANDS.INSTALL]: install,
   [SERVICE_COMMANDS.UNINSTALL]: uninstall,
+  [SERVICE_COMMANDS.RESTART]: restart,
 } as const;
 
 const isServiceCommand = (value: string | undefined): value is ServiceCommand =>
-  value === SERVICE_COMMANDS.INSTALL || value === SERVICE_COMMANDS.UNINSTALL;
+  Object.values<string | undefined>(SERVICE_COMMANDS).includes(value);
 
 export async function serviceCommand(
   command: string | undefined,

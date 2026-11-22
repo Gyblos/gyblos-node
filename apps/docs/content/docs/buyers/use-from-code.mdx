@@ -10,6 +10,20 @@ give them the app's **Base URL** and an **API key**. You don't install anything 
 Your prompt reaches the seller that answers it. That seller's machine runs the model and can read your
 prompt. Don't send passwords, keys or other secrets. See [Data and privacy](/en/reference/data-and-privacy).
 
+## Automatic seller selection
+
+For an existing open-discovery buyer with a channel policy and a positive per-response limit, enable Auto with the maximum input and output prices you accept in USDC per million tokens. For example:
+
+In desktop, open **Payments → Automatic seller selection**. Enable paid offers and save the maximum per response and both prices in USDC per million tokens. In chat, open the model and select **Auto**. The CLI and OpenCode share these limits when connected to this buyer. Turn off paid offers to return Auto to free-only discovery.
+
+From the source checkout, use the same `GYBLOS_HOME` as the buyer serving OpenCode.
+
+```sh
+pnpm buyer:auto 0.052 0.208
+```
+
+Restart the buyer, then select the model in OpenCode. Auto asks verified sellers for signed offers. Your per-response limit and the remaining API key budget still apply. A zero-budget key can only use free offers. Auto may settle the previous channel before opening a replacement within the remaining deposit authority. To return to free-only open discovery, run `pnpm buyer:auto off` and restart the buyer.
+
 ## Prerequisites [#before-you-start]
 
 - The [Gyblos desktop app](/en/buyers/desktop-app), installed and open. Keep it open while your tools use

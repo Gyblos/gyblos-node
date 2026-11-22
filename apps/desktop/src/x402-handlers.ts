@@ -1,5 +1,11 @@
-import type { BuyerSellerChoice } from '@gyblos/protocol/buyer-api';
-import { OFFER_PRICING_KINDS } from '@gyblos/protocol/constants';
+import {
+  BUYER_API,
+  parseAutoPrices,
+  type BuyerApiPolicy,
+  type BuyerSellerChoice,
+} from '@gyblos/protocol/buyer-api';
+import { MODEL_IDS, OFFER_PRICING_KINDS } from '@gyblos/protocol/constants';
+import type { TokenPricesV2 } from '@gyblos/protocol/control-types';
 import { controlAtomic } from '@gyblos/protocol/control-validation';
 
 // Fixed main-frame actions; explorer destinations come only from confirmed stored records.
@@ -66,7 +72,11 @@ async function referenceAction(
 }
 export interface ManagedBuyerPorts {
   start(): Promise<void>;
-  configure?(maxAtomic: string, policyId?: string): Promise<void>;
+  configure?(
+    maxAtomic: string,
+    policyId?: string,
+    autoPrices?: TokenPricesV2 | null,
+  ): Promise<void>;
   changing?(): boolean;
   review?: Parameters<X402Budget['review']>[0];
 }
@@ -78,6 +88,7 @@ function sendResponse(
   prompt: string,
   progress?: (value: X402Progress) => void,
   choice?: DesktopSellerChoice,
+  route?: NonNullable<BuyerApiPolicy['autoRoutes']>[number],
 ) {
   return client.send(
     id,
@@ -92,6 +103,7 @@ function sendResponse(
         }
       : undefined,
     choice,
+    route,
   );
 }
 function buyerAction(owner: Owner, event: Sender, args: readonly unknown[]) {
@@ -114,6 +126,28 @@ async function selectedOffer(
     id: string,
   ) => BuyerSellerChoice | undefined | Promise<BuyerSellerChoice | undefined>,
 ) {
+  if (input.auto === true) {
+    if (
+      'freeOnly' in input ||
+      'offerId' in input ||
+      !policy ||
+      input.policyId !== policy.policyId
+    )
+      throw new PaidSellerLimitError(
+        'Select Auto again for the current buyer.',
+      );
+    const route = policy.autoRoutes?.find(
+      (item) => item.modelId === input.model,
+    );
+    if (!route)
+      throw new PaidSellerLimitError(
+        'This buyer cannot serve the selected model.',
+      );
+    if (policy.maxAtomic === '0') return undefined;
+    return policy.paidAuto && route.modelId === MODEL_IDS.QWEN3_0_6B
+      ? BUYER_API.AUTO
+      : OFFER_PRICING_KINDS.FREE;
+  }
   if (input.freeOnly === true) {
     if (input.offerId || !policy || input.policyId !== policy.policyId)
       throw new PaidSellerLimitError('Select the free model again.');
@@ -137,6 +171,25 @@ async function selectedOffer(
     );
   return selected;
 }
+async function selectionFor(
+  client: X402Client,
+  input: Record<string, unknown>,
+  resolve?: Parameters<typeof selectedOffer>[2],
+) {
+  const policy = client.policy();
+  const selected = await selectedOffer(policy, input, resolve);
+  if (client.policy()?.policyId !== policy?.policyId)
+    throw new PaidSellerLimitError(
+      'The buyer changed. Select the model again.',
+    );
+  return {
+    selected,
+    route:
+      input.auto === true
+        ? policy?.autoRoutes?.find((item) => item.modelId === input.model)
+        : undefined,
+  };
+}
 function configureAction(
   managed: ManagedBuyerPorts | undefined,
   input: Record<string, unknown>,
@@ -152,13 +205,42 @@ function configureAction(
   const maxAtomic = controlAtomic(input.maxAtomic);
   if (maxAtomic === '0')
     throw new PaidSellerLimitError('Enter a positive maximum per response.');
-  return managed.configure(maxAtomic, input.policyId).then(() => true);
+  if (input.autoPrices === undefined)
+    return managed.configure(maxAtomic, input.policyId).then(() => true);
+  const rates =
+    input.autoPrices === null ? null : parseAutoPrices(input.autoPrices);
+  return managed.configure(maxAtomic, input.policyId, rates).then(() => true);
 }
 async function checkPayment(
   budget: X402Budget,
   review: NonNullable<ManagedBuyerPorts['review']>,
+  client: X402Client,
 ) {
-  if (!(await budget.review(review))) throw new Error('Unconfirmed payment');
+  let reviewed: BuyerApiPolicy | undefined;
+  const confirmed = await budget.review(async (ref, policy) => {
+    reviewed = policy;
+    return review(ref, policy);
+  });
+  if (!confirmed) throw new Error('Unconfirmed payment');
+  const scope = reviewed ?? client.policy();
+  if (scope) {
+    try {
+      await client.reconcileReviewedPool(scope);
+    } catch {
+      throw new PaidSellerLimitError(
+        reviewed
+          ? 'This payment is confirmed. Check channel status in Payments before spending again.'
+          : 'Channel status is still uncertain. Check again after settlement.',
+      );
+    }
+  }
+}
+async function buyerStatus(client: X402Client, budget: X402Budget) {
+  return {
+    ...(client.canCheckChannels() && { canCheckChannels: true as const }),
+    summary: await budget.summary(),
+    policy: client.policy(),
+  };
 }
 export function createX402Handlers(
   client: X402Client,
@@ -174,10 +256,7 @@ export function createX402Handlers(
     id: string,
   ) => BuyerSellerChoice | undefined | Promise<BuyerSellerChoice | undefined>,
 ) {
-  const summary = async () => ({
-    summary: await budget.summary(),
-    policy: client.policy(),
-  });
+  const summary = () => buyerStatus(client, budget);
   return async (
     event: Sender,
     args: readonly unknown[],
@@ -199,8 +278,8 @@ export function createX402Handlers(
         x402Id(input.id) &&
         typeof input.prompt === 'string'
       ) {
-        const selected = await selectedOffer(
-          client.policy(),
+        const { selected, route } = await selectionFor(
+          client,
           input,
           resolveOffer,
         );
@@ -212,6 +291,7 @@ export function createX402Handlers(
           input.prompt,
           progress,
           selected,
+          route,
         );
         return {
           ...(await summary()),
@@ -256,7 +336,7 @@ async function manageBuyer(
     await managed.start();
     return true;
   } else if (action === X402_ACTION.REVIEW && managed?.review) {
-    await checkPayment(budget, managed.review);
+    await checkPayment(budget, managed.review, client);
     return true;
   }
   return false;

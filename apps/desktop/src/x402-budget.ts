@@ -13,8 +13,8 @@ import {
   DESKTOP_X402,
   emptyX402,
   parseX402Summary,
+  spendingPolicy,
   x402Id,
-  x402Policy,
   type X402Summary,
 } from './x402-model';
 
@@ -165,7 +165,7 @@ export class X402Budget {
       const state = await this.load();
       if (this.failed || state.pending || state.summary.active)
         throw new Error('Finish or review the existing chat budget first');
-      const policy = x402Policy(input);
+      const policy = spendingPolicy(input);
       if (
         !buyerAtomic(limitAtomic) ||
         BigInt(limitAtomic) < BigInt(policy.maxAtomic)
@@ -197,7 +197,7 @@ export class X402Budget {
         ? {
             ...state.summary,
             sessionId: randomUUID(),
-            policy: single,
+            policy: spendingPolicy(single),
             limitAtomic: single.maxAtomic,
             spentAtomic: '0',
           }
