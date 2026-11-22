@@ -200,7 +200,8 @@ de tu cuenta, listar tus gists públicos y crear el gist de prueba. `gyblos sell
 
 **Cómo quitarlo.** Ejecuta `gyblos seller verify github --cancel`. El índice deja de mostrar la cuenta, la
 ruta GET responde `404` y el comando borra el archivo de avance. El índice guarda solo tu NodeId, la hora de
-la cancelación y la hora de su última lectura de tu gist, y nunca los muestra; así nadie puede volver a enviar
+la cancelación y la hora del último turno de lectura que reservó (se fija antes de una revisión que pediste con
+el comando, no en las revisiones programadas), y nunca los muestra; así nadie puede volver a enviar
 una declaración vieja. El gist sigue en GitHub: bórralo
 tú. Las copias que otros hicieron mientras era público quedan fuera del control de Gyblos.
 

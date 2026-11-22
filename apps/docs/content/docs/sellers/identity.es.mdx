@@ -114,8 +114,9 @@ del rol, recibos, logs completos ni capturas del aviso de registro. Pide ayuda e
 
 ## Verifica tu cuenta de GitHub [#verificar-github]
 
-Puedes mostrar a los compradores qué cuenta de GitHub opera tu vendedor. Es opcional. Tu vendedor tiene que
-estar registrado o publicando. El vínculo tiene dos partes públicas que cualquiera puede comprobar: un gist de
+Puedes mostrar a los compradores qué cuenta de GitHub opera tu vendedor. Es opcional. El índice ya tiene que conocer tu
+vendedor: un registro activo o un catálogo que tenga guardado. Activar la publicación no basta, y el vendedor no
+necesita estar en línea. El vínculo tiene dos partes públicas que cualquiera puede comprobar: un gist de
 tu cuenta de GitHub con un archivo llamado `gyblos-proof.txt` que contiene la línea `gyblos-node=NODEID`, y
 una declaración firmada con la llave de tu nodo que nombra la cuenta y el gist. El índice de descubrimiento
 revisa el gist por su cuenta, sin ningún token de GitHub.
@@ -151,7 +152,6 @@ la dirección del gist.
 
 Si `gh` no está instalada, o tiene la sesión iniciada con otra cuenta (el comando lo dice), el comando no la usa
 y muestra los pasos de abajo. La imagen de Docker no incluye `gh`, así que un vendedor Docker sigue los pasos de abajo.
-La imagen de Docker no incluye `gh`, así que un vendedor Docker sigue los pasos de abajo.
 
 ### Sin la CLI de GitHub [#verificar-github-a-mano]
 
@@ -193,24 +193,26 @@ del vendedor y se salta lo que ya está hecho.
 
 | Estado     | Qué significa                                                                                                                                                                                                                                                                   |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `verified` | En la última revisión, el índice encontró la línea de prueba en tu gist. Los compradores ven la cuenta y el gist en la lista de la red del índice.                                                                                                                              |
+| `verified` | En la última revisión que llegó a GitHub, el índice encontró la línea de prueba en tu gist. Los compradores ven la cuenta y el gist en la lista de la red del índice.                                                                                                           |
 | `pending`  | El índice tiene tu declaración, pero aún no encontró la prueba. No aparece en la lista de la red, pero cualquiera puede leerla en `GET /v1/identity/github/<NodeId>`. El índice revisa de nuevo cada 6 horas más o menos, durante 7 días; después, ejecuta el comando otra vez. |
 | `lost`     | La cuenta estaba verificada, pero la última revisión no encontró la prueba: el gist, el archivo o la línea ya no están, o la cuenta cambió de nombre. Los compradores ya no la ven.                                                                                             |
 
 Solo `verified` significa que se encontró la prueba. Cuando GitHub no responde, la declaración mantiene su
-estado: `pending` sigue en `pending` y `verified` sigue en `verified`.
+estado: `pending` sigue en `pending` y `verified` sigue en `verified`, pero la hora de revisión avanza igual. Así que
+esa hora puede ser un intento fallido, no la última vez que el índice encontró la prueba.
 
 ### Bueno saber [#github-bueno-saber]
 
 - **El índice revisó hace un momento.** El comando muestra `waiting N s to ask again (Ctrl+C is safe)` y
-  vuelve a preguntar una vez por su cuenta. Si la espera es de más de 2 minutos, se detiene y te dice que lo
-  ejecutes otra vez más tarde.
+  vuelve a preguntar una vez por su cuenta. Si la espera es de más de 2 minutos, o el índice le pide esperar
+  por segunda vez, se detiene y te dice que lo ejecutes otra vez más tarde.
 - **Cambiar la cuenta o el gist.** Ejecuta el comando otra vez con el nuevo `USER`, o con `--gist` y el nuevo
   gist. La declaración vuelve a `pending` hasta que el índice revise el nuevo gist.
 - **No borres el gist.** El índice lo revisa otra vez cada 6 horas más o menos. Si borras el gist, cambias el
   nombre del archivo o quitas la línea, el estado pasa a `lost`.
 - **Varios vendedores.** Una cuenta de GitHub puede verificar varios vendedores. Cada vendedor tiene su propio
-  NodeId, así que necesita su propio gist.
+  NodeId y su propia línea de prueba. Un solo archivo `gyblos-proof.txt` puede tener una línea por vendedor, cada
+  una en su propia línea.
 
 ### Comprueba el estado [#comprobar-github]
 
@@ -220,7 +222,9 @@ gyblos seller status --online
 ```
 
 `--status` muestra la cuenta, la dirección del gist, el estado, el motivo y cuándo revisó el índice por última
-vez. `gyblos seller status --online` muestra el mismo vínculo en su línea `github`. En un vendedor Docker, pon
+vez. `gyblos seller status --online` muestra el mismo vínculo en su línea `github`, con la
+dirección del gist solo cuando el estado es `verified`. No muestra esa línea si la publicación está apagada o no
+hay ningún modelo listado. En un vendedor Docker, pon
 `docker compose exec seller` delante de los dos.
 
 ### Quita el vínculo [#quitar-github]
@@ -243,7 +247,7 @@ Cada error empieza con una frase que dice qué hacer y termina con un código en
 | `VERIFY_GIST_OWNER_MISMATCH`                            | El gist es de otra cuenta de GitHub. Crea el gist con la sesión iniciada como `USER`.                                                                                                        |
 | `VERIFY_GIST_NOT_FOUND`                                 | GitHub no tiene ese gist para `USER`: revisa la dirección y el nombre de usuario. Si borraste el gist, ejecuta el comando otra vez para crear uno nuevo, o pasa otra dirección con `--gist`. |
 | `VERIFY_NOT_VERIFIED` con `could not reach GitHub`      | El índice no pudo llegar a GitHub. Tu declaración mantiene su estado. Ejecuta el comando otra vez en unos minutos.                                                                           |
-| `VERIFY_NOT_VERIFIED` con `checked this seller moments` | El índice revisó tu vendedor hace un momento y la espera es de más de 2 minutos. Ejecuta el comando otra vez pasado el tiempo que muestra.                                                   |
+| `VERIFY_NOT_VERIFIED` con `checked this seller moments` | El índice revisó tu vendedor hace un momento y la espera es de más de 2 minutos, o pidió esperar por segunda vez. Ejecuta el comando otra vez pasado el tiempo que muestra.                  |
 | `VERIFY_GH_FAILED`                                      | La CLI de GitHub no pudo crear el gist. Créalo a mano y ejecuta el comando con `--gist`.                                                                                                     |
 | `DISCOVERY_UNKNOWN_NODE`                                | El índice aún no conoce tu vendedor. Primero [regístralo](/es/sellers/register-publish) o publícalo.                                                                                         |
 | `DISCOVERY_STALE_CLAIM`                                 | El índice tiene una declaración más nueva de este vendedor. El comando ya probó una vez más. Revisa el reloj de este equipo y ejecuta el comando otra vez.                                   |
