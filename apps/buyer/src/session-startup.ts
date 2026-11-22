@@ -30,6 +30,7 @@ import { routedRequest } from './model-routes';
 import {
   automaticPoolRoute,
   openDiscoveryRequest,
+  selectAffordableAutoQuote,
   selectConfiguredThenOpen,
 } from './quote-selection';
 import { classifyPaidError } from './session-errors';
@@ -219,6 +220,39 @@ function freeSessionExecution(
       ),
     );
 }
+function executeSingleRoute(
+  ports: BuyerRoutePorts<ChatResult>,
+  dependencies: Context['dependencies'],
+  unresolved: ReturnType<typeof makeManager>['unresolved'],
+  request: Context['prepared']['config']['request'],
+  pinnedNodeId: string | undefined,
+  streaming: boolean,
+  selection: typeof request.selection | undefined,
+  signal: AbortSignal,
+) {
+  return executeBuyerQuote(
+    {
+      ...ports,
+      enter: dependencies.enter ?? (() => () => {}),
+      unresolved,
+      select: (excluded, current) =>
+        ports
+          .select(excluded, current, {
+            pinnedNodeId,
+            priceCeilings: request.priceCeilings,
+          })
+          .catch(
+            onBuyerSelectionFailure(
+              current,
+              dependencies,
+              streaming,
+              selection,
+            ),
+          ),
+    },
+    signal,
+  );
+}
 function sessionExecutor(
   context: Context,
   options: Options,
@@ -232,18 +266,28 @@ function sessionExecutor(
     const request = routedRequest(config.request, model);
     if (model?.sellerChoice && !permission && request.maxAtomic !== '0')
       await manager.prepareChoice(model.sellerChoice.expiresAt, signal);
+    const select = sessionSelection(
+      context,
+      options,
+      buyer,
+      request,
+      input,
+      permission,
+      router,
+      manager.previousSeller,
+      model?.sellerChoice,
+    );
     const ports: BuyerRoutePorts<ChatResult> = {
-      select: sessionSelection(
-        context,
-        options,
-        buyer,
-        request,
-        input,
-        permission,
-        router,
-        manager.previousSeller,
-        model?.sellerChoice,
-      ),
+      select:
+        config.discovery?.paidAuto && !model?.sellerChoice
+          ? (excluded, current, route) =>
+              selectAffordableAutoQuote(
+                excluded,
+                current,
+                (skip) => select(skip, current, route),
+                (quote) => manager.preflight(quote, input, current),
+              )
+          : select,
       free: freeSessionExecution(context, manager, input, permission, onDelta),
 
       paid: (winner, current, sending) => {
@@ -274,26 +318,14 @@ function sessionExecutor(
     const routed =
       router && !model?.sellerChoice
         ? await router.execute(ports, signal, routeScope(request))
-        : await executeBuyerQuote(
-            {
-              ...ports,
-              enter: context.dependencies.enter ?? (() => () => {}),
-              unresolved: manager.unresolved,
-              select: (excluded, current) =>
-                ports
-                  .select(excluded, current, {
-                    pinnedNodeId: config.pinnedNodeId,
-                    priceCeilings: request.priceCeilings,
-                  })
-                  .catch(
-                    onBuyerSelectionFailure(
-                      current,
-                      context.dependencies,
-                      Boolean(onDelta),
-                      model?.selection,
-                    ),
-                  ),
-            },
+        : await executeSingleRoute(
+            ports,
+            context.dependencies,
+            manager.unresolved,
+            request,
+            config.pinnedNodeId,
+            Boolean(onDelta),
+            model?.selection,
             signal,
           );
     return { ...routed.result, execution: routed.kind };

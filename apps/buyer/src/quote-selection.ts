@@ -1,8 +1,15 @@
 import { SELLER_SELECTION_CODES } from '@gyblos/core/constants';
+import {
+  buyerQuoteKind,
+  type BuyerQuoteWinner,
+} from '@gyblos/node/buyer-quote-execution';
+import { OFFER_PRICING_KINDS } from '@gyblos/protocol/constants';
 
+import { BUYER_SELECTION } from './constants';
 import { FreeSelectionFailure } from './free-execution';
 import type { SelectionRoute } from './free-route';
 import type { BuyerSelectionConfig } from './selection-config';
+import { unaffordableSessionQuote } from './session-errors';
 
 type Request = BuyerSelectionConfig['request'];
 
@@ -58,4 +65,44 @@ export async function selectConfiguredThenOpen<Winner>(
   );
   signal.throwIfAborted();
   return winner;
+}
+
+export async function selectAffordableAutoQuote<
+  Winner extends BuyerQuoteWinner,
+>(
+  excluded: ReadonlySet<string>,
+  signal: AbortSignal,
+  select: (excluded: Set<string>) => Promise<Winner>,
+  preflight: (quote: Winner['quote']) => Promise<void>,
+): Promise<Winner> {
+  const skipped = new Set(excluded);
+  let budgetFailure: Error | undefined;
+  for (;;) {
+    signal.throwIfAborted();
+    let winner: Winner;
+    try {
+      winner = await select(skipped);
+    } catch (error) {
+      signal.throwIfAborted();
+      if (budgetFailure && error instanceof FreeSelectionFailure)
+        throw budgetFailure;
+      throw error;
+    }
+    signal.throwIfAborted();
+    if (budgetFailure && skipped.has(winner.nodeId)) throw budgetFailure;
+    if (buyerQuoteKind(winner.quote) === OFFER_PRICING_KINDS.FREE)
+      return winner;
+    try {
+      await preflight(winner.quote);
+      signal.throwIfAborted();
+      return winner;
+    } catch (error) {
+      signal.throwIfAborted();
+      if (!unaffordableSessionQuote(error)) throw error;
+      skipped.add(winner.nodeId);
+      if (skipped.size - excluded.size >= BUYER_SELECTION.maxSellers)
+        throw error;
+      budgetFailure = error;
+    }
+  }
 }

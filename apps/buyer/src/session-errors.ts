@@ -36,6 +36,15 @@ const unavailable = (
 
 class UnsentSessionPreflightError extends BatchChannelError {}
 
+export function unaffordableSessionQuote(
+  error: unknown,
+): error is BatchChannelError {
+  return (
+    error instanceof UnsentSessionPreflightError &&
+    error.code === PAID_EXECUTION_CODES.BUDGET_EXHAUSTED
+  );
+}
+
 // Applies only around local recounting and quote verification, before opening a channel or sending input.
 export async function unsentSessionPreflight<T>(
   operation: Promise<T>,
