@@ -9,15 +9,16 @@ desactivar lo que es opcional.
 
 ## Resumen [#resumen]
 
-| Qué                                                         | Adónde va                                                    | Cuándo                                                                 | Cómo desactivarlo                                                |
-| ----------------------------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| Tus prompts y las respuestas                                | El vendedor que atiende la solicitud y su proveedor de motor | En cada solicitud                                                      | No se puede: un vendedor tiene que leer el prompt para responder |
-| [Recibos firmados](#recibos)                                | El recolector de métricas, `collector.gyblos.com`            | Versiones publicadas, más o menos una vez por minuto                   | No se puede                                                      |
-| [Observaciones de telemetría](#observaciones)               | El recolector de métricas                                    | Versiones publicadas, junto con los recibos                            | Sí: `GYBLOS_OBSERVATIONS=off`                                    |
-| [Registros públicos del vendedor](#descubrimiento)          | El índice de descubrimiento, `discovery.gyblos.com`          | Mientras el vendedor está listado; la lista de la red, más tiempo      | En parte: pon `publish = false`                                  |
-| [Registro](#descubrimiento)                                 | El índice de descubrimiento y Solana devnet                  | Una vez, cuando ejecutas `gyblos seller register`                      | Tú decides si te registras                                       |
-| [Búsqueda de actualizaciones](#búsqueda-de-actualizaciones) | La API de GitHub                                             | App de escritorio: al iniciar y cada 5 minutos. Vendedor: con `status` | Sí: `GYBLOS_UPDATE_CHECK=0`                                      |
-| [Metadatos de red](#red)                                    | Relays, pares, el índice, el recolector y el RPC de Solana   | En cada conexión                                                       | En parte: [modo solo relay](/es/reference/configuration)         |
+| Qué                                                         | Adónde va                                                    | Cuándo                                                                                                  | Cómo desactivarlo                                                |
+| ----------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Tus prompts y las respuestas                                | El vendedor que atiende la solicitud y su proveedor de motor | En cada solicitud                                                                                       | No se puede: un vendedor tiene que leer el prompt para responder |
+| [Recibos firmados](#recibos)                                | El recolector de métricas, `collector.gyblos.com`            | Versiones publicadas, más o menos una vez por minuto                                                    | No se puede                                                      |
+| [Observaciones de telemetría](#observaciones)               | El recolector de métricas                                    | Versiones publicadas, junto con los recibos                                                             | Sí: `GYBLOS_OBSERVATIONS=off`                                    |
+| [Registros públicos del vendedor](#descubrimiento)          | El índice de descubrimiento, `discovery.gyblos.com`          | Mientras el vendedor está listado; la lista de la red, más tiempo                                       | En parte: pon `publish = false`                                  |
+| [Registro](#descubrimiento)                                 | El índice de descubrimiento y Solana devnet                  | Una vez, cuando ejecutas `gyblos seller register`                                                       | Tú decides si te registras                                       |
+| [Verificación de GitHub](#github)                           | El índice de descubrimiento, que luego lee tu gist en GitHub | Solo cuando ejecutas `gyblos seller verify github`; el índice vuelve a revisar cada 6 horas más o menos | Tú decides si verificas; `--cancel` lo quita                     |
+| [Búsqueda de actualizaciones](#búsqueda-de-actualizaciones) | La API de GitHub                                             | App de escritorio: al iniciar y cada 5 minutos. Vendedor: con `status`                                  | Sí: `GYBLOS_UPDATE_CHECK=0`                                      |
+| [Metadatos de red](#red)                                    | Relays, pares, el índice, el recolector y el RPC de Solana   | En cada conexión                                                                                        | En parte: [modo solo relay](/es/reference/configuration)         |
 
 Una versión de desarrollo, ejecutada desde el código fuente, no sube recibos ni observaciones salvo que
 definas `GYBLOS_COLLECTOR_URL`.
@@ -168,6 +169,41 @@ Los compradores y la app de escritorio leen el índice para encontrar vendedores
 --online` además le pide el uptime del propio vendedor por su NodeId, que el vendedor ya publica ahí. El
 índice usa las direcciones IP para limitar la tasa de solicitudes y no guarda ninguna.
 
+## Verificación de GitHub [#github]
+
+Vincular una cuenta de GitHub a tu vendedor es opcional. No se envía nada salvo que ejecutes
+`gyblos seller verify github` (consulta [Verifica tu cuenta de GitHub](/es/sellers/identity#verificar-github)).
+
+**Qué se vuelve público.** El índice publica tu declaración en `GET /v1/identity/github/<NodeId>`: tu
+NodeId, el nombre de tu cuenta de GitHub, el id del gist, el estado (`pending`, `verified` o `lost`), el
+motivo del último resultado, cuándo revisó el índice por última vez y desde cuándo la cuenta está
+verificada. Cualquiera puede leerla, sea cual sea el estado. Mientras el estado es `verified`, la lista de la
+red (`/v1/network`) también muestra la cuenta y el gist junto a tu vendedor. El gist en sí es público en
+GitHub. Un gist secreto también sirve, pero su id se publica, así que trátalo como público.
+
+**Qué envía el índice a GitHub.** El índice lee un solo archivo,
+`https://gist.githubusercontent.com/<account>/<gist>/raw/gyblos-proof.txt`, sin token ni llamadas a la API
+de GitHub. Lo lee cuando envías la declaración, como mucho una vez por minuto por vendedor, y luego cada 6
+horas más o menos (busca revisiones pendientes cada 10 minutos). Una declaración que sigue en `pending` 7
+días después de enviarla deja de revisarse hasta que ejecutes el comando otra vez. GitHub ve que estas
+consultas vienen del índice, no de tu equipo.
+
+**Qué envía tu equipo.** El comando firma la declaración con la llave del nodo y la envía al índice: tu
+NodeId, la cuenta, el id del gist y la hora. También lee el mismo archivo del gist desde tu equipo (y, si ese
+archivo falta, la dirección raw del gist sin nombre de archivo, para distinguir un nombre de archivo equivocado de
+un gist que no existe), así que GitHub ve tu dirección IP. Si usas la CLI de GitHub (`gh`), esta usa tu sesión de GitHub para leer el nombre
+de tu cuenta, listar tus gists públicos y crear el gist de prueba. `gyblos seller status --online` y
+`--status` le piden tu declaración al índice por tu NodeId.
+
+**En tu equipo.** El comando guarda su avance (una versión del formato, tu NodeId, la cuenta, el id del gist y el último paso) en
+`github-verification.json`, dentro de la carpeta `seller/` del home del vendedor. Solo tú puedes leerlo.
+
+**Cómo quitarlo.** Ejecuta `gyblos seller verify github --cancel`. El índice deja de mostrar la cuenta, la
+ruta GET responde `404` y el comando borra el archivo de avance. El índice guarda solo tu NodeId, la hora de
+la cancelación y la hora de su última lectura de tu gist, y nunca los muestra; así nadie puede volver a enviar
+una declaración vieja. El gist sigue en GitHub: bórralo
+tú. Las copias que otros hicieron mientras era público quedan fuera del control de Gyblos.
+
 ## Solana devnet [#solana]
 
 El registro y los pagos son transacciones públicas en devnet: cualquiera puede ver las direcciones y los
@@ -201,6 +237,9 @@ desde la que te conectas.
 | Vendedor Docker   | `~/gyblos-seller` y el volumen Docker `gyblos` (montado en `/data`)                   | `config.toml` y `seller.env` en la carpeta. Llaves, estado del registro, recibos y registros de pago en el volumen                                          |
 | Vendedor nativo   | `~/.gyblos` (Windows: `%USERPROFILE%\.gyblos`)                                        | `config.toml`, `seller.env`, `service.log` (macOS y Windows) y `seller/` con llaves, registro, recibos y pagos                                              |
 | App de escritorio | `gyblos-desktop` y `gyblos-wallet` en la carpeta de datos de aplicaciones del sistema | Conversaciones, actividad, el presupuesto del Chat y el comprador local; la billetera, cuando la configuras, protegida por el almacén de llaves del sistema |
+
+Si ejecutaste `gyblos seller verify github`, la carpeta `seller/` del vendedor (en el volumen o en `~/.gyblos`)
+también guarda `github-verification.json` hasta que canceles.
 
 La carpeta de datos de aplicaciones es `~/Library/Application Support` en macOS, `%APPDATA%` en Windows y
 `~/.config` en Linux.
