@@ -1388,12 +1388,12 @@ html .app.desktop-frame .preview-guide-key .preview-guide-key-trigger:hover {
   background: var(--line);
 }
 .desktop-frame .preview-agents-entry {
-  border-color: color-mix(in srgb, var(--blue) 28%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
   background: var(--soft);
 }
 .desktop-frame .preview-agents-entry:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--blue) 45%, transparent);
-  background: color-mix(in srgb, var(--blue) 12%, var(--panel));
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  background: color-mix(in srgb, var(--accent) 16%, var(--panel));
 }
 
 /* Blurred ::backdrop mirrors the whole window in Chromium; a flat scrim keeps focus on the dialog. */
@@ -3869,6 +3869,11 @@ html .app.desktop-frame.sidebar-collapsed > .buyer-sidebar {
   border: 2px solid color-mix(in srgb, var(--ink) 20%, transparent);
   border-top-color: var(--ink);
   animation: pk-spin 800ms linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .desktop-frame .preview-chat-state[data-state='running'] {
+    animation: none;
+  }
 }
 @keyframes pk-spin {
   to {

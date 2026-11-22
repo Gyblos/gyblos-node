@@ -71,6 +71,10 @@ void test('the title bar adds a conversation menu and a details panel for the ch
   assert.match(css, /\.preview-chat-state\[data-state='running'\]/);
   assert.match(
     css,
+    /prefers-reduced-motion: reduce\) \{\s*\.desktop-frame \.preview-chat-state\[data-state='running'\] \{\s*animation: none;/,
+  );
+  assert.match(
+    css,
     /> \.app-body \{[^}]*border-start-start-radius: var\(--radius-panel\);/,
   );
   assert.doesNotMatch(css, /--pk-side-width/);
