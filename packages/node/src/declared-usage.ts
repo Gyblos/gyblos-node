@@ -41,11 +41,14 @@ function declaredBounds(input: InferenceBuildInput, result: Delivered) {
 }
 
 // The seller's bill: the provider's count, held to the bounds the buyer will check.
+// None exists when the delivery's byte floor exceeds its ceiling (more output than maxTokens can hold):
+// the answer is then an invalid response, never a bill the buyer would refuse.
 export function boundDeclaredUsage(
   input: InferenceBuildInput,
   result: Delivered & { usage: InferenceUsage },
-): InferenceUsage {
+): InferenceUsage | undefined {
   const bounds = declaredBounds(input, result);
+  if (bounds.outputFloor > bounds.output) return undefined;
   return {
     inputTokens: Math.max(1, Math.min(result.usage.inputTokens, bounds.input)),
     // A count below the delivered text's floor is refused earlier (DECLARED_METER.usage); this only keeps

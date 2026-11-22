@@ -145,6 +145,27 @@ function batchGeneration(
     window.check,
   );
   let emitted = false;
+  // A declared bill is held to the bounds the buyer checks before the shared pipeline validates it, so a
+  // provider count past maxTokens is capped instead of failing an answer that was delivered. A delivery
+  // whose byte floor exceeds maxTokens has no bill and fails as an invalid response.
+  const meter =
+    live.meter.mode === CONTROL_METERING_MODES.DECLARED
+      ? {
+          ...live.meter,
+          usage: (...args: Parameters<typeof live.meter.usage>) => {
+            const [text, , , toolCalls] = args;
+            const usage = live.meter.usage(...args);
+            return (
+              usage &&
+              boundDeclaredUsage(input, {
+                text,
+                ...(toolCalls ? { toolCalls: [...toolCalls] } : {}),
+                usage,
+              })
+            );
+          },
+        }
+      : live.meter;
   return {
     stop: output.stop,
     generate: async () => {
@@ -153,7 +174,7 @@ function batchGeneration(
         engine: live.engine,
         input,
         inputTokens,
-        meter: live.meter,
+        meter,
         contextTokens: live.model.contextTokens,
         signal: window.signal,
         check: window.check,
@@ -166,10 +187,7 @@ function batchGeneration(
       window.check();
       if (!emitted && generated.text) await output.onText(generated.text);
       output.complete(generated.text);
-      // A declared bill is held to the bounds the buyer checks, in the result it sees as well.
-      return live.meter.mode === CONTROL_METERING_MODES.DECLARED
-        ? { ...generated, usage: boundDeclaredUsage(input, generated) }
-        : generated;
+      return generated;
     },
     measure: (
       generated: import('@gyblos/inference').Generated<ExecutionResult>,

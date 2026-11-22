@@ -152,6 +152,13 @@ export async function prepareChosenMeter(
     throw new UnsentSellerChoiceError(SESSION_CODES.BINDING);
 }
 
+// A declared quote is checked by bytes, so its preflight never needs the meter; one that reaches it anyway
+// is refused rather than counted.
+const NO_METER = {
+  chat: () => batchFail(PAID_EXECUTION_CODES.UNSUPPORTED),
+  output: () => batchFail(PAID_EXECUTION_CODES.UNSUPPORTED),
+};
+
 export function createSessionPreflight(
   load: ReturnType<typeof sessionMeter>,
   policy: BuyerSessionPolicy,
@@ -161,8 +168,12 @@ export function createSessionPreflight(
     quote: SignedOfferV2,
     input: Parameters<typeof recountSessionInput>[1],
   ) => {
-    const meter = await load();
-    recountSessionInput(quote, input, meter);
+    // Only a recounted quote needs the pinned tokenizer; a declared one is bounded by bytes.
+    const meter =
+      quote.offer.meteringMode === CONTROL_METERING_MODES.DECLARED
+        ? undefined
+        : await load();
+    recountSessionInput(quote, input, meter ?? NO_METER);
     const now = Date.now();
     await verifyBatchQuote(
       quote,

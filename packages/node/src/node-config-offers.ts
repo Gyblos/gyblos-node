@@ -110,8 +110,10 @@ function offerModel(
     ]);
   }
   if (resolution.kind === MODEL_CLASSIFICATIONS.CATALOG) {
+    // The catalog grows: an offer that needed `custom = true` before its model was added keeps loading,
+    // as the catalog model, and the operator is told to drop the flag.
     if (custom === true)
-      return issues.add(NODE_CONFIG_ISSUE_CODES.CUSTOM_MODEL_IN_CATALOG, [
+      issues.warn(NODE_CONFIG_WARNING_CODES.CUSTOM_MODEL_NOW_IN_CATALOG, [
         ...path,
         'custom',
       ]);

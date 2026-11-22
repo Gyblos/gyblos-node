@@ -1,5 +1,5 @@
 // The anthropic engine plugin: which offers it serves (an API key, https anywhere or a literal loopback
-// proxy at the API root, reasoning off), declared usage, readiness by describing the model (never
+// proxy at the API root, reasoning off), declared usage (recounted for the Qwen3 catalog models), readiness by describing the model (never
 // generating, even on loopback) and where its key goes. Offline, synthetic values.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -123,6 +123,28 @@ void test('an anthropic engine is declared, only described for readiness, and se
       { url: `${url}/v1/models/acme-chat-large-2026`, key: FAKE_SECRET },
     ]);
   }
+});
+
+void test('a Qwen3 hybrid model behind a Messages API is recounted with the pinned tokenizer, like any engine', () => {
+  // The buyer refuses declared Qwen3 quotes; the recount does not depend on the engine that served them.
+  const prepared = createSellerEngine(
+    {
+      ...OFFER,
+      model: {
+        kind: MODEL_CLASSIFICATIONS.CATALOG,
+        id: 'qwen3-30b-a3b',
+        requested: 'qwen3-30b-a3b',
+      },
+    },
+    { fetch, environment: { ANTHROPIC_UPSTREAM_KEY: FAKE_SECRET } },
+  );
+  assert.equal(prepared.metering.mode, CONTROL_METERING_MODES.RECOUNTED);
+  assert.equal(prepared.engine.capabilities().recountable, true);
+  const declared = createSellerEngine(OFFER, {
+    fetch,
+    environment: { ANTHROPIC_UPSTREAM_KEY: FAKE_SECRET },
+  });
+  assert.equal(declared.engine.capabilities().recountable, false);
 });
 
 void test('examples/anthropic-free.toml is a file the seller daemon serves as written', () => {
