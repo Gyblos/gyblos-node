@@ -22,7 +22,8 @@ const lowestPaidOutput = (seller: Seller) =>
 
 function uptimeBand(seller: Seller, now: number): number | null {
   const history = seller.uptime
-    ? (seller.uptime.readAt ?? now) - seller.uptime.firstSeenAt
+    ? (seller.uptime.generatedAt ?? seller.uptime.readAt ?? now) -
+      seller.uptime.firstSeenAt
     : 0;
   if (!(history >= DISPLAY.weekWindow * UNITS.msPerDay)) return null;
   const ratio = uptimeRatio(seller, DISPLAY.weekWindow);

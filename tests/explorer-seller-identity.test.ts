@@ -6,6 +6,7 @@ import test from 'node:test';
 import { gistUrl } from '@gyblos/explorer/config';
 import { DISPLAY, IDENTITY } from '@gyblos/explorer/constants';
 import type { Seller } from '@gyblos/explorer/discovery';
+import { uptime } from '@gyblos/explorer/discovery-shape';
 import {
   normalizeNetwork,
   parseNetworkStatus,
@@ -241,4 +242,20 @@ void test('the not-online counts follow the verified filter', () => {
   const status = parseNetworkStatus(network(null));
   assert.equal(notOnlineMeta(status, 2), '2 verified sellers not online');
   assert.equal(notOnlineMeta(status, null), '0 offline · 0 not published');
+});
+
+void test('a week of history is counted when the index computed the uptime', () => {
+  const computed = NOW - 3 * 86_400_000;
+  const young = seller(NODE_A, 1, '9', computed - 5 * 86_400_000);
+  Object.assign(young.uptime as object, { generatedAt: computed, readAt: NOW });
+  const ordered = orderSellers([young, seller(NODE_B, 0.9, '9')], NOW);
+  assert.deepEqual(
+    ordered.map((entry) => entry.nodeId),
+    [NODE_B, NODE_A],
+  );
+  assert.equal(
+    uptime({ firstSeenAt: 1, generatedAt: 5, windows: [] }).generatedAt,
+    5,
+  );
+  assert.equal(uptime({ firstSeenAt: 1, windows: [] }).generatedAt, undefined);
 });

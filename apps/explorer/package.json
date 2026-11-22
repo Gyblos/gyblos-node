@@ -12,6 +12,7 @@
     "./config": "./lib/config.ts",
     "./constants": "./lib/constants.ts",
     "./discovery": "./lib/discovery.ts",
+    "./discovery-shape": "./lib/discovery-shape.ts",
     "./discovery-snapshot": "./lib/discovery-snapshot.ts",
     "./fetch-json": "./lib/fetch-json.ts",
     "./format": "./lib/format.ts",
