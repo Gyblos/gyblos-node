@@ -1,0 +1,56 @@
+name: LinuxImg22 build
+on:
+  push:
+    branches: [codex/bench-linux-image-nov22]
+permissions:
+  contents: read
+  packages: write
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 24.22.1
+      - name: Assemble minimal image context
+        run: |
+          set -euo pipefail
+          ctx="$RUNNER_TEMP/context"
+          mkdir -p "$ctx/node"
+          cp .bench/Dockerfile pnpm-lock.yaml pnpm-workspace.yaml "$ctx/"
+          cp -a patches "$ctx/"
+          prefix="$(dirname "$(dirname "$(command -v node)")")"
+          cp -a "$prefix/bin" "$prefix/lib" "$ctx/node/"
+      - name: Build Ubuntu image
+        run: docker build -t local-ci:bench "$RUNNER_TEMP/context"
+      - name: Qualify exact product checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 04e1eab01518ebc3247009af8c20e88ca2bbbd01
+          path: product
+          persist-credentials: false
+      - name: Offline frozen install and patch verification
+        run: |
+          set -eu
+          test "$(id -u)" = 1001
+          docker run --rm --network none -v "$PWD/product:/work" -v "$PWD/.bench/verify.py:/tmp/verify.py:ro" -w /work local-ci:bench bash -ec 'test "$(node -v)" = v24.22.1 && test "$(pnpm -v)" = 10.12.1 && pnpm install --offline --frozen-lockfile && python3 /tmp/verify.py'
+      - name: Exercise native loopback Iroh
+        run: |
+          set -euo pipefail
+          docker run --rm -v "$PWD/product:/work" -w /work local-ci:bench node --import tsx --test --test-reporter=spec tests/iroh-transport.test.ts | tee "$RUNNER_TEMP/iroh.txt"
+          grep -Fx 'ℹ pass 5' "$RUNNER_TEMP/iroh.txt"
+          grep -Fx 'ℹ skipped 0' "$RUNNER_TEMP/iroh.txt"
+      - name: Cache qualified image in registry
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          image=ghcr.io/gyblos/gyblos-node-ci-bench-nov22:${GITHUB_SHA}
+          docker tag local-ci:bench "$image"
+          docker push "$image"
+          docker inspect "$image" --format '{{index .RepoDigests 0}}' | tee "$GITHUB_STEP_SUMMARY"
