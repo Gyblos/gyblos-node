@@ -26,6 +26,7 @@ import {
   REASONING_LEVELS,
 } from '@gyblos/protocol/constants';
 
+import { COMPLETE } from './support/fake-openai';
 import {
   BASE,
   FAKE_SECRET,
@@ -136,7 +137,7 @@ void test('any Qwen3 model behind an openai server is recounted with the shared 
       model: {
         kind: MODEL_CLASSIFICATIONS.CATALOG,
         id: 'qwen3-4b',
-        requested: 'qwen3:4b',
+        requested: 'qwen3-4b',
       },
     },
     { fetch: globalThis.fetch, environment: {} },
@@ -233,4 +234,30 @@ void test('settings refuse an API key read from a Gyblos or relay token variable
       env,
     );
   }
+});
+
+void test('only a local Qwen3 server is asked to keep thinking off; a hosted one never gets the field', async () => {
+  const bodies: Record<string, unknown>[] = [];
+  const fetch = (async (_input: unknown, init?: RequestInit) => {
+    bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+    return new Response(COMPLETE, {
+      status: 200,
+      headers: { 'content-type': 'text/event-stream' },
+    });
+  }) as typeof globalThis.fetch;
+  const qwen = {
+    kind: MODEL_CLASSIFICATIONS.CATALOG,
+    id: 'qwen3-4b',
+    requested: 'qwen3-4b',
+  } as const;
+  for (const offer of [
+    { ...LOCAL, model: qwen },
+    { ...REMOTE, model: qwen },
+  ])
+    await createSellerEngine(offer, {
+      fetch,
+      environment: { UPSTREAM_API_KEY: 'synthetic' },
+    }).engine.generate({ prompt: 'synthetic', maxTokens: 8 });
+  assert.deepEqual(bodies[0]!.chat_template_kwargs, { enable_thinking: false });
+  assert.equal('chat_template_kwargs' in bodies[1]!, false);
 });

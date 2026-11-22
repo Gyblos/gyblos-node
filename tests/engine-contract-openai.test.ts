@@ -39,7 +39,7 @@ function engineAt(
   options: {
     apiKey?: string;
     generationTimeoutMs?: number;
-    recountable?: boolean;
+    disableThinking?: boolean;
   } = {},
 ): Engine {
   return createOpenAiEngine(
@@ -47,7 +47,8 @@ function engineAt(
       base,
       model: FAKE_OPENAI_MODEL,
       contextTokens: CONTEXT,
-      recountable: options.recountable ?? false,
+      recountable: false,
+      ...(options.disableThinking ? { disableThinking: true } : {}),
       ...(options.apiKey ? { apiKey: options.apiKey } : {}),
     },
     fetch,
@@ -115,9 +116,9 @@ void test('engine-openai streams one user message with the upstream model, max_t
     });
   }));
 
-void test('engine-openai asks a recountable Qwen3 server to keep thinking off, as the recount renders it', () =>
+void test('engine-openai asks a local Qwen3 server to keep thinking off, as the recount renders it', () =>
   withServer(stream(COMPLETE), async (server) => {
-    await engineAt(server.base, { recountable: true }).generate({
+    await engineAt(server.base, { disableThinking: true }).generate({
       prompt: 'synthetic',
       maxTokens: 8,
     });
