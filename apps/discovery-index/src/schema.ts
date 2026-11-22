@@ -222,9 +222,10 @@ export const githubClaims = sqliteTable(
     checkedAt: integer('checked_at'),
     verifiedAt: integer('verified_at'),
     lastFetchAt: integer('last_fetch_at'),
+    nextCheckAt: integer('next_check_at'),
   },
   (table) => [
-    index('discovery_github_claims_by_check').on(table.checkedAt),
+    index('discovery_github_claims_by_next_check').on(table.nextCheckAt),
     check(
       'discovery_github_claims_node_id',
       eq(textLength(table.nodeId), nodeIdCharacters),

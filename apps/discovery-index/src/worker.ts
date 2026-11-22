@@ -143,6 +143,8 @@ export function createWorker() {
 }
 
 // The scheduled run rechecks one bounded batch of GitHub claims. Without a database it does nothing.
+// A storage failure (for example before migration 0007 is applied) ends the run quietly: every write
+// is conditional, so nothing already stored is lost, and the next run tries again.
 export async function scheduledRecheck(
   bindings: unknown,
   now: number,
@@ -150,11 +152,15 @@ export async function scheduledRecheck(
 ) {
   const database = binding(bindings, DISCOVERY_DB_BINDING);
   if (!isDatabase(database)) return 0;
-  return recheckGithubClaims(
-    createD1GithubClaimStore(database),
-    edgeFetch(fetcher),
-    now,
-  );
+  try {
+    return await recheckGithubClaims(
+      createD1GithubClaimStore(database),
+      edgeFetch(fetcher),
+      now,
+    );
+  } catch {
+    return 0;
+  }
 }
 
 // The default worker creates its app cache on the first request, not on import.

@@ -37,17 +37,19 @@ specified in
 }
 ```
 
-`account` is the lowercase GitHub login and `gist` the id of a public gist that
-account owns. That gist must contain, on a line of its own, the proof line
-`gyblos-node=<nodeId>` (`githubProofLine(nodeId)`). Both fields `null` cancels
-the claim. The signing domain is `gyblos/identity-claim/v1\n`.
+`account` is the lowercase GitHub login (at most 39 characters) and `gist` the
+id of a public gist that account owns. That gist must contain, on a line of its
+own, the proof line `gyblos-node=<nodeId>` (`githubProofLine(nodeId)`). Both
+fields `null` cancels the claim. The signing domain is
+`gyblos/identity-claim/v1\n`.
 
 Anyone can re-check the binding: verify the signature with the NodeId, then
 fetch `https://gist.githubusercontent.com/<account>/<gist>/raw`, which answers
 only when the account owns the gist (the account name is matched
 case-insensitively), and look for the proof line. The discovery index does this
 for sellers it knows and publishes the result
-([discovery-index.md](discovery-index.md#github-claims)).
+([discovery-index.md](discovery-index.md#github-claims)). Clients must treat an
+account as proven only when the index reports `state` `verified`.
 
 A GitHub claim is a public label, not buyer trust: it is not the 8004 binding
 and no buyer admission policy reads it.

@@ -319,7 +319,10 @@ is `400 INVALID_QUERY`):
       "firstSeenAt": 1762473600000,
       "lastSeenAt": 1763078400000,
       "models": ["qwen3-0.6b"],
-      "github": { "account": "octo-cat" }
+      "github": {
+        "account": "octo-cat",
+        "gist": "0123456789abcdef0123456789abcdef"
+      }
     },
     {
       "nodeId": "…",
@@ -361,10 +364,12 @@ is `400 INVALID_QUERY`):
 - **Fields.** `firstSeenAt` and `lastSeenAt` are the [uptime](#uptime) sightings
   (`lastSeenAt` is `null` when none falls within the last 30 days). `models`
   lists the catalog's model ids while `online`, and is empty otherwise. `github`
-  is `{ account }` when the seller's [GitHub claim](#github-claims) is
-  `verified`, and `null` otherwise; a `pending` or `lost` claim is read only
-  through `GET /v1/identity/github/<NodeId>`. No owner, contact, country or IP
-  is returned.
+  is `{ account, gist }` when the seller's [GitHub claim](#github-claims) is
+  `verified`, so a client can link the proof gist, and `null` otherwise; a
+  `pending` or `lost` claim is read only through
+  `GET /v1/identity/github/<NodeId>`. If the claims read fails (for example
+  before migration `0007` is applied), every `github` is `null` and the route
+  still answers. No owner, contact, country or IP is returned.
 - **Order and size.** Online first, then by `lastSeenAt` (latest first), then by
   NodeId. `counts` cover every listed seller. The `nodes` list stops before the
   answer would exceed 1 MiB.
@@ -393,13 +398,18 @@ anyone can re-check both:
 The claim is a separate message. It is never part of a public record, so record
 parsers and older nodes are unaffected.
 
+**Trust only `verified`.** A client must treat an account as proven only when
+`state === 'verified'`. `pending` and `lost` accounts are unproven claims by the
+node. A verified claim proves that the GitHub account and the node key agreed at
+the last check; it says nothing about the code the seller runs, the quality of
+its answers or who controls the account later.
+
 **Ownership check.** The index reads
 `https://gist.githubusercontent.com/<account>/<gist>/raw`. GitHub answers that
 URL only when `<account>` owns the gist; for any other account name it answers
 `404`. The account name is matched case-insensitively, and claims carry it
 lowercase. The index therefore needs no GitHub API call or token. It follows no
-redirect (a redirect, such as one left by a renamed account, counts as not
-found), waits at most 3 seconds and reads at most the first 16 KiB; a line cut
+redirect, waits at most 3 seconds and reads at most the first 16 KiB; a line cut
 at that bound never counts.
 
 ### Submitting a claim
@@ -412,40 +422,53 @@ at most 1024 bytes). The index checks, in this order:
 2. The node signature over the claim (`400 INVALID_SIGNATURE`).
 3. `issuedAt`: at most 5 seconds ahead of the index's clock
    (`400 INVALID_CLAIM`) and at most 60 seconds old (`409 STALE_CLAIM`).
-4. The NodeId must be a seller the index knows: an active registration or a
-   stored catalog. Any other is `403 UNKNOWN_NODE`.
-5. `issuedAt` must be newer than the stored claim's or cancel's
+4. `issuedAt` must be newer than the stored claim's or cancel's
    (`409 STALE_CLAIM`), so a signed claim cannot be replayed.
+5. A new binding needs a seller the index knows: an active registration or a
+   stored catalog. Any other is `403 UNKNOWN_NODE`. A cancel does not, so a
+   NodeId the index no longer knows can still withdraw its claim.
 
 A cancel (`account` and `gist` both `null`) replaces the claim with a tombstone
 that keeps only the NodeId and `issuedAt`, and answers
-`200 {"ok":true,"state":null,"reason":null}`. Any other claim is stored and its
-gist checked at once: `200 {"ok":true,"state":"verified","reason":null}`.
-Re-posting the same account and gist keeps the stored state; a new account or
-gist starts over as `pending`.
+`200 {"ok":true,"state":null,"reason":null}`. A cancel from a NodeId with
+nothing stored that the index does not know writes nothing. Any other claim is
+stored and its gist checked at once:
+`200 {"ok":true,"state":"verified","reason":null}`. The answer's `reason` is the
+stored one after the check (see [States](#states)). Re-posting the same account
+and gist keeps the stored state; a new account or gist starts over as `pending`.
 
 POSTs fetch a NodeId's gist at most once a minute. The slot is reserved
 atomically in storage (`last_fetch_at`, kept across claims and cancels), because
 the index's rate-limit bindings count per IP, not per NodeId, and the publish
 quota belongs to records. A claim posted inside that minute is stored without a
-check and answers its stored state with `reason` `CHECK_DEFERRED`. A new binding
-stored this way has never been checked, so the next scheduled run checks it; an
-unchanged binding keeps its last check until a later POST or the 6-hour recheck.
+check and answers
+`200 {"ok":true,"state":"<stored>","reason":"CHECK_DEFERRED","retryAfter":<seconds>}`.
+`retryAfter` is when a new POST may fetch again; the stored claim is also due
+for the next scheduled run, at most 10 minutes later.
 
 Without the claims store or fetcher (no D1 binding) both claim routes answer
 `503 DISCOVERY_UNAVAILABLE`.
 
 ### States
 
-| Check outcome                                            | `reason`             | New state                                                     |
-| -------------------------------------------------------- | -------------------- | ------------------------------------------------------------- |
-| Proof line found                                         | `null`               | `verified`; `verifiedAt` is set when a verified streak begins |
-| Any status but `200`, `429` or `5xx`, redirects included | `GIST_NOT_FOUND`     | `lost` if this binding was ever verified, else `pending`      |
-| `200` without the proof line                             | `NODE_ID_MISSING`    | `lost` if this binding was ever verified, else `pending`      |
-| `429`, `5xx`, a timeout or a network error               | `GITHUB_UNAVAILABLE` | Unchanged; only `checkedAt` moves                             |
+| Check outcome                                                        | Outcome code         | New state                                                     |
+| -------------------------------------------------------------------- | -------------------- | ------------------------------------------------------------- |
+| Proof line found                                                     | none                 | `verified`; `verifiedAt` is set when a verified streak begins |
+| Any status but `200`, `403`, `429`, `451` or `5xx`, redirects too    | `GIST_NOT_FOUND`     | `lost` if this binding was ever verified, else `pending`      |
+| `200` without the proof line                                         | `NODE_ID_MISSING`    | `lost` if this binding was ever verified, else `pending`      |
+| `403`, `429`, `451`, `5xx`, a timeout or a network error (an outage) | `GITHUB_UNAVAILABLE` | Unchanged; `checkedAt` moves                                  |
 
-The `POST` answer carries the check's own `reason`. The stored `reason` is the
-last conclusive negative one (`GIST_NOT_FOUND` or `NODE_ID_MISSING`), or `null`.
+A redirect, such as the one a renamed account leaves, counts as not found, so
+the claim turns `lost`. `403` and `429` are GitHub limiting the index, and `451`
+is a legal block that may apply only where the request ran, so all three are
+outages rather than evidence.
+
+The stored `reason`, which the GET and POST answers carry, follows the state: it
+is `null` while `verified` (an outage never shows a reason on a verified claim);
+`GIST_NOT_FOUND` or `NODE_ID_MISSING` after a conclusive miss; and
+`GITHUB_UNAVAILABLE` only when an outage hits a `pending` claim. A `lost` claim
+keeps its miss reason through an outage. A check records only onto the claim it
+started for, and never over a check that started later.
 
 ### Reading a claim
 
@@ -465,27 +488,36 @@ else is `400 INVALID_QUERY`) answers:
 ```
 
 A NodeId without a claim, or whose claim was cancelled, is `404 NOT_FOUND`.
-`/v1/network` carries the account of every verified claim ([Network](#network)).
+`/v1/network` carries the account and gist of every verified claim
+([Network](#network)).
 
 ### Recheck
 
 The Worker's cron trigger (`*/10 * * * *` in `wrangler.jsonc`) runs one bounded
-batch: at most 25 claims never checked or last checked more than 6 hours ago,
-least recently checked first, one gist at a time. A check recorded for an older
-claim never overwrites a newer one.
+batch: at most 25 claims whose next check is due, earliest first, one gist at a
+time. A check schedules the next one 6 hours later. A claim still `pending` and
+never verified 7 days after its `issuedAt` is no longer scheduled; it stays
+readable, and a new POST (a newer `issuedAt`) checks it again. A storage
+failure, such as a missing table, ends the run quietly; every write is
+conditional, so nothing stored is lost.
+
+### Operator view
+
+`pnpm index:github-claims [--state pending|verified|lost] [--remote]`
+(`apps/discovery-index/scripts/github-claims.ts`) lists claims, without
+tombstones: NodeId, account, gist, state, reason, `issuedAt` and `checkedAt`,
+newest first within each state, at most 1000 rows. It is read-only and runs
+`wrangler d1 execute --json` against the local database, or the remote one with
+`--remote` (a maintainer action).
 
 ### What is stored
 
 Table `discovery_github_claims` (migration `0007_github_claims.sql`), one row
 per NodeId: `node_id`, `account`, `gist`, `issued_at`, `state` (`pending`,
-`verified` or `lost`), `reason`, `checked_at`, `verified_at` and
-`last_fetch_at`. A tombstone keeps `node_id`, `issued_at` and `last_fetch_at`,
-with every other column `NULL`. The signature is checked and not kept. No IP or
-request data is stored or logged.
-
-A verified claim proves that the GitHub account and the node key agree at the
-last check. It says nothing about the code the seller runs, the quality of its
-answers or who controls the account later.
+`verified` or `lost`), `reason`, `checked_at`, `verified_at`, `last_fetch_at`
+and `next_check_at` (indexed). A tombstone keeps `node_id`, `issued_at` and
+`last_fetch_at`, with every other column `NULL`. The signature is checked and
+not kept. No IP or request data is stored or logged.
 
 ## Storage
 

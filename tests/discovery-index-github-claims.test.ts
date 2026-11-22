@@ -1,8 +1,9 @@
 // POST /v1/identity/github and its reads: a node-signed claim from a seller the index knows is stored and
-// its gist checked at once; states move verified -> lost on a conclusive miss, an outage keeps them, a
-// cancel deletes the claim, and replays or unknown NodeIds are refused with static codes. GET returns
-// one claim and /v1/network carries each node's account and state. Memory and SQLite-backed D1; fake
-// gist fetcher and clock; offline.
+// its gist checked at once; states move verified -> lost -> verified on conclusive checks, an outage keeps
+// them, a cancel leaves a tombstone (also for a NodeId the index forgot), a NodeId's gist is fetched at
+// most once a minute, and replays or unknown NodeIds are refused with static codes. GET returns one claim
+// and /v1/network carries only verified accounts and gists. Memory and SQLite-backed D1; fake gist
+// fetcher and clock; offline.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -61,7 +62,7 @@ for (const kind of CLAIM_KINDS) {
       verifiedAt: now,
     });
     const network = await (await index.call('/v1/network')).json();
-    assert.deepEqual(network.nodes[0].github, { account: ACCOUNT });
+    assert.deepEqual(network.nodes[0].github, { account: ACCOUNT, gist: GIST });
   });
 
   void test(`github claim (${kind}): verified becomes lost on a miss, an outage keeps the state, a new binding starts pending`, async (context) => {
@@ -92,10 +93,11 @@ for (const kind of CLAIM_KINDS) {
     for (const outage of [{ status: 503 }, 'throw' as const, { status: 429 }]) {
       index.clock.now += MINUTE;
       index.gists.answer(() => outage);
+      // A lost claim keeps its own reason through an outage.
       assert.deepEqual(await index.claim(node), {
         ok: true,
         state: 'lost',
-        reason: 'GITHUB_UNAVAILABLE',
+        reason: 'GIST_NOT_FOUND',
       });
       assert.deepEqual(await (await index.read(node.nodeId)).json(), {
         nodeId: node.nodeId,
@@ -107,6 +109,21 @@ for (const kind of CLAIM_KINDS) {
         verifiedAt,
       });
     }
+    // Lost becomes verified again with a new streak.
+    index.clock.now += MINUTE;
+    index.gists.answer(() => ({ status: 200, body: proofText(node.nodeId) }));
+    assert.equal((await index.claim(node)).state, 'verified');
+    const again = await (await index.read(node.nodeId)).json();
+    assert.equal(again.verifiedAt, index.clock.now);
+    assert.equal(again.reason, null);
+    // A verified claim shows no reason through an outage.
+    index.clock.now += MINUTE;
+    index.gists.answer(() => ({ status: 503 }));
+    assert.deepEqual(await index.claim(node), {
+      ok: true,
+      state: 'verified',
+      reason: null,
+    });
     index.clock.now += MINUTE;
     index.gists.answer(() => ({ status: 200, body: 'no proof here\n' }));
     assert.deepEqual(await index.claim(node, { gist: OTHER_GIST }), {
@@ -118,10 +135,11 @@ for (const kind of CLAIM_KINDS) {
     assert.equal(fresh.verifiedAt, null);
     index.clock.now += MINUTE;
     index.gists.answer(() => 'throw');
-    assert.equal(
-      (await index.claim(node, { gist: OTHER_GIST })).state,
-      'pending',
-    );
+    assert.deepEqual(await index.claim(node, { gist: OTHER_GIST }), {
+      ok: true,
+      state: 'pending',
+      reason: 'GITHUB_UNAVAILABLE',
+    });
     index.clock.now += MINUTE;
     index.gists.answer(() => ({ status: 200, body: proofText(node.nodeId) }));
     assert.equal(
@@ -167,43 +185,47 @@ for (const kind of CLAIM_KINDS) {
     );
   });
 
-  void test(`github claim (${kind}): a NodeId's gist is fetched at most once a minute; deferred claims wait for the recheck`, async (context) => {
+  void test(`github claim (${kind}): a NodeId's gist is fetched at most once a minute; a deferred claim is due for the next recheck`, async (context) => {
     const index = await claimHarness(kind);
     if (!index) return context.skip('node:sqlite unavailable');
     const node = indexNode();
     await index.publish(node);
     index.gists.answer(() => ({ status: 200, body: proofText(node.nodeId) }));
     assert.equal((await index.claim(node)).state, 'verified');
+    const recheck = () =>
+      recheckGithubClaims(index.claims, index.gists.fetcher, index.clock.now);
+    // An unchanged binding is deferred too, and still due for the very next scheduled run.
     index.clock.now += 1000;
     assert.deepEqual(await index.claim(node), {
       ok: true,
       state: 'verified',
       reason: 'CHECK_DEFERRED',
+      retryAfter: 59,
     });
+    assert.equal(index.gists.requests.length, 1);
+    assert.equal(await recheck(), 1);
+    assert.equal(await recheck(), 0);
     index.clock.now += 1000;
     assert.deepEqual(await index.claim(node, { gist: OTHER_GIST }), {
       ok: true,
       state: 'pending',
       reason: 'CHECK_DEFERRED',
+      retryAfter: 58,
     });
-    assert.equal(index.gists.requests.length, 1);
     const deferred = await (await index.read(node.nodeId)).json();
     assert.equal(deferred.checkedAt, null);
-    assert.equal(
-      await recheckGithubClaims(
-        index.claims,
-        index.gists.fetcher,
-        index.clock.now,
-      ),
-      1,
-    );
+    assert.equal(await recheck(), 1);
     assert.equal(
       (await (await index.read(node.nodeId)).json()).state,
       'verified',
     );
     index.clock.now += MINUTE;
-    assert.equal((await index.claim(node, { gist: OTHER_GIST })).reason, null);
-    assert.equal(index.gists.requests.length, 3);
+    assert.deepEqual(await index.claim(node, { gist: OTHER_GIST }), {
+      ok: true,
+      state: 'verified',
+      reason: null,
+    });
+    assert.equal(index.gists.requests.length, 4);
   });
 
   void test(`github claim (${kind}): unknown, stale, future, forged and malformed claims are refused`, async (context) => {

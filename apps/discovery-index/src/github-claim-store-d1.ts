@@ -1,11 +1,11 @@
 // Owns the Cloudflare D1 adapter of the seller GitHub claim storage contract (migrations/0007). Each
-// write is one conditional statement on issued_at (or last_fetch_at), so a newer claim always wins a
-// race. Rows are our own, but a corrupted row fails closed (503) instead of being trusted.
+// write is one conditional statement on issued_at (or last_fetch_at, or checked_at), so a newer claim
+// or a later check always wins a race. Rows are our own, but a corrupted row fails closed (503) instead of being trusted.
 import { and, asc, eq, isNotNull, isNull, lt, lte, or } from 'drizzle-orm';
 
 import {
-  GITHUB_CLAIM_REASONS,
   GITHUB_CLAIM_STATES,
+  STORED_GITHUB_CLAIM_REASONS,
   type GithubClaimState,
   type StoredGithubClaimReason,
 } from './constants';
@@ -14,16 +14,12 @@ import {
   githubClaimTombstone,
   type GithubClaimRow,
   type GithubClaimStore,
+  type RecordedCheck,
   type StoredGithubClaim,
 } from './github-claim-store';
 import { githubClaims } from './schema';
 import type { D1Database, D1Row } from './storage-d1';
 import { integer, text } from './uptime-d1';
-
-const STORED_REASONS: readonly StoredGithubClaimReason[] = [
-  GITHUB_CLAIM_REASONS.GIST_NOT_FOUND,
-  GITHUB_CLAIM_REASONS.NODE_ID_MISSING,
-];
 
 function unexpected(): never {
   throw new TypeError('Unexpected GitHub claim row.');
@@ -39,16 +35,24 @@ function stateOf(value: unknown): GithubClaimState {
 }
 function reasonOf(value: unknown): StoredGithubClaimReason | null {
   if (value === null) return null;
-  return STORED_REASONS.find((reason) => reason === value) ?? unexpected();
+  return (
+    STORED_GITHUB_CLAIM_REASONS.find((reason) => reason === value) ??
+    unexpected()
+  );
 }
 function storedClaim(row: D1Row): StoredGithubClaim {
   const nodeId = text(row.nodeId);
   const issuedAt = integer(row.issuedAt);
   if (row.state === null) {
     if (
-      [row.account, row.gist, row.reason, row.checkedAt, row.verifiedAt].some(
-        (value) => value !== null,
-      )
+      [
+        row.account,
+        row.gist,
+        row.reason,
+        row.checkedAt,
+        row.verifiedAt,
+        row.nextCheckAt,
+      ].some((value) => value !== null)
     )
       return unexpected();
     return githubClaimTombstone(nodeId, issuedAt);
@@ -62,6 +66,7 @@ function storedClaim(row: D1Row): StoredGithubClaim {
     reason: reasonOf(row.reason),
     checkedAt: nullableInteger(row.checkedAt),
     verifiedAt: nullableInteger(row.verifiedAt),
+    nextCheckAt: nullableInteger(row.nextCheckAt),
   };
 }
 const claimColumns = {
@@ -73,17 +78,19 @@ const claimColumns = {
   reason: githubClaims.reason,
   checkedAt: githubClaims.checkedAt,
   verifiedAt: githubClaims.verifiedAt,
+  nextCheckAt: githubClaims.nextCheckAt,
 };
 
-// Spends the NodeId's fetch slot for this claim when the last reserved fetch is old enough.
-function reserveFetchQuery(
+// Spends the NodeId's fetch slot for this claim when the last reserved fetch is old enough; otherwise
+// reads how long until it is.
+async function reserveFetch(
   database: DiscoveryDatabase,
   nodeId: string,
   issuedAt: number,
   now: number,
   intervalMs: number,
 ) {
-  return database
+  const reserved = await database
     .update(githubClaims)
     .set({ lastFetchAt: now })
     .where(
@@ -97,21 +104,53 @@ function reserveFetchQuery(
       ),
     )
     .returning({ nodeId: githubClaims.nodeId });
+  if (reserved.length === 1) return 0;
+  const [row] = await database
+    .select({
+      issuedAt: githubClaims.issuedAt,
+      lastFetchAt: githubClaims.lastFetchAt,
+    })
+    .from(githubClaims)
+    .where(eq(githubClaims.nodeId, nodeId));
+  const last = row ? nullableInteger(row.lastFetchAt) : null;
+  if (!row || integer(row.issuedAt) !== issuedAt || last === null)
+    return intervalMs;
+  return Math.max(1, last + intervalMs - now);
 }
 
-// Live claims never checked or last checked before `before`, least recently checked first.
-function dueQuery(database: DiscoveryDatabase, before: number, limit: number) {
+// Live claims whose next check is due, earliest first.
+function dueQuery(database: DiscoveryDatabase, now: number, limit: number) {
   return database
     .select(claimColumns)
     .from(githubClaims)
     .where(
-      and(
-        isNotNull(githubClaims.state),
-        or(isNull(githubClaims.checkedAt), lt(githubClaims.checkedAt, before)),
-      ),
+      and(isNotNull(githubClaims.state), lte(githubClaims.nextCheckAt, now)),
     )
-    .orderBy(asc(githubClaims.checkedAt), asc(githubClaims.nodeId))
+    .orderBy(asc(githubClaims.nextCheckAt), asc(githubClaims.nodeId))
     .limit(limit);
+}
+
+// Writes a check only onto the same claim, and never over a check that started later.
+function recordQuery(
+  database: DiscoveryDatabase,
+  nodeId: string,
+  issuedAt: number,
+  check: RecordedCheck,
+) {
+  return database
+    .update(githubClaims)
+    .set(check)
+    .where(
+      and(
+        eq(githubClaims.nodeId, nodeId),
+        eq(githubClaims.issuedAt, issuedAt),
+        isNotNull(githubClaims.state),
+        or(
+          isNull(githubClaims.checkedAt),
+          lte(githubClaims.checkedAt, check.checkedAt),
+        ),
+      ),
+    );
 }
 
 export function createD1GithubClaimStore(client: D1Database): GithubClaimStore {
@@ -138,30 +177,13 @@ export function createD1GithubClaimStore(client: D1Database): GithubClaimStore {
         .returning({ nodeId: githubClaims.nodeId });
       return written.length === 1;
     },
-    async reserveFetch(nodeId, issuedAt, now, intervalMs) {
-      const reserved = await reserveFetchQuery(
-        database,
-        nodeId,
-        issuedAt,
-        now,
-        intervalMs,
-      );
-      return reserved.length === 1;
-    },
+    reserveFetch: (nodeId, issuedAt, now, intervalMs) =>
+      reserveFetch(database, nodeId, issuedAt, now, intervalMs),
     async record(nodeId, issuedAt, check) {
-      await database
-        .update(githubClaims)
-        .set(check)
-        .where(
-          and(
-            eq(githubClaims.nodeId, nodeId),
-            eq(githubClaims.issuedAt, issuedAt),
-            isNotNull(githubClaims.state),
-          ),
-        );
+      await recordQuery(database, nodeId, issuedAt, check);
     },
-    async due(before, limit) {
-      return (await dueQuery(database, before, limit))
+    async due(now, limit) {
+      return (await dueQuery(database, now, limit))
         .map(storedClaim)
         .filter((entry): entry is GithubClaimRow => entry.state !== null);
     },
@@ -170,6 +192,7 @@ export function createD1GithubClaimStore(client: D1Database): GithubClaimStore {
         .select({
           nodeId: githubClaims.nodeId,
           account: githubClaims.account,
+          gist: githubClaims.gist,
         })
         .from(githubClaims)
         .where(eq(githubClaims.state, GITHUB_CLAIM_STATES.VERIFIED))
@@ -178,6 +201,7 @@ export function createD1GithubClaimStore(client: D1Database): GithubClaimStore {
       return rows.map((row) => ({
         nodeId: text(row.nodeId),
         account: text(row.account),
+        gist: text(row.gist),
       }));
     },
   };

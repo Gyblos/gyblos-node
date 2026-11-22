@@ -16,9 +16,12 @@ CREATE TABLE IF NOT EXISTS discovery_github_claims (
   -- When the current verified streak began; kept after a loss so a later miss stays 'lost'.
   verified_at INTEGER,
   -- The last gist fetch a POST reserved for this NodeId, kept across claims; never served.
-  last_fetch_at INTEGER
+  last_fetch_at INTEGER,
+  -- When the scheduled run should check this claim next; NULL for a tombstone or an abandoned pending
+  -- claim. Never served.
+  next_check_at INTEGER
 ) WITHOUT ROWID;
 
--- The scheduled recheck reads the least recently checked claims first.
-CREATE INDEX IF NOT EXISTS discovery_github_claims_by_check
-  ON discovery_github_claims (checked_at);
+-- The scheduled recheck reads the claims due soonest first.
+CREATE INDEX IF NOT EXISTS discovery_github_claims_by_next_check
+  ON discovery_github_claims (next_check_at);

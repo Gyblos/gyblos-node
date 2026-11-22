@@ -1,7 +1,8 @@
 // The gist check and the scheduled recheck of seller GitHub claims: which statuses and texts conclude a
-// check, the 16 KiB read bound (a cut never makes a proof line), one bounded batch of the least recently
-// checked claims per run, a newer claim never overwritten by a check of an older one, and the Worker's
-// scheduled entry over D1. Fake fetcher and clock; offline.
+// check, the 16 KiB read bound (a cut never makes a proof line), one bounded batch of due claims per
+// run, abandoned pending claims left alone, a newer claim or later check never overwritten, tombstones,
+// the per-NodeId fetch slot, the Worker's scheduled entry over D1 (quiet without the table) and the
+// read-only operator listing. Fake fetcher and clock; offline.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -11,6 +12,7 @@ import {
   type GithubClaimRow,
 } from '@gyblos/discovery-index/github-claim-store';
 import { recheckGithubClaims } from '@gyblos/discovery-index/github-claims';
+import { runGithubClaims } from '@gyblos/discovery-index/github-claims-admin';
 import { checkGist } from '@gyblos/discovery-index/github-gist';
 import { scheduledRecheck } from '@gyblos/discovery-index/worker';
 import { githubProofLine } from '@gyblos/protocol/identity-claim';
@@ -43,14 +45,15 @@ function row(index: number, patch: Partial<GithubClaimRow> = {}) {
     reason: null,
     checkedAt: null,
     verifiedAt: null,
+    nextCheckAt: T0,
     ...patch,
   } satisfies GithubClaimRow;
 }
 
-void test('only 429, 5xx and network errors are inconclusive; any other status, redirects included, is not found', async () => {
-  for (const status of [301, 302, 307, 400, 403, 404, 410])
+void test('403, 429, 451, 5xx and network errors are inconclusive; any other status, redirects included, is not found', async () => {
+  for (const status of [301, 302, 307, 400, 401, 404, 410])
     assert.equal(await outcome({ status }), 'GIST_NOT_FOUND', `${status}`);
-  for (const status of [429, 500, 502, 503])
+  for (const status of [403, 429, 451, 500, 502, 503])
     assert.equal(await outcome({ status }), 'GITHUB_UNAVAILABLE', `${status}`);
   assert.equal(await outcome('throw'), 'GITHUB_UNAVAILABLE');
 });
@@ -86,81 +89,153 @@ void test('only the first 16 KiB are read, and a line cut at the bound never cou
   );
 });
 
+const DAY = 86_400_000;
+
 for (const kind of CLAIM_KINDS) {
-  void test(`recheck (${kind}): one bounded batch of the least recently checked claims per run`, async (context) => {
+  void test(`recheck (${kind}): one bounded batch of due claims per run, earliest first`, async (context) => {
     const made = await claimStoreOf(kind);
     if (!made) return context.skip('node:sqlite unavailable');
     const { claims } = made;
-    const now = T0 + GITHUB_CLAIM.recheckAfterMs * 2;
+    const now = T0 + GITHUB_CLAIM.recheckAfterMs;
     const total = GITHUB_CLAIM.recheckBatch + 3;
     for (let index = 1; index <= total; index++)
       await claims.put(
         row(index, {
           state: 'verified',
           verifiedAt: T0,
-          checkedAt: index === 1 ? null : T0 + index,
+          checkedAt: T0,
+          nextCheckAt: T0 + index,
         }),
       );
-    // Checked recently: not due.
-    await claims.put(
-      row(total + 1, { checkedAt: now - GITHUB_CLAIM.recheckAfterMs + 1 }),
-    );
+    // Not due yet, and a tombstone: never checked.
+    await claims.put(row(total + 1, { nextCheckAt: now + 1 }));
+    await claims.put(githubClaimTombstone(row(total + 2).nodeId, T0));
     const gists = fakeGists(() => ({ status: 404 }));
     assert.equal(
       await recheckGithubClaims(claims, gists.fetcher, now),
       GITHUB_CLAIM.recheckBatch,
     );
     assert.equal(gists.requests.length, GITHUB_CLAIM.recheckBatch);
-    const first = await claims.get(row(1).nodeId);
     assert.deepEqual(
-      { ...first },
+      { ...(await claims.get(row(1).nodeId)) },
       {
         ...row(1),
         state: 'lost',
         reason: 'GIST_NOT_FOUND',
         checkedAt: now,
         verifiedAt: T0,
+        nextCheckAt: now + GITHUB_CLAIM.recheckAfterMs,
       },
     );
     const untouched = await claims.get(row(total).nodeId);
     assert.equal(untouched?.state, 'verified');
-    assert.equal(untouched?.checkedAt, T0 + total);
-    // The next run takes the rest; the recently checked claim waits.
     assert.equal(await recheckGithubClaims(claims, gists.fetcher, now), 3);
     assert.equal(await recheckGithubClaims(claims, gists.fetcher, now), 0);
   });
 
-  void test(`recheck (${kind}): an outage moves checked_at only and a newer claim is never overwritten`, async (context) => {
+  void test(`recheck (${kind}): an outage keeps the state; only a pending claim stores GITHUB_UNAVAILABLE`, async (context) => {
     const made = await claimStoreOf(kind);
     if (!made) return context.skip('node:sqlite unavailable');
     const { claims } = made;
-    const stored = row(1, {
+    const verified = row(1, {
       state: 'verified',
       checkedAt: T0,
       verifiedAt: T0,
     });
-    await claims.put(stored);
-    const now = T0 + GITHUB_CLAIM.recheckAfterMs + 1;
+    const lost = row(2, {
+      state: 'lost',
+      reason: 'NODE_ID_MISSING',
+      checkedAt: T0,
+      verifiedAt: T0,
+    });
+    const pending = row(3);
+    for (const entry of [verified, lost, pending]) await claims.put(entry);
+    const now = T0 + 1;
     await recheckGithubClaims(claims, fakeGists(() => 'throw').fetcher, now);
+    const after = {
+      checkedAt: now,
+      nextCheckAt: now + GITHUB_CLAIM.recheckAfterMs,
+    };
+    assert.deepEqual(
+      { ...(await claims.get(verified.nodeId)) },
+      { ...verified, ...after },
+    );
+    assert.deepEqual(
+      { ...(await claims.get(lost.nodeId)) },
+      { ...lost, ...after },
+    );
+    assert.deepEqual(
+      { ...(await claims.get(pending.nodeId)) },
+      { ...pending, ...after, reason: 'GITHUB_UNAVAILABLE' },
+    );
+  });
+
+  void test(`recheck (${kind}): a pending claim never verified stops being rechecked after 7 days`, async (context) => {
+    const made = await claimStoreOf(kind);
+    if (!made) return context.skip('node:sqlite unavailable');
+    const { claims } = made;
+    const fresh = row(1);
+    const old = row(2);
+    const lostOld = row(3, { state: 'lost', verifiedAt: T0, checkedAt: T0 });
+    for (const entry of [fresh, old, lostOld]) await claims.put(entry);
+    const gists = fakeGists(() => ({ status: 404 }));
+    const now = T0 + GITHUB_CLAIM.abandonPendingAfterMs;
+    assert.equal(
+      await recheckGithubClaims(claims, gists.fetcher, now - DAY),
+      3,
+    );
+    assert.equal(
+      (await claims.get(fresh.nodeId))?.nextCheckAt,
+      now - DAY + GITHUB_CLAIM.recheckAfterMs,
+    );
+    const later = now + GITHUB_CLAIM.recheckAfterMs;
+    assert.equal(await recheckGithubClaims(claims, gists.fetcher, later), 3);
+    for (const entry of [fresh, old]) {
+      const stored = await claims.get(entry.nodeId);
+      assert.equal(stored?.state, 'pending');
+      assert.equal(stored?.nextCheckAt, null);
+    }
+    assert.equal((await claims.get(lostOld.nodeId))?.state, 'lost');
+    assert.equal(
+      await recheckGithubClaims(claims, gists.fetcher, later * 2),
+      1,
+    );
+  });
+
+  void test(`recheck (${kind}): a newer claim, a later check or a tombstone is never overwritten`, async (context) => {
+    const made = await claimStoreOf(kind);
+    if (!made) return context.skip('node:sqlite unavailable');
+    const { claims } = made;
+    const stored = row(1);
+    await claims.put(stored);
+    const late = {
+      state: 'verified',
+      reason: null,
+      checkedAt: T0 + 20,
+      verifiedAt: T0 + 20,
+      nextCheckAt: T0 + 20 + GITHUB_CLAIM.recheckAfterMs,
+    } as const;
+    await claims.record(stored.nodeId, stored.issuedAt, late);
+    // A check that started earlier lands after the later one: it changes nothing.
+    await claims.record(stored.nodeId, stored.issuedAt, {
+      state: 'pending',
+      reason: 'GIST_NOT_FOUND',
+      checkedAt: T0 + 10,
+      verifiedAt: null,
+      nextCheckAt: T0 + 10,
+    });
     assert.deepEqual(
       { ...(await claims.get(stored.nodeId)) },
-      {
-        ...stored,
-        checkedAt: now,
-      },
+      { ...stored, ...late },
     );
-    // A check of the claim issued at T0 lands after a newer claim replaced it: it changes nothing.
     const newer = row(1, { issuedAt: T0 + 1, gist: 'ab'.repeat(10) });
     assert.equal(await claims.put(newer), true);
     assert.equal(await claims.put(stored), false);
     await claims.record(stored.nodeId, stored.issuedAt, {
-      state: 'lost',
-      reason: 'GIST_NOT_FOUND',
-      checkedAt: now,
-      verifiedAt: T0,
+      ...late,
+      checkedAt: T0 + 30,
     });
     assert.deepEqual({ ...(await claims.get(stored.nodeId)) }, newer);
-    // A cancel keeps a tombstone: no older claim replaces it, it is never due and never recorded.
     const tombstone = githubClaimTombstone(stored.nodeId, newer.issuedAt + 1);
     assert.equal(
       await claims.put(githubClaimTombstone(stored.nodeId, newer.issuedAt)),
@@ -169,13 +244,11 @@ for (const kind of CLAIM_KINDS) {
     assert.equal(await claims.put(tombstone), true);
     assert.equal(await claims.put(newer), false);
     await claims.record(stored.nodeId, tombstone.issuedAt, {
-      state: 'verified',
-      reason: null,
-      checkedAt: now,
-      verifiedAt: now,
+      ...late,
+      checkedAt: T0 + 40,
     });
     assert.deepEqual({ ...(await claims.get(stored.nodeId)) }, tombstone);
-    assert.deepEqual(await claims.due(now * 2, 10), []);
+    assert.deepEqual(await claims.due(T0 * 2, 10), []);
     assert.deepEqual(await claims.verified(10), []);
   });
 
@@ -188,22 +261,19 @@ for (const kind of CLAIM_KINDS) {
     await claims.put(first);
     assert.equal(
       await claims.reserveFetch(first.nodeId, T0 + 1, T0, interval),
-      false,
+      interval,
     );
-    assert.equal(
-      await claims.reserveFetch(first.nodeId, T0, T0, interval),
-      true,
-    );
+    assert.equal(await claims.reserveFetch(first.nodeId, T0, T0, interval), 0);
     const next = row(1, { issuedAt: T0 + 1, gist: 'ab'.repeat(10) });
     await claims.put(next);
     assert.equal(
       await claims.reserveFetch(
         next.nodeId,
         next.issuedAt,
-        T0 + interval - 1,
+        T0 + interval - 1000,
         interval,
       ),
-      false,
+      1000,
     );
     assert.equal(
       await claims.reserveFetch(
@@ -212,16 +282,16 @@ for (const kind of CLAIM_KINDS) {
         T0 + interval,
         interval,
       ),
-      true,
+      0,
     );
     assert.equal(
       await claims.reserveFetch(row(2).nodeId, T0, T0, interval),
-      false,
+      interval,
     );
   });
 }
 
-void test('the scheduled entry rechecks due claims in D1 and does nothing without a database', async (context) => {
+void test('the scheduled entry rechecks due claims in D1, does nothing without a database and stays quiet without the table', async (context) => {
   const made = await claimStoreOf('sqlite-d1');
   if (!made?.db) return context.skip('node:sqlite unavailable');
   await made.claims.put(row(1));
@@ -242,4 +312,62 @@ void test('the scheduled entry rechecks due claims in D1 and does nothing withou
   assert.equal(checked?.state, 'verified');
   assert.equal(checked?.verifiedAt, now);
   assert.equal(await scheduledRecheck({}, now, fetcher), 0);
+  made.db.raw.exec('DROP TABLE discovery_github_claims');
+  assert.equal(
+    await scheduledRecheck({ DISCOVERY_DB: made.db }, now, fetcher),
+    0,
+  );
+});
+
+void test('the operator listing reads claims without writing, filtered by state, and refuses bad options', async (context) => {
+  const made = await claimStoreOf('sqlite-d1');
+  if (!made?.db) return context.skip('node:sqlite unavailable');
+  const db = made.db;
+  await made.claims.put(
+    row(1, { state: 'verified', verifiedAt: T0, checkedAt: T0 }),
+  );
+  await made.claims.put(row(2, { reason: 'NODE_ID_MISSING', checkedAt: T0 }));
+  await made.claims.put(githubClaimTombstone(row(3).nodeId, T0));
+  const before = JSON.stringify(
+    db.raw.prepare('SELECT * FROM discovery_github_claims').all(),
+  );
+  const run = (argv: string[]) => {
+    const out: string[] = [];
+    const err: string[] = [];
+    const remotes: boolean[] = [];
+    const code = runGithubClaims(argv, {
+      stdout: (text) => out.push(text),
+      stderr: (text) => err.push(text),
+      query: (sql, remote) => {
+        remotes.push(remote);
+        return db.raw.prepare(sql).all();
+      },
+    });
+    return { code, out: out.join(''), err: err.join(''), remotes };
+  };
+  const all = run([]);
+  assert.equal(all.code, 0);
+  assert.deepEqual(all.remotes, [false]);
+  assert.match(all.out, /2 claim\(s\)\n$/);
+  assert.ok(
+    all.out.includes(
+      `${row(2).nodeId}\t${ACCOUNT}\t${GIST}\tpending\tNODE_ID_MISSING\t`,
+    ),
+  );
+  const pending = run(['--state', 'pending', '--remote']);
+  assert.deepEqual(pending.remotes, [true]);
+  assert.match(pending.out, /1 claim\(s\)\n$/);
+  assert.ok(!pending.out.includes(row(1).nodeId));
+  for (const argv of [['--state', 'gone'], ['--nope']]) {
+    const bad = run(argv);
+    assert.equal(bad.code, 1);
+    assert.deepEqual(bad.remotes, []);
+    assert.match(bad.err, /usage/);
+  }
+  assert.equal(
+    JSON.stringify(
+      db.raw.prepare('SELECT * FROM discovery_github_claims').all(),
+    ),
+    before,
+  );
 });

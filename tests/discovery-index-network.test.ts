@@ -38,7 +38,7 @@ interface NetworkNode {
   firstSeenAt: number | null;
   lastSeenAt: number | null;
   models: string[];
-  github: { account: string; state: string } | null;
+  github: { account: string; gist: string } | null;
 }
 
 async function setup(

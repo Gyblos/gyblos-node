@@ -282,23 +282,29 @@ export type GithubClaimState =
   (typeof GITHUB_CLAIM_STATES)[keyof typeof GITHUB_CLAIM_STATES];
 // Static outcome codes of a gist check. Only the first two are ever stored; an outage keeps the state.
 export const GITHUB_CLAIM_REASONS = {
-  // Any status but 200, 429 or 5xx, redirects included (a renamed account redirects): no such gist,
-  // or the account does not own it.
+  // Any status but 200, 403, 429, 451 or 5xx, redirects included (a renamed account redirects): no
+  // such gist, or the account does not own it.
   GIST_NOT_FOUND: 'GIST_NOT_FOUND',
   // The gist exists but its first GITHUB_CLAIM.maxGistBytes hold no proof line for the NodeId.
   NODE_ID_MISSING: 'NODE_ID_MISSING',
-  // 429, 5xx, a timeout or a network error: inconclusive.
+  // 403, 429, 451, 5xx, a timeout or a network error: inconclusive. 403 and 429 are GitHub limiting
+  // the index; 451 is a legal block that may apply only where the request ran. Stored only on a
+  // pending claim; a verified or lost claim keeps its own reason.
   GITHUB_UNAVAILABLE: 'GITHUB_UNAVAILABLE',
   // POST answer only: the NodeId's gist was fetched less than GITHUB_CLAIM.minFetchIntervalMs ago, so
-  // the claim was stored unchecked; the scheduled run or a later POST checks it.
+  // the claim was stored unchecked and is due for the next scheduled run; see `retryAfter`.
   CHECK_DEFERRED: 'CHECK_DEFERRED',
 } as const;
 export type GithubClaimReason =
   (typeof GITHUB_CLAIM_REASONS)[keyof typeof GITHUB_CLAIM_REASONS];
 // The reasons a stored claim can carry.
+export const STORED_GITHUB_CLAIM_REASONS = [
+  GITHUB_CLAIM_REASONS.GIST_NOT_FOUND,
+  GITHUB_CLAIM_REASONS.NODE_ID_MISSING,
+  GITHUB_CLAIM_REASONS.GITHUB_UNAVAILABLE,
+] as const;
 export type StoredGithubClaimReason =
-  | typeof GITHUB_CLAIM_REASONS.GIST_NOT_FOUND
-  | typeof GITHUB_CLAIM_REASONS.NODE_ID_MISSING;
+  (typeof STORED_GITHUB_CLAIM_REASONS)[number];
 export const GITHUB_CLAIM = {
   // A signed claim is a few hundred bytes.
   maxBodyBytes: 1024,
@@ -310,11 +316,16 @@ export const GITHUB_CLAIM = {
   maxGistBytes: 16_384,
   // At most one gist fetch per NodeId per interval from POSTs, reserved atomically in storage.
   minFetchIntervalMs: 60_000,
-  // The scheduled run rechecks claims last checked this long ago, at most `recheckBatch` per run.
+  // The scheduled run checks claims whose next check is due, at most `recheckBatch` per run, and
+  // schedules the next one this long after a check.
   recheckAfterMs: 6 * 60 * 60 * 1000,
   recheckBatch: 25,
-  // Statuses of the raw gist URL: 200 is read; 429 and 5xx are inconclusive; any other is not found.
+  // A claim still pending this long after it was issued, never verified, is no longer rechecked by the
+  // scheduled run; it stays readable and a new POST checks it again.
+  abandonPendingAfterMs: 7 * 24 * 60 * 60 * 1000,
+  // Statuses of the raw gist URL: 200 is read; these and 5xx are inconclusive; any other is not found.
   found: 200,
-  rateLimited: 429,
+  inconclusive: [403, 429, 451],
   serverError: 500,
+  msPerSecond: 1000,
 } as const;

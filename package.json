@@ -30,6 +30,7 @@
     "index:invite": "node --import tsx apps/discovery-index/scripts/admin.ts invite",
     "index:revoke": "node --import tsx apps/discovery-index/scripts/admin.ts revoke",
     "index:restore": "node --import tsx apps/discovery-index/scripts/admin.ts restore",
+    "index:github-claims": "node --import tsx apps/discovery-index/scripts/github-claims.ts",
     "node:start": "node --import tsx apps/node/src/bin.ts start",
     "paypal:sandbox": "node --import tsx apps/node/src/paypal-main.ts",
     "gyblos": "node --import tsx apps/node/src/bin.ts",

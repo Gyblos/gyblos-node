@@ -17,8 +17,9 @@ export type GistOutcome = Exclude<
   typeof GITHUB_CLAIM_REASONS.CHECK_DEFERRED
 > | null;
 
+const INCONCLUSIVE: ReadonlySet<number> = new Set(GITHUB_CLAIM.inconclusive);
 const inconclusive = (status: number) =>
-  status === GITHUB_CLAIM.rateLimited || status >= GITHUB_CLAIM.serverError;
+  INCONCLUSIVE.has(status) || status >= GITHUB_CLAIM.serverError;
 
 // At most `maxBytes` of the body. When it was cut, the last (possibly partial) line is dropped, so a
 // cut can only hide a proof line, never make one.
