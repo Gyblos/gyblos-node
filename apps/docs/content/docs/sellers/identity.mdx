@@ -197,7 +197,8 @@ and skips what is done.
 | `lost`     | The account was verified, but the last check didn't find the proof: the gist, the file or the line is gone, or the account was renamed. Buyers no longer see it.                                                                                            |
 
 Only `verified` means the proof was found. When GitHub doesn't answer, the claim keeps its current state:
-`pending` stays `pending` and `verified` stays `verified`.
+`pending` stays `pending` and `verified` stays `verified`. The check time shows the last attempt, even one
+that failed.
 
 ### Good to know [#github-good-to-know]
 
