@@ -25,16 +25,14 @@ import { createBuyerBatchSession } from './batch-buyer';
 import type { BuyerBatchSessionOptions } from './batch-buyer-types';
 import {
   prepareNewChannel,
+  UnsentChannelRequestError,
   type PreparedChannel,
 } from './buyer-channel-prepare';
 import { UnsentOpeningError } from './buyer-opening-retry';
 import { checkPreviousOpening, disposeAbsent } from './buyer-opening-state';
 import { bounded } from './buyer-operation';
 import { UnsentSellerBusyError } from './buyer-routing';
-import {
-  prepareRenewal,
-  UnsentSellerSwitchError,
-} from './buyer-session-renewal';
+import { prepareRenewal } from './buyer-session-renewal';
 import { sessionApproval } from './session-accounting';
 import type { BuyerSessionBackend } from './session-backend';
 import {
@@ -45,7 +43,7 @@ import {
   type BuyerSessionPolicy,
 } from './session-policy';
 
-export { UnsentSellerSwitchError } from './buyer-session-renewal';
+export { UnsentChannelRequestError } from './buyer-channel-prepare';
 
 export interface BuyerSessionOptions<Remote extends BatchDestination> {
   // Known capability of the financial adapter. Unspecified adapters negotiate after construction.
@@ -266,7 +264,7 @@ async function renewable<Remote extends BatchDestination>(
       cause instanceof UnsentChannelLimitError
     )
       throw cause;
-    throw new UnsentSellerSwitchError(quote.offer.nodeId, cause);
+    throw new UnsentChannelRequestError(quote.offer.nodeId, cause);
   });
   if (!plan) return opened;
   state.current = undefined;

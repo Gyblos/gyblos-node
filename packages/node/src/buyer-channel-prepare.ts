@@ -8,13 +8,16 @@ import {
   BatchChannelError,
   batchFail,
   matchBatchTerms,
+  verifyBatchQuote,
 } from '@gyblos/protocol/batch-channel';
 import { CONTROL_METERING_MODES } from '@gyblos/protocol/constants';
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import {
   PAYMENT_SESSION,
+  PaymentSessionError,
   SESSION_CODES,
+  UnsentChannelLimitError,
   type PaymentSessionTerms,
 } from '@gyblos/protocol/payment-session';
 import {
@@ -25,6 +28,39 @@ import {
 
 import { UnsentSellerBusyError } from './buyer-routing';
 import type { BuyerSessionOptions } from './buyer-session';
+
+export class UnsentChannelRequestError extends Error {
+  readonly code: BatchChannelError['code'];
+  constructor(
+    readonly nodeId: string,
+    cause: unknown,
+  ) {
+    super('Channel request was not sent', { cause });
+    this.code =
+      cause instanceof BatchChannelError || cause instanceof PaymentSessionError
+        ? cause.code
+        : SESSION_CODES.UNAVAILABLE;
+  }
+}
+
+export async function verifyUnsentPoolQuote(
+  quote: SignedOfferV2,
+  terms: PaymentSessionTerms,
+  peer: string,
+  now: number,
+) {
+  try {
+    return await verifyBatchQuote(quote, terms, peer, now);
+  } catch (error) {
+    if (
+      error instanceof BatchChannelError &&
+      !error.remote &&
+      error.code === SESSION_CODES.LIMIT
+    )
+      throw new UnsentChannelLimitError(quote.offer.nodeId);
+    throw error;
+  }
+}
 
 export class UnsentChannelPeerError extends BatchChannelError {
   constructor(readonly nodeId: string) {

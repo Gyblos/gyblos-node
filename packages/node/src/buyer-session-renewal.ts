@@ -1,10 +1,7 @@
-import {
-  BatchChannelError,
-  verifyBatchQuote,
-} from '@gyblos/protocol/batch-channel';
+// Prepares replacement terms and finishes the previous channel before replacement authority begins.
+import { verifyBatchQuote } from '@gyblos/protocol/batch-channel';
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
 import {
-  PaymentSessionError,
   SESSION_CODES,
   SESSION_STATES,
   sessionFail,
@@ -15,20 +12,6 @@ import { checkPreviousOpening } from './buyer-opening-state';
 import { UnsentSellerBusyError } from './buyer-routing';
 import type { Current, State } from './buyer-session';
 import { newSessionTerms, replacementTerms } from './session-policy';
-
-export class UnsentSellerSwitchError extends Error {
-  readonly code: BatchChannelError['code'];
-  constructor(
-    readonly nodeId: string,
-    cause: unknown,
-  ) {
-    super('Seller switch stopped before replacement', { cause });
-    this.code =
-      cause instanceof BatchChannelError || cause instanceof PaymentSessionError
-        ? cause.code
-        : SESSION_CODES.UNAVAILABLE;
-  }
-}
 
 export async function prepareRenewal<Remote extends BatchDestination>(
   state: State<Remote>,

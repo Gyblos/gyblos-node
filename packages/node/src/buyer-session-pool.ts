@@ -6,12 +6,12 @@ import {
   type BatchBuyerPool,
   type BatchPoolEntry,
 } from '@gyblos/payments-upto/batch-session';
-import { verifyBatchQuote } from '@gyblos/protocol/batch-channel';
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
 import { controlInteger } from '@gyblos/protocol/control-validation';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import {
+  PaymentSessionError,
   SESSION_CODES,
   sessionFail,
   UnsentChannelLimitError,
@@ -23,6 +23,8 @@ import {
 
 import {
   prepareNewChannel,
+  UnsentChannelRequestError,
+  verifyUnsentPoolQuote,
   type PreparedChannel,
 } from './buyer-channel-prepare';
 import { UnsentOpeningError } from './buyer-opening-retry';
@@ -204,7 +206,7 @@ async function execute<Remote extends BatchDestination>(
         ? undefined
         : existing?.terms) ??
       newSessionTerms(quote, state.options.policy, state.options.now());
-    await verifyBatchQuote(
+    await verifyUnsentPoolQuote(
       quote,
       terms,
       state.options.endpoint.id().toString(),
@@ -217,7 +219,10 @@ async function execute<Remote extends BatchDestination>(
       (state.options.now() >= terms.expiresAt &&
         !existing?.stored?.openingPending)
     )
-      return sessionFail(SESSION_CODES.CLOSED);
+      throw new UnsentChannelRequestError(
+        terms.sellerNodeId,
+        new PaymentSessionError(SESSION_CODES.CLOSED),
+      );
     await checkPoolBudget(state, pool, existing, terms);
     return {
       terms,
@@ -234,7 +239,7 @@ async function execute<Remote extends BatchDestination>(
   const entry = await state.admission.serial(async () => {
     if (await unresolved(state)) return sessionFail(SESSION_CODES.UNVERIFIED);
     signal.throwIfAborted();
-    await verifyBatchQuote(
+    await verifyUnsentPoolQuote(
       quote,
       terms,
       state.options.endpoint.id().toString(),

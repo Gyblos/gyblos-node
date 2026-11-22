@@ -7,6 +7,7 @@ import {
   reserveApiKey,
 } from '@gyblos/buyer/api-key-execution';
 import { classifyPaidError } from '@gyblos/buyer/session-errors';
+import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
 import { createBuyerApiKeys } from '@gyblos/node/buyer-api-keys';
 import { createBuyerSessionPool } from '@gyblos/node/buyer-session-pool';
 import { BUYER_KEY_CHARGE } from '@gyblos/protocol/buyer-api-keys';
@@ -190,3 +191,67 @@ void test('a generic busy-shaped failure cannot release a delegated paid reserva
     await keys.close();
   }
 });
+
+for (const condition of ['expired', 'closed', 'catalog capacity'] as const) {
+  void test(`pooled channel rejection (${condition}) releases only the new API-key request`, async (t) => {
+    const fixture = await multisellerLoopback('1000000');
+    const host = createBuyerSessionPool(fixture.options);
+    const keys = await createBuyerApiKeys({
+      files: { read: async () => undefined, write: async () => {} },
+      scope: {
+        network: fixture.a.terms.network,
+        mint: fixture.a.terms.mint,
+        payer: fixture.a.terms.buyer,
+      },
+    });
+    t.after(async () => {
+      await host.close();
+      await keys.close();
+      await fixture.close();
+    });
+    const offers = fixture.offers[0]!;
+    const signal = new AbortController().signal;
+    if (condition === 'catalog capacity') {
+      const pool = await fixture.options.pool();
+      try {
+        for (let i = 0; i < BATCH_SESSION_DEFAULTS.maxSessions; i++) {
+          await pool.allocate({
+            ...fixture.a.terms,
+            sellerNodeId: i.toString(16).padStart(64, '0'),
+          });
+        }
+        assert.ok(
+          BigInt((await pool.budget()).availableAtomic) >=
+            BigInt(fixture.a.terms.depositAtomic),
+        );
+      } finally {
+        await pool.dispose();
+      }
+    } else {
+      await host.execute(await offers.quote(1), offers.input, signal);
+      if (condition === 'expired') fixture.a.time(fixture.a.terms.expiresAt);
+      else {
+        await fixture.a.seller().close();
+        await host.reconcile(signal);
+      }
+    }
+    const key = await keys.create('Synthetic caller', '1000');
+    const operation = keys.operation(key.id);
+    const quote = await offers.quote(2);
+    await reserveApiKey(operation, quote);
+    await assert.rejects(
+      executeApiKeySession(operation, quote.offer.nodeId, () =>
+        host.execute(quote, offers.input, signal),
+      ),
+      {
+        code:
+          condition === 'closed' ? SESSION_CODES.CLOSED : SESSION_CODES.LIMIT,
+      },
+    );
+    assert.equal((await keys.snapshot()).keys[0]?.reservedAtomic, '0');
+    assert.equal(
+      offers.generations(),
+      condition === 'catalog capacity' ? 0 : 1,
+    );
+  });
+}
