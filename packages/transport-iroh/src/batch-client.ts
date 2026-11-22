@@ -378,8 +378,10 @@ export function createBatchChannelClient<Remote extends BatchDestination>(
       blocks?: BatchBlockClient,
     ) => exchange(state, value, signal, onDelta, blocks),
     // Lets the seller admit another connection from this buyer (one data connection per peer); the
-    // next exchange reconnects. Callers release only an idle client.
+    // next exchange reconnects. Refused while an operation is in flight: the buyer channel releases
+    // only between operations, which its exclusive() serializes.
     release() {
+      if (state.pending.size) throw new BatchChannelError(SESSION_CODES.BUSY);
       drop(state);
     },
     async close() {

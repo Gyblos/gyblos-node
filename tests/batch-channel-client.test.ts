@@ -277,3 +277,22 @@ void test('the default OPEN deadline covers the seller opening window', () => {
   // the confirmation window (packages/payments-upto/src/batch-session-seller.ts openSeller).
   assert.ok(openMs > 4 * operationMs + openingConfirmMs);
 });
+
+void test('batch client refuses to release a connection while an operation is in flight', async () => {
+  const f = silentSeller();
+  const client = createBatchChannelClient(f.endpoint, destination, seller, {
+    operationMs: 50,
+  });
+  const running = client.exchange(request);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.throws(
+    () => client.release(),
+    (error) =>
+      error instanceof Error &&
+      (error as { code?: string }).code === SESSION_CODES.BUSY,
+  );
+  await assert.rejects(running);
+  client.release();
+  await client.close();
+  await client.settled();
+});

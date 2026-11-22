@@ -120,13 +120,11 @@ function createContext<Remote extends BatchDestination>(
   // One client per protocol. A channel that checkpoints keeps a second, whole-response client for the
   // requests that cannot (a declared offer has no tokenizer to certify prefixes). The seller admits one
   // data connection per buyer, so each client releases the other's idle connection before it is used.
-  let primary: ChannelTransport<Remote>;
+  // As between PREPARE and OPEN, a close the seller has not seen yet can refuse the next connection.
   let whole: ChannelTransport<Remote> | undefined;
-  const transport = (blockStreams: boolean) =>
-    channelTransport(options, blockStreams, () =>
-      (blockStreams === blockMode ? whole : primary)?.client.release(),
-    );
-  primary = transport(blockMode);
+  const primary = channelTransport(options, blockMode, () =>
+    whole?.client.release(),
+  );
   const context: BuyerBatchContext<Remote> = {
     blockMode,
     options,
@@ -138,7 +136,9 @@ function createContext<Remote extends BatchDestination>(
     // A view for one request's transport: exclusive() keeps `active` on the channel itself, never here.
     wholeResponse: () => {
       if (!blockMode) return context;
-      whole ??= transport(false);
+      whole ??= channelTransport(options, false, () =>
+        primary.client.release(),
+      );
       return { ...context, ...whole, blockMode: false };
     },
   };
