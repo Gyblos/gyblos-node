@@ -61,6 +61,7 @@ void test('profile refusals map to static codes', async () => {
       DISCOVERY_ERROR_CODES.INVALID_SIGNATURE,
     ],
     [403, { error: 'UNKNOWN_NODE' }, DISCOVERY_ERROR_CODES.UNKNOWN_NODE],
+    [403, { error: 'PROFILE_HELD' }, DISCOVERY_ERROR_CODES.PROFILE_HELD],
     [409, { error: 'STALE_CLAIM' }, DISCOVERY_ERROR_CODES.STALE_CLAIM],
     [413, {}, DISCOVERY_ERROR_CODES.PAYLOAD_TOO_LARGE],
     [429, {}, DISCOVERY_ERROR_CODES.RATE_LIMITED],
@@ -113,6 +114,8 @@ void test('a profile answer or view with a name outside the rule is malformed', 
     { ...view, name: null },
     { ...view, nodeId: 'cd'.repeat(32) },
     { ...view, issuedAt: -1 },
+    { ...view, issuedAt: 8.64e15 + 1 },
+    { ...view, issuedAt: Number.MAX_SAFE_INTEGER },
     { ...view, signature: 'xyz' },
     { ...view, extra: 1 },
   ])
@@ -149,6 +152,15 @@ void test('a profile is read back, a 404 is none and a bad NodeId is refused bef
     view,
   );
   assert.deepEqual(seen, [`${BASE}/profile/${NODE}`]);
+  const latest = { ...view, issuedAt: 8.64e15 };
+  assert.deepEqual(
+    await fetchSellerProfile({
+      baseUrl: BASE,
+      nodeId: NODE,
+      fetch: reply(200, latest),
+    }),
+    latest,
+  );
   assert.equal(
     await fetchSellerProfile({
       baseUrl: BASE,

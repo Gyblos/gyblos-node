@@ -74,6 +74,7 @@ function checkView(body: unknown, nodeId: string): SellerProfileView {
     typeof issuedAt !== 'number' ||
     !Number.isSafeInteger(issuedAt) ||
     issuedAt < 0 ||
+    issuedAt > DISCOVERY_LIMITS.maxTimeMs ||
     typeof signature !== 'string' ||
     !SIGNATURE_HEX.test(signature)
   )
