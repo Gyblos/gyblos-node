@@ -27,7 +27,11 @@ import type { BuyerExecutionFactory } from './free-startup';
 import { onBuyerSelectionFailure } from './free-telemetry';
 import { requireBuyerIdentity } from './identity';
 import { routedRequest } from './model-routes';
-import { selectConfiguredThenOpen } from './quote-selection';
+import {
+  automaticPoolRoute,
+  openDiscoveryRequest,
+  selectConfiguredThenOpen,
+} from './quote-selection';
 import { classifyPaidError } from './session-errors';
 import { makeManager, type SessionState } from './session-manager';
 import {
@@ -108,6 +112,15 @@ function freeExecutionGuard(
     sending?.();
   };
 }
+async function preferChannel(
+  selectionRoute: SelectionRoute | undefined,
+  paidAuto: boolean | undefined,
+  previousSeller: () => Promise<string | undefined>,
+) {
+  return selectionRoute?.open && paidAuto && !selectionRoute.previousSeller
+    ? { ...selectionRoute, previousSeller: await previousSeller() }
+    : selectionRoute;
+}
 function sessionSelection(
   context: Context,
   options: Options,
@@ -116,6 +129,7 @@ function sessionSelection(
   input: Parameters<Awaited<ReturnType<BuyerExecutionFactory>>['execute']>[0],
   permission: Parameters<typeof reserveApiKey>[0],
   router: ReturnType<typeof sessionRouter> | undefined,
+  previousSeller: () => Promise<string | undefined>,
   choice?: BuyerSellerChoice,
 ): BuyerRoutePorts<ChatResult>['select'] {
   const { prepared, endpoint, relayOnly } = context;
@@ -131,7 +145,7 @@ function sessionSelection(
         request.maxAtomic === '0' ? request.priceCeilings : route.priceCeilings,
       ...(inferenceNeedsTools(input) ? { tools: true as const } : {}),
     };
-    const select = (
+    const select = async (
       candidate: typeof request,
       selectionRoute?: SelectionRoute,
     ) =>
@@ -147,7 +161,11 @@ function sessionSelection(
         excluded,
         current,
         candidate,
-        selectionRoute,
+        await preferChannel(
+          selectionRoute,
+          prepared.config.discovery?.paidAuto,
+          previousSeller,
+        ),
       );
     if (choice) {
       if (permission) return sessionFail(SESSION_CODES.BINDING);
@@ -172,7 +190,13 @@ function sessionSelection(
         return { ...winner, seller: chosen.seller };
       });
     }
-    if (router || route.pinnedNodeId) return select(policy, route);
+    if (router || route.pinnedNodeId)
+      return select(
+        prepared.config.discovery?.paidAuto
+          ? openDiscoveryRequest(policy, true)
+          : policy,
+        automaticPoolRoute(prepared.config, route),
+      );
     return selectConfiguredThenOpen(prepared.config, policy, current, select);
   };
 }
@@ -217,6 +241,7 @@ function sessionExecutor(
         input,
         permission,
         router,
+        manager.previousSeller,
         model?.sellerChoice,
       ),
       free: freeSessionExecution(context, manager, input, permission, onDelta),

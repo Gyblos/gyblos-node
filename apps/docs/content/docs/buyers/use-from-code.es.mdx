@@ -11,6 +11,18 @@ Tu prompt llega al vendedor que lo responde. La máquina de ese vendedor ejecuta
 prompt. No envíes contraseñas, llaves ni otros secretos. Consulta
 [Datos y privacidad](/es/reference/data-and-privacy).
 
+## Selección automática de vendedor
+
+Si tu comprador usa descubrimiento abierto, canales y un máximo positivo por respuesta, activa Auto con los precios máximos de entrada y salida que aceptas en USDC por millón de tokens. Por ejemplo:
+
+Desde el repositorio, usa el mismo `GYBLOS_HOME` que el comprador al que se conecta OpenCode.
+
+```sh
+pnpm buyer:auto 0.052 0.208
+```
+
+Reinicia el comprador y selecciona el modelo en OpenCode. Auto pide ofertas firmadas a vendedores verificados. Se respetan el máximo por respuesta y el saldo de la clave API. Una clave con límite cero solo puede usar ofertas gratuitas. Auto puede liquidar el canal anterior antes de abrir otro con el depósito autorizado restante. Para volver al descubrimiento de ofertas gratuitas, ejecuta `pnpm buyer:auto off` y reinicia el comprador.
+
 ## Requisitos previos [#antes-de-empezar]
 
 - La [app de escritorio de Gyblos](/es/buyers/desktop-app), instalada y abierta. Mantenla abierta mientras

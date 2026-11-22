@@ -85,8 +85,8 @@ interface OpenRun {
   now: number;
 }
 
-// A seller the index lists but this buyer never configured, admitted only under open discovery (on the
-// free path, which passes the relay), only when its NodeId is registered to the catalog's owner, only
+// A seller the index lists but this buyer never configured, admitted only under open discovery,
+// only when its NodeId is registered to the catalog's owner, only
 // while the candidate list has room (the configured sellers come first), never one this request
 // excluded, and within the lookup and process bounds. It is dialed through the configured relay, never an
 // index address.
@@ -233,16 +233,11 @@ const conversationSellers = (config: BuyerSelectionConfig) =>
   );
 const cryptoRandom = () =>
   randomInt(BUYER_SELECTION.randomRange) / BUYER_SELECTION.randomRange;
-export async function discoverBuyerSellers(
-  config: BuyerSelectionConfig & { discovery: BuyerDiscoveryConfig },
-  state: BuyerDiscoveryState,
+async function verifiedConfiguredSellers(
+  config: BuyerSelectionConfig,
   options: DiscoverOptions,
-): Promise<BuyerSelectionConfig> {
-  const now = options.now ?? Date.now;
-  const signal = AbortSignal.any([
-    AbortSignal.timeout(options.timeoutMs ?? BUYER_DISCOVERY.timeoutMs),
-    ...(options.signal ? [options.signal] : []),
-  ]);
+  signal: AbortSignal,
+) {
   if (config.identity && !options.verifyIdentity)
     throw new BuyerSelectionError(BUYER_SELECTION_CODES.IDENTITY);
   const accepted = [];
@@ -255,6 +250,19 @@ export async function discoverBuyerSellers(
       accepted.push(seller);
     signal.throwIfAborted();
   }
+  return accepted;
+}
+export async function discoverBuyerSellers(
+  config: BuyerSelectionConfig & { discovery: BuyerDiscoveryConfig },
+  state: BuyerDiscoveryState,
+  options: DiscoverOptions,
+): Promise<BuyerSelectionConfig> {
+  const now = options.now ?? Date.now;
+  const signal = AbortSignal.any([
+    AbortSignal.timeout(options.timeoutMs ?? BUYER_DISCOVERY.timeoutMs),
+    ...(options.signal ? [options.signal] : []),
+  ]);
+  const accepted = await verifiedConfiguredSellers(config, options, signal);
   const identities = new Map(accepted.map((seller) => [seller.nodeId, seller]));
   // Sellers known only from the index (open discovery), each with a verified registered identity.
   const run: OpenRun = {
@@ -269,6 +277,12 @@ export async function discoverBuyerSellers(
   const configured = new Set(config.sellers.map((seller) => seller.nodeId));
   const open: DiscoveredSeller[] = [];
   for (const entry of entries) {
+    if (
+      config.discovery?.paidAuto &&
+      config.pinnedNodeId &&
+      entry.catalog.nodeId !== config.pinnedNodeId
+    )
+      continue;
     const trusted = identities.get(entry.catalog.nodeId);
     if (!trusted) {
       if (!configured.has(entry.catalog.nodeId)) open.push(entry);
