@@ -63,8 +63,14 @@ Do not add comments to source code. The ESLint rule and `pnpm comments:check`
 enforce an exact per-file budget in
 [`tooling/source-comment-budget.json`](../tooling/source-comment-budget.json).
 Existing comments can remain while cleanup is in progress, but a file's budget
-must equal its current count and may only decrease. New files start at zero.
-Reduce budgets in the same change that removes comments.
+must equal its current count. New files start at zero. Reduce budgets in the
+same change that removes comments. `comments:check` also compares the comments
+of every changed file with the base (`COMMENT_BASE_SHA` in CI, otherwise the
+merge base with `origin/develop` or, on a fork, `upstream/develop`): a comment
+whose text is not in the base is new, even when it replaces a deleted one. A
+budget grows only when the scanner starts counting comments that were already
+there, such as shell comments after escaped quotes, `.tsx.preview` views or
+lines a dependency patch adds; heredoc bodies are data and are not counted.
 
 Delete tautology and stale comments. Delete excuse comments and file an issue to
 replace the workaround. Move durable, non-obvious decisions to
