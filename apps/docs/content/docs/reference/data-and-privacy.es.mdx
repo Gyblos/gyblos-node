@@ -189,17 +189,19 @@ días después de enviarla deja de revisarse hasta que ejecutes el comando otra 
 consultas vienen del índice, no de tu equipo.
 
 **Qué envía tu equipo.** El comando firma la declaración con la llave del nodo y la envía al índice: tu
-NodeId, la cuenta, el id del gist y la hora. También lee el mismo archivo del gist desde tu equipo, así que
-GitHub ve tu dirección IP. Si usas la CLI de GitHub (`gh`), esta usa tu sesión de GitHub para leer el nombre
+NodeId, la cuenta, el id del gist y la hora. También lee el mismo archivo del gist desde tu equipo (y, si ese
+archivo falta, la dirección raw del gist sin nombre de archivo, para distinguir un nombre de archivo equivocado de
+un gist que no existe), así que GitHub ve tu dirección IP. Si usas la CLI de GitHub (`gh`), esta usa tu sesión de GitHub para leer el nombre
 de tu cuenta, listar tus gists públicos y crear el gist de prueba. `gyblos seller status --online` y
 `--status` le piden tu declaración al índice por tu NodeId.
 
-**En tu equipo.** El comando guarda su avance (cuenta, id del gist y último paso) en
+**En tu equipo.** El comando guarda su avance (una versión del formato, tu NodeId, la cuenta, el id del gist y el último paso) en
 `github-verification.json`, dentro de la carpeta `seller/` del home del vendedor. Solo tú puedes leerlo.
 
 **Cómo quitarlo.** Ejecuta `gyblos seller verify github --cancel`. El índice deja de mostrar la cuenta, la
-ruta GET responde `404` y el comando borra el archivo de avance. El índice guarda solo tu NodeId y la hora de
-la cancelación, para que nadie pueda volver a enviar una declaración vieja. El gist sigue en GitHub: bórralo
+ruta GET responde `404` y el comando borra el archivo de avance. El índice guarda solo tu NodeId, la hora de
+la cancelación y la hora de su última lectura de tu gist, y nunca los muestra; así nadie puede volver a enviar
+una declaración vieja. El gist sigue en GitHub: bórralo
 tú. Las copias que otros hicieron mientras era público quedan fuera del control de Gyblos.
 
 ## Solana devnet [#solana]

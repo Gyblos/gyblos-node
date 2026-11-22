@@ -184,17 +184,19 @@ longer checked until you run the command again. GitHub sees these requests come 
 your machine.
 
 **What your machine sends.** The command signs the claim with the node key and sends it to the index:
-your NodeId, the account, the gist id and the time. It also reads the same gist file from your machine, so
+your NodeId, the account, the gist id and the time. It also reads the same gist file from your machine (and,
+when that file is missing, the gist's bare raw URL, to tell a wrong file name from a missing gist), so
 GitHub sees your IP address. If you use the GitHub CLI (`gh`), it uses your signed-in GitHub session to
 read your account name, list your public gists and create the proof gist. `gyblos seller status --online`
 and `--status` ask the index for your claim by NodeId.
 
-**On your machine.** The command saves its progress (account, gist id and last step) in
+**On your machine.** The command saves its progress (a format version, your NodeId, the account, the gist id and the last step) in
 `github-verification.json` in the seller home's `seller/` folder, readable only by you.
 
 **Remove it.** Run `gyblos seller verify github --cancel`. The index stops showing the account, the GET
-route answers `404`, and the command deletes the progress file. The index keeps only your NodeId and the
-time of the cancel, so an old claim can't be sent again. The gist stays on GitHub: delete it yourself.
+route answers `404`, and the command deletes the progress file. The index keeps only your NodeId, the time of the
+cancel and the time it last fetched your gist, and never serves them; this stops an old claim from being sent
+again. The gist stays on GitHub: delete it yourself.
 Copies that others made while it was public are outside Gyblos's control.
 
 ## Solana devnet [#solana]

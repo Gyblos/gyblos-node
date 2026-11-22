@@ -149,7 +149,8 @@ El comando crea un gist público con la descripción `Gyblos node verification N
 que esa ejecución creó. Cuando funciona, muestra `Verified: GitHub account USER is linked to seller NODEID.` y
 la dirección del gist.
 
-Si `gh` tiene la sesión iniciada con otra cuenta, el comando lo dice, no lo usa y muestra los pasos de abajo.
+Si `gh` no está instalada, o tiene la sesión iniciada con otra cuenta (el comando lo dice), el comando no la usa
+y muestra los pasos de abajo. La imagen de Docker no incluye `gh`, así que un vendedor Docker sigue los pasos de abajo.
 La imagen de Docker no incluye `gh`, así que un vendedor Docker sigue los pasos de abajo.
 
 ### Sin la CLI de GitHub [#verificar-github-a-mano]
@@ -190,14 +191,26 @@ del vendedor y se salta lo que ya está hecho.
 
 ### Qué significa cada estado [#estados-github]
 
-| Estado     | Qué significa                                                                                                                                                                                        |
-| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `verified` | En la última revisión, el índice encontró la línea de prueba en tu gist. Los compradores ven la cuenta y el gist en la lista de la red del índice.                                                   |
-| `pending`  | El índice tiene tu declaración, pero aún no encontró la prueba. Los compradores no la ven. El índice revisa de nuevo cada 6 horas más o menos, durante 7 días; después, ejecuta el comando otra vez. |
-| `lost`     | La cuenta estaba verificada, pero la última revisión no encontró la prueba: el gist, el archivo o la línea ya no están, o la cuenta cambió de nombre. Los compradores ya no la ven.                  |
+| Estado     | Qué significa                                                                                                                                                                                                                                                                   |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `verified` | En la última revisión, el índice encontró la línea de prueba en tu gist. Los compradores ven la cuenta y el gist en la lista de la red del índice.                                                                                                                              |
+| `pending`  | El índice tiene tu declaración, pero aún no encontró la prueba. No aparece en la lista de la red, pero cualquiera puede leerla en `GET /v1/identity/github/<NodeId>`. El índice revisa de nuevo cada 6 horas más o menos, durante 7 días; después, ejecuta el comando otra vez. |
+| `lost`     | La cuenta estaba verificada, pero la última revisión no encontró la prueba: el gist, el archivo o la línea ya no están, o la cuenta cambió de nombre. Los compradores ya no la ven.                                                                                             |
 
-Solo `verified` significa que se encontró la prueba. Cuando GitHub no responde, el índice mantiene el estado
-que tenía.
+Solo `verified` significa que se encontró la prueba. Cuando GitHub no responde, la declaración mantiene su
+estado: `pending` sigue en `pending` y `verified` sigue en `verified`.
+
+### Bueno saber [#github-bueno-saber]
+
+- **El índice revisó hace un momento.** El comando muestra `waiting N s to ask again (Ctrl+C is safe)` y
+  vuelve a preguntar una vez por su cuenta. Si la espera es de más de 2 minutos, se detiene y te dice que lo
+  ejecutes otra vez más tarde.
+- **Cambiar la cuenta o el gist.** Ejecuta el comando otra vez con el nuevo `USER`, o con `--gist` y el nuevo
+  gist. La declaración vuelve a `pending` hasta que el índice revise el nuevo gist.
+- **No borres el gist.** El índice lo revisa otra vez cada 6 horas más o menos. Si borras el gist, cambias el
+  nombre del archivo o quitas la línea, el estado pasa a `lost`.
+- **Varios vendedores.** Una cuenta de GitHub puede verificar varios vendedores. Cada vendedor tiene su propio
+  NodeId, así que necesita su propio gist.
 
 ### Comprueba el estado [#comprobar-github]
 
@@ -229,10 +242,17 @@ Cada error empieza con una frase que dice qué hacer y termina con un código en
 | `VERIFY_PROOF_MISSING`                                  | El archivo no contiene `gyblos-node=NODEID` de este vendedor. Agrega la línea sola en su renglón y ejecuta el comando otra vez.                                                              |
 | `VERIFY_GIST_OWNER_MISMATCH`                            | El gist es de otra cuenta de GitHub. Crea el gist con la sesión iniciada como `USER`.                                                                                                        |
 | `VERIFY_GIST_NOT_FOUND`                                 | GitHub no tiene ese gist para `USER`: revisa la dirección y el nombre de usuario. Si borraste el gist, ejecuta el comando otra vez para crear uno nuevo, o pasa otra dirección con `--gist`. |
-| `VERIFY_NOT_VERIFIED` con `could not reach GitHub`      | El índice no pudo llegar a GitHub. Tu declaración sigue en `pending`. Ejecuta el comando otra vez en unos minutos.                                                                           |
-| `VERIFY_NOT_VERIFIED` con `checked this seller moments` | El índice revisó tu vendedor hace menos de un minuto. Ejecuta el comando otra vez en un minuto.                                                                                              |
+| `VERIFY_NOT_VERIFIED` con `could not reach GitHub`      | El índice no pudo llegar a GitHub. Tu declaración mantiene su estado. Ejecuta el comando otra vez en unos minutos.                                                                           |
+| `VERIFY_NOT_VERIFIED` con `checked this seller moments` | El índice revisó tu vendedor hace un momento y la espera es de más de 2 minutos. Ejecuta el comando otra vez pasado el tiempo que muestra.                                                   |
 | `VERIFY_GH_FAILED`                                      | La CLI de GitHub no pudo crear el gist. Créalo a mano y ejecuta el comando con `--gist`.                                                                                                     |
 | `DISCOVERY_UNKNOWN_NODE`                                | El índice aún no conoce tu vendedor. Primero [regístralo](/es/sellers/register-publish) o publícalo.                                                                                         |
+| `DISCOVERY_STALE_CLAIM`                                 | El índice tiene una declaración más nueva de este vendedor. El comando ya probó una vez más. Revisa el reloj de este equipo y ejecuta el comando otra vez.                                   |
+| `DISCOVERY_RATE_LIMITED`                                | El índice recibió demasiados intentos. Espera un minuto y ejecuta el comando otra vez.                                                                                                       |
+| `VERIFY_ACCOUNT_INVALID`                                | Eso no es un nombre de usuario de GitHub. Usa letras, números y guiones sueltos, con 39 caracteres como máximo.                                                                              |
+| `VERIFY_GIST_INVALID`                                   | Eso no es una dirección ni un id de gist. Copia la dirección de tu gist desde gist.github.com.                                                                                               |
+| `VERIFY_NO_GIST`                                        | El comando no pudo pedir la dirección del gist, por ejemplo en un script. Crea el gist y ejecuta el comando con `--gist`.                                                                    |
+| `VERIFY_SIGNING_FAILED`                                 | La llave del nodo no pudo firmar la declaración. Ejecuta `gyblos doctor`.                                                                                                                    |
+| `VERIFY_STATE_FAILED`                                   | El comando no pudo guardar su avance en el home del vendedor. Revisa que la carpeta del vendedor sea tuya y se pueda escribir (`gyblos doctor`) y ejecuta el comando otra vez.               |
 
 ## Privacidad [#datos-del-comprador-y-privacidad-de-red]
 

@@ -146,8 +146,8 @@ The command creates a public gist described `Gyblos node verification NODEID` wi
 the claim and sends it to the index. If an earlier run was interrupted, it reuses the gist that run made.
 When it works, it prints `Verified: GitHub account USER is linked to seller NODEID.` and the gist address.
 
-If `gh` is signed in as another account, the command says so, doesn't use it and shows the steps below. The
-Docker image doesn't include `gh`, so a Docker seller follows the steps below.
+If `gh` isn't installed, or is signed in as another account (the command says so), the command doesn't use it
+and shows the steps below. The Docker image doesn't include `gh`, so a Docker seller follows the steps below.
 
 ### Without the GitHub CLI [#verify-github-by-hand]
 
@@ -187,13 +187,25 @@ and skips what is done.
 
 ### What each state means [#github-states]
 
-| State      | What it means                                                                                                                                                                  |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `verified` | At the last check the index found the proof line in your gist. Buyers see the account and the gist in the index's network list.                                                |
-| `pending`  | The index has your claim but hasn't found the proof yet. Buyers don't see it. The index checks again about every 6 hours, for up to 7 days; after that, run the command again. |
-| `lost`     | The account was verified, but the last check didn't find the proof: the gist, the file or the line is gone, or the account was renamed. Buyers no longer see it.               |
+| State      | What it means                                                                                                                                                                                                                                               |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `verified` | At the last check the index found the proof line in your gist. Buyers see the account and the gist in the index's network list.                                                                                                                             |
+| `pending`  | The index has your claim but hasn't found the proof yet. It isn't shown in the network list, but anyone can read it at `GET /v1/identity/github/<NodeId>`. The index checks again about every 6 hours, for up to 7 days; after that, run the command again. |
+| `lost`     | The account was verified, but the last check didn't find the proof: the gist, the file or the line is gone, or the account was renamed. Buyers no longer see it.                                                                                            |
 
-Only `verified` means the proof was found. When GitHub doesn't answer, the index keeps the state it had.
+Only `verified` means the proof was found. When GitHub doesn't answer, the claim keeps its current state:
+`pending` stays `pending` and `verified` stays `verified`.
+
+### Good to know [#github-good-to-know]
+
+- **The index checked moments ago.** The command prints `waiting N s to ask again (Ctrl+C is safe)` and asks
+  once more by itself. If the wait is longer than 2 minutes, it stops and tells you to run it again later.
+- **Change the account or the gist.** Run the command again with the new `USER`, or with `--gist` and the new
+  gist. The claim goes back to `pending` until the index checks the new gist.
+- **Keep the gist.** The index checks it again about every 6 hours. If you delete the gist, rename its file or
+  remove the line, the state becomes `lost`.
+- **Several sellers.** One GitHub account can verify several sellers. Each seller has its own NodeId, so it
+  needs its own gist.
 
 ### Check the state [#github-check]
 
@@ -225,10 +237,17 @@ Each error starts with a sentence that says what to do and ends with a code in b
 | `VERIFY_PROOF_MISSING`                                   | The file doesn't contain `gyblos-node=NODEID` for this seller. Add the line on its own and run the command again.                                                               |
 | `VERIFY_GIST_OWNER_MISMATCH`                             | The gist belongs to another GitHub account. Create the gist while signed in as `USER`.                                                                                          |
 | `VERIFY_GIST_NOT_FOUND`                                  | GitHub has no such gist for `USER`: check the address and the user name. If the gist was deleted, run the command again to make a new one, or pass a new address with `--gist`. |
-| `VERIFY_NOT_VERIFIED` with `could not reach GitHub`      | The index couldn't reach GitHub. Your claim stays `pending`. Run the command again in a few minutes.                                                                            |
-| `VERIFY_NOT_VERIFIED` with `checked this seller moments` | The index checked your seller less than a minute ago. Run the command again in a minute.                                                                                        |
+| `VERIFY_NOT_VERIFIED` with `could not reach GitHub`      | The index couldn't reach GitHub. Your claim keeps its current state. Run the command again in a few minutes.                                                                    |
+| `VERIFY_NOT_VERIFIED` with `checked this seller moments` | The index checked your seller moments ago and the wait is longer than 2 minutes. Run the command again after the time it shows.                                                 |
 | `VERIFY_GH_FAILED`                                       | The GitHub CLI couldn't create the gist. Create it by hand and run the command with `--gist`.                                                                                   |
 | `DISCOVERY_UNKNOWN_NODE`                                 | The index doesn't know your seller yet. [Register](/en/sellers/register-publish) or publish first.                                                                              |
+| `DISCOVERY_STALE_CLAIM`                                  | The index holds a newer claim from this seller. The command already tried once more. Check this computer's clock, then run the command again.                                   |
+| `DISCOVERY_RATE_LIMITED`                                 | The index got too many attempts. Wait a minute and run the command again.                                                                                                       |
+| `VERIFY_ACCOUNT_INVALID`                                 | That is not a GitHub user name. Use letters, digits and single hyphens, at most 39 characters.                                                                                  |
+| `VERIFY_GIST_INVALID`                                    | That is not a gist address or id. Copy the address of your gist from gist.github.com.                                                                                           |
+| `VERIFY_NO_GIST`                                         | The command couldn't ask for the gist address, for example in a script. Create the gist, then run the command with `--gist`.                                                    |
+| `VERIFY_SIGNING_FAILED`                                  | The node key couldn't sign the claim. Run `gyblos doctor`.                                                                                                                      |
+| `VERIFY_STATE_FAILED`                                    | The command couldn't save its progress in the seller home. Check that the seller folder is yours and writable (`gyblos doctor`), then run the command again.                    |
 
 ## Privacy [#buyer-data-and-network-privacy]
 
