@@ -216,6 +216,8 @@ void test('the route only reads, spends the read budget, and fails closed withou
   }
   assert.equal(database.log.length, 1);
   assert.equal(database.log[0]!.sql.match(/\blimit\b/gi)?.length, 1);
+  const statement = database.log[0]!.sql.toLowerCase();
+  assert.ok(statement.search(/\blimit\b/) < statement.indexOf('from "page"'));
   assert.equal(read.keys.length, 1);
   assert.equal(ip.keys.length, 0);
   const limited = collector(database, { read: false });
