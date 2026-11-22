@@ -304,4 +304,9 @@ export const NAME_ERRORS = {
   CONFIG_INVALID: 'NAME_CONFIG_INVALID',
   SIGNING_FAILED: 'NAME_SIGNING_FAILED',
 } as const;
-export const SELLER_NAME = { indexTimeoutMs: 15_000 } as const;
+export const SELLER_NAME = {
+  indexTimeoutMs: 15_000,
+  showDelaySeconds: 10,
+  clockNoteSeconds: 2,
+  garbled: /[?\ufffd]/,
+} as const;

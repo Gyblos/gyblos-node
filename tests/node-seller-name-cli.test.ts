@@ -184,3 +184,105 @@ void test('seller name is listed in the CLI help', async () => {
   assert.equal(code, 0);
   assert.match(stdout, /gyblos seller name "<name>" \| --clear \| --status/);
 });
+
+const dated = (status: number, body: unknown, offsetMs: number) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      'content-type': 'application/json',
+      date: new Date(Date.now() + offsetMs).toUTCString(),
+    },
+  });
+
+void test('seller name says in plain words which part of a refused name failed', async () => {
+  await withKeyedHome(async (home) => {
+    for (const [input, code, text] of [
+      ['Ada ✓', 'NAME_INVALID', /emoji|symbol/],
+      ['\u0301Ada', 'NAME_INVALID', /accent|mark/i],
+      ['Ada \u0410da', 'NAME_INVALID', /one writing system/],
+      ['x'.repeat(33), 'NAME_INVALID', /1 to 32 characters/],
+      ['GYBL0S', 'NAME_RESERVED', /gyblos.*verified/s],
+      ['Official seller', 'NAME_RESERVED', /official/],
+    ] as const) {
+      const run = await nameRun(home, [input], () => assert.fail('fetched'));
+      assert.equal(run.code, 1);
+      assert.match(run.stderr, text);
+      assert.match(run.stderr, new RegExp(`\\[${code}\\]`));
+    }
+  });
+});
+
+void test('seller name suggests a UTF-8 terminal when letters arrived as question marks', async () => {
+  await withKeyedHome(async (home) => {
+    for (const input of ['Jos? Garc?a', 'Jos\ufffd']) {
+      const run = await nameRun(home, [input], () => assert.fail('fetched'));
+      assert.equal(run.code, 1);
+      assert.match(run.stderr, /UTF-8/);
+    }
+    const plain = await nameRun(home, ['Ada ✓'], () => assert.fail('fetched'));
+    assert.doesNotMatch(plain.stderr, /UTF-8/);
+  });
+});
+
+void test('seller name explains clock refusals with the gap the index reports', async () => {
+  await withKeyedHome(async (home) => {
+    const behind = await nameRun(home, ['Ada'], () =>
+      dated(409, { error: 'STALE_CLAIM' }, 120_000),
+    );
+    assert.equal(behind.code, 1);
+    assert.match(
+      behind.stderr,
+      /clock may be behind, or a newer name was already sent/,
+    );
+    assert.match(behind.stderr, /Turn on automatic time/);
+    assert.match(behind.stderr, /1(19|20|21) s behind/);
+    assert.match(behind.stderr, /\[DISCOVERY_STALE_CLAIM\]\n$/);
+    const ahead = await nameRun(home, ['Ada'], () =>
+      dated(400, { error: 'INVALID_CLAIM' }, -60_000),
+    );
+    assert.equal(ahead.code, 1);
+    assert.match(ahead.stderr, /signed time/);
+    assert.match(ahead.stderr, /(59|60|61) s ahead/);
+    assert.match(ahead.stderr, /\[DISCOVERY_CLAIM_REJECTED\]\n$/);
+    const shape = await nameRun(home, ['Ada'], () =>
+      dated(400, { error: 'INVALID_CLAIM' }, 0),
+    );
+    assert.equal(shape.code, 1);
+    assert.doesNotMatch(shape.stderr, /clock|time/);
+    assert.match(shape.stderr, /\[DISCOVERY_CLAIM_REJECTED\]\n$/);
+  });
+});
+
+void test('seller name explains an old index and a name held by the operator', async () => {
+  await withKeyedHome(async (home) => {
+    const old = await nameRun(home, ['Ada'], () => json(404, {}));
+    assert.match(old.stderr, /does not take seller names yet/);
+    const held = await nameRun(home, ['Ada'], () =>
+      json(403, { error: 'PROFILE_HELD' }),
+    );
+    assert.equal(held.code, 1);
+    assert.match(held.stderr, /operator/);
+    assert.match(held.stderr, /\[DISCOVERY_PROFILE_HELD\]\n$/);
+  });
+});
+
+void test('seller name accepts a name that starts with a hyphen after --, and says when it shows', async () => {
+  await withKeyedHome(async (home) => {
+    const run = await nameRun(home, ['--', '-Ada'], accept);
+    assert.equal(run.code, 0, run.stderr);
+    const signed = await verifyProfileClaim(run.posted[0]);
+    assert.equal(signed.claim.name, '-Ada');
+    assert.match(run.stdout, /10 seconds/);
+  });
+});
+
+void test('seller name prints the verify tip as a container command inside Docker', async () => {
+  await withKeyedHome(async (home) => {
+    const run = await nameRun(home, ['Ada'], accept, { GYBLOS_CONTAINER: '1' });
+    assert.equal(run.code, 0, run.stderr);
+    assert.match(
+      run.stdout,
+      /docker compose exec seller gyblos seller verify github/,
+    );
+  });
+});

@@ -20,6 +20,14 @@ import {
 
 import { urlOrigin } from './cli-format';
 import { commandsFor } from './cli-next';
+import {
+  clockGapSeconds,
+  indexHint,
+  ISSUE_TEXT,
+  SHOW_DELAY,
+  TERMINAL_HINT,
+  UNVERIFIED,
+} from './cli-seller-name-text';
 import { EXIT, NAME_ERRORS, SELLER_NAME } from './constants';
 import {
   discoverySettings,
@@ -45,55 +53,11 @@ interface NameSession {
   baseUrl: string;
   fetch: DiscoveryFetch;
   interrupt: AbortSignal | undefined;
+  serverDate: string | null;
 }
 
 const USAGE =
   'Usage: gyblos seller name "<name>"\n       gyblos seller name --clear\n       gyblos seller name --status\n';
-const UNVERIFIED =
-  'Names are chosen by each seller: they are not verified and not unique. Only `gyblos seller verify github` verifies who runs a seller';
-const AGAIN = 'Run the same command again';
-
-const ISSUE_TEXT: Readonly<Record<SellerNameIssue, string>> = {
-  [SELLER_NAME_ISSUES.LENGTH]: `A seller name has ${PROFILE_CLAIM.minNameCharacters} to ${PROFILE_CLAIM.maxNameCharacters} characters`,
-  [SELLER_NAME_ISSUES.CHARACTERS]:
-    "A seller name may use only letters, numbers, spaces and - _ . ' (no emoji, symbols or check marks), with at least one letter or number",
-  [SELLER_NAME_ISSUES.RESERVED]: `A seller name may not contain "${PROFILE_CLAIM.reservedWord}" in any letter case`,
-};
-const INDEX_HINTS: ReadonlyMap<string, string> = new Map([
-  [
-    DISCOVERY_ERROR_CODES.UNKNOWN_NODE,
-    `The index does not know this seller yet. Register it with \`gyblos seller register\`, or start it with publishing on, then ${AGAIN.toLowerCase()}`,
-  ],
-  [
-    DISCOVERY_ERROR_CODES.RATE_LIMITED,
-    `The index got too many attempts. Wait a minute and ${AGAIN.toLowerCase()}`,
-  ],
-  [
-    DISCOVERY_ERROR_CODES.UNAVAILABLE,
-    `The index does not take seller names right now. ${AGAIN} later`,
-  ],
-  [
-    DISCOVERY_ERROR_CODES.STALE_CLAIM,
-    `The index holds a newer name from this seller. Check this computer's clock, then ${AGAIN.toLowerCase()}`,
-  ],
-  [
-    DISCOVERY_ERROR_CODES.CLAIM_REJECTED,
-    `The index refused the name. Check this computer's clock, then ${AGAIN.toLowerCase()}`,
-  ],
-  [
-    DISCOVERY_ERROR_CODES.INVALID_SIGNATURE,
-    'The index refused the signature. Run `gyblos doctor`',
-  ],
-  [
-    DISCOVERY_ERROR_CODES.HTTP_STATUS,
-    'This index does not take seller names. Check discovery.url in config.toml',
-  ],
-  [
-    DISCOVERY_ERROR_CODES.MALFORMED_RESPONSE,
-    'The index sent an answer this version cannot read. Update gyblos, or try again later',
-  ],
-]);
-
 class SigningFailed extends Error {}
 
 function indexFailure(session: NameSession, error: unknown) {
@@ -115,7 +79,10 @@ function indexFailure(session: NameSession, error: unknown) {
   return fail(
     session.output,
     error.code,
-    commandsFor(mode, INDEX_HINTS.get(error.code) ?? RETRY_LATER),
+    commandsFor(
+      mode,
+      indexHint(error.code, clockGapSeconds(session.serverDate, Date.now())),
+    ),
   );
 }
 
@@ -156,10 +123,11 @@ async function send(session: NameSession, name: string | null) {
       DISCOVERY_ERROR_CODES.MALFORMED_RESPONSE,
       RETRY_LATER,
     );
+  const unverified = commandsFor(runMode(session.output.env), UNVERIFIED);
   session.output.stdout(
     name === null
-      ? `Name cleared: ${where} shows no name.\n`
-      : `Name set: ${where} shows "${name}".\n  ${UNVERIFIED}.\n`,
+      ? `Name cleared: ${where} shows no name. ${SHOW_DELAY}.\n`
+      : `Name set: ${where} shows "${name}". ${SHOW_DELAY}.\n  ${unverified}.\n`,
   );
   return EXIT.ok;
 }
@@ -176,7 +144,7 @@ async function status(session: NameSession) {
     });
     session.output.stdout(
       view
-        ? `Public name for ${where}: "${view.name}" (set ${new Date(view.issuedAt).toISOString()}).\n  ${UNVERIFIED}.\n`
+        ? `Public name for ${where}: "${view.name}" (set ${new Date(view.issuedAt).toISOString()}).\n  ${commandsFor(runMode(session.output.env), UNVERIFIED)}.\n`
         : `No public name for ${where}.\n`,
     );
     return EXIT.ok;
@@ -229,7 +197,8 @@ export async function nameCommand(
         checked.issue === SELLER_NAME_ISSUES.RESERVED
           ? NAME_ERRORS.RESERVED
           : NAME_ERRORS.INVALID,
-        ISSUE_TEXT[checked.issue],
+        ISSUE_TEXT[checked.issue] +
+          (SELLER_NAME.garbled.test(parsed.name) ? TERMINAL_HINT : ''),
       );
     name = checked.name;
   }
@@ -246,13 +215,20 @@ export async function nameCommand(
         'The configuration is invalid. Run `gyblos doctor`',
       ),
     );
+  const base: DiscoveryFetch =
+    context.fetch ?? ((input, init) => fetch(input, init));
   const session: NameSession = {
     output,
     environment,
     nodeId: identity.nodeId,
     baseUrl: discovery.url,
-    fetch: context.fetch ?? ((input, init) => fetch(input, init)),
+    fetch: async (input, init) => {
+      const response = await base(input, init);
+      session.serverDate = response.headers.get('date');
+      return response;
+    },
     interrupt: context.interrupt,
+    serverDate: null,
   };
   if (parsed.status) return status(session);
   return send(session, name);
