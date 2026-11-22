@@ -120,6 +120,14 @@ void test(
       BATCH_CHANNEL.maxOutputTokens,
       BATCH_CHANNEL.maxOutputTokens,
     ]);
+    const simultaneous = await Promise.all([ask(64), ask(64)]);
+    for (const answer of simultaneous)
+      assert.equal(answer.status, 200, await answer.clone().text());
+    const final = parseBuyerApiKeysReply(
+      await (await owner(new URL(BUYER_API_KEYS.PATH, host.buyer().url))).json(),
+    ).snapshot;
+    assert.equal(final.keys[0]?.reservedAtomic, '0');
+    assert.equal(final.blocked, false);
     assert.deepEqual(host.finance.calls, ['deposit']);
   },
 );
