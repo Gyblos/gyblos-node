@@ -60,6 +60,7 @@ type Scanner = {
   quoteLength: number;
   quoteEscapes: boolean;
   inTag: boolean;
+  lineBound: boolean;
   heredocs: { tag: string; dash: boolean }[];
   ranges: CommentRange[];
 };
@@ -124,7 +125,9 @@ function advanceInQuote(scanner: Scanner): void {
   const character = text[scanner.index];
   const escape = options.powershell
     ? quote === '"' && character === '`'
-    : character === '\\' && (quote !== "'" || scanner.quoteEscapes);
+    : character === '\\' &&
+      !options.html &&
+      (quote !== "'" || scanner.quoteEscapes);
   if (escape) {
     scanner.index += 2;
     return;
@@ -134,7 +137,10 @@ function advanceInQuote(scanner: Scanner): void {
     (quoteLength === 1 ||
       text.slice(scanner.index, scanner.index + quoteLength) ===
         quote.repeat(quoteLength));
-  if (options.lineQuotes && quote !== '`' && character === '\n') {
+  if (
+    (scanner.lineBound || (options.lineQuotes && quote !== '`')) &&
+    character === '\n'
+  ) {
     scanner.quote = '';
     return;
   }
@@ -142,7 +148,12 @@ function advanceInQuote(scanner: Scanner): void {
     scanner.index += 1;
     return;
   }
-  if (quoteLength === 1 && quote === "'" && text[scanner.index + 1] === "'") {
+  if (
+    quoteLength === 1 &&
+    quote === "'" &&
+    !options.html &&
+    text[scanner.index + 1] === "'"
+  ) {
     scanner.index += 2;
     return;
   }
@@ -178,6 +189,11 @@ function opensQuote(scanner: Scanner): boolean {
     (!options.powershell && !options.yaml && character === '`');
   if (!opens) return false;
   scanner.quote = character;
+  scanner.lineBound =
+    options.yaml === true &&
+    !/(^|[:\-[{,?])$/.test(
+      text.slice(text.lastIndexOf('\n', index - 1) + 1, index).trimEnd(),
+    );
   scanner.quoteEscapes =
     options.singleQuoteEscapes === true ||
     (options.shell === true && text[index - 1] === '$');
@@ -286,6 +302,7 @@ function delimitedCommentRanges(
     quoteLength: 1,
     quoteEscapes: false,
     inTag: false,
+    lineBound: false,
     heredocs: [],
     ranges: [],
   };

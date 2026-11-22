@@ -297,3 +297,14 @@ void test('second Devin pass on the scanner', () => {
     [],
   );
 });
+
+void test('inch marks in YAML and backslashes in HTML attributes', () => {
+  assert.deepEqual(
+    commentTexts('description: Support 24" displays\n# actual', 'a.yml'),
+    ['# actual'],
+  );
+  assert.deepEqual(
+    commentTexts('<div data-path="C:\\"></div><!-- actual -->', 'a.html'),
+    ['<!-- actual -->'],
+  );
+});
