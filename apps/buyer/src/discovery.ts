@@ -269,6 +269,12 @@ export async function discoverBuyerSellers(
   const configured = new Set(config.sellers.map((seller) => seller.nodeId));
   const open: DiscoveredSeller[] = [];
   for (const entry of entries) {
+    if (
+      config.discovery?.paidAuto &&
+      config.pinnedNodeId &&
+      entry.catalog.nodeId !== config.pinnedNodeId
+    )
+      continue;
     const trusted = identities.get(entry.catalog.nodeId);
     if (!trusted) {
       if (!configured.has(entry.catalog.nodeId)) open.push(entry);

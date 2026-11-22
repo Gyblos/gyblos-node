@@ -1,6 +1,7 @@
 import { SELLER_SELECTION_CODES } from '@gyblos/core/constants';
 
 import { FreeSelectionFailure } from './free-execution';
+import type { SelectionRoute } from './free-route';
 import type { BuyerSelectionConfig } from './selection-config';
 
 type Request = BuyerSelectionConfig['request'];
@@ -17,6 +18,17 @@ export function openDiscoveryRequest(
         priceCeilings: { inputAtomicPerMtok: '0', outputAtomicPerMtok: '0' },
       };
 }
+export function automaticPoolRoute(
+  config: Pick<BuyerSelectionConfig, 'discovery' | 'pinnedNodeId'>,
+  route: SelectionRoute,
+): SelectionRoute {
+  return config.discovery?.paidAuto &&
+    !config.pinnedNodeId &&
+    (!route.pinnedNodeId || route.waitingFor === route.pinnedNodeId)
+    ? { ...route, open: true }
+    : route;
+}
+
 export async function selectConfiguredThenOpen<Winner>(
   config: Pick<BuyerSelectionConfig, 'sellers' | 'discovery'>,
   request: Request,

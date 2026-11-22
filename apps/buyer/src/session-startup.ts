@@ -28,6 +28,7 @@ import { onBuyerSelectionFailure } from './free-telemetry';
 import { requireBuyerIdentity } from './identity';
 import { routedRequest } from './model-routes';
 import {
+  automaticPoolRoute,
   openDiscoveryRequest,
   selectConfiguredThenOpen,
 } from './quote-selection';
@@ -194,12 +195,7 @@ function sessionSelection(
         prepared.config.discovery?.paidAuto
           ? openDiscoveryRequest(policy, true)
           : policy,
-        {
-          ...route,
-          ...(prepared.config.discovery?.paidAuto &&
-            !route.pinnedNodeId &&
-            !prepared.config.pinnedNodeId && { open: true as const }),
-        },
+        automaticPoolRoute(prepared.config, route),
       );
     return selectConfiguredThenOpen(prepared.config, policy, current, select);
   };

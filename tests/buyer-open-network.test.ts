@@ -4,7 +4,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { FreeSelectionFailure } from '@gyblos/buyer/free-execution';
-import { selectConfiguredThenOpen } from '@gyblos/buyer/quote-selection';
+import {
+  automaticPoolRoute,
+  selectConfiguredThenOpen,
+} from '@gyblos/buyer/quote-selection';
 import {
   parseBuyerSelectionConfig,
   type BuyerSelectionConfig,
@@ -297,5 +300,18 @@ void test('Auto never spends on a free key and rejects an existing seller pin', 
   assert.deepEqual(rec.calls[0]?.request.priceCeilings, FREE.priceCeilings);
   assert.throws(() =>
     parseBuyerSelectionConfig({ ...auto, pinnedNodeId: sellerNodeId }),
+  );
+});
+
+void test('Auto discovers the same busy indexed seller again while waiting', () => {
+  const route = { pinnedNodeId: sellerNodeId, waitingFor: sellerNodeId };
+  const discovery = { ...config(0, true).discovery!, paidAuto: true as const };
+  assert.deepEqual(automaticPoolRoute({ discovery }, route), {
+    ...route,
+    open: true,
+  });
+  assert.deepEqual(
+    automaticPoolRoute({ discovery, pinnedNodeId: sellerNodeId }, route),
+    route,
   );
 });
