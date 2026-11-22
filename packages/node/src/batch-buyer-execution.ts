@@ -31,12 +31,12 @@ import type { BatchDestination } from '@gyblos/transport-iroh/batch-client';
 
 import { runBuyerBlocks } from './batch-block-buyer';
 import { isBlockBuyer } from './batch-block-ports';
+import { executeOpenedBatchBuyer } from './batch-buyer-opened';
 import type { BuyerBatchContext } from './batch-buyer-types';
 import {
   publishBuyerSessionReceipt,
   sessionReceiptPayment,
 } from './batch-receipts';
-import { executeOpenedBatchBuyer } from './batch-session';
 import { verifyDecline } from './buyer-declined-request';
 import { recoverBuyerOpening } from './buyer-opening-retry';
 import { bounded } from './buyer-operation';

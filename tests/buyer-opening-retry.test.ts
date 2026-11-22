@@ -72,3 +72,37 @@ void test('permission withdrawn before OPEN does not claim or observe a deposit'
   assert.equal(observations, 0);
   assert.deepEqual(fixture.rig.calls, []);
 });
+
+void test('permission withdrawn after the deposit prevents replay and inference', async (t) => {
+  let allowed = true;
+  let permits = 0;
+  const fixture = await batchPrepareFixture(
+    async () => {
+      allowed = false;
+      return 'present';
+    },
+    async (work) => {
+      permits++;
+      if (!allowed) throw new BatchChannelError(SESSION_CODES.UNVERIFIED);
+      return work();
+    },
+  );
+  t.after(fixture.close);
+  let opens = 0;
+  fixture.intercept(async (...args) => {
+    const result = await fixture.service.exchange(...args);
+    if (args[0].method === BATCH_METHODS.OPEN && ++opens === 1)
+      throw new BatchChannelError(SESSION_CODES.UNAVAILABLE);
+    return result;
+  });
+  await assert.rejects(
+    fixture.buyer.execute(await fixture.offers.quote(1), fixture.offers.input),
+    { code: SESSION_CODES.OPENING_PENDING },
+  );
+  assert.equal(permits, 2);
+  assert.equal(opens, 1);
+  assert.equal(fixture.pendingOpening(), true);
+  assert.notEqual(fixture.rig.buyer.snapshot().channelId, '');
+  assert.equal(fixture.offers.generations(), 0);
+  assert.deepEqual(fixture.rig.calls, ['deposit']);
+});

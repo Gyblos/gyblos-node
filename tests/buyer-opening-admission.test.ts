@@ -1,3 +1,4 @@
+// Exercises desktop opening admission over loopback with a temporary buyer profile.
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
