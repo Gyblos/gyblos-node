@@ -1,7 +1,6 @@
-// Owns the collector's typed tables, keys, indexes and checks, matching migrations/ exactly (a test
-// compares them); drizzle-kit generates migrations from it. Historical D1 migrations retain physical
-// WITHOUT ROWID layout, which Drizzle cannot declare. These declarations perform no client
-// initialization or I/O.
+// Owns the collector's typed tables, keys, indexes and checks, matching migrations/ (tests compare
+// them); drizzle-kit generates migrations from it. D1 keeps the WITHOUT ROWID layout Drizzle cannot
+// declare. These declarations perform no client initialization or I/O.
 import { eq, sql } from 'drizzle-orm';
 import {
   check,

@@ -1,7 +1,6 @@
-// Guards the D1 migrations drizzle-kit generates from each Worker's schema.ts: the latest snapshot must
-// describe schema.ts exactly (a schema change without `db:generate` fails here), the journal, snapshots
-// and SQL files must agree, already-applied baseline files never change, and no generated file may
-// silently drop a table's WITHOUT ROWID layout, which Drizzle cannot declare.
+// Guards drizzle-kit's D1 migrations: the latest snapshot matches schema.ts (else run db:generate),
+// journal, snapshots and SQL files agree, recorded migration files never change, custom migrations
+// move only data, and no generated file drops a table's WITHOUT ROWID layout.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -144,9 +143,33 @@ for (const app of APPS) {
       readdirSync(new URL('meta/', migrations(app.name))).sort(),
       [
         '_journal.json',
+        '_sha256.json',
         ...entries.map((entry) => `${prefix(entry.idx)}_snapshot.json`),
       ].sort(),
     );
+  });
+
+  // Wrangler skips a file already applied by name, so an edit to any migration would silently never
+  // reach the live database. Every file is recorded once (pnpm db:hashes) and never re-recorded.
+  void test(`${app.name}: every migration file is recorded and unchanged since`, () => {
+    const recorded: Record<string, string> = JSON.parse(
+      read(new URL('meta/_sha256.json', migrations(app.name))),
+    );
+    const files = sqlFiles(app.name);
+    for (const file of files) {
+      assert.ok(
+        file in recorded,
+        `${file} is not recorded: run pnpm db:hashes after writing it`,
+      );
+      assert.equal(
+        createHash('sha256')
+          .update(read(new URL(file, migrations(app.name))))
+          .digest('hex'),
+        recorded[file],
+        `${file} changed after it was recorded; applied migrations are never edited, add a new one`,
+      );
+    }
+    assert.deepEqual(Object.keys(recorded).sort(), files);
   });
 
   void test(`${app.name}: generated migrations keep every WITHOUT ROWID table`, () => {
