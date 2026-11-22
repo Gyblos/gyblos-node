@@ -18,18 +18,11 @@ import { NATIVE_CAPABILITY } from '../support/native-runtime';
 import { paidAcceptanceMeter } from '../support/paid-acceptance-engine';
 import { sessionProductHost } from '../support/session-product-host';
 
-void test(
-  'native buyer keys constrain signed session quotes and retain approved usage across a product restart',
-  { skip: NATIVE_CAPABILITY.transportSkip },
-  async (t) => {
-    const request = globalThis.fetch;
-    const limits: number[] = [];
-    const host = await sessionProductHost(undefined, undefined, {
-      meter: paidAcceptanceMeter,
-      observe: (input) => limits.push(input.maxTokens),
-    });
-    t.after(host.close);
-    const token = (
+async function buyerClient(
+  host: Awaited<ReturnType<typeof sessionProductHost>>,
+  request: typeof fetch,
+) {
+  const token = (
       await readFile(
         rolePathIn(process.env, P2P_ROLES.BUYER, PAID_BUYER.tokenFile),
         'utf8',
@@ -75,6 +68,21 @@ void test(
           max_completion_tokens: maxTokens,
         }),
       });
+  return { ask, owner };
+}
+
+void test(
+  'native buyer keys constrain signed session quotes and retain approved usage across a product restart',
+  { skip: NATIVE_CAPABILITY.transportSkip },
+  async (t) => {
+    const request = globalThis.fetch;
+    const limits: number[] = [];
+    const host = await sessionProductHost(undefined, undefined, {
+      meter: paidAcceptanceMeter,
+      observe: (input) => limits.push(input.maxTokens),
+    });
+    t.after(host.close);
+    const { ask, owner } = await buyerClient(host, request);
     const first = await ask(64);
     assert.equal(first.status, 200, await first.clone().text());
     const firstReply = await first.json();
@@ -131,3 +139,34 @@ void test(
     assert.deepEqual(host.finance.calls, ['deposit']);
   },
 );
+
+void test('a restarted single-channel buyer releases only a finalized unsigned request from its delegated key', {
+  skip: NATIVE_CAPABILITY.transportSkip,
+}, async (t) => {
+  const request = globalThis.fetch;
+  const host = await sessionProductHost();
+  t.after(host.close);
+  const { ask, owner } = await buyerClient(host, request);
+  const status = async () => parseBuyerApiKeysReply(await (await owner(new URL(BUYER_API_KEYS.PATH, host.buyer().url))).json()).snapshot;
+  const first = await ask(64);
+  assert.equal(first.status, 200, await first.clone().text());
+  const paid = (await first.json()).gyblos_payment.session;
+  host.engine.fail(true);
+  const broken = await ask(64);
+  assert.notEqual(broken.status, 200);
+  await host.restartBuyer();
+  const before = await status();
+  assert.equal(before.blocked, true);
+  assert.equal(before.keys[0]?.reservedAtomic, String(1000n - BigInt(paid.approvedAtomic)));
+  host.finance.settled.set(paid.channelId, {
+    channelId: paid.channelId,
+    chargedAtomic: paid.approvedAtomic,
+    refundedAtomic: String(100000n - BigInt(paid.approvedAtomic)),
+    transaction: 'syntheticConfirmedClose',
+  });
+  await host.restartBuyer();
+  const after = await status();
+  assert.equal(after.blocked, false);
+  assert.equal(after.keys[0]?.reservedAtomic, '0');
+  assert.equal(after.keys[0]?.spentAtomic, paid.approvedAtomic);
+});
