@@ -59,12 +59,12 @@ void test('possible prompt send is never retried and remains reserved', async (t
   t.after(f.close);
   let attempts = 0;
   f.intercept(async (...args) => {
-    const result = await f.service.exchange(...args);
     if (args[0].method === BATCH_METHODS.EXECUTE) {
       attempts++;
+      await f.service.exchange(...args);
       throw new BatchChannelError(SESSION_CODES.UNAVAILABLE);
     }
-    return result;
+    return f.service.exchange(...args);
   });
   await assert.rejects(
     f.buyer.execute(await f.offers.quote(1), f.offers.input),

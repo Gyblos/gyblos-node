@@ -6,11 +6,14 @@ import {
   BATCH_METHODS,
   BatchChannelError,
 } from '@gyblos/protocol/batch-channel';
-import { SESSION_CODES } from '@gyblos/protocol/payment-session';
+import {
+  OPENING_STATUS,
+  SESSION_CODES,
+} from '@gyblos/protocol/payment-session';
 
 import { batchPrepareFixture } from './support/batch-prepare';
 
-for (const status of ['present', 'absent', 'unknown'] as const) {
+for (const status of Object.values(OPENING_STATUS)) {
   void test(`uncertain OPEN checks the original deposit: ${status}`, async (t) => {
     let observations = 0;
     const f = await batchPrepareFixture(async () => {
@@ -24,14 +27,15 @@ for (const status of ['present', 'absent', 'unknown'] as const) {
       if (request.method === BATCH_METHODS.OPEN) {
         payloads.push(request.params.payload);
         if (payloads.length === 1) {
-          if (status === 'present') await f.service.exchange(...args);
+          if (status === OPENING_STATUS.PRESENT)
+            await f.service.exchange(...args);
           throw new BatchChannelError(SESSION_CODES.UNAVAILABLE);
         }
       }
       return f.service.exchange(...args);
     });
     const run = f.buyer.execute(await f.offers.quote(1), f.offers.input);
-    if (status === 'present') {
+    if (status === OPENING_STATUS.PRESENT) {
       assert.equal((await run).text, 'ok!');
       assert.deepEqual(payloads, [payloads[0], payloads[0]]);
       assert.equal(f.offers.generations(), 1);
@@ -39,14 +43,14 @@ for (const status of ['present', 'absent', 'unknown'] as const) {
     } else {
       await assert.rejects(run, {
         code:
-          status === 'absent'
-            ? 'PAYMENT_SESSION_OPENING_ABSENT'
-            : 'PAYMENT_SESSION_OPENING_PENDING',
+          status === OPENING_STATUS.ABSENT
+            ? SESSION_CODES.OPENING_ABSENT
+            : SESSION_CODES.OPENING_PENDING,
       });
       assert.equal(payloads.length, 1);
       assert.equal(f.offers.generations(), 0);
     }
-    assert.ok(observations >= (status === 'unknown' ? 2 : 1));
+    assert.ok(observations >= (status === OPENING_STATUS.UNKNOWN ? 2 : 1));
   });
 }
 
@@ -56,7 +60,7 @@ void test('permission withdrawn before OPEN does not claim or observe a deposit'
   const fixture = await batchPrepareFixture(
     async () => {
       observations++;
-      return 'absent';
+      return OPENING_STATUS.ABSENT;
     },
     async () => {
       throw denied;
@@ -79,7 +83,7 @@ void test('permission withdrawn after the deposit prevents replay and inference'
   const fixture = await batchPrepareFixture(
     async () => {
       allowed = false;
-      return 'present';
+      return OPENING_STATUS.PRESENT;
     },
     async (work) => {
       permits++;
