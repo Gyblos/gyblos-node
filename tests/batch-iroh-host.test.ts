@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import { createBuyerBatchSession } from '@gyblos/node/batch-buyer';
 import { createSellerBatchSession } from '@gyblos/node/batch-seller';
 import { executeBuyerQuote } from '@gyblos/node/buyer-quote-execution';
+import type { BuyerReceiptEvidence } from '@gyblos/node/receipts';
 import {
   BATCH_CHANNEL,
   BATCH_METHODS,
@@ -23,7 +24,12 @@ import { batchOfferFixture } from './support/batch-iroh-offer';
 import { batchLoopback } from './support/batch-loopback';
 import { sessionRig } from './support/batch-session';
 
-async function fixture(input: { verify?: () => Promise<void> } = {}) {
+async function fixture(
+  input: {
+    verify?: () => Promise<void>;
+    receipt?: (value: BuyerReceiptEvidence) => void;
+  } = {},
+) {
   const rig = await sessionRig();
   const offers = await batchOfferFixture(rig.terms, rig.owner, rig.now);
   const service = createSellerBatchSession({
@@ -57,6 +63,7 @@ async function fixture(input: { verify?: () => Promise<void> } = {}) {
       assert.equal(quote.offer.owner, rig.terms.owner);
     },
     observe: rig.sellerOptions.observe,
+    receipt: input.receipt,
   });
   return {
     rig,
@@ -189,6 +196,30 @@ void test('expired or invalidly signed quotes cannot open a deposit', async (t) 
   assert.equal(f.offers.generations(), 0);
   assert.deepEqual(f.rig.calls, []);
 });
+void test('a quote that expires before OPEN is confirmed reserves nothing, and the funded channel serves the next request', async (t) => {
+  // A slow opening can outlast the quote; the buyer must refuse it before reserving payment, or recovery
+  // would treat the reservation as interrupted inference and close the channel it just funded.
+  const f = await fixture();
+  t.after(f.close);
+  const quote = await f.offers.quote(1);
+  f.intercept(async (request) => {
+    if (request.method === BATCH_METHODS.OPEN)
+      f.rig.time(quote.offer.expiresAt);
+  });
+  const begin = t.mock.method(f.rig.buyer, 'begin');
+  await assert.rejects(f.buyer.execute(quote, f.offers.input), {
+    code: PAID_EXECUTION_CODES.EXPIRED,
+  });
+  assert.equal(begin.mock.callCount(), 0);
+  assert.equal(f.offers.generations(), 0);
+  assert.equal(f.rig.seller().snapshot().state, SESSION_STATES.OPEN);
+  assert.equal(f.rig.buyer.snapshot().state, SESSION_STATES.OPEN);
+  f.intercept(undefined);
+  const channelId = f.rig.buyer.snapshot().channelId;
+  await f.buyer.execute(await f.offers.quote(2), f.offers.input);
+  assert.equal(f.rig.buyer.snapshot().channelId, channelId);
+  assert.equal(f.offers.generations(), 1);
+});
 void test('an already used execution id never generates or charges again', async (t) => {
   const f = await fixture();
   t.after(f.close);
@@ -298,4 +329,22 @@ void test('disconnect during identity verification forbids a late opening signat
   assert.equal(opening.mock.callCount(), 0);
   assert.equal(f.offers.generations(), 0);
   assert.deepEqual(f.rig.calls, []);
+});
+
+void test('whole-response buyer receipts include time waiting for OPEN', async (t) => {
+  const observations: BuyerReceiptEvidence['observed'][] = [];
+  const f = await fixture({
+    receipt: (value) => {
+      observations.push(value.observed);
+    },
+  });
+  t.after(f.close);
+  let elapsed = 0;
+  t.mock.method(performance, 'now', () => elapsed);
+  f.intercept(async (request) => {
+    if (request.method === BATCH_METHODS.OPEN) elapsed += 3000;
+  });
+  await f.buyer.execute(await f.offers.quote(1), f.offers.input);
+  assert.equal(observations[0]?.firstTokenMs, 3000);
+  assert.equal(observations[0]?.totalMs, 3000);
 });

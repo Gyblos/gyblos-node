@@ -270,7 +270,6 @@ export const NODE_CONFIG_ISSUE_CODES = {
   DUPLICATE_VALUE: 'DUPLICATE_VALUE',
   TOO_MANY: 'TOO_MANY',
   UNKNOWN_MODEL: 'UNKNOWN_MODEL',
-  CUSTOM_MODEL_IN_CATALOG: 'CUSTOM_MODEL_IN_CATALOG',
   NON_CANONICAL_DECIMAL: 'NON_CANONICAL_DECIMAL',
   PRICE_OUT_OF_RANGE: 'PRICE_OUT_OF_RANGE',
   PRICE_ZERO: 'PRICE_ZERO',
@@ -291,6 +290,8 @@ export const NODE_CONFIG_WARNING_CODES = {
   ENV_SWITCH_NOT_STRICT: 'ENV_SWITCH_NOT_STRICT',
   // An offer's reasoning levels cannot be checked: a custom model or a catalog model without verified levels.
   REASONING_UNVERIFIED: 'REASONING_UNVERIFIED',
+  // An offer still marks as custom a model the catalog now lists; it is served as the catalog model.
+  CUSTOM_MODEL_NOW_IN_CATALOG: 'CUSTOM_MODEL_NOW_IN_CATALOG',
 } as const;
 export type NodeConfigWarningCode =
   (typeof NODE_CONFIG_WARNING_CODES)[keyof typeof NODE_CONFIG_WARNING_CODES];

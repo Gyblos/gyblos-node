@@ -141,7 +141,7 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
     matchBatchTerms(prepared.terms, terms);
   }
   await verify(signal);
-  const request = await recoverBuyerOpening(
+  const { request, started } = await recoverBuyerOpening(
     options.buyer,
     async () => {
       signal.throwIfAborted();
@@ -153,16 +153,18 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
       });
       const channelId = options.buyer.snapshot().channelId;
       const prepared = buildBatchExecutionRequest(channelId, quote, input);
+      const started = performance.now();
       await verify(signal);
       return async () => {
         await openBuyerChannel(context, prepared, signal, payload);
-        return prepared;
+        return { request: prepared, started };
       };
     },
     verify,
     signal,
     options.financialPermission,
   );
+  await verify(signal);
   await options.beforeInference?.(request.requestId, {
     requestId: request.requestId,
     channelId: request.channelId,
@@ -172,6 +174,7 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
   signal.throwIfAborted();
   if (blockMode) return runBuyerBlocks(context, request, signal, onDelta);
   return runBuyerSession(context, request, {
+    started,
     verifyUsage: async (result) =>
       verifiedCharge(context, quote, input, result),
     signal,
@@ -185,15 +188,15 @@ async function runBuyerSession<Remote extends BatchDestination>(
   context: BuyerBatchContext<Remote>,
   request: import('@gyblos/protocol/batch-channel').BatchExecutionRequest,
   steps: {
+    started: number;
     verifyUsage: (result: FreeExecutionResult) => Promise<string>;
     signal: AbortSignal;
     onDelta?: (text: string) => Promise<void>;
   },
 ) {
   const { options, terms, rpc, approve } = context;
-  const { signal, onDelta } = steps;
+  const { signal, onDelta, started } = steps;
   const pending = await batchSessionRequest(request);
-  const started = performance.now();
   let first: number | null = null;
   let billed: SessionBill | undefined;
   const baseAtomic = options.buyer.snapshot().cumulativeAtomic;

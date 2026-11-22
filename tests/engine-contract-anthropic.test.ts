@@ -129,6 +129,24 @@ void test('engine-anthropic streams one user message with the key, version and m
     });
   }));
 
+void test('engine-anthropic turns thinking off for a recounted Qwen3 model, and sends nothing otherwise', () =>
+  withServer(stream(COMPLETE), async (server) => {
+    // Qwen3 hybrids think by default behind a Messages API (Ollama, vLLM); the recount bills only the
+    // visible answer, so hidden thinking would cost the seller and could use up max_tokens.
+    const settings = { base: server.base, model: FAKE_ANTHROPIC_MODEL };
+    const common = { ...settings, contextTokens: CONTEXT, apiKey: FAKE_SECRET };
+    for (const recountable of [true, false])
+      await createAnthropicEngine({ ...common, recountable }, fetch).generate({
+        prompt: 'synthetic',
+        maxTokens: 8,
+      });
+    const [qwen, plain] = server.seen
+      .filter((seen) => seen.url === '/v1/messages')
+      .map((seen) => JSON.parse(seen.body));
+    assert.deepEqual(qwen.thinking, { type: 'disabled' });
+    assert.equal('thinking' in plain, false);
+  }));
+
 void test('engine-anthropic maps max_tokens to length and stop_sequence to stop; tool use fails', async () => {
   for (const [reason, done] of [
     ['max_tokens', ENGINE_DONE_REASONS.LENGTH],
