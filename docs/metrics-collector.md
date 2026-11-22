@@ -458,24 +458,30 @@ chain, so payer and payee counts are not withheld.
 
 ### Chain transactions
 
-`GET /v1/stats/chain/txs` lists the decoded instructions of channels that claim
-Gyblos traffic (`gyblos = 1` in `collector_chain_channels`), newest first by
-slot, then signature, then instruction index. It reads the chain index tables
-only, never writes, and takes no day range. Query parameters, each at most once:
+`GET /v1/stats/chain/txs` lists the decoded instructions of Gyblos channels
+(`gyblos = 1` in `collector_chain_channels`: the open carries a Gyblos memo, or
+a distribute the index read pays the Gyblos treasury; see
+[Gyblos traffic is a claim](#chain-index)), newest first by slot, then
+signature, then instruction index. It reads the chain index tables only, never
+writes, and takes no day range. It first selects the page's rows, then computes
+amounts for those rows only. Query parameters, each at most once and in this
+order:
 
-- `limit`: rows per page, 1 to 50, default 25;
 - `before`: the `next` cursor of the previous page,
-  `<slot>-<signature>-<instructionIndex>`.
+  `<slot>-<signature>-<instructionIndex>`;
+- `limit`: rows per page, 1 to 50, default 25.
 
-Any other parameter, a repeated one, a `limit` outside 1 to 50 or a malformed
-cursor answers `400 INVALID_QUERY`. Caching, the read budget and
-`503 COLLECTOR_UNAVAILABLE` are as for the other stats routes. The answer:
+Numbers are canonical (`0` or no leading zero). Any other parameter, a repeated
+one, another order, a `limit` outside 1 to 50 or a malformed cursor answers
+`400 INVALID_QUERY`, so each page has one cache key. Caching, the read budget
+and `503 COLLECTOR_UNAVAILABLE` are as for the other stats routes. The answer:
 
 ```json
 {
   "network": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
   "programId": "CHNLxYvVA28MJP9PrFuDXccuoGXAx7jBacfLEkahyGsX",
   "mint": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+  "treasury": "4Ui1dfvqbFx9CtjXNcKajHdr7aKT1nbYRiYjB1s7umNy",
   "transactions": [
     {
       "signature": "<base58>",
@@ -493,21 +499,32 @@ cursor answers `400 INVALID_QUERY`. Caching, the read budget and
 }
 ```
 
-`next` is `null` on the last page. `blockTime` is in milliseconds, or `null`
-when the RPC gave none. `kind` is one of `open`, `settle`, `top_up`,
-`settle_and_seal`, `request_close`, `seal`, `distribute`, `reclaim`. `payee` is
-the channel's payee as opened (the seller's fee payer) and `recipients` the
-owners of its split recipients as opened (the seller's payout address and the
-fee treasury); both are `null` or empty when the open was not read.
-`amountAtomic` is devnet USDC as a decimal string, `null` for another mint and
-for `request_close` and `seal`:
+`treasury` is the Gyblos fee treasury. `next` is `null` on the last page.
+`blockTime` is in milliseconds, or `null` when the RPC gave none. `kind` is one
+of `open`, `settle`, `top_up`, `settle_and_seal`, `request_close`, `seal`,
+`distribute`, `reclaim`. `payee` is the channel's payee as opened (the seller's
+fee payer, not a recipient of money) and `recipients` the owners of its split
+recipients as opened, in order (for Gyblos sessions the seller's payout address,
+then the fee treasury); `payee` is `null` and `recipients` empty when the open
+was not read. `amountAtomic` is devnet USDC as a decimal string:
 
 - `open` and `top_up`: the deposit added;
 - `settle` and `settle_and_seal`: the voucher's cumulative amount above the
   highest one the channel settled before it, both capped at the channel's
-  deposits (`0` when it adds nothing; `null` without a voucher);
+  deposits, in the daily aggregate's order (slot, capped cumulative, signature,
+  instruction index), so the rows of a day add up to its `settledAtomic`; `0`
+  when it adds nothing;
 - `distribute` and `reclaim`: the USDC that left the channel's vault in that
   transaction, on the first such instruction of the channel in it.
+
+`amountAtomic` is `null` when:
+
+- the channel's mint is not devnet USDC, or is unknown because its open was
+  never read;
+- the kind is `request_close` or `seal`;
+- a settle carries no voucher, or its transaction has no block time;
+- a `distribute` or `reclaim` has no negative USDC change of the channel's vault
+  in its transaction, or is not the channel's first paying instruction in it.
 
 The list is as complete as the chain index: channels it never read, and history
 before its floor, are missing.

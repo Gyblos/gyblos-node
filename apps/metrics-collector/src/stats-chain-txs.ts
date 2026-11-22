@@ -1,4 +1,9 @@
-import { CHANNEL_PROGRAM, DEVNET, DEVNET_USDC } from '@gyblos/config/network';
+import {
+  CHANNEL_PROGRAM,
+  DEVNET,
+  DEVNET_GYBLOS_TREASURY,
+  DEVNET_USDC,
+} from '@gyblos/config/network';
 
 import { CHAIN_TX_PAGE, type ChainInstructionKind } from './constants';
 
@@ -28,6 +33,7 @@ export interface ChainTxPage {
   network: string;
   programId: string;
   mint: string;
+  treasury: string;
   transactions: ChainTx[];
   next: string | null;
 }
@@ -36,10 +42,11 @@ export interface ChainTxQuery {
   limit: number;
 }
 
-const CURSOR = /^(\d{1,15})-([1-9A-HJ-NP-Za-km-z]{32,88})-(\d{1,3})$/;
+const CURSOR =
+  /^(0|[1-9]\d{0,14})-([1-9A-HJ-NP-Za-km-z]{32,88})-(0|[1-9]\d{0,2})$/;
 const LIMIT = /^[1-9]\d{0,2}$/;
 const PARAMS = CHAIN_TX_PAGE.params;
-const KNOWN_PARAMS: ReadonlySet<string> = new Set(Object.values(PARAMS));
+const PARAM_ORDER: readonly string[] = [PARAMS.BEFORE, PARAMS.LIMIT];
 
 export const cursorOf = (row: ChainTxCursor) =>
   `${row.slot}-${row.signature}-${row.instructionIndex}`;
@@ -64,11 +71,8 @@ export function parseChainTxQuery(
   params: URLSearchParams,
 ): ChainTxQuery | undefined {
   const keys = [...params.keys()];
-  if (
-    keys.some((key) => !KNOWN_PARAMS.has(key)) ||
-    new Set(keys).size !== keys.length
-  )
-    return undefined;
+  const canonical = PARAM_ORDER.filter((key) => keys.includes(key));
+  if (keys.join('&') !== canonical.join('&')) return undefined;
   const limit = parseLimit(params.get(PARAMS.LIMIT));
   const text = params.get(PARAMS.BEFORE);
   const before = text === null ? null : parseCursor(text);
@@ -107,6 +111,7 @@ export async function chainTransactions(
     network: DEVNET,
     programId: CHANNEL_PROGRAM,
     mint: DEVNET_USDC,
+    treasury: DEVNET_GYBLOS_TREASURY,
     transactions: page.map(({ recipientsJson, ...row }) => ({
       ...row,
       recipients: recipientOwners(recipientsJson),

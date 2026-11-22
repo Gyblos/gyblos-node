@@ -147,8 +147,8 @@ void test('GET /v1/stats/chain/txs lists Gyblos channel instructions newest firs
   assert.equal(status, 200);
   assert.equal(cache, 'public, max-age=300');
   assert.deepEqual(
-    [body.network, body.programId, body.mint, body.next],
-    [DEVNET, CHANNEL_PROGRAM, DEVNET_USDC, null],
+    [body.network, body.programId, body.mint, body.treasury, body.next],
+    [DEVNET, CHANNEL_PROGRAM, DEVNET_USDC, DEVNET_GYBLOS_TREASURY, null],
   );
   assert.deepEqual(summary(body.transactions), expected(EXPECTED));
   const open = body.transactions.at(-1)!;
@@ -179,13 +179,13 @@ void test('pages follow the (slot, signature, instruction) cursor without gaps o
     seen.push(...body.transactions);
     cursors.push(body.next);
     if (!body.next) break;
-    query = `?limit=4&before=${body.next}`;
+    query = `?before=${body.next}&limit=4`;
   }
   assert.deepEqual(summary(seen), expected(EXPECTED));
   assert.deepEqual(cursors, [`140-${sig('E')}-1`, `110-${sig('B')}-0`, null]);
   const exact = await get(app, '?limit=9');
   assert.equal(exact.body.next, null);
-  const thirds = await get(app, `?limit=3&before=130-${sig('D')}-0`);
+  const thirds = await get(app, `?before=130-${sig('D')}-0&limit=3`);
   assert.deepEqual(
     summary(thirds.body.transactions),
     expected(EXPECTED.slice(6)),
@@ -227,6 +227,10 @@ void test('a malformed, unknown or repeated query parameter answers 400 INVALID_
     `?before=1-${'0'.repeat(87)}-0`,
     `?before=1-${sig('A')}-0&before=1-${sig('A')}-0`,
     '?from=2026-11-01',
+    `?before=0100-${sig('A')}-0`,
+    `?before=100-${sig('A')}-00`,
+    `?before=100-${sig('A')}-01`,
+    `?limit=4&before=100-${sig('A')}-0`,
   ]) {
     const { status, cache, body } = await get(app, query);
     assert.equal(status, 400, query);
@@ -291,4 +295,59 @@ void test('the real devnet lifecycle lists its instructions with the amounts the
     sum([amountOf('distribute'), amountOf('reclaim')]),
     sum(usdc.map((day) => day.depositedAtomic)),
   );
+});
+
+void test('a cursor of slot or index 0 is canonical and accepted', async () => {
+  const { app } = collector(seeded());
+  for (const query of [
+    `?before=0-${sig('A')}-0`,
+    `?before=100-${sig('A')}-0&limit=4`,
+  ])
+    assert.equal((await get(app, query)).status, 200, query);
+});
+
+void test('settles in one slot count in the order of the daily aggregate', async () => {
+  const database = createCollectorD1();
+  channel(database, 'G', { mint: DEVNET_USDC });
+  const at = Date.UTC(2026, 10, 10);
+  tx(database, sig('Open'), at, 1, { slot: 10 });
+  instruction(database, sig('Open'), 0, 'open', 'G', { amount: '1000' });
+  tx(database, sig('Sa'), at + 1000, 1, { slot: 20 });
+  instruction(database, sig('Sa'), 0, 'settle', 'G', { cumulative: '800' });
+  tx(database, sig('Sb'), at + 1000, 1, { slot: 20 });
+  instruction(database, sig('Sb'), 0, 'settle', 'G', { cumulative: '500' });
+  await runAggregation(database, at + 10 * 86_400_000);
+  const { app } = collector(database);
+  const { body } = await get(app);
+  assert.deepEqual(summary(body.transactions), [
+    [sig('Sb'), 0, 'settle', 'G', '500'],
+    [sig('Sa'), 0, 'settle', 'G', '300'],
+    [sig('Open'), 0, 'open', 'G', '1000'],
+  ]);
+  const stats = (await (
+    await app.request(`${ORIGIN}/v1/stats/chain?from=2026-11-10&to=2026-11-10`)
+  ).json()) as ChainStats;
+  assert.equal(stats.days[0]!.gyblosClaimed!.usdc.settledAtomic, '800');
+});
+
+void test('a channel with thousands of settles still answers a page quickly and exactly', async () => {
+  const database = createCollectorD1();
+  channel(database, 'G', { mint: DEVNET_USDC });
+  tx(database, sig('Open'), 1000, 1, { slot: 1 });
+  instruction(database, sig('Open'), 0, 'open', 'G', { amount: '100000' });
+  const settles = 4000;
+  for (let i = 1; i <= settles; i += 1) {
+    tx(database, sig(`S${i}`), 1000 + i, 1, { slot: 1 + i });
+    instruction(database, sig(`S${i}`), 0, 'settle', 'G', {
+      cumulative: String(i * 10),
+    });
+  }
+  const { app } = collector(database);
+  const started = performance.now();
+  const { status, body } = await get(app, '?limit=50');
+  const elapsed = performance.now() - started;
+  assert.equal(status, 200);
+  assert.equal(body.transactions.length, 50);
+  assert.ok(body.transactions.every((row) => row.amountAtomic === '10'));
+  assert.ok(elapsed < 3000, `${elapsed} ms`);
 });
