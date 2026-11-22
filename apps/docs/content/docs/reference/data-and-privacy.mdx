@@ -195,7 +195,8 @@ and `--status` ask the index for your claim by NodeId.
 
 **Remove it.** Run `gyblos seller verify github --cancel`. The index stops showing the account, the GET
 route answers `404`, and the command deletes the progress file. The index keeps only your NodeId, the time of the
-cancel and the time it last fetched your gist, and never serves them; this stops an old claim from being sent
+cancel and the time of the last check you asked for with the command (scheduled checks don't change
+it), and never serves them; this stops an old claim from being sent
 again. The gist stays on GitHub: delete it yourself.
 Copies that others made while it was public are outside Gyblos's control.
 
