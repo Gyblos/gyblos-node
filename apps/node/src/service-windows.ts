@@ -62,7 +62,13 @@ function taskScript(input: ServiceInput) {
 // The seller home the installed task runs: the --home its script passes the supervisor. Restart and
 // uninstall stop the supervisor through that home's pipe, whatever GYBLOS_HOME the invoking shell has.
 export function taskScriptHome(script: string): string | undefined {
-  return / --home "([^"]+)"/.exec(script)?.[1];
+  const home = / --home "([^"]+)"/.exec(script)?.[1];
+  if (home === undefined) return undefined;
+  try {
+    return checkWindowsPath(home);
+  } catch {
+    return undefined;
+  }
 }
 export async function installedTaskHome(accountHome: string) {
   try {

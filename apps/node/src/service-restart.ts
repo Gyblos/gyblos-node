@@ -1,6 +1,7 @@
-// Restarting the Windows scheduled task: Task Scheduler ignores a run while the task still runs
-// (MultipleInstancesPolicy IgnoreNew) and the supervisor answers the stop before its process ends, so restart
-// waits for the task to end before running it again.
+// Restarting in place waits for the stopped service to be gone before starting it again: Task Scheduler
+// ignores a run while the task still runs (MultipleInstancesPolicy IgnoreNew) and the supervisor answers the
+// stop before its process ends; launchd's bootout can return before the agent is torn down, and an
+// immediate bootstrap then fails, leaving it unloaded.
 import { execFile } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { promisify } from 'node:util';
@@ -29,19 +30,42 @@ export async function windowsTaskRunning(task: string) {
   return stdout.trim() === 'Running';
 }
 
-// Waits, within a bound, until Task Scheduler no longer reports the task running.
-export async function waitForTaskStop(
-  system: { windowsTaskRunning: (task: string) => Promise<boolean> },
-  task: string,
-  limits: { waitMs: number; pollMs: number } = {
-    waitMs: SERVICE.taskStopWaitMs,
-    pollMs: SERVICE.taskStopPollMs,
-  },
+interface StopLimits {
+  waitMs: number;
+  pollMs: number;
+}
+const STOP_LIMITS: StopLimits = {
+  waitMs: SERVICE.taskStopWaitMs,
+  pollMs: SERVICE.taskStopPollMs,
+};
+
+// Waits, within a bound, until the service no longer reports running.
+export async function waitUntilStopped(
+  running: () => Promise<boolean>,
+  limits: StopLimits = STOP_LIMITS,
 ) {
   const deadline = performance.now() + limits.waitMs;
-  while (await system.windowsTaskRunning(task)) {
+  while (await running()) {
     if (performance.now() >= deadline)
       throw new ServiceError(SERVICE_ERRORS.COMMAND_FAILED);
     await delay(limits.pollMs);
+  }
+}
+
+export const waitForTaskStop = (
+  system: { windowsTaskRunning: (task: string) => Promise<boolean> },
+  task: string,
+  limits: StopLimits = STOP_LIMITS,
+) => waitUntilStopped(() => system.windowsTaskRunning(task), limits);
+
+// Whether launchd still has the agent loaded; quiet, unlike the commands restart shows.
+export async function launchAgentLoaded(target: string) {
+  try {
+    await execFileAsync('launchctl', ['print', target], {
+      encoding: 'utf8',
+    });
+    return true;
+  } catch {
+    return false;
   }
 }

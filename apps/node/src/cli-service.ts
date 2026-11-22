@@ -40,7 +40,12 @@ import {
   type ServiceInput,
 } from './service';
 import { readEnvironmentFile } from './service-environment';
-import { waitForTaskStop, windowsTaskRunning } from './service-restart';
+import {
+  launchAgentLoaded,
+  waitForTaskStop,
+  waitUntilStopped,
+  windowsTaskRunning,
+} from './service-restart';
 import { servicePipe, stopWindowsService } from './service-run';
 import { installedTaskHome, taskName } from './service-windows';
 
@@ -63,7 +68,7 @@ const HINTS: Readonly<Record<ServiceErrorCode, string>> = {
   [SERVICE_ERRORS.ALREADY_INSTALLED]:
     'run `gyblos seller service uninstall` first',
   [SERVICE_ERRORS.RESTART_INCOMPLETE]:
-    'the seller stopped but its task did not end in time to start again; run the schtasks /Run command above, or `gyblos seller service restart` again',
+    'the seller stopped but did not end in time to start again; run the command above, or `gyblos seller service restart` again',
   [SERVICE_ERRORS.NOT_INSTALLED]:
     'Not installed: no background service to restart; restart `gyblos start` yourself, or run `gyblos seller service install`',
   [SERVICE_ERRORS.DOCTOR_NOT_READY]:
@@ -103,6 +108,8 @@ export interface ServiceSystem {
   stopWindowsService: (home: string) => Promise<boolean>;
   // Windows: whether Task Scheduler still reports the task running.
   windowsTaskRunning: (task: string) => Promise<boolean>;
+  // macOS: whether launchd still has the agent (gui/<uid>/<label>) loaded.
+  launchAgentLoaded: (target: string) => Promise<boolean>;
 }
 
 export interface ServiceOptions {
@@ -146,6 +153,7 @@ export function defaultServiceSystem(
     windowsUser: () => userSid(),
     stopWindowsService,
     windowsTaskRunning,
+    launchAgentLoaded,
   };
 }
 
@@ -346,10 +354,18 @@ async function restart(
     }
     await runAll(location.restart, system, output);
   } else if (kind === SERVICE_KINDS.LAUNCHD) {
-    // bootout fails when the agent is not loaded; bootstrap loads it either way.
+    // bootout fails when the agent is not loaded; what counts is that it is gone before bootstrap.
     const [stop, ...start] = location.restart;
     await system.run(stop!);
-    await runAll(start, system, output);
+    try {
+      await waitUntilStopped(() =>
+        system.launchAgentLoaded(`gui/${uid}/${SERVICE.label}`),
+      );
+      await runAll(start, system, output);
+    } catch {
+      output.stderr(`launchctl bootstrap gui/${uid} ${location.path}\n`);
+      throw new ServiceError(SERVICE_ERRORS.RESTART_INCOMPLETE);
+    }
   } else await runAll(location.restart, system, output);
   output.stdout(`Restarted: ${location.path}\n`);
 }

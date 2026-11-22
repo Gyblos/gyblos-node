@@ -198,6 +198,7 @@ function fakeSystem(run: Fixture, platform: NodeJS.Platform = 'linux') {
       return true;
     },
     windowsTaskRunning: async () => false,
+    launchAgentLoaded: async () => false,
   };
   return { system, commands };
 }
@@ -433,7 +434,7 @@ void test('Windows waits for the stopped task to end before running it again, wi
   );
 });
 
-void test('macOS restart stops the agent gracefully with bootout, then bootstraps it, even when it was not loaded', () =>
+void test('macOS restart stops the agent gracefully with bootout, waits until it is gone, then bootstraps it', () =>
   scenario({ free: true }, async (run) => {
     await readySeller(run);
     const { system, commands } = fakeSystem(run, 'darwin');
@@ -449,10 +450,19 @@ void test('macOS restart stops the agent gracefully with bootout, then bootstrap
       commands.push([...argv]);
       return argv[1] === 'bootout' ? 1 : 0;
     };
+    const loaded = [true, true, false];
+    system.launchAgentLoaded = async (target) => {
+      commands.push(['loaded?', target]);
+      return loaded.shift() ?? false;
+    };
     const restarted = await service(run, ['restart'], system);
     assert.equal(restarted.code, 0, restarted.output);
+    const target = `gui/${system.uid}/com.gyblos.seller`;
     assert.deepEqual(commands, [
       ['launchctl', 'bootout', `gui/${system.uid}`, plist],
+      ['loaded?', target],
+      ['loaded?', target],
+      ['loaded?', target],
       ['launchctl', 'bootstrap', `gui/${system.uid}`, plist],
     ]);
     assert.equal(
@@ -470,4 +480,8 @@ void test('Windows reads the seller home the installed task runs, not the invoki
   ].join('\r\n');
   assert.equal(taskScriptHome(script), 'D:\\Seller');
   assert.equal(taskScriptHome('@echo off\r\n'), undefined);
+  assert.equal(
+    taskScriptHome('x --home "relative\\path" --config "C:\\c.toml"'),
+    undefined,
+  );
 });
