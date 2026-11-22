@@ -115,7 +115,7 @@ del rol, recibos, logs completos ni capturas del aviso de registro. Pide ayuda e
 ## Verifica tu cuenta de GitHub [#verificar-github]
 
 Puedes mostrar a los compradores qué cuenta de GitHub opera tu vendedor. Es opcional. El índice ya tiene que conocer tu
-vendedor: un registro activo o un catálogo que tenga guardado. Activar la publicación no basta, y el vendedor no
+vendedor: un registro activo o un catálogo que tenga guardado (por ejemplo, después de publicar al menos una vez). Activar la publicación no basta, y el vendedor no
 necesita estar en línea. El vínculo tiene dos partes públicas que cualquiera puede comprobar: un gist de
 tu cuenta de GitHub con un archivo llamado `gyblos-proof.txt` que contiene la línea `gyblos-node=NODEID`, y
 una declaración firmada con la llave de tu nodo que nombra la cuenta y el gist. El índice de descubrimiento
@@ -198,8 +198,8 @@ del vendedor y se salta lo que ya está hecho.
 | `lost`     | La cuenta estaba verificada, pero la última revisión no encontró la prueba: el gist, el archivo o la línea ya no están, o la cuenta cambió de nombre. Los compradores ya no la ven.                                                                                             |
 
 Solo `verified` significa que se encontró la prueba. Cuando GitHub no responde, la declaración mantiene su
-estado: `pending` sigue en `pending` y `verified` sigue en `verified`, pero la hora de revisión avanza igual. Así que
-esa hora puede ser un intento fallido, no la última vez que el índice encontró la prueba.
+estado: `pending` sigue en `pending` y `verified` sigue en `verified`. La hora de revisión muestra el último intento,
+aunque haya fallado.
 
 ### Bueno saber [#github-bueno-saber]
 
@@ -211,8 +211,7 @@ esa hora puede ser un intento fallido, no la última vez que el índice encontr�
 - **No borres el gist.** El índice lo revisa otra vez cada 6 horas más o menos. Si borras el gist, cambias el
   nombre del archivo o quitas la línea, el estado pasa a `lost`.
 - **Varios vendedores.** Una cuenta de GitHub puede verificar varios vendedores. Cada vendedor tiene su propio
-  NodeId y su propia línea de prueba. Un solo archivo `gyblos-proof.txt` puede tener una línea por vendedor, cada
-  una en su propia línea.
+  NodeId y su propia línea de prueba. Un solo archivo `gyblos-proof.txt` puede tener una línea por vendedor.
 
 ### Comprueba el estado [#comprobar-github]
 
@@ -223,9 +222,11 @@ gyblos seller status --online
 
 `--status` muestra la cuenta, la dirección del gist, el estado, el motivo y cuándo revisó el índice por última
 vez. `gyblos seller status --online` muestra el mismo vínculo en su línea `github`, con la
-dirección del gist solo cuando el estado es `verified`. No muestra esa línea si la publicación está apagada o no
-hay ningún modelo listado. En un vendedor Docker, pon
-`docker compose exec seller` delante de los dos.
+dirección del gist solo cuando el estado es `verified`.
+
+La línea `github` no aparece si la publicación está apagada o no hay ningún modelo listado.
+
+En un vendedor Docker, pon `docker compose exec seller` delante de los dos.
 
 ### Quita el vínculo [#quitar-github]
 
@@ -249,7 +250,7 @@ Cada error empieza con una frase que dice qué hacer y termina con un código en
 | `VERIFY_NOT_VERIFIED` con `could not reach GitHub`      | El índice no pudo llegar a GitHub. Tu declaración mantiene su estado. Ejecuta el comando otra vez en unos minutos.                                                                           |
 | `VERIFY_NOT_VERIFIED` con `checked this seller moments` | El índice revisó tu vendedor hace un momento y la espera es de más de 2 minutos, o pidió esperar por segunda vez. Ejecuta el comando otra vez pasado el tiempo que muestra.                  |
 | `VERIFY_GH_FAILED`                                      | La CLI de GitHub no pudo crear el gist. Créalo a mano y ejecuta el comando con `--gist`.                                                                                                     |
-| `DISCOVERY_UNKNOWN_NODE`                                | El índice aún no conoce tu vendedor. Primero [regístralo](/es/sellers/register-publish) o publícalo.                                                                                         |
+| `DISCOVERY_UNKNOWN_NODE`                                | El índice aún no conoce tu vendedor. Primero [regístralo](/es/sellers/register-publish), o publícalo para que el índice guarde tu catálogo.                                                  |
 | `DISCOVERY_STALE_CLAIM`                                 | El índice tiene una declaración más nueva de este vendedor. El comando ya probó una vez más. Revisa el reloj de este equipo y ejecuta el comando otra vez.                                   |
 | `DISCOVERY_RATE_LIMITED`                                | El índice recibió demasiados intentos. Espera un minuto y ejecuta el comando otra vez.                                                                                                       |
 | `VERIFY_ACCOUNT_INVALID`                                | Eso no es un nombre de usuario de GitHub. Usa letras, números y guiones sueltos, con 39 caracteres como máximo.                                                                              |

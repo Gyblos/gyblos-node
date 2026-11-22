@@ -113,7 +113,7 @@ logs or screenshots of the registration prompt. Ask for help in the [Gyblos Tele
 ## Verify your GitHub account [#verify-github]
 
 You can show buyers which GitHub account runs your seller. This is optional. The index must already know your
-seller: an active registration or a catalog it has stored. Turning on publishing alone isn't enough, and the
+seller: an active registration or a catalog it has stored (for example, after you published at least once). Turning on publishing alone isn't enough, and the
 seller doesn't need to be online. The link has two public parts that anyone can check: a gist owned by your GitHub
 account with a file named `gyblos-proof.txt` that contains the line `gyblos-node=NODEID`, and a claim signed
 by your node key that names the account and the gist. The discovery index checks the gist itself, with no
@@ -195,8 +195,8 @@ and skips what is done.
 | `lost`     | The account was verified, but the last check didn't find the proof: the gist, the file or the line is gone, or the account was renamed. Buyers no longer see it.                                                                                            |
 
 Only `verified` means the proof was found. When GitHub doesn't answer, the claim keeps its current state:
-`pending` stays `pending` and `verified` stays `verified`, but the check time still moves forward. So the check
-time can be a failed attempt, not the last time the index found the proof.
+`pending` stays `pending` and `verified` stays `verified`. The check time shows the last attempt, even one
+that failed.
 
 ### Good to know [#github-good-to-know]
 
@@ -208,7 +208,7 @@ time can be a failed attempt, not the last time the index found the proof.
 - **Keep the gist.** The index checks it again about every 6 hours. If you delete the gist, rename its file or
   remove the line, the state becomes `lost`.
 - **Several sellers.** One GitHub account can verify several sellers. Each seller has its own NodeId and its own
-  proof line. One `gyblos-proof.txt` file can hold one line per seller, each on a line of its own.
+  proof line. One `gyblos-proof.txt` file can hold one line per seller.
 
 ### Check the state [#github-check]
 
@@ -219,8 +219,11 @@ gyblos seller status --online
 
 `--status` shows the account, the gist address, the state, the reason and when the index last checked.
 `gyblos seller status --online` shows the same link in its `github` line, with the gist
-address only when the state is `verified`. It skips that line when publishing is off or no model is listed. For a Docker seller, put
-`docker compose exec seller` in front of both.
+address only when the state is `verified`.
+
+The `github` line is hidden when publishing is off or no model is listed.
+
+For a Docker seller, put `docker compose exec seller` in front of both.
 
 ### Remove it [#github-remove]
 
@@ -244,7 +247,7 @@ Each error starts with a sentence that says what to do and ends with a code in b
 | `VERIFY_NOT_VERIFIED` with `could not reach GitHub`      | The index couldn't reach GitHub. Your claim keeps its current state. Run the command again in a few minutes.                                                                    |
 | `VERIFY_NOT_VERIFIED` with `checked this seller moments` | The index checked your seller moments ago and the wait is longer than 2 minutes, or it asked to wait a second time. Run the command again after the time it shows.              |
 | `VERIFY_GH_FAILED`                                       | The GitHub CLI couldn't create the gist. Create it by hand and run the command with `--gist`.                                                                                   |
-| `DISCOVERY_UNKNOWN_NODE`                                 | The index doesn't know your seller yet. [Register](/en/sellers/register-publish) or publish first.                                                                              |
+| `DISCOVERY_UNKNOWN_NODE`                                 | The index doesn't know your seller yet. [Register](/en/sellers/register-publish) first, or publish so the index stores your catalog.                                            |
 | `DISCOVERY_STALE_CLAIM`                                  | The index holds a newer claim from this seller. The command already tried once more. Check this computer's clock, then run the command again.                                   |
 | `DISCOVERY_RATE_LIMITED`                                 | The index got too many attempts. Wait a minute and run the command again.                                                                                                       |
 | `VERIFY_ACCOUNT_INVALID`                                 | That is not a GitHub user name. Use letters, digits and single hyphens, at most 39 characters.                                                                                  |
