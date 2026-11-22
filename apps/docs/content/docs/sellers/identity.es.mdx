@@ -274,10 +274,10 @@ Cada error empieza con una frase que dice qué hacer y termina con un código en
 ## Elige un nombre público [#nombre-del-vendedor]
 
 Puedes darle a tu vendedor un nombre público opcional. El índice de descubrimiento lo muestra junto a tu
-NodeId en la lista de la red. Lo eliges tú, así que el índice no lo verifica y otro vendedor puede usar el
+NodeId en la lista de la red del índice (`/v1/network`). Lo eliges tú, así que el índice no lo verifica y otro vendedor puede usar el
 mismo nombre. Nunca lleva una marca de verificación: solo una [cuenta de GitHub verificada](#verificar-github)
-muestra quién opera un vendedor. El índice ya debe conocer tu vendedor, igual que para la verificación de
-GitHub.
+muestra quién opera un vendedor. Para poner un nombre, el índice ya debe conocer tu vendedor, igual que para la verificación de
+GitHub; quitarlo funciona en cualquier caso.
 
 ```sh
 gyblos seller name "NAME"
@@ -291,7 +291,7 @@ ejemplo `docker compose exec seller gyblos seller name "Mi Vendedor"`.
 Un nombre tiene de 1 a 32 caracteres: letras y números, espacios y `-` `_` `.` `'`, con al menos una letra o
 un número. Se permiten tildes y otros signos después de una letra, así que funcionan nombres en hindi,
 tailandés, árabe, hebreo, yoruba y muchos otros idiomas, pero todas las letras deben ser de un mismo sistema
-de escritura. Se rechazan los emoji, los símbolos como las marcas de verificación, los caracteres invisibles
+de escritura de uso amplio. El latín se puede mezclar con caracteres chinos y kana japonés, hangul coreano o bopomofo. Los apóstrofos tipográficos como ’ se convierten en un apóstrofo recto; usa un apóstrofo recto `'`. No se aceptan los unificadores (ZWNJ, ZWJ) ni los puntos medios `·` y `・`. Se rechazan los emoji, los símbolos como las marcas de verificación, los caracteres invisibles
 y cualquier nombre que contenga `gyblos`, `verified`, `verificado`, `official` u `oficial` (`NAME_INVALID` o
 `NAME_RESERVED`, con una frase que dice qué parte falló). El índice puede tardar hasta 10 segundos en mostrar
 un nombre nuevo. El nombre es público, así que no pongas tu nombre legal, tu correo ni tu ubicación: consulta

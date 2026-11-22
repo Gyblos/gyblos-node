@@ -581,18 +581,20 @@ so buyers and older nodes are unaffected.
 
 The rule (`parseSellerName`, shared by the CLI, the index and the client) is
 defined in the [profile claim](../packages/protocol/SPEC.md#profile-claim-v1).
-In short: NFKC, spaces collapsed and trimmed, 1 to 32 characters of letters,
-numbers, spaces and `-`, `_`, `.`, `'`, with at least one letter or number.
-Accents and other combining marks are allowed after a letter (at most 3 in a
-row), so names in scripts such as Devanagari, Thai, Arabic with harakat or
-Hebrew with niqqud can be spelled, but enclosing and overlay marks are not.
-Every letter must come from one writing system (Chinese characters may be mixed
-with Japanese kana, Korean Hangul or Bopomofo), so look-alike letters from
-another script cannot be mixed in. Controls, format and bidi characters,
-invisible characters, emoji, symbols (so no `✓` or `✅`), modifier letters,
+In short: NFKC, typographic apostrophes made straight, spaces collapsed and
+trimmed, 1 to 32 characters of letters, numbers, spaces and `-`, `_`, `.`, `'`,
+with at least one letter or number. Accents and other combining marks are
+allowed after a letter (at most 3 in a row), so names in Devanagari, Thai,
+Arabic with harakat or Hebrew with niqqud can be spelled, but enclosing, overlay
+and other decorative marks are not. Letters and non-ASCII digits must come from
+the widely used scripts of UTS #31 and share one script, or mix Latin with Han
+and Japanese kana, Korean Hangul or Bopomofo, so look-alike letters from another
+script (Cyrillic, Greek, Lisu, Cherokee, Coptic) cannot be mixed in. Controls,
+format and bidi characters, joiners (ZWNJ, ZWJ), invisible characters, emoji,
+symbols (so no `✓` or `✅`), the middle dots `·` and `・`, modifier letters,
 small capitals and check-like letters are refused, and so is any name whose
-skeleton (case, separators and look-alike digits ignored) contains `gyblos`,
-`verified`, `verificado`, `official` or `oficial`.
+skeleton (case, separators, look-alike letters and digits ignored) contains
+`gyblos`, `verified`, `verificado`, `official` or `oficial`.
 
 `POST /v1/profile` takes
 `{"claim":{"schemaVersion":1,"nodeId":"…","name":"…","issuedAt":…},"signature":"<128 hex>"}`
@@ -622,21 +624,27 @@ so anyone can rebuild the `ProfileClaimV1` and check it with
 `verifyProfileClaim`. A NodeId without a name, whose name was cleared or held,
 or that the index no longer knows (no active registration and no stored catalog,
 for example after a revocation) is `404 NO_PROFILE`, a code an index without
-this route never sends (its unknown routes answer `404 NOT_FOUND`).
-`/v1/network` carries each seller's `name` ([Network](#network)). Without the
-profile store (no D1 binding) both routes answer `503 DISCOVERY_UNAVAILABLE`.
+this route never sends (its unknown routes answer `404 NOT_FOUND`). A NodeId
+whose name an operator holds is `403 PROFILE_HELD`. `/v1/network` carries each
+seller's `name` ([Network](#network)). Without the profile store (no D1 binding)
+both routes answer `503 DISCOVERY_UNAVAILABLE`.
 
 ### Removing a name
 
 `pnpm index:seller-profiles [--remote]`
 (`apps/discovery-index/scripts/seller-profiles.ts`) lists stored names and held
 NodeIds: NodeId, name, whether it is held and `issuedAt`, newest first, at most
-1000 rows. `--hold <NodeId>` removes that seller's name and keeps a held
-tombstone: the index then refuses the seller's new names (`403 PROFILE_HELD`)
-until `--release <NodeId>`, which keeps the tombstone's `issuedAt` so an older
-signed name still cannot be replayed. It runs `wrangler d1 execute` like
-`pnpm index:github-claims`, against the local database, or the remote one with
-`--remote` (a maintainer action).
+1,000 rows; when it reaches that bound it says so. It reads the local database,
+or the remote one with `--remote`.
+
+`pnpm index:seller-profiles --hold <NodeId> --local|--remote` removes that
+seller's name and keeps a held tombstone: the index then answers its GET with
+`403 PROFILE_HELD` and refuses the seller's new names with the same code until
+`pnpm index:seller-profiles --release <NodeId> --local|--remote`, which keeps
+the tombstone's `issuedAt` so an older signed name still cannot be replayed.
+Writes need an explicit `--local` or `--remote` (a maintainer action), and the
+command prints which database it changed. It runs `wrangler d1 execute` like
+`pnpm index:github-claims`.
 
 ### Stored names
 

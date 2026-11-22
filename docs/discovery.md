@@ -55,19 +55,20 @@ Failures throw `DiscoveryError` with a static code from `DISCOVERY_ERROR_CODES`
 and, when a response arrived, its `status`. Messages never echo input or
 response text.
 
-| Index answer                                                                      | Client code                                                                            |
-| --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `400` `INVALID_RECORD`, `INVALID_SIGNATURE`, `EXPIRED_RECORD`, `UNKNOWN_CATALOG`  | `DISCOVERY_` plus the same name                                                        |
-| `400` with an unreadable body or another code on publish                          | `DISCOVERY_RECORD_REJECTED`                                                            |
-| `400 HTTPS_REQUIRED`                                                              | `DISCOVERY_INSECURE_URL`                                                               |
-| `409` on publish or read                                                          | `DISCOVERY_STALE_RECORD`                                                               |
-| `403` on publish                                                                  | `DISCOVERY_PUBLISH_NOT_ALLOWED` (the index does not accept this NodeId as a publisher) |
-| `403` `INVITE_INVALID`, `IDENTITY_NOT_REGISTERED`, `NODE_REVOKED` on registration | `DISCOVERY_` plus the same name                                                        |
-| `400 INVALID_REGISTRATION`, or another `400`/`403` body on registration           | `DISCOVERY_REGISTRATION_REJECTED`                                                      |
-| `400 INVALID_CLAIM` or another `400`/`403` body on a GitHub claim                 | `DISCOVERY_CLAIM_REJECTED` (`INVALID_SIGNATURE` stays `DISCOVERY_INVALID_SIGNATURE`)   |
-| `403 UNKNOWN_NODE` and `409` on a GitHub claim                                    | `DISCOVERY_UNKNOWN_NODE`, `DISCOVERY_STALE_CLAIM`                                      |
-| `413`, `429`, `503`                                                               | `DISCOVERY_PAYLOAD_TOO_LARGE`, `DISCOVERY_RATE_LIMITED`, `DISCOVERY_UNAVAILABLE`       |
-| Any other status                                                                  | `DISCOVERY_HTTP_STATUS`                                                                |
+| Index answer                                                                         | Client code                                                                            |
+| ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| `400` `INVALID_RECORD`, `INVALID_SIGNATURE`, `EXPIRED_RECORD`, `UNKNOWN_CATALOG`     | `DISCOVERY_` plus the same name                                                        |
+| `400` with an unreadable body or another code on publish                             | `DISCOVERY_RECORD_REJECTED`                                                            |
+| `400 HTTPS_REQUIRED`                                                                 | `DISCOVERY_INSECURE_URL`                                                               |
+| `409` on publish or read                                                             | `DISCOVERY_STALE_RECORD`                                                               |
+| `403` on publish                                                                     | `DISCOVERY_PUBLISH_NOT_ALLOWED` (the index does not accept this NodeId as a publisher) |
+| `403` `INVITE_INVALID`, `IDENTITY_NOT_REGISTERED`, `NODE_REVOKED` on registration    | `DISCOVERY_` plus the same name                                                        |
+| `400 INVALID_REGISTRATION`, or another `400`/`403` body on registration              | `DISCOVERY_REGISTRATION_REJECTED`                                                      |
+| `400 INVALID_CLAIM` or another `400`/`403` body on a GitHub claim or `POST /profile` | `DISCOVERY_CLAIM_REJECTED` (`INVALID_SIGNATURE` stays `DISCOVERY_INVALID_SIGNATURE`)   |
+| `403 UNKNOWN_NODE` and `409` on a GitHub claim or `POST /profile`                    | `DISCOVERY_UNKNOWN_NODE`, `DISCOVERY_STALE_CLAIM`                                      |
+| `403 PROFILE_HELD` on `POST /profile` or `GET /profile/<nodeId>`                     | `DISCOVERY_PROFILE_HELD`                                                               |
+| `413`, `429`, `503`                                                                  | `DISCOVERY_PAYLOAD_TOO_LARGE`, `DISCOVERY_RATE_LIMITED`, `DISCOVERY_UNAVAILABLE`       |
+| Any other status                                                                     | `DISCOVERY_HTTP_STATUS`                                                                |
 
 A deadline is always `DISCOVERY_TIMEOUT`, including one that ends while reading
 a rejection body. A caller `signal` cancels header and body reads with
