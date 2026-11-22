@@ -6,14 +6,12 @@ import { createPublicKey, verify } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-import {
-  CONTROL_CODES,
-  IDENTITY_CLAIM,
-  IDENTITY_CLAIM_KINDS,
-} from '@gyblos/protocol/constants';
+import { CONTROL_CODES } from '@gyblos/protocol/constants';
 import { ControlError } from '@gyblos/protocol/control-validation';
 import {
   githubProofLine,
+  IDENTITY_CLAIM,
+  IDENTITY_CLAIM_KINDS,
   parseIdentityClaim,
   signIdentityClaim,
   verifyIdentityClaim,

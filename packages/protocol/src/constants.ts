@@ -404,18 +404,3 @@ export const INFERENCE_CODES = {
   LIMIT: 'INFERENCE_LIMIT',
   INTERNAL: 'INFERENCE_INTERNAL',
 } as const;
-
-// A node's signed claim to an external account (identity-claim.ts). The GitHub kind names an account
-// and a public gist whose text carries `proofPrefix` + the NodeId; whoever reads both can re-check it.
-export const IDENTITY_CLAIM_KINDS = { GITHUB: 'github' } as const;
-export type IdentityClaimKind =
-  (typeof IDENTITY_CLAIM_KINDS)[keyof typeof IDENTITY_CLAIM_KINDS];
-export const IDENTITY_CLAIM = {
-  schemaVersion: 1,
-  domain: 'gyblos/identity-claim/v1\n',
-  proofPrefix: 'gyblos-node=',
-  // A GitHub login, lowercase only: 1 to 39 characters, single hyphens between alphanumerics.
-  githubAccount: /^[a-z0-9](?:-?[a-z0-9]){0,38}$/,
-  // A gist id: lowercase hex.
-  gistId: /^[0-9a-f]{20,32}$/,
-} as const;

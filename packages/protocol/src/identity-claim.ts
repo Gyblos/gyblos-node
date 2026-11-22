@@ -1,13 +1,7 @@
 // Owns the signed identity claim v1: a node names an external account it controls (GitHub: an account
 // and a public gist) or cancels its claim. The node key signs; checking the account side (the gist
 // carrying githubProofLine) and freshness or replay belong to the verifier, such as the discovery index.
-import {
-  CONTROL_CODES,
-  CONTROL_LIMITS,
-  IDENTITY_CLAIM,
-  IDENTITY_CLAIM_KINDS,
-  type IdentityClaimKind,
-} from './constants';
+import { CONTROL_CODES, CONTROL_LIMITS } from './constants';
 import {
   controlFail,
   controlHex,
@@ -15,8 +9,19 @@ import {
   controlObject,
   controlVerify,
 } from './control-validation';
+import {
+  IDENTITY_CLAIM,
+  IDENTITY_CLAIM_KINDS,
+  type IdentityClaimKind,
+} from './identity-claim/constants';
 import { bytesHex, hexBytes } from './public-validation';
 import { sign, type Signer } from './signing';
+
+export {
+  IDENTITY_CLAIM,
+  IDENTITY_CLAIM_KINDS,
+  type IdentityClaimKind,
+} from './identity-claim/constants';
 
 export interface IdentityClaimV1 {
   schemaVersion: typeof IDENTITY_CLAIM.schemaVersion;
