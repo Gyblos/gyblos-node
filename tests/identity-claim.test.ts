@@ -66,7 +66,14 @@ void test('a node signs a GitHub claim and a cancel, and both verify detached', 
 
 void test('the parser accepts GitHub login and gist id bounds', () => {
   const nodeId = 'ab'.repeat(32);
-  for (const account of ['a', '0', 'a-b-c', 'x'.repeat(39), 'a1-2b'])
+  for (const account of [
+    'a',
+    '0',
+    'a-b-c',
+    'x'.repeat(39),
+    'a1-2b',
+    `a${'-b'.repeat(19)}`,
+  ])
     assert.equal(
       parseIdentityClaim(claim(nodeId, { account })).account,
       account,
@@ -78,9 +85,19 @@ void test('the parser accepts GitHub login and gist id bounds', () => {
 void test('the parser refuses malformed accounts, gists, keys and half cancels', () => {
   const nodeId = 'ab'.repeat(32);
   const bad: unknown[] = [
-    ...['', 'Octo', '-a', 'a-', 'a--b', 'x'.repeat(40), 'a_b', 'a.b', ' a'].map(
-      (account) => claim(nodeId, { account }),
-    ),
+    ...[
+      '',
+      'Octo',
+      '-a',
+      'a-',
+      'a--b',
+      'x'.repeat(40),
+      `a${'-b'.repeat(38)}`,
+      `ab${'-b'.repeat(19)}`,
+      'a_b',
+      'a.b',
+      ' a',
+    ].map((account) => claim(nodeId, { account })),
     ...[
       'a'.repeat(19),
       'a'.repeat(33),
@@ -168,7 +185,7 @@ void test('identity claim vectors match independent canonical bytes and OpenSSL 
     ),
   ) as { domain: string; cases: { signed: unknown; signingHex: string }[] };
   assert.equal(data.domain, IDENTITY_CLAIM.domain);
-  assert.equal(data.cases.length, 2);
+  assert.equal(data.cases.length, 3);
   for (const vector of data.cases) {
     const signed = await verifyIdentityClaim(vector.signed);
     assert.deepEqual(signed, vector.signed);

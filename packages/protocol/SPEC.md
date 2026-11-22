@@ -1839,7 +1839,7 @@ LF). Vectors are `vectors/identity-claim-v1.json`.
 `claim` has exactly the fields `schemaVersion` (`1`; any other value is
 `VERSION`), `kind` (`github`), `nodeId` (64 lowercase hex), `account`, `gist` and
 `issuedAt` (a non-negative safe integer, milliseconds). `account` is a lowercase
-GitHub login (`^[a-z0-9](?:-?[a-z0-9]){0,38}$`) and `gist` a lowercase hex gist
+GitHub login (`^[a-z0-9](?:-?[a-z0-9])*$`, at most 39 characters) and `gist` a lowercase hex gist
 id of 20 to 32 characters. Both are set, or both are `null`, which cancels the
 node's claim; anything else is `INVALID`.
 

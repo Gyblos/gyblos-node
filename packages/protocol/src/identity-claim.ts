@@ -49,9 +49,15 @@ const CLAIM_KEYS = [
   'issuedAt',
 ] as const;
 
-function nullableMatch(value: unknown, pattern: RegExp): string | null {
+function nullableMatch(
+  value: unknown,
+  pattern: RegExp,
+  maxCharacters: number,
+): string | null {
   if (value === null) return null;
-  return typeof value === 'string' && pattern.test(value)
+  return typeof value === 'string' &&
+    value.length <= maxCharacters &&
+    pattern.test(value)
     ? value
     : controlFail();
 }
@@ -62,8 +68,16 @@ export function parseIdentityClaim(value: unknown): IdentityClaimV1 {
   if (input.schemaVersion !== IDENTITY_CLAIM.schemaVersion)
     return controlFail(CONTROL_CODES.VERSION);
   if (input.kind !== IDENTITY_CLAIM_KINDS.GITHUB) return controlFail();
-  const account = nullableMatch(input.account, IDENTITY_CLAIM.githubAccount);
-  const gist = nullableMatch(input.gist, IDENTITY_CLAIM.gistId);
+  const account = nullableMatch(
+    input.account,
+    IDENTITY_CLAIM.githubAccount,
+    IDENTITY_CLAIM.maxAccountCharacters,
+  );
+  const gist = nullableMatch(
+    input.gist,
+    IDENTITY_CLAIM.gistId,
+    IDENTITY_CLAIM.maxGistCharacters,
+  );
   if ((account === null) !== (gist === null)) return controlFail();
   return {
     schemaVersion: IDENTITY_CLAIM.schemaVersion,
