@@ -18,13 +18,13 @@ Views never use raw color values; colors come from theme variables or `--pk-*` t
 
 ## Surfaces
 
-| Layer                 | Dark                   | Use                                       |
-| --------------------- | ---------------------- | ----------------------------------------- |
-| Page (`--bg`)         | `charcoal`             | Route background                          |
-| Sidebar (`--pk-side`) | between page and panel | Navigation column, reaching the title bar |
-| Panel (`--panel`)     | `panel`                | Grouped settings, usage panels, tables    |
-| Raised (`--raised`)   | `raised`               | Selected pills, chips, controls on panels |
-| Line (`--line`)       | `line`                 | 1 px borders and row dividers             |
+| Layer               | Dark       | Use                                                                                    |
+| ------------------- | ---------- | -------------------------------------------------------------------------------------- |
+| Page (`--bg`)       | `charcoal` | Route background: an inset sheet with a 1 px border and `--radius-panel` start corners |
+| Frame (`--pk-side`) | `panel`    | Sidebar, title bar and status bar                                                      |
+| Panel (`--panel`)   | `panel`    | Grouped settings, usage panels, tables                                                 |
+| Raised (`--raised`) | `raised`   | Selected pills, chips, controls on panels                                              |
+| Line (`--line`)     | `line`     | 1 px borders and row dividers                                                          |
 
 ## Tones
 
