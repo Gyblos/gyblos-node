@@ -98,6 +98,14 @@ async function openBuyerChannel<Remote extends BatchDestination>(
     return batchFail(SESSION_CODES.BINDING);
   return snapshot;
 }
+function verifyOpeningTime(
+  quote: SignedOfferV2,
+  expiresAt: number,
+  now: number,
+) {
+  validateOfferV2Time(quote.offer, now);
+  if (now >= expiresAt) return batchFail(SESSION_CODES.LIMIT);
+}
 export async function runBuyerBatch<Remote extends BatchDestination>(
   context: BuyerBatchContext<Remote>,
   value: SignedOfferV2,
@@ -105,7 +113,7 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
   signal: AbortSignal,
   onDelta?: (text: string) => Promise<void>,
 ) {
-  const { options, terms, rpc, approve } = context;
+  const { options, terms, rpc } = context;
   const quote = {
     offer: parseOfferV2(value.offer),
     signature: parseOfferSignatureV2(value.signature),
@@ -129,9 +137,7 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
       options.endpoint.id().toString(),
       options.now(),
     );
-    const checkedAt = options.now();
-    validateOfferV2Time(quote.offer, checkedAt);
-    if (checkedAt >= terms.expiresAt) return batchFail(SESSION_CODES.LIMIT);
+    verifyOpeningTime(quote, terms.expiresAt, options.now());
     current.throwIfAborted();
   };
   await verify(signal);
@@ -147,9 +153,7 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
       signal.throwIfAborted();
       const payload = await options.buyer.open(() => {
         signal.throwIfAborted();
-        validateOfferV2Time(quote.offer, options.now());
-        if (options.now() >= terms.expiresAt)
-          return batchFail(SESSION_CODES.LIMIT);
+        verifyOpeningTime(quote, terms.expiresAt, options.now());
       });
       const channelId = options.buyer.snapshot().channelId;
       const prepared = buildBatchExecutionRequest(channelId, quote, input);
