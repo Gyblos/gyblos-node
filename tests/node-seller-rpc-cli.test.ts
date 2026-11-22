@@ -3,7 +3,7 @@
 // providers embed API keys in it; output shows only the origin. A URL is saved only after it answers as
 // devnet, every other role field and key file stays untouched, and the seller must restart to use it.
 import assert from 'node:assert/strict';
-import { readFile, writeFile } from 'node:fs/promises';
+import { chmod, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import test from 'node:test';
 
@@ -236,4 +236,69 @@ void test('seller rpc: an unreadable role file is not reported as a missing sell
     const result = await rpc(home, []);
     assert.equal(result.code, 1);
     assert.match(result.stderr, /cannot be read/);
+  }));
+
+void test('seller rpc set: a GYBLOS_RPC_URL equal to the saved RPC is stale, so a terminal is asked for the new one', () =>
+  withHome(async (home) => {
+    const questions: string[] = [];
+    const result = await rpc(home, ['set'], {
+      env: { GYBLOS_RPC_URL: 'https://rpc.example.com' },
+      prompt: async (question) => {
+        questions.push(question);
+        return PRIVATE;
+      },
+      genesis: devnet,
+    });
+    assert.equal(result.code, 0, result.stderr);
+    assert.equal(questions.length, 1);
+    assert.equal((await role(home)).rpcUrl, PRIVATE);
+    const scripted = await rpc(home, ['set'], {
+      env: { GYBLOS_RPC_URL: PRIVATE },
+      genesis: devnet,
+    });
+    assert.equal(scripted.code, 1);
+    assert.match(scripted.stderr, /already uses/);
+  }));
+
+void test('seller rpc: restart advice keeps the installed service, never uninstalling it', () =>
+  withHome(async (home) => {
+    const result = await rpc(home, ['reset']);
+    assert.equal(result.code, 0, result.stderr);
+    assert.equal(/uninstall/.test(result.stdout), false, result.stdout);
+    assert.match(
+      result.stdout,
+      /systemctl --user restart|launchctl kickstart -k|schtasks/,
+    );
+  }));
+
+void test('seller rpc: only rpcUrl changes in role.json; a legacy buyer field is kept as written', () =>
+  withHome(async (home) => {
+    const path = join(home.seller, 'role.json');
+    const original = JSON.parse(await readFile(path, 'utf8')) as Record<
+      string,
+      unknown
+    >;
+    const legacy = {
+      ...original,
+      authorizer: 'So11111111111111111111111111111111111111112',
+      facilitator: 'SysvarRent111111111111111111111111111111111',
+      payTo: 'SysvarC1ock11111111111111111111111111111111',
+      buyer: 'Vote111111111111111111111111111111111111111',
+    };
+    await writeFile(path, JSON.stringify(legacy));
+    const result = await rpc(home, ['reset']);
+    assert.equal(result.code, 0, result.stderr);
+    assert.deepEqual(await role(home), { ...legacy, rpcUrl: DEVNET_RPC_URL });
+  }));
+
+void test('seller rpc: a role that cannot be written fails without printing private paths', () =>
+  withHome(async (home) => {
+    await chmod(home.seller, 0o500);
+    try {
+      const result = await rpc(home, ['reset']);
+      assert.equal(result.code, 1);
+      assert.match(result.stderr, /cannot be written/);
+    } finally {
+      await chmod(home.seller, 0o700);
+    }
   }));
