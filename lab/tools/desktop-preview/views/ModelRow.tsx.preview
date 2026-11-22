@@ -1,0 +1,316 @@
+// Preview-only: a model row summarizes its sellers; a side panel holds strategy, the seller table and pinning.
+const STRATEGIES = SELLER_MODES;
+type Strategy = SellerMode;
+const READY = READY_SELLER_MODES;
+const QUANTS = ['Q4_K_M', 'Q8_0', 'FP16'] as const;
+const modelChoice = new Map<string, { strategy: Strategy; pinned: string | null }>();
+type PreviewSeller = { id: string; name: string; quant: string; input: number; output: number; latency: number; uptime: number; online: boolean };
+function previewSellers(model: CatalogModel): PreviewSeller[] {
+  return Array.from({ length: model.providers }, (_, index) => {
+    const factor = index === 0 ? 1 : 1 + ((index * 37 + model.providers * 11) % 60) / 100;
+    const hex = ((index + 3) * 2654435761 % 65536).toString(16).padStart(4, '0');
+    return {
+      id: model.id + '-' + index,
+      name: hex + '…' + ((index + 7) * 40503 % 65536).toString(16).padStart(4, '0'),
+      quant: QUANTS[index % QUANTS.length] ?? 'Q4_K_M',
+      input: Math.round(model.input * factor * 100) / 100,
+      output: Math.round(model.output * factor * 100) / 100,
+      latency: 180 + ((index * 53) % 420),
+      uptime: 99.9 - ((index * 13) % 40) / 10,
+      // One synthetic seller is offline so the pinned-seller replacement can be reviewed.
+      online: !(model.providers > 3 && index === 2),
+    };
+  });
+}
+function pick(sellers: PreviewSeller[], strategy: Strategy) {
+  const by = (score: (seller: PreviewSeller) => number) => sellers.filter((s) => s.online).sort((a, b) => score(a) - score(b))[0];
+  if (strategy === 'Cheapest') return by((s) => s.input + s.output);
+  if (strategy === 'Fastest') return by((s) => s.latency);
+  if (strategy === 'Most reliable') return by((s) => -s.uptime);
+  return by((s) => (s.input + s.output) * 10 + s.latency / 100 - s.uptime);
+}
+function ModelRow({ model, selected, canSelect, onSelect }: {
+  model: CatalogModel; selected: string; canSelect: boolean; onSelect(model: CatalogModel): void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [choice, setChoice] = useState(() => modelChoice.get(model.id) ?? { strategy: previewSetting('sellerMode'), pinned: null });
+  const sellers = previewSellers(model);
+  const prices = sellers.map((s) => s.input);
+  const min = Math.min(...prices);
+  const cheapest = sellers.filter((s) => s.online).sort((a, b) => a.input - b.input)[0];
+  const max = Math.max(...prices);
+  const pinnedSeller = sellers.find((s) => s.id === choice.pinned);
+  const unavailable = pinnedSeller && !pinnedSeller.online ? pinnedSeller : undefined;
+  const active = unavailable ? pick(sellers, choice.strategy) : (pinnedSeller ?? pick(sellers, choice.strategy));
+  const position = max > min && active ? ((active.input - min) / (max - min)) * 100 : 0;
+  const latency = Math.round(sellers.reduce((sum, s) => sum + s.latency, 0) / sellers.length);
+  const update = (next: { strategy: Strategy; pinned: string | null }) => {
+    modelChoice.set(model.id, next);
+    setChoice(next);
+  };
+  const current = canSelect && selected === model.id;
+  const mode = choice.pinned ? 'Pinned' : choice.strategy;
+  return (
+    <div className="preview-model-item" data-current={current}>
+      <button type="button" className="preview-model-head preview-model-summary" aria-haspopup="dialog" onClick={() => setOpen(true)}>
+        <ModelImage name={model.name} artwork={model.image} />
+        <span className="preview-model-copy">
+          <strong>{model.name}{current && <Check size={14} aria-label="In use" />}</strong>
+          <small>{model.family + ' · ' + model.context + ' context'}</small>
+        </span>
+        <span className="preview-model-stats">
+          <small>{sellers.length} sellers · ~{latency} ms</small>
+          {!model.free && (
+            <span className="preview-price-range" aria-label={'Input price from ' + usdPerMtok(min) + ' to ' + usdPerMtok(max)}>
+              <span>{usdPerMtok(min)}</span>
+              <span className="preview-price-track"><span style={{ left: position + '%' }} /></span>
+              <span>{usdPerMtok(max)}</span>
+            </span>
+          )}
+        </span>
+        <span className="preview-model-mode">{mode}</span>
+        <span className="ui-price">
+          <strong>{model.free ? 'Free' : 'from ' + usdPerMtok(cheapest?.input ?? min)}</strong>
+          <small>{model.free ? 'Community supported' : cheapest && <Savings price={cheapest.input} median={comparableMedian(sellers, cheapest)} />}</small>
+        </span>
+        <CaretRight size={14} aria-hidden="true" />
+      </button>
+      <MotionPresence>{open && (
+        <Modal title={model.name} size="lg" close={() => setOpen(false)}>
+          <div className="preview-seller-drawer">
+            <div className="preview-model-head-line">
+              <span className="ui-help-text">{model.family + ' · ' + model.context + ' context · ' + sellers.length + ' sellers'}</span>
+              {canSelect && !current && <Button variant={BUTTON_VARIANT.PRIMARY} onClick={() => { setOpen(false); onSelect(model); }}>Use this model</Button>}
+            </div>
+            <div
+              className="preview-strategy"
+              role="radiogroup"
+              aria-label="Seller selection"
+              onKeyDown={(event) => {
+                const step =
+                  event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 0;
+                if (!step) return;
+                event.preventDefault();
+                const index = READY.indexOf(choice.strategy);
+                const next = READY[(index + step + READY.length) % READY.length] ?? 'Auto';
+                update({ strategy: next, pinned: choice.pinned });
+                event.currentTarget.querySelector<HTMLButtonElement>('[data-strategy="' + next + '"]')?.focus();
+              }}
+            >
+              {STRATEGIES.map((strategy) => {
+                const ready = READY.includes(strategy);
+                return (
+                  <button
+                    key={strategy}
+                    type="button"
+                    role="radio"
+                    data-strategy={strategy}
+                    aria-checked={choice.strategy === strategy}
+                    disabled={!ready}
+                    title={ready ? undefined : PREVIEW_COPY.sellerModeSoon}
+                    tabIndex={choice.strategy === strategy ? 0 : -1}
+                    onClick={() => update({ strategy, pinned: choice.pinned })}
+                  >
+                    {strategy}
+                    {!ready && <Tag>Soon</Tag>}
+                  </button>
+                );
+              })}
+            </div>
+            {unavailable && (
+              <Notice>
+                {active
+                  ? PREVIEW_COPY.pinnedUnavailable(unavailable.name, active.name, choice.strategy)
+                  : PREVIEW_COPY.pinnedNoReplacement(unavailable.name)}
+              </Notice>
+            )}
+            <div className="preview-route" data-tone={choice.pinned ? TONE.INFO : TONE.NEUTRAL}>
+              <span className="ui-icon-tile" aria-hidden="true">
+                {choice.pinned ? <PushPin size={16} weight="fill" /> : <Shuffle size={16} />}
+              </span>
+              <span className="preview-route-copy">
+                <strong>{choice.pinned ? 'Pinned to ' + (pinnedSeller?.name ?? '') : choice.strategy === 'Auto' ? 'Gyblos picks the seller' : choice.strategy + ' seller first'}</strong>
+                <small>
+                  {choice.pinned
+                    ? 'Always used first. If it goes offline, ' + choice.strategy + ' picks another.'
+                    : 'Now using ' + (active?.name ?? 'no seller') + '. Pin a seller to always use it first.'}
+                </small>
+              </span>
+              {choice.pinned && <Button onClick={() => update({ ...choice, pinned: null })}>Unpin</Button>}
+            </div>
+            <SellerTable sellers={sellers} free={model.free} active={active?.id} pinned={choice.pinned}
+              onPin={(id) => update({ strategy: choice.strategy, pinned: choice.pinned === id ? null : id })} />
+          </div>
+        </Modal>
+      )}</MotionPresence>
+    </div>
+  );
+}
+const SORTS = ['Price', 'Latency', 'Uptime'] as const;
+function SellerTable({ sellers, free, active, pinned, onPin }: {
+  sellers: PreviewSeller[]; free: boolean; active?: string; pinned: string | null; onPin(id: string): void;
+}) {
+  const [query, setQuery] = useState('');
+  const [sort, setSort] = useState<(typeof SORTS)[number]>('Price');
+  const [page, setPage] = useState(1);
+  const [size, setSize] = useState<number>(HISTORY.PAGE_SIZES[0]);
+  const rows = sellers
+    .filter((s) => (s.name + ' ' + s.quant).toLowerCase().includes(query.trim().toLowerCase()))
+    .sort((a, b) => sort === 'Price' ? a.input - b.input : sort === 'Latency' ? a.latency - b.latency : b.uptime - a.uptime);
+  const current = Math.min(page, Math.max(1, Math.ceil(rows.length / size)));
+  return (
+    <>
+      <div className="ui-toolbar">
+        <SearchField label="Search sellers" placeholder="Search sellers or quantization" value={query} onValueChange={(v) => { setQuery(v); setPage(1); }} />
+        <ChoiceMenu label="Sort sellers" value={sort} options={SORTS} onChange={setSort} />
+      </div>
+      <div className="preview-simple-table-region">
+        <table className="preview-simple-table">
+          <caption className="sr-only">Sellers</caption>
+          <thead><tr>
+            <th scope="col">Seller</th><th scope="col">Quant</th>
+            <th scope="col" className="preview-num">{free ? 'In / out · 1M' : 'In / out · 1M, ' + feeLabel}</th>
+            <th scope="col" className="preview-num">Latency</th><th scope="col" className="preview-num">Uptime</th>
+            <th scope="col" className="preview-num">Pin</th>
+          </tr></thead>
+          <tbody>
+            {rows.slice((current - 1) * size, current * size).map((s) => (
+              <tr key={s.id} data-active={s.id === active} data-pinned={pinned === s.id}>
+                <th scope="row">
+                  <span className="preview-seller-name">
+                    {s.name}
+                    {pinned === s.id && <Tag tone={TONE.INFO}>Pinned</Tag>}
+                    {s.id === active && <Tag tone={TONE.SUCCESS} dot>In use</Tag>}
+                    {!s.online && <Tag tone={TONE.WARNING}>Offline</Tag>}
+                  </span>
+                </th>
+                <td>{s.quant}</td>
+                <td className="preview-num preview-tabular">{free ? 'Free' : usdPerMtok(s.input) + ' / ' + usdPerMtok(s.output)}</td>
+                <td className="preview-num preview-tabular">{s.latency} ms</td>
+                <td className="preview-num preview-tabular">{s.uptime.toFixed(1)}%</td>
+                <td className="preview-num preview-limit-action">
+                  <IconButton className="preview-pin" label={(pinned === s.id ? 'Unpin seller ' : 'Pin seller ') + s.name} aria-pressed={pinned === s.id} onClick={() => onPin(s.id)}>
+                    <PushPin size={14} weight={pinned === s.id ? 'fill' : 'regular'} aria-hidden="true" />
+                  </IconButton>
+                </td>
+              </tr>
+            ))}
+            {!rows.length && <tr><td colSpan={6}>No sellers match.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      {rows.length >= HISTORY.PAGE_SIZES[0] && (
+        <Pagination label="Seller pagination" total={rows.length} page={current} pageSize={size} onPage={setPage} onPageSize={(v) => { setSize(v); setPage(1); }} />
+      )}
+    </>
+  );
+}
+// Synthetic catalog sized to review lab, family and sort filters with pagination; real offers come from the discovery index.
+const PREVIEW_LABS: Record<string, CatalogModel['image']> = {
+  Qwen: { src: './assets/models/qwen-color.svg' },
+  OpenAI: { src: './assets/models/openai.svg', monochrome: true },
+  Meta: { src: './assets/models/meta-color.svg' },
+  Google: { src: './assets/models/gemma-color.svg' },
+  DeepSeek: { src: './assets/models/deepseek-color.svg' },
+  Mistral: { src: './assets/models/mistral-color.svg' },
+};
+const PREVIEW_SERIES: readonly [lab: string, family: string, sizes: readonly string[]][] = [
+  ['Qwen', 'Qwen3', ['0.6B', '4B', '8B', '14B', '32B', '235B-A22B']],
+  ['Qwen', 'Qwen3 Coder', ['7B', '30B-A3B', '480B-A35B']],
+  ['Qwen', 'QwQ', ['32B']],
+  ['OpenAI', 'gpt-oss', ['120B']],
+  ['Meta', 'Llama 3', ['3.2 1B', '3.2 3B', '3.1 8B', '3.1 405B']],
+  ['Meta', 'Llama 4', ['Scout', 'Maverick']],
+  ['Google', 'Gemma 3', ['1B', '4B', '12B', '27B']],
+  ['Google', 'Gemma 4', ['4B', '12B']],
+  ['DeepSeek', 'DeepSeek V4', ['Pro', 'Lite']],
+  ['DeepSeek', 'DeepSeek R2', ['Distill 7B', 'Distill 32B', '671B']],
+  ['Mistral', 'Mistral Small', ['3.2 24B']],
+  ['Mistral', 'Devstral', ['Small 24B', 'Medium']],
+  ['Mistral', 'Magistral', ['Small 24B']],
+];
+const SHIPPED_FAMILY: Record<string, string> = { qwen: 'Qwen3', oss: 'gpt-oss', llama: 'Llama 3', gemma: 'Gemma 4', deepseek: 'DeepSeek V4' };
+const PREVIEW_CONTEXTS = ['32K', '128K', '256K'] as const;
+const PREVIEW_CATEGORIES = [MODEL_CATEGORY.EVERYDAY, MODEL_CATEGORY.REASONING, MODEL_CATEGORY.WRITING, MODEL_CATEGORY.CODING] as const;
+const PREVIEW_CATALOG: { model: CatalogModel; family: string }[] = [
+  ...MODELS.map((model) => ({ model, family: SHIPPED_FAMILY[model.id] ?? model.family })),
+  ...PREVIEW_SERIES.flatMap(([lab, family, sizes], series) =>
+    sizes.map((size, index) => {
+      const seed = series * 7 + index * 3;
+      const free = seed % 4 === 0;
+      const input = free ? 0 : Math.round((0.04 + (seed % 9) * 0.07) * 100) / 100;
+      return {
+        family,
+        model: {
+          id: 'preview-' + (family + '-' + size).toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+          name: /^\d+\.\d/.test(size) ? family.split(' ')[0] + ' ' + size : family + ' ' + size,
+          family: lab,
+          image: PREVIEW_LABS[lab] ?? { src: './assets/models/qwen-color.svg' },
+          category: PREVIEW_CATEGORIES[seed % PREVIEW_CATEGORIES.length] ?? MODEL_CATEGORY.EVERYDAY,
+          context: PREVIEW_CONTEXTS[seed % PREVIEW_CONTEXTS.length] ?? '32K',
+          providers: 1 + ((seed * 5) % 18),
+          free,
+          input,
+          output: Math.round(input * 3 * 100) / 100,
+        },
+      };
+    }),
+  ),
+];
+const ALL_LABS = 'All labs';
+const ALL_FAMILIES = 'All families';
+const CONTEXT_FILTERS = ['Any context', '128K+', '256K+'] as const;
+const CATALOG_SORTS = ['Most sellers', 'Lowest price', 'Name'] as const;
+const contextK = (context: string) => Number.parseInt(context, 10);
+function PreviewCatalog({ query, filter, selected, canSelect, onSelect }: {
+  query: string; filter: ModelFilter; selected: string; canSelect: boolean; onSelect(model: CatalogModel): void;
+}) {
+  const [lab, setLab] = useState(ALL_LABS);
+  const [family, setFamily] = useState(ALL_FAMILIES);
+  const [context, setContext] = useState<(typeof CONTEXT_FILTERS)[number]>(CONTEXT_FILTERS[0]);
+  const [sort, setSort] = useState<(typeof CATALOG_SORTS)[number]>(CATALOG_SORTS[0]);
+  const [page, setPage] = useState(1);
+  const [size, setSize] = useState<number>(HISTORY.PAGE_SIZES[0]);
+  const labs = [ALL_LABS, ...new Set(PREVIEW_CATALOG.map((entry) => entry.model.family))];
+  const families = [ALL_FAMILIES, ...new Set(PREVIEW_CATALOG.filter((entry) => lab === ALL_LABS || entry.model.family === lab).map((entry) => entry.family))];
+  const minContext = context === CONTEXT_FILTERS[0] ? 0 : contextK(context);
+  const rows = PREVIEW_CATALOG.filter(
+    (entry) =>
+      matchesCatalog({ ...entry.model, family: entry.model.family + ' ' + entry.family }, query, filter) &&
+      (lab === ALL_LABS || entry.model.family === lab) &&
+      (family === ALL_FAMILIES || entry.family === family) &&
+      contextK(entry.model.context) >= minContext,
+  )
+    .map((entry) => entry.model)
+    .sort((a, b) => (sort === 'Name' ? a.name.localeCompare(b.name) : sort === 'Lowest price' ? a.input - b.input : b.providers - a.providers));
+  const current = Math.min(page, Math.max(1, Math.ceil(rows.length / size)));
+  const filtered = lab !== ALL_LABS || family !== ALL_FAMILIES || context !== CONTEXT_FILTERS[0];
+  const reset = (apply: () => void) => {
+    apply();
+    setPage(1);
+  };
+  return (
+    <>
+      <div className="ui-toolbar preview-catalog-filters">
+        <ChoiceMenu label="Model lab" value={lab} options={labs} onChange={(v) => reset(() => { setLab(v); setFamily(ALL_FAMILIES); })} />
+        <ChoiceMenu label="Model family" value={family} options={families} onChange={(v) => reset(() => setFamily(v))} />
+        <ChoiceMenu label="Model context" value={context} options={CONTEXT_FILTERS} onChange={(v) => reset(() => setContext(v))} />
+        <ChoiceMenu label="Sort models" value={sort} options={CATALOG_SORTS} onChange={(v) => reset(() => setSort(v))} />
+        <span className="ui-help-text" aria-live="polite">{rows.length} models</span>
+        {filtered && <Button onClick={() => reset(() => { setLab(ALL_LABS); setFamily(ALL_FAMILIES); setContext(CONTEXT_FILTERS[0]); })}>Clear filters</Button>}
+      </div>
+      <List label="Model catalog">
+        {rows.length ? (
+          rows.slice((current - 1) * size, current * size).map((model) => (
+            <ModelRow key={model.id} model={model} selected={selected} canSelect={canSelect} onSelect={onSelect} />
+          ))
+        ) : (
+          <p className="ui-list-empty">No models match your search.</p>
+        )}
+      </List>
+      {rows.length >= HISTORY.PAGE_SIZES[0] && (
+        <Pagination label="Model catalog pagination" total={rows.length} page={current} pageSize={size} onPage={setPage} onPageSize={(v) => reset(() => setSize(v))} />
+      )}
+    </>
+  );
+}

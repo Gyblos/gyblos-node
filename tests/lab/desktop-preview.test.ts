@@ -150,27 +150,26 @@ void test('preview buyer status is runtime-loadable and keeps free replies trans
   assert.equal(result.summary.records[0]?.transaction, null);
   assert.equal(result.summary.records[0]?.chargeAtomic, '0');
 });
-void test('preview network catalog passes the desktop contract with one free listing and two paid sellers', async () => {
+void test('preview network catalog passes the desktop contract with models offered by several sellers', async () => {
   const call = await fixture();
   const catalog = parseNetworkCatalog(await call('desktopCatalog', 'summary'));
   assert.equal(catalog.state, CATALOG_STATE.READY);
-  assert.deepEqual(
-    catalog.models.map((model) => [
-      model.free,
-      model.inputAtomicPerMtok,
-      model.outputAtomicPerMtok,
-    ]),
-    [
-      [true, '0', '0'],
-      [false, '52000', '208000'],
-      [false, '80000', '240000'],
-    ],
-  );
-  assert.equal(
-    parseNetworkCatalog(await call('desktopCatalog', 'lookup', 'qwen3-0.6b'))
-      .state,
-    CATALOG_STATE.READY,
-  );
+  const prices = (models: typeof catalog.models) =>
+    models.map((model) => model.modelId + ' ' + model.inputAtomicPerMtok);
+  assert.deepEqual(prices(catalog.models), [
+    'qwen3-0.6b 0',
+    'qwen3-0.6b 52000',
+    'qwen3-0.6b 80000',
+    'llama-3.2-3b 60000',
+    'llama-3.2-3b 90000',
+    'gemma-3-4b 70000',
+  ]);
+  const lookup = async (query: string) =>
+    parseNetworkCatalog(await call('desktopCatalog', 'lookup', query)).models;
+  assert.deepEqual(prices(await lookup('llama-3.2-3b')), [
+    'llama-3.2-3b 60000',
+    'llama-3.2-3b 90000',
+  ]);
 });
 
 void test('preview wallet collection contains public example metadata only', async () => {
@@ -267,7 +266,7 @@ void test('preview build retains a desktop baseline and declares its brand propo
   const brand = object(manifest.brand);
   const tokens = object(brand.themeTokens);
   assert.equal(tokens.blue, '#0a28f0');
-  assert.equal(tokens.charcoal, '#090909');
+  assert.equal(tokens.charcoal, '#141414');
   assert.equal(brand.kitVersion, '3.0.0');
   const baseline = object(manifest.baselineAssets);
   const preview = object(manifest.previewAssets);
@@ -371,7 +370,7 @@ void test('preview brand hooks normalize Windows module identifiers', async () =
   const desktop = 'C:\\repo\\apps\\desktop';
   assert.match(
     transformBrand(theme, 'C:/repo/apps/desktop/src/theme.ts', desktop) ?? '',
-    /#090909/,
+    /#141414/,
   );
   assert.equal(
     transformBrand(signal, 'C:/repo/apps/desktop/src/ui/Signal.tsx', desktop),
@@ -392,7 +391,7 @@ void test('preview brand hooks accept Windows CRLF source files', async () => {
       'C:/repo/apps/desktop/src/theme.ts',
       'C:/repo/apps/desktop',
     ) ?? '',
-    /#090909/,
+    /#141414/,
   );
 });
 
