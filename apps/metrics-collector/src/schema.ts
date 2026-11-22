@@ -1,6 +1,5 @@
-// Owns the collector's typed tables, keys, indexes and checks, matching migrations/ (tests compare
-// them); drizzle-kit generates migrations from it. D1 keeps the WITHOUT ROWID layout Drizzle cannot
-// declare. These declarations perform no client initialization or I/O.
+// Owns the collector's typed tables, keys and indexes, matching migrations/ exactly (a test compares
+// them). These declarations perform no client initialization or I/O.
 import { eq, sql } from 'drizzle-orm';
 import {
   check,
@@ -48,8 +47,6 @@ export const envelopes = sqliteTable(
   (table) => [
     unique().on(table.uploaderNodeId, table.nonce),
     index('collector_envelopes_by_received').on(table.receivedAt),
-    // Inlined: drizzle-kit writes check expressions into migration SQL, where a bound parameter
-    // would be a bare `?`.
     check(
       'collector_envelopes_uploader_node_id',
       eq(sql`length(${table.uploaderNodeId})`, nodeIdCharacters).inlineParams(),

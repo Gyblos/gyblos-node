@@ -170,9 +170,8 @@ export const FIRST_SEEN_KINDS = {
   BUYER_PAID: 'buyer-paid',
   MODEL: 'model',
 } as const;
-// The single row of collector_agg_state (and collector_agg_chain_state).
+// The single row of collector_agg_state.
 export const AGG_STATE_ID = 1;
-// The single row of collector_chain_cursor.
 export const CHAIN_CURSOR_ID = 1;
 
 // Chain index (#349): the x402 payment-channels program (@x402/svm 2.28 Codama client). Discriminators

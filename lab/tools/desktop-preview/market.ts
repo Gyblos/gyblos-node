@@ -1,0 +1,55 @@
+// Preview-only market helpers: the fee label, the median reference and the closest free model.
+import { PROTOCOL_FEE } from '@gyblos/config/network';
+
+import { PREVIEW } from './constants';
+
+// Listed prices already include the protocol fee (seller net price, rounded up).
+export const feeLabel = `incl. ${PROTOCOL_FEE.bps / PREVIEW.percentScale}% fee`;
+
+const scale = PREVIEW.priceScale;
+
+export function marketMedian(prices: readonly number[]) {
+  if (prices.length < PREVIEW.medianMinOffers) return null;
+  const sorted = [...prices].sort((left, right) => left - right);
+  const middle = Math.floor(sorted.length / 2);
+  const median =
+    sorted.length % 2 === 0
+      ? ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2
+      : (sorted[middle] ?? 0);
+  return Math.round(median * scale) / scale;
+}
+
+// Option B: only offers from sellers online now, at the reference offer's quantization.
+export function comparableMedian<
+  T extends { input: number; quant: string; online: boolean },
+>(offers: readonly T[], reference: T) {
+  return marketMedian(
+    offers
+      .filter((offer) => offer.online && offer.quant === reference.quant)
+      .map((offer) => offer.input),
+  );
+}
+
+const family = (name: string) => name.toLowerCase().match(/^[a-z]+/)?.[0] ?? '';
+const size = (name: string) => {
+  const match = name.toLowerCase().match(/(\d+(?:\.\d+)?)\s*b\b/);
+  return match ? Number(match[1]) : null;
+};
+
+export function similarFreeModel<T extends { name: string; free: boolean }>(
+  models: readonly T[],
+  current: string,
+) {
+  const target = size(current);
+  const distance = (item: T) => {
+    const value = size(item.name);
+    return value === null || target === null
+      ? Number.MAX_SAFE_INTEGER
+      : Math.abs(value - target);
+  };
+  const free = models.filter((item) => item.free);
+  const same = free.filter((item) => family(item.name) === family(current));
+  return [...(same.length ? same : free)].sort(
+    (left, right) => distance(left) - distance(right),
+  )[0];
+}

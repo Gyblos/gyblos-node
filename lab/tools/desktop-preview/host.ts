@@ -7,7 +7,6 @@ import {
   type ChatArchiveSave,
 } from '@gyblos/desktop/chat-archive-model';
 import { ChatController } from '@gyblos/desktop/chat-controller';
-import { CATALOG_STATE } from '@gyblos/desktop/network-catalog';
 import { LOCAL_NODE_STATE } from '@gyblos/desktop/node-status';
 import { PAYMENT_METHOD } from '@gyblos/desktop/paypal-model';
 import {
@@ -43,7 +42,7 @@ import { exampleKeys } from './example-keys';
 import { previewFunding } from './funding';
 import { requestObject as read, type AgentExamples } from './input';
 import { createPaypalPreview } from './paypal';
-import { previewCatalog } from './seller-listings';
+import { previewDesktopCatalog } from './seller-listings';
 
 export function createPreviewHost(
   search: string,
@@ -75,14 +74,16 @@ export function createPreviewHost(
   let connected = ready;
   let active = ready && query.get('seller-budget') !== 'ready';
   let authorized = ready;
-  let limitAtomic = '1000000';
+  const limitQuery = query.get('limit');
+  let limitAtomic = limitQuery === '0' ? '0' : '1000000';
+  let limited = limitQuery === 'set' || limitQuery === '0';
   let generation = 0;
   let selectedHome = ready;
   let keys = exampleKeys(query.get('keys') === 'empty');
   let setup: UsdcApiState['setup'];
   const clone = <T>(value: T) => structuredClone(value);
   const answer =
-    'This is the desktop interface with example data.\n\nYour **API key** and **Base URL** are in Connections. The key’s spend limit is shared across its tools and models.\n\n- Open your preferred coding tool.\n- Follow its configuration guide.\n- Review usage in Activity and payment details in Payments.';
+    'This is the desktop interface with example data.\n\nYour **API key** and **Base URL** are in Connections. The key’s spend limit is shared across its tools and models.\n\n- Open your preferred coding tool.\n- Follow its configuration guide.\n- Review usage and payments in Usage & payments.';
 
   const conversations = new ChatController('preview-first-chat');
   const records: X402Record[] = [];
@@ -143,8 +144,7 @@ export function createPreviewHost(
     );
   }
   for (const title of titles) {
-    if (tenChats) exampleChat(title, crypto.randomUUID());
-    else conversations.setDraft(title);
+    exampleChat(title, crypto.randomUUID());
     conversations.newChat(crypto.randomUUID());
   }
   exampleChat('How can I use Gyblos in my coding tools?', 'preview-free-reply');
@@ -212,22 +212,10 @@ export function createPreviewHost(
       return nodeState;
     },
   };
-  let catalogQuery = '';
-  const catalogResult = () => {
-    const result = previewCatalog(model, now, catalogQuery);
-    return !catalogQuery || catalogQuery === model
-      ? result
-      : { ...result, state: CATALOG_STATE.EMPTY, models: [] };
-  };
-  const desktopCatalog = {
-    summary: async () => previewCatalog(model, now, ''),
-    lookup: async (value: unknown) => {
-      catalogQuery = typeof value === 'string' ? value.trim() : '';
-      return catalogResult();
-    },
-  };
+  const desktopCatalog = previewDesktopCatalog(model, now);
 
-  const accountBudget = () => accountBudgetSnapshot(limitAtomic, records);
+  const accountBudget = () =>
+    accountBudgetSnapshot(limitAtomic, records, limited);
   function buyerState() {
     return parseX402Result({
       summary: {
@@ -271,10 +259,14 @@ export function createPreviewHost(
         );
         if (error) return { ...buyerState(), error };
         limitAtomic = request.limitAtomic;
+        limited = true;
         active = true;
         authorized = true;
       }
-      if (request.action === X402_ACTION.FINISH) active = false;
+      if (request.action === X402_ACTION.FINISH) {
+        active = false;
+        limited = false;
+      }
       if (request.action === X402_ACTION.COPY_PAYER)
         await navigator.clipboard.writeText(payer);
       if (request.action === X402_ACTION.COPY_MINT)
@@ -381,7 +373,7 @@ export function createPreviewHost(
   };
 
   return {
-    desktopFunding: previewFunding(query, payer),
+    desktopFunding: previewFunding(payer),
     desktopWindow,
     desktopConversations,
     desktopWallet,

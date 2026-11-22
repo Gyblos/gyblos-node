@@ -1,4 +1,3 @@
-// Verify that migration hashes are recorded once, never rewritten, and wait for a filled custom file.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import {
@@ -45,7 +44,6 @@ void test('records new files and never rewrites a recorded hash', (context) => {
   assert.deepEqual(recordMigrationHashes(dir), ['0002_new.sql']);
   assert.deepEqual(manifest(), {
     '0001_old.sql': 'recorded-before-an-edit',
-    // LF-normalized, so Windows and Unix checkouts record the same hash.
     '0002_new.sql': sha256('CREATE TABLE b (id TEXT);\n'),
   });
   assert.deepEqual(recordMigrationHashes(dir), []);

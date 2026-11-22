@@ -33,7 +33,4 @@ overrides:
   # (GHSA-5j98-mcp5-4vw2, a CLI command injection); 10.5.0 is the patched release of the same line.
   # Remove when @node-minify/core allows it.
   '@node-minify/core>glob': 10.5.0
-  # drizzle-orm's optional @opentelemetry/api peer: one copy (the root's 1.9.0), so the apps' schemas
-  # and the root tests share one drizzle-orm instance (two copies break the typecheck). Otherwise
-  # any lockfile update re-resolves the apps' peer to 1.10.0. Remove when nothing pins 1.9.0.
   'drizzle-orm>@opentelemetry/api': 1.9.0

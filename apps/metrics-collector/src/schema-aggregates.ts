@@ -54,7 +54,6 @@ export const aggState = sqliteTable(
     scannedAt: integer('scanned_at').notNull(),
     formulaVersion: integer('formula_version').notNull(),
   },
-  // Inlined: drizzle-kit writes check expressions into migration SQL.
   (table) => [
     check('collector_agg_state_id', eq(table.id, AGG_STATE_ID).inlineParams()),
   ],

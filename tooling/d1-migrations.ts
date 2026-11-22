@@ -1,5 +1,3 @@
-// Runs drizzle-kit generate for a D1 Worker, then records new migration hashes
-// (d1-migration-hashes.ts); `hashes` records filled custom migrations of every D1 Worker.
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';

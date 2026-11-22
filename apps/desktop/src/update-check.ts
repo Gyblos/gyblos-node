@@ -1,4 +1,3 @@
-// Checks bounded public desktop release metadata; never downloads or installs a build.
 import { DESKTOP_UPDATE } from './constants';
 
 export interface DesktopUpdate {

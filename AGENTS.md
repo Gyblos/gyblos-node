@@ -34,7 +34,7 @@ Node 24.22.1+ and the pnpm version pinned in `package.json`.
 pnpm install --frozen-lockfile
 pnpm check          # typecheck + lint + test:all; run before every PR
 pnpm typecheck      # includes tests and the desktop renderer
-pnpm lint           # eslint + prettier --check + tooling:test + skills:check + boundaries + db:check
+pnpm lint           # eslint + comments:check + prettier --check + tooling:test + skills:check + boundaries + db:check
 pnpm test           # product suites tests/*.test.ts and packages/*/test (required checks)
 pnpm test:lab       # lab suites tests/lab/
 pnpm tooling:test   # boundary checker and lint rule tests
@@ -59,6 +59,7 @@ None of these needs a funded wallet, engine or Docker. `gate:*`, funding, identi
 ## Hard rules
 
 - Boundaries and lint errors are enforcing; never suppress, baseline or cast around them. Lint warnings must not grow.
+- Source comment budgets are exact per file and may only decrease.
 - One canonical definition per owned discrete value (`as const` in the owning `constants.ts`, type derived from it); for example use `INFERENCE_EVIDENCE_CODES.ASSERTION_FAILED`, never a second `'ASSERTION_FAILED'` literal. Details: [docs/code-standards.md](docs/code-standards.md).
 - No `any`, no widening closed types to `string`, no object-literal `as`, no floating promises, one declaration per `const`/`let`. Parse external input as `unknown` and validate at the boundary.
 - Delete code no product path uses: when a replacement is ready, remove the old path with its tests, scripts, docs and workspace entries instead of keeping it "for compatibility". Reachability from product entry points (seller daemon and `gyblos` CLI, buyer commands, desktop, Workers) decides; a test, lab gate or doc that is its only user does not keep it alive. This applies to every app and package.
@@ -87,6 +88,7 @@ None of these needs a funded wallet, engine or Docker. `gate:*`, funding, identi
 - Open the web preview and visually review all seven screens at wide and narrow widths, including both themes, interactions and relevant states. Show the result to the founder and wait for explicit approval of that visual proposal before porting it to the desktop app.
 - A request to change, preview, save, push or open a PR for the mockup does not authorize desktop implementation. Approval to implement an earlier proposal does not carry over to later visual changes.
 - After explicit approval, port the accepted shared design to the desktop app and compare it against the approved web preview at the same viewport size. Do not consider a successful build a visual review. Record remaining differences and validation limits in the PR.
+- In the web mockup (`lab/tools/desktop-preview`), reuse the shared components listed in the Components table of its `DESIGN.md` instead of writing raw markup; a new reusable component is added to that table in the same change. Shipped desktop code follows `apps/desktop/DESIGN.md` until a port is approved. Procedure: [gyblos-desktop-ui](.agents/skills/gyblos-desktop-ui/SKILL.md).
 - Keep the workflow and component rules aligned with `apps/desktop/DESIGN.md`. This root file remains the single public agent-instruction source; do not add a conflicting desktop-specific agent file.
 
 ## Workflow and merges

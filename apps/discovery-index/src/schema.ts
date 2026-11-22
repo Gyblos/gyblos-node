@@ -1,6 +1,5 @@
-// Owns discovery's typed tables, keys, indexes and checks; drizzle-kit generates migrations from it.
-// Historical D1 migrations retain physical WITHOUT ROWID layout, which Drizzle cannot declare; these
-// declarations perform no client initialization or I/O.
+// Owns discovery's typed tables, keys, indexes and checks. Historical D1 migrations retain
+// physical WITHOUT ROWID layout; these declarations perform no client initialization or I/O.
 import {
   between,
   eq,
@@ -31,7 +30,6 @@ import {
 } from './constants';
 import { nullableTextLength, textLength } from './sqlite-expressions';
 
-// drizzle-kit writes check expressions into migration SQL, where a bound parameter would be a bare `?`.
 const literalCheck = (name: string, value: SQL) =>
   check(name, value.inlineParams());
 

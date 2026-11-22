@@ -1,0 +1,657 @@
+// Preview-only shared components: every mockup view composes these instead of route-local markup.
+import { CaretRight, Check, Copy, CreditCard, Info, Minus, PaypalLogo, Plus, Wallet, Warning } from '@phosphor-icons/react';
+import { useEffect, useMemo, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react';
+
+import { AGENT_TOOLS, type AgentTool } from '@gyblos/node/agent-setup-constants';
+
+import { AddBuyerFunds } from './BuyerFunding';
+import { CopyField } from './Form';
+import { useDesktopWallet } from './WalletState';
+import { CODE_LANGUAGE, codeLanguageLabel, highlightCode, type CodeLanguage } from './code-highlight';
+import { BUTTON_VARIANT, UI_VIEW } from './constants';
+import { similarFreeModel } from './market';
+import { Modal } from './Modal';
+import { usdPerMtok } from './model-price';
+import type { View } from './model-types';
+import { ServiceLogo } from './ServiceLogo';
+import { MotionPresence } from './Motion';
+import { TONE, type Tone } from './status-tone';
+import { Button, IconButton } from './UI';
+import { useUsdcApiKeys } from './useUsdcApiKeys';
+
+export { statusTone, TONE } from './status-tone';
+export type { Tone } from './status-tone';
+export { comparableMedian, feeLabel, similarFreeModel } from './market';
+export { CODE_LANGUAGE } from './code-highlight';
+
+export function Tag({ tone = TONE.NEUTRAL, dot = false, pill = false, children }: { tone?: Tone; dot?: boolean; pill?: boolean; children: ReactNode }) {
+  return (
+    <span className="pk-tag" data-tone={tone} data-pill={pill || undefined}>
+      {dot && <span className="pk-dot" aria-hidden="true" />}
+      {children}
+    </span>
+  );
+}
+
+/** One-line notice with a tone: replacement, fallback or limit messages that must stay visible. */
+export function Notice({ tone = TONE.WARNING, children }: { tone?: Tone; children: ReactNode }) {
+  const Glyph = tone === TONE.WARNING || tone === TONE.DANGER ? Warning : Info;
+  return (
+    <p className="pk-notice" data-tone={tone} role="status">
+      <Glyph size={15} weight="fill" aria-hidden="true" />
+      <span>{children}</span>
+    </p>
+  );
+}
+
+/** On/off control for a global setting; the row beside it carries the label and help. */
+export function Switch({ label, checked, onChange }: { label: string; checked: boolean; onChange(checked: boolean): void }) {
+  return (
+    <Button className="pk-switch" role="switch" aria-checked={checked} aria-label={label} onClick={() => onChange(!checked)}>
+      <span className="pk-switch-thumb" aria-hidden="true" />
+    </Button>
+  );
+}
+
+/** Signed percentage; `lowerIsBetter` colors a decrease green (prices, latency) and an increase red. */
+export function Delta({ percent, lowerIsBetter = false, suffix }: { percent: number; lowerIsBetter?: boolean; suffix?: string }) {
+  const rounded = Math.round(percent);
+  const good = lowerIsBetter ? rounded < 0 : rounded > 0;
+  return (
+    <span className="pk-delta" data-tone={rounded === 0 ? TONE.NEUTRAL : good ? TONE.SUCCESS : TONE.DANGER}>
+      {(rounded > 0 ? '+' : rounded < 0 ? '−' : '') + Math.abs(rounded) + '%'}
+      {suffix && <span className="pk-delta-suffix">{' ' + suffix}</span>}
+    </span>
+  );
+}
+
+/** "20% below median" against the median of the current offers for the same model. */
+export function Savings({ price, median }: { price: number; median: number | null }) {
+  if (median == null || !(median > 0) || price >= median) return null;
+  const percent = Math.round(((median - price) / median) * 100);
+  return (
+    <span className="pk-delta" data-tone={TONE.SUCCESS} title={'Median of current offers: ' + usdPerMtok(median) + ' / 1M tokens'}>
+      {percent}% below median
+    </span>
+  );
+}
+
+export type Segment = { label: string; value: number; tone: Tone };
+export function SegmentedBar({ label, total, segments, format }: {
+  label: string;
+  total: number;
+  segments: readonly Segment[];
+  format(value: number): string;
+}) {
+  const used = segments.reduce((sum, segment) => sum + segment.value, 0);
+  const scale = Math.max(total, used, 1);
+  return (
+    <div className="pk-segmented">
+      <div className="pk-segmented-track" aria-hidden="true">
+        {segments.map((segment) => (
+          <span key={segment.label} data-tone={segment.tone} style={{ width: (segment.value / scale) * 100 + '%' }} />
+        ))}
+      </div>
+      <ul className="pk-legend" aria-label={label}>
+        {segments.map((segment) => (
+          <li key={segment.label}>
+            <span className="pk-dot" data-tone={segment.tone} aria-hidden="true" />
+            {segment.label}
+            <strong>{format(segment.value)}</strong>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+export type FilterOption<T extends string> = { value: T; label: string; count: number };
+export function FilterChips<T extends string>({ label, options, value, onChange }: {
+  label: string;
+  options: readonly FilterOption<T>[];
+  value: T;
+  onChange(value: T): void;
+}) {
+  const move = (event: KeyboardEvent<HTMLDivElement>) => {
+    const step = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 0;
+    if (!step) return;
+    event.preventDefault();
+    const index = options.findIndex((option) => option.value === value);
+    const next = options[(index + step + options.length) % options.length];
+    if (!next) return;
+    onChange(next.value);
+    event.currentTarget.querySelector<HTMLButtonElement>('[data-value="' + next.value + '"]')?.focus();
+  };
+  return (
+    <div className="pk-chips" role="radiogroup" aria-label={label} onKeyDown={move}>
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          role="radio"
+          data-value={option.value}
+          aria-checked={option.value === value}
+          tabIndex={option.value === value ? 0 : -1}
+          onClick={() => onChange(option.value)}
+        >
+          {option.label}
+          <span className="pk-count">{option.count}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** The one code sample: language label, colored tokens and a copy action. `onCopy` returning false keeps "Copy". */
+export function CodeBlock({ code, language, title, onCopy, copyDisabled = false }: {
+  code: string;
+  language: CodeLanguage;
+  title?: string;
+  onCopy?: () => Promise<unknown> | unknown;
+  copyDisabled?: boolean;
+}) {
+  const [copied, setCopied] = useState(false);
+  const tokens = useMemo(() => highlightCode(code, language), [code, language]);
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 1600);
+    return () => clearTimeout(timer);
+  }, [copied]);
+  useEffect(() => setCopied(false), [code]);
+  return (
+    <figure className="pk-code">
+      <figcaption>
+        <span className="pk-code-language">{codeLanguageLabel(language)}</span>
+        {title && <span className="pk-code-title">{title}</span>}
+        <button
+          type="button"
+          className="pk-code-copy"
+          disabled={copyDisabled}
+          aria-label={copied ? 'Copied' : 'Copy ' + (title ?? 'code')}
+          onClick={() => {
+            void Promise.resolve(onCopy ? onCopy() : navigator.clipboard.writeText(code))
+              .then((result) => setCopied(onCopy ? result === true : true))
+              .catch(() => setCopied(false));
+          }}
+        >
+          {copied ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
+          <span aria-hidden="true">{copied ? 'Copied' : 'Copy'}</span>
+        </button>
+      </figcaption>
+      <pre tabIndex={0}>
+        <code>
+          {tokens.map((token, index) =>
+            token.kind ? <span key={index} data-token={token.kind}>{token.text}</span> : token.text,
+          )}
+        </code>
+      </pre>
+    </figure>
+  );
+}
+const FENCE_LANGUAGE: Record<string, CodeLanguage> = {
+  sh: CODE_LANGUAGE.SHELL, bash: CODE_LANGUAGE.SHELL, zsh: CODE_LANGUAGE.SHELL, shell: CODE_LANGUAGE.SHELL, console: CODE_LANGUAGE.SHELL,
+  json: CODE_LANGUAGE.JSON, toml: CODE_LANGUAGE.TOML,
+  ts: CODE_LANGUAGE.TS, tsx: CODE_LANGUAGE.TS, typescript: CODE_LANGUAGE.TS, js: CODE_LANGUAGE.TS, javascript: CODE_LANGUAGE.TS,
+};
+/** Language of a Markdown fence such as "```json"; unlabeled fences stay plain text. */
+export function fenceLanguage(fence: string): CodeLanguage {
+  return FENCE_LANGUAGE[/^```\s*([\w-]*)/.exec(fence)?.[1]?.toLowerCase() ?? ''] ?? CODE_LANGUAGE.TEXT;
+}
+/** Coding-tool configuration format: Codex uses TOML, Claude Code shell variables, the others JSON. */
+export function agentCodeLanguage(tool: AgentTool): CodeLanguage {
+  if (tool === AGENT_TOOLS.CODEX) return CODE_LANGUAGE.TOML;
+  if (tool === AGENT_TOOLS.CLAUDE_CODE) return CODE_LANGUAGE.SHELL;
+  return CODE_LANGUAGE.JSON;
+}
+
+export type DetailItem = { label: string; value: ReactNode; note?: string };
+/** The one detail-dialog summary: status line, headline numbers, then a key/value list. */
+export function DetailSummary({ status, meta, totals, rows = [] }: {
+  status?: { label: string; tone: Tone };
+  meta?: string;
+  totals: DetailItem[];
+  rows?: DetailItem[];
+}) {
+  return (
+    <div className="pk-detail">
+      {(status || meta) && (
+        <div className="preview-detail-head">
+          {status && <Tag tone={status.tone} dot>{status.label}</Tag>}
+          {meta && <span className="ui-help-text">{meta}</span>}
+        </div>
+      )}
+      <dl className="preview-detail-totals">
+        {totals.map((item) => (
+          <div key={item.label}>
+            <dt>{item.label}</dt>
+            <dd>{item.value}</dd>
+          </div>
+        ))}
+      </dl>
+      {rows.length > 0 && (
+        <dl className="preview-detail-list">
+          {rows.map((item) => (
+            <div key={item.label}>
+              <dt>{item.label}</dt>
+              <dd>
+                <span>{item.value}</span>
+                {item.note && <small>{item.note}</small>}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </div>
+  );
+}
+
+export function Panel({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="preview-panel" aria-label={title}>
+      <h3>{title}</h3>
+      {children}
+    </section>
+  );
+}
+
+export function PreviewKitShowcase() {
+  const [filter, setFilter] = useState<'all' | 'chat' | 'api'>('all');
+  const usd = (value: number) => value.toFixed(3) + ' USDC';
+  return (
+    <div className="pk-showcase">
+      <Panel title="Tags">
+        <div className="pk-row">
+          <Tag tone={TONE.SUCCESS} pill>Free</Tag>
+          <Tag pill>Paid</Tag>
+          <Tag tone={TONE.SUCCESS} dot>Active</Tag>
+          <Tag tone={TONE.INFO} dot>Session open</Tag>
+          <Tag tone={TONE.WARNING}>Demo</Tag>
+          <Tag tone={TONE.DANGER} dot>Failed</Tag>
+          <Tag>Revoked</Tag>
+        </div>
+      </Panel>
+      <Panel title="Notices and switches">
+        <Notice>Seller 4b91…1f32 is unavailable. Using 83ce…a019 (Cheapest) for now.</Notice>
+        <Notice tone={TONE.INFO}>{PREVIEW_COPY.fallbackUsed('Qwen3 0.6B')}</Notice>
+        <div className="pk-row">
+          <Switch label="Example switch off" checked={false} onChange={() => undefined} />
+          <Switch label="Example switch on" checked onChange={() => undefined} />
+        </div>
+      </Panel>
+      <Panel title="Deltas and savings">
+        <div className="pk-row">
+          <Delta percent={12.4} suffix="this week" />
+          <Delta percent={-6} suffix="this week" />
+          <Delta percent={-18} lowerIsBetter suffix="latency" />
+          <Savings price={0.12} median={0.24} />
+        </div>
+      </Panel>
+      <Panel title="Segmented usage">
+        <SegmentedBar
+          label="Spending limit used"
+          total={1}
+          format={usd}
+          segments={[
+            { label: 'Chat', value: 0.18, tone: TONE.INFO },
+            { label: 'Coding tools', value: 0.27, tone: TONE.SUCCESS },
+            { label: 'Research', value: 0.09, tone: TONE.WARNING },
+          ]}
+        />
+      </Panel>
+      <Panel title="Filter chips">
+        <FilterChips
+          label="Usage source"
+          value={filter}
+          onChange={setFilter}
+          options={[
+            { value: 'all', label: 'All', count: 39 },
+            { value: 'chat', label: 'Chat', count: 12 },
+            { value: 'api', label: 'API', count: 27 },
+          ]}
+        />
+      </Panel>
+    </div>
+  );
+}
+
+/* Synthetic buyer balance for the funds-needed flow; it never reads or moves real funds. */
+declare global {
+  interface Window {
+    previewFunds?: { atomic: number; open: boolean; host?: FundsHost };
+  }
+}
+export const FUNDS_HOST = { CHAT: 'chat', PAYMENTS: 'payments' } as const;
+type FundsHost = (typeof FUNDS_HOST)[keyof typeof FUNDS_HOST];
+const FUNDS = { READY_ATOMIC: 2_000_000, ATOMIC_PER_USDC: 1_000_000 } as const;
+const fundsListeners = new Set<() => void>();
+function fundsState() {
+  window.previewFunds ??= {
+    atomic: new URLSearchParams(location.search).get('funding') === 'ready' ? FUNDS.READY_ATOMIC : 0,
+    open: false,
+  };
+  return window.previewFunds;
+}
+function subscribeFunds(listener: () => void) {
+  fundsListeners.add(listener);
+  return () => {
+    fundsListeners.delete(listener);
+  };
+}
+function updateFunds(next: Partial<{ atomic: number; open: boolean; host: FundsHost }>) {
+  window.previewFunds = { ...fundsState(), ...next };
+  fundsListeners.forEach((listener) => listener());
+}
+export function openPreviewFunds(host: FundsHost = FUNDS_HOST.CHAT) {
+  updateFunds({ open: true, host });
+}
+export function usePreviewBalance() {
+  return useSyncExternalStore(subscribeFunds, () => fundsState().atomic);
+}
+export function previewUsdc(atomic: number) {
+  return (atomic / FUNDS.ATOMIC_PER_USDC).toFixed(2) + ' USDC';
+}
+type FundsModel = { id: string; name: string; free: boolean };
+export function usePreviewFunds(model: { name: string; free: boolean }, applies: boolean, models: readonly FundsModel[]) {
+  const atomic = usePreviewBalance();
+  const fallback = usePreviewSetting('freeFallback');
+  const broke = applies && !model.free && atomic === 0;
+  // The free-model fallback needs a free model to answer; without one, sending stays blocked.
+  const free = models.find((item) => item.free && item.name === model.name) ?? similarFreeModel(models, model.name);
+  return { model, free, blocked: broke && !(fallback && free), fallback: broke && fallback && !!free };
+}
+
+/* Account-wide buyer settings (the buyer config.toml in the product); synthetic and kept until reload. */
+export const SELLER_MODES = ['Auto', 'Cheapest', 'Fastest', 'Most reliable'] as const;
+export type SellerMode = (typeof SELLER_MODES)[number];
+// Fastest and Most reliable stay visible with "Soon" until real latency and reliability data exist.
+export const READY_SELLER_MODES: readonly SellerMode[] = ['Auto', 'Cheapest'];
+export const PREVIEW_COPY = {
+  sellerModeSoon: 'Available once real latency and reliability data exist',
+  sellerModeSoonShort: 'Needs real performance data',
+  freeFallbackLabel: 'Use a free model when out of funds',
+  needsFunds: 'Needs funds · Add funds, or turn on the free-model fallback in Settings.',
+  fallbackNext: (model: string) => 'Out of funds: answers will come from free model ' + model + '. Paid models resume when you add funds.',
+  keyAtLimit: "At this key's limit, raise it in Connections.",
+  fallbackUsed: (model: string) => 'Out of funds: answered with free model ' + model + '. Paid models resume when you add funds.',
+  keyOutOfFunds: 'Out of funds. Add funds in Gyblos, or turn on "Use a free model when out of funds" in Settings.',
+  pinnedUnavailable: (seller: string, replacement: string, mode: SellerMode) => seller + ' is unavailable. Using ' + replacement + ' (' + mode + ') for now.',
+  pinnedNoReplacement: (seller: string) => seller + ' is unavailable. Choose another seller to continue.',
+} as const;
+type PreviewSettings = { freeFallback: boolean; showTestnet: boolean; sellerMode: SellerMode };
+declare global {
+  interface Window {
+    previewSettings?: PreviewSettings;
+  }
+}
+const settingsListeners = new Set<() => void>();
+function settingsState() {
+  const query = new URLSearchParams(location.search);
+  window.previewSettings ??= {
+    freeFallback: query.get('fallback') === 'on',
+    showTestnet: query.get('testnet') !== 'hidden',
+    sellerMode: 'Auto',
+  };
+  return window.previewSettings;
+}
+function subscribeSettings(listener: () => void) {
+  settingsListeners.add(listener);
+  return () => {
+    settingsListeners.delete(listener);
+  };
+}
+export function usePreviewSetting<K extends keyof PreviewSettings>(key: K) {
+  return useSyncExternalStore(subscribeSettings, () => settingsState()[key]);
+}
+export function setPreviewSetting<K extends keyof PreviewSettings>(key: K, value: PreviewSettings[K]) {
+  window.previewSettings = { ...settingsState(), [key]: value };
+  settingsListeners.forEach((listener) => listener());
+}
+export function previewSetting<K extends keyof PreviewSettings>(key: K) {
+  return settingsState()[key];
+}
+
+export const PREVIEW_EVENT = { NETWORK: 'preview:network' } as const;
+export const PREVIEW_NETWORKS = ['Testnet', 'Mainnet'] as const;
+export type PreviewNetworkName = (typeof PREVIEW_NETWORKS)[number];
+
+function subscribeNetwork(listener: () => void) {
+  window.addEventListener(PREVIEW_EVENT.NETWORK, listener);
+  return () => window.removeEventListener(PREVIEW_EVENT.NETWORK, listener);
+}
+/** The one network reading for the title bar and the composer: the URL, or Mainnet while Testnet is hidden. */
+export function usePreviewNetwork(): PreviewNetworkName {
+  const showTestnet = usePreviewSetting('showTestnet');
+  return useSyncExternalStore(subscribeNetwork, (): PreviewNetworkName =>
+    !showTestnet || new URLSearchParams(location.search).get('network') === 'mainnet' ? 'Mainnet' : 'Testnet',
+  );
+}
+
+export function useSpending() {
+  const keys = useUsdcApiKeys().state.snapshot;
+  const account = window.previewAccountBudget.current();
+  const keySpend = (keys?.keys ?? []).reduce((sum, key) => sum + BigInt(key.spentAtomic), 0n);
+  const spent = BigInt(account.spentAtomic) + keySpend;
+  const limited = account.limited;
+  const limit = BigInt(account.limitAtomic);
+  return { keys, spent, limit, limited, freeOnly: limited && limit === 0n, remaining: limit > spent ? limit - spent : 0n };
+}
+
+/** Context tab attached above the composer: network, balance and limit, or the funds-needed notice. */
+export function PreviewComposerTab({
+  funds,
+  models,
+  onSelectModel,
+}: {
+  funds: ReturnType<typeof usePreviewFunds>;
+  models: readonly { id: string; name: string; free: boolean }[];
+  onSelectModel: (id: string) => void;
+}) {
+  const atomic = usePreviewBalance();
+  const { spent, limit, limited, freeOnly } = useSpending();
+  const percent = limited && limit > 0n ? Math.min(100, Number((spent * 100n) / limit)) : 0;
+  const network = usePreviewNetwork();
+  const free = funds.free;
+  return (
+    <>
+      <div className="pk-composer-tab" data-warning={funds.blocked || funds.fallback || undefined}>
+        {funds.fallback && free ? (
+          <>
+            <Info size={15} weight="fill" aria-hidden="true" />
+            <p role="status">{PREVIEW_COPY.fallbackNext(free.name)}</p>
+            <Button variant={BUTTON_VARIANT.PRIMARY} onClick={() => openPreviewFunds()}>
+              Add funds
+            </Button>
+          </>
+        ) : funds.blocked ? (
+          <>
+            <Warning size={15} weight="fill" aria-hidden="true" />
+            <p role="status">
+              <strong>{funds.model.name}</strong> needs USDC to send. Your draft is kept.
+            </p>
+            {free && (
+              <Button onClick={() => onSelectModel(free.id)}>
+                {free.name === funds.model.name ? 'Use a free seller' : 'Use ' + free.name}
+              </Button>
+            )}
+            <Button variant={BUTTON_VARIANT.PRIMARY} onClick={() => openPreviewFunds()}>
+              Add funds
+            </Button>
+          </>
+        ) : (
+          <>
+            <span className="pk-tab-item" data-network={network.toLowerCase()}>
+              <span className="pk-dot" aria-hidden="true" />
+              {network}
+            </span>
+            <span className="pk-tab-item">
+              <Wallet size={14} aria-hidden="true" />
+              {previewUsdc(atomic)}
+            </span>
+            <span className="pk-tab-item pk-tab-limit" title="Spending limit used">
+              <span
+                className="pk-ring"
+                aria-hidden="true"
+                style={{ background: `conic-gradient(var(--ink) ${percent * 3.6}deg, var(--line) 0deg)` }}
+              />
+              {!limited ? 'No limit' : freeOnly ? 'Free models only' : percent + '% of limit'}
+            </span>
+          </>
+        )}
+      </div>
+      <PreviewFundsDialog host={FUNDS_HOST.CHAT} description="Your draft stays in the chat." />
+    </>
+  );
+}
+
+/* Testnet funds come from the Circle faucet; Mainnet funds are real USDC, so the faucet never appears there. */
+export function PreviewFundsDialog({ host, description }: { host: FundsHost; description?: string }) {
+  const open = useSyncExternalStore(subscribeFunds, () => fundsState().open && (fundsState().host ?? FUNDS_HOST.CHAT) === host);
+  const network = usePreviewNetwork();
+  return (
+    <MotionPresence>
+      {open && (
+        <Modal title={'Add funds · ' + network} description={description} close={() => updateFunds({ open: false })}>
+          {network === 'Testnet' ? <AddBuyerFunds /> : <PreviewMainnetFunds />}
+          <Button className="wide" onClick={() => updateFunds({ atomic: FUNDS.READY_ATOMIC, open: false })}>
+            Preview: simulate 2 USDC arriving
+          </Button>
+        </Modal>
+      )}
+    </MotionPresence>
+  );
+}
+function PreviewMainnetFunds() {
+  const address = useDesktopWallet().address;
+  return (
+    <div className="ui-form">
+      <p className="ui-help-text">Send USDC on Solana to your buyer wallet. Other tokens or networks cannot be recovered.</p>
+      {address && (
+        <CopyField id="preview-mainnet-address" label="Buyer wallet address" value={address} actionLabel="Copy address" onCopy={() => void navigator.clipboard.writeText(address)} />
+      )}
+      <ul className="preview-method-list">
+        <li className="preview-method-row" aria-label="PayPal">
+          <span className="ui-icon-tile" aria-hidden="true"><PaypalLogo size={18} /></span>
+          <div className="preview-method-copy">
+            <span className="preview-method-name"><h3>PayPal</h3><Tag tone={TONE.WARNING}>Demo</Tag></span>
+            <span className="ui-help-text">Choose PayPal in Usage &amp; payments.</span>
+          </div>
+        </li>
+        <li className="preview-method-row" aria-label="Card">
+          <span className="ui-icon-tile" aria-hidden="true"><CreditCard size={18} /></span>
+          <div className="preview-method-copy">
+            <span className="preview-method-name"><h3>Card</h3><Tag>Soon</Tag></span>
+            <span className="ui-help-text">Card top-ups are planned; nothing is connected yet.</span>
+          </div>
+        </li>
+      </ul>
+    </div>
+  );
+}
+
+declare global {
+  interface Window {
+    previewNavigate?: (view: View) => void;
+  }
+}
+/** Placeholder lines shown under the progress label until the first words arrive. */
+export function PreviewAnswerSkeleton() {
+  return (
+    <span className="preview-answer-skeleton" aria-hidden="true">
+      <i />
+      <i />
+      <i />
+    </span>
+  );
+}
+
+const ENTRY_TOOLS = ['OpenCode', 'Codex', 'Claude Code', 'Pi'] as const;
+/** Empty-chat shortcut to the Connections setup guide. */
+export function PreviewConnectEntry() {
+  return (
+    <button
+      type="button"
+      className="preview-connect-entry"
+      onClick={() => window.previewNavigate?.(UI_VIEW.CONNECT)}
+    >
+      <span className="preview-connect-logos" aria-hidden="true">
+        {ENTRY_TOOLS.map((tool) => (
+          <span key={tool} className="preview-tool-logo">
+            <ServiceLogo service={tool} />
+          </span>
+        ))}
+      </span>
+      <span className="preview-connect-copy">
+        <strong>Connect a dev tool</strong>
+        <small>Use Gyblos models in OpenCode, Codex, Claude Code or Pi.</small>
+      </span>
+      <CaretRight size={14} aria-hidden="true" />
+    </button>
+  );
+}
+export function CompactAmount({ id, value, onChange, unit, parse, format, step, invalid, placeholder, describedBy, onEnter, onEscape }: {
+  id: string; value: string; onChange(value: string): void; unit: string;
+  parse(value: string): bigint | null; format(atomic: bigint): string; step: bigint;
+  invalid: boolean; placeholder?: string; describedBy?: string; onEnter?(): void; onEscape?(): void;
+}) {
+  const atomic = value.trim() ? parse(value.trim()) : null;
+  const nudge = (direction: bigint) => {
+    const next = (atomic ?? 0n) + direction * step;
+    onChange(format(next > 0n ? next : 0n));
+  };
+  return (
+    <div className="preview-compact-amount" data-invalid={invalid}>
+      <input id={id} inputMode="decimal" autoComplete="off" placeholder={placeholder} value={value}
+        aria-invalid={invalid} aria-describedby={describedBy}
+        onChange={event => onChange(event.target.value.replace(',', '.'))}
+        onKeyDown={event => {
+          if (event.key === 'ArrowUp' || event.key === 'ArrowDown') { event.preventDefault(); nudge(event.key === 'ArrowUp' ? 1n : -1n); }
+          if (event.key === 'Enter' && onEnter) { event.preventDefault(); onEnter(); }
+          if (event.key === 'Escape' && onEscape) { event.preventDefault(); onEscape(); }
+        }} />
+      <span className="preview-amount-unit">{unit}</span>
+      <span className="preview-steppers">
+        <IconButton label={'Decrease by ' + format(step) + ' ' + unit} disabled={!atomic} onClick={() => nudge(-1n)}><Minus size={14} /></IconButton>
+        <IconButton label={'Increase by ' + format(step) + ' ' + unit} onClick={() => nudge(1n)}><Plus size={14} /></IconButton>
+      </span>
+    </div>
+  );
+}
+export function AmountEditor({ id, label, value, onChange, unit, presets, empty, parse, format, step, error, help, onEnter, disabled = false, autoFocus = false }: {
+  id: string; label: string; value: string; onChange(value: string): void; unit: string;
+  presets: readonly { value: string; label: string }[]; empty?: { label: string; placeholder: string };
+  parse(value: string): bigint | null; format(atomic: bigint): string; step: bigint;
+  error: string; help: ReactNode; onEnter?(): void; disabled?: boolean; autoFocus?: boolean;
+}) {
+  const text = value.trim();
+  const atomic = text ? parse(text) : null;
+  const nudge = (direction: bigint) => {
+    const next = (atomic ?? 0n) + direction * step;
+    onChange(format(next > 0n ? next : 0n));
+  };
+  return (
+    <div className="preview-amount-editor">
+      <label htmlFor={id} className="preview-limit-label">{label}</label>
+      <div className="preview-amount-field" data-invalid={!!error}>
+        <input id={id} autoFocus={autoFocus} inputMode="decimal" autoComplete="off" placeholder={empty?.placeholder} disabled={disabled}
+          value={value} aria-invalid={!!error} aria-describedby={id + '-help'}
+          onChange={event => onChange(event.target.value.replace(',', '.'))}
+          onKeyDown={event => {
+            if (event.key === 'ArrowUp' || event.key === 'ArrowDown') { event.preventDefault(); nudge(event.key === 'ArrowUp' ? 1n : -1n); }
+            if (event.key === 'Enter' && onEnter) { event.preventDefault(); onEnter(); }
+          }} />
+        <span className="preview-amount-unit">{unit}</span>
+        <span className="preview-steppers">
+          <IconButton label={'Decrease by ' + format(step) + ' ' + unit} disabled={disabled || !atomic} onClick={() => nudge(-1n)}><Minus size={14} /></IconButton>
+          <IconButton label={'Increase by ' + format(step) + ' ' + unit} disabled={disabled} onClick={() => nudge(1n)}><Plus size={14} /></IconButton>
+        </span>
+      </div>
+      <div className="preview-amount-presets" role="group" aria-label="Quick amounts">
+        {presets.map(preset => (
+          <button key={preset.value} type="button" disabled={disabled} aria-pressed={text === preset.value} onClick={() => onChange(preset.value)}>{preset.label}</button>
+        ))}
+        {empty && <button type="button" disabled={disabled} aria-pressed={!text} onClick={() => onChange('')}>{empty.label}</button>}
+      </div>
+      <p id={id + '-help'} className={error ? 'preview-field-error' : 'ui-help-text'} role={error ? 'alert' : undefined}>{error || help}</p>
+    </div>
+  );
+}

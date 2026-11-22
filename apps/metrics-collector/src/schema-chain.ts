@@ -33,7 +33,6 @@ export const chainCursor = sqliteTable(
     gapUntilSlot: integer('gap_until_slot'),
     leaseUntil: integer('lease_until'),
   },
-  // Inlined: drizzle-kit writes check expressions into migration SQL.
   (table) => [
     check(
       'collector_chain_cursor_id',

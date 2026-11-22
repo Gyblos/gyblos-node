@@ -15,9 +15,9 @@ Related pages:
 
 `pnpm lint` runs ESLint ([eslint.config.js](../eslint.config.js) with the local
 rules in [tooling/code-standards.ts](../tooling/code-standards.ts)),
-`prettier --check`, `pnpm tooling:test`, `pnpm skills:check` and
-`pnpm boundaries`. Errors fail the check; warnings are reported and must not
-grow in a PR.
+`pnpm comments:check`, `prettier --check`, `pnpm tooling:test`,
+`pnpm skills:check` and `pnpm boundaries`. Errors fail the check; warnings are
+reported and must not grow in a PR.
 
 | Rule                                      | Level | Scope and exceptions                                                                                        |
 | ----------------------------------------- | ----- | ----------------------------------------------------------------------------------------------------------- |
@@ -25,6 +25,8 @@ grow in a PR.
 | `@typescript-eslint/no-explicit-any`      | error | All TypeScript.                                                                                             |
 | No object-literal `as` assertion          | error | Product, lab and tooling; allowed in `tests/` and `packages/*/test/` for invalid inputs and SDK doubles.    |
 | `@typescript-eslint/no-floating-promises` | error | All TypeScript.                                                                                             |
+| `gyblos/no-new-comments`                  | error | TypeScript source; comments cannot exceed the exact per-file budget.                                        |
+| `pnpm comments:check`                     | error | Source formats outside ESLint, including shell, YAML, TOML, CSS, SQL, JSONC, HTML and SVG.                  |
 | `gyblos/package-boundaries`               | error | `apps`, `packages`, `lab`: a relative import must not leave its package.                                    |
 | `gyblos/import-extensions`                | error | All TypeScript: relative code imports have no extension; `.json`/`.css` keep it.                            |
 | `gyblos/version-pins`                     | error | `packages/config/src/versions.ts` must match the dependency pins in manifests.                              |
@@ -35,23 +37,13 @@ grow in a PR.
 | `no-magic-numbers`                        | warn  | Off for `packages/config`, `constants.ts` files and tests; -1, 0, 1, 2 and their BigInt forms are allowed.  |
 | `gyblos/structure` (short-name denylist)  | warn  | `apps`, `packages`, `lab`: bindings such as `r`, `res`, `req`, `e`, `env`, `addr`, `sig`.                   |
 
-Review checks the rest: module headers, canonical values and derived types,
-error catalogs, boundary parsing, naming beyond the denylist and declaration
-placement.
+Review checks the rest: canonical values and derived types, error catalogs,
+boundary parsing, naming beyond the denylist and declaration placement.
 
 Never silence a rule, add a baseline or cast to make a check pass. Fix the code
 or, if the rule is wrong, change the rule in a separate tooling PR with a test.
 
 ## Module shape
-
-- Start each TypeScript module with a 1-3 line header stating its responsibility
-  and the boundary it must not cross. For example, `packages/node/src/home.ts`
-  opens with:
-
-  ```ts
-  // Fail-closed guard for the local home: a missing home directory next to an existing legacy path stops
-  // setup and startup. Uses lstat existence checks only; never reads, lists, moves or migrates legacy data.
-  ```
 
 - Keep functions focused on one named step. Use descriptive names; `i` and `tx`
   are permitted.
@@ -64,6 +56,21 @@ or, if the rule is wrong, change the rule in a separate tooling PR with a test.
   entry functions, never on import. `tests/entrypoint-inertness.test.ts` and
   `tests/lab/entrypoint-inertness.test.ts` check that executable modules are
   inert when imported.
+
+## Source comments
+
+Do not add comments to source code. The ESLint rule and `pnpm comments:check`
+enforce an exact per-file budget in
+[`tooling/source-comment-budget.json`](../tooling/source-comment-budget.json).
+Existing comments can remain while cleanup is in progress, but a file's budget
+must equal its current count and may only decrease. New files start at zero.
+Reduce budgets in the same change that removes comments.
+
+Delete tautology and stale comments. Delete excuse comments and file an issue to
+replace the workaround. Move durable, non-obvious decisions to
+[`docs/adr/`](adr/README.md), then delete their source comments. Use the
+[`delete-comment`](../.agents/skills/delete-comment/SKILL.md) skill for a
+repeatable audit.
 
 ```ts
 // Do: preserve order and give each declaration a name.
@@ -151,6 +158,14 @@ always generated.
   they would rebuild every table and drop `WITHOUT ROWID`. The configs carry no
   credentials. Only `generate` plus `wrangler d1 migrations apply` change D1,
   and `--remote` only with founder approval.
+- Migration hashes in `_sha256.json` are taken over LF-normalized text, so a
+  Windows checkout records and compares the same value.
+- `collector_envelopes` enforces `(uploader_node_id, nonce)` with the inline
+  `UNIQUE` of `0001`, but the drizzle-kit snapshot records it as a named index
+  `collector_envelopes_uploader_node_id_nonce_unique`. Removing or changing that
+  `unique()` in `schema.ts` would generate a `DROP INDEX` that fails on D1,
+  because the index does not exist there. Change it only through a hand-reviewed
+  table rebuild approved by the founder.
 
 ## Errors and external boundaries
 

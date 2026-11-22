@@ -9,6 +9,8 @@ import { X402_ACTION, x402Amount, x402BudgetInput } from '../x402-model';
 import { BUTTON_VARIANT } from './constants';
 import { FormActions, FormField, FormInput } from './Form';
 import { Modal } from './Modal';
+import { MotionPresence } from './Motion';
+import { CompactAmount } from './PreviewKit';
 import { Button } from './UI';
 import type { X402View } from './useX402';
 
@@ -40,11 +42,11 @@ function X402Connection({ buyer }: { buyer: X402View }) {
           Connect a running buyer
         </Button>
       </FormActions>
-      {external && (
+      <MotionPresence>{external && (
         <Modal title="Connect a running buyer" close={() => setExternal(false)}>
           <X402ExternalConnection buyer={buyer} />
         </Modal>
-      )}
+      )}</MotionPresence>
     </div>
   );
 }
@@ -95,13 +97,21 @@ function X402ExternalConnection({ buyer }: { buyer: X402View }) {
   );
 }
 
+function budgetAtomic(value: string, policy: BuyerApiPolicy) {
+  try {
+    return BigInt(x402BudgetInput(value, policy));
+  } catch {
+    return null;
+  }
+}
+
 function AccountBudgetForm({ buyer, policy, onSaved }: {
   buyer: X402View;
   policy: BuyerApiPolicy;
   onSaved(): void;
 }) {
   const account = window.previewAccountBudget.current();
-  const [amount, setAmount] = useState(() => buyer.state.summary.active ? x402Amount(account.limitAtomic, policy) : '');
+  const [amount, setAmount] = useState(() => account.limited ? x402Amount(account.limitAtomic, policy) : '');
   const [error, setError] = useState('');
   return (
     <form className="ui-form" onSubmit={async (event) => {
@@ -111,18 +121,20 @@ function AccountBudgetForm({ buyer, policy, onSaved }: {
         const limitAtomic = amount.trim() && x402BudgetInput(amount, policy);
         const result = await buyer.run(limitAtomic ? { action: X402_ACTION.AUTHORIZE, limitAtomic } : { action: X402_ACTION.FINISH });
         if (result && !result.error) onSaved();
-        else setError(result?.error ?? 'Could not save the budget.');
+        else setError(result?.error ?? 'Could not save the limit.');
       } catch (failure) {
         setError(failure instanceof Error ? failure.message : 'Enter a valid amount.');
       }
     }}>
-      <FormField htmlFor="account-budget" label="Optional chat limit · USDC">
-        <FormInput id="account-budget" inputMode="decimal" value={amount} onChange={event => setAmount(event.target.value)} />
+      <FormField htmlFor="account-budget" label="Spending limit · USDC">
+        <CompactAmount id="account-budget" unit="USDC" value={amount} onChange={setAmount} placeholder="No limit"
+          parse={value => budgetAtomic(value, policy)} format={value => x402Amount(String(value), policy)}
+          step={budgetAtomic('0.5', policy) ?? 1n} invalid={!!error} />
       </FormField>
-      <p className="ui-help-text">Leave blank for no total chat limit. The maximum per response still applies.</p>
+      <p className="ui-help-text">Covers chat and every API key. Leave blank for no limit. The maximum per response still applies.</p>
       {error && <p role="status">{error}</p>}
       <FormActions align="start">
-        <Button type="submit" disabled={buyer.busy || buyer.state.summary.blocked} variant={BUTTON_VARIANT.PRIMARY}>Save budget</Button>
+        <Button type="submit" disabled={buyer.busy || buyer.state.summary.blocked} variant={BUTTON_VARIANT.PRIMARY}>Save limit</Button>
       </FormActions>
     </form>
   );

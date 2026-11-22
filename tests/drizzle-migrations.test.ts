@@ -1,6 +1,3 @@
-// Guards drizzle-kit's D1 migrations: the latest snapshot matches schema.ts (else run db:generate),
-// journal, snapshots and SQL files agree, recorded migration files never change, custom migrations
-// move only data, and no generated file drops a table's WITHOUT ROWID layout.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -14,8 +11,6 @@ import { getTableConfig } from 'drizzle-orm/sqlite-core';
 import * as discovery from '@gyblos/discovery-index/schema';
 import * as collector from '@gyblos/metrics-collector/schema';
 
-// Hand-written before drizzle-kit and applied to the production D1 databases; never edited or
-// re-run. Hashes are of the LF-normalized text, so a Windows checkout compares the same bytes.
 const BASELINE_INDEX = 7;
 const APPS = [
   {
@@ -79,14 +74,11 @@ const snapshot = (app: string, index: number): Record<string, unknown> =>
   JSON.parse(
     read(new URL(`meta/${prefix(index)}_snapshot.json`, migrations(app))),
   );
-// Identity and rename hints differ per generation; everything else describes the schema.
 const described = ({ id, prevId, _meta, ...rest }: Record<string, unknown>) => {
   void [id, prevId, _meta];
   return rest;
 };
 
-// True when SQL names no schema or database-level statement outside strings, quoted identifiers and
-// comments. One left-to-right pass, so `--` or a quote inside any of them cannot hide a statement.
 const dataOnly = (sql: string) =>
   !/\b(create|alter|drop|pragma|reindex|vacuum|attach|detach)\b/i.test(
     sql.replaceAll(
@@ -134,7 +126,6 @@ for (const app of APPS) {
     const latest = entries.at(-1);
     assert.ok(latest);
     const current = await generateSQLiteDrizzleJson({ ...app.schema });
-    // drizzle-kit writes the snapshot with JSON.stringify, which drops undefined fields.
     assert.deepEqual(
       described(JSON.parse(JSON.stringify(current))),
       described(snapshot(app.name, latest.idx)),
@@ -170,7 +161,6 @@ for (const app of APPS) {
       );
     const { dialect, entries } = journal(app.name);
     assert.equal(dialect, 'sqlite');
-    // The baseline entry names the last hand-written file, so drizzle-kit numbers the next one after it.
     assert.equal(entries[0]?.idx, BASELINE_INDEX);
     assert.ok(`${entries[0].tag}.sql` in baseline);
     entries.forEach((entry, position) => {
@@ -192,8 +182,6 @@ for (const app of APPS) {
     );
   });
 
-  // Wrangler skips a file already applied by name, so an edit to any migration would silently never
-  // reach the live database. Every file is recorded once (pnpm db:hashes) and never re-recorded.
   void test(`${app.name}: every migration file is recorded and unchanged since`, () => {
     const recorded: Record<string, string> = JSON.parse(
       read(new URL('meta/_sha256.json', migrations(app.name))),
@@ -231,11 +219,9 @@ for (const app of APPS) {
     const before = layout(Object.keys(app.baseline));
     const after = new Set(layout(all));
     assert.ok(before.length > 0);
-    // A drizzle-kit table rebuild (`__new_<table>`) would recreate it as an ordinary rowid table.
     for (const table of before) assert.ok(after.has(table), table);
   });
 
-  // A `drizzle-kit generate --custom` file leaves the snapshot unchanged; it may only move data.
   void test(`${app.name}: custom (data-only) migrations hold no schema statements`, () => {
     const entries = journal(app.name).entries;
     entries.slice(1).forEach((entry, position) => {
@@ -254,11 +240,6 @@ for (const app of APPS) {
   });
 }
 
-// collector_envelopes enforces (uploader_node_id, nonce) with the inline UNIQUE of 0001, but the
-// drizzle-kit snapshot records a named index collector_envelopes_uploader_node_id_nonce_unique. Removing
-// or changing this unique() would generate `DROP INDEX collector_envelopes_uploader_node_id_nonce_unique`,
-// which fails on D1 because that index does not exist. Change it only through a hand-reviewed table
-// rebuild approved by the founder, then update this test.
 void test('metrics-collector: the envelopes (uploader, nonce) unique stays as the live table has it', () => {
   const uniques = getTableConfig(collector.envelopes).uniqueConstraints.map(
     (constraint) => ({
