@@ -1,5 +1,3 @@
-// One readiness checklist in the status bar: local node, wallet, backup, app version and network.
-// It only reads host summaries; it never starts payments, changes wallet custody or installs updates.
 import { CheckCircle, Info, Warning, WarningCircle } from '@phosphor-icons/react';
 import { useState } from 'react';
 
