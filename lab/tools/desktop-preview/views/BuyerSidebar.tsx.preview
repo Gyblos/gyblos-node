@@ -1,0 +1,38 @@
+export function BuyerSidebar(props: Props) {
+  const nav = (name: View) => MAIN_NAV.find((item) => item.name === name);
+  const usage = nav(UI_VIEW.PAYMENTS);
+  const footerView = props.view === UI_VIEW.ACTIVITY ? UI_VIEW.PAYMENTS : props.view;
+  return (
+    <aside id="app-sidebar" className="sidebar buyer-sidebar">
+      <nav aria-label="Main navigation" className="ui-sidebar-primary">
+        <Button
+          className="ui-nav-row ui-sidebar-motion-control preview-new-chat"
+          aria-label="New chat"
+          disabled={props.storageState === CHAT_STORAGE_STATE.LOADING}
+          onClick={props.onNewChat}
+        >
+          <SidebarActionIcon kind={SIDEBAR_ACTION.CREATE} />
+          <span>New chat</span>
+        </Button>
+        {[UI_VIEW.MODELS, UI_VIEW.CONNECT].map((name) => {
+          const item = nav(name);
+          return item ? <NavigationItem key={item.name} item={item} view={props.view} navigate={props.navigate} /> : null;
+        })}
+      </nav>
+      <ConversationList {...props} />
+      <nav className="ui-sidebar-footer" aria-label="Account and activity">
+        {usage && <NavigationItem item={usage} view={footerView} navigate={props.navigate} />}
+        <Button
+          className="ui-nav-row ui-sidebar-motion-control"
+          aria-label="Settings"
+          aria-current={props.view === UI_VIEW.SETTINGS ? 'page' : undefined}
+          onClick={() => props.navigate(UI_VIEW.SETTINGS)}
+        >
+          <SidebarActionIcon kind={SIDEBAR_ACTION.SETTINGS} />
+          <span>Settings</span>
+        </Button>
+        {props.systemStatus}
+      </nav>
+    </aside>
+  );
+}

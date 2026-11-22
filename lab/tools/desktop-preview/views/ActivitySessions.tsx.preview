@@ -74,13 +74,13 @@ export function ActivitySessions({ conversations, activity, x402, onOpenChat, on
     <div className="preview-usage-overview">
       <p className="ui-help-text">{period === USAGE_PERIOD.ALL ? 'All recorded dates' : start === new Date(now).setHours(0,0,0,0) ? dates.format(now) : dates.formatRange(start, now)}</p>
       <StatGrid>
-        <StatCard label="Tokens used" icon={Stack} {...measuredMetric(chatAvailable,
+        <StatCard label="Tokens used" help="Input and output tokens across chats and API keys in the selected period." icon={Stack} {...measuredMetric(chatAvailable,
           count && !totals.measured ? null : totals.tokens,
           previous && previous.measured === previous.Chat + previous.API && totals.measured === count
             ? previous.tokens : null)} />
-        <StatCard label="Chat requests" icon={ChatCircle}
+        <StatCard label="Chat requests" help="Replies requested from the desktop chat in the selected period." icon={ChatCircle}
           {...measuredMetric(chatAvailable, totals.Chat, previous?.Chat ?? null)} />
-        <StatCard label="API requests" icon={Code}
+        <StatCard label="API requests" help="Requests sent by coding tools with your API keys in the selected period." icon={Code}
           {...measuredMetric(apiAvailable, totals.API, previous?.API ?? null)} />
       </StatGrid>
       {totals.measured < count && <small className="ui-help-text">Token counts available for {numbers.format(totals.measured)} of {numbers.format(count)} requests.</small>}

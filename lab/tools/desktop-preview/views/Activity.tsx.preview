@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { Modal } from './Modal';
+import { MotionPresence } from './Motion';
 import { activityDate } from './activity-presentation';
 import { conversationSummary } from './chat-history';
 import { ActivitySessions } from './ActivitySessions';
@@ -37,7 +38,7 @@ export function Activity({
     <PagePanel>
       <ActivitySessions conversations={conversations} activity={activity} x402={x402}
         onOpenChat={onOpenChat} onSelect={onSelectSession} />
-      {selected && <Modal title="Session activity" close={() => onSelectSession(null)}>
+      <MotionPresence>{selected && <Modal title="Session activity" close={() => onSelectSession(null)}>
         <List label="Usage breakdown">
           <ListRow trailing={selected.chatCount}>Chat replies</ListRow>
           <ListRow trailing={selected.agentCount}>API requests</ListRow>
@@ -47,7 +48,7 @@ export function Activity({
           onSelectSession(null);
           onOpenChat(chat.id);
         }}>{chat.title}</Button>)}
-      </Modal>}
+      </Modal>}</MotionPresence>
     </PagePanel>
   );
 }
