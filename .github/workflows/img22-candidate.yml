@@ -1,0 +1,370 @@
+name: ImgPilot22 candidate
+permissions:
+  contents: read
+concurrency:
+  group: img22-candidate-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  changes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+      windows_full: ${{ steps.diff.outputs.windows_full }}
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        persist-credentials: false
+        fetch-depth: 0
+        ref: 04e1eab01518ebc3247009af8c20e88ca2bbbd01
+    - run: bash .github/scripts/test-ci-changes.sh
+    - id: diff
+      env:
+        EVENT: ${{ github.event_name }}
+        BASE: ${{ github.event.pull_request.base.sha }}
+        TARGET: ${{ github.base_ref }}
+      run: 'printf ''code=true\nwindows_full=false\n'' >> "$GITHUB_OUTPUT" '
+  docs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        persist-credentials: false
+        ref: 04e1eab01518ebc3247009af8c20e88ca2bbbd01
+    - name: Pull pinned Linux image
+      env:
+        READ_TOKEN: ${{ github.token }}
+      run: 'set -euo pipefail
+
+        export DOCKER_CONFIG="$RUNNER_TEMP/bench-registry"
+
+        mkdir -p "$DOCKER_CONFIG"
+
+        echo "$READ_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+        docker pull ghcr.io/gyblos/gyblos-node-ci-bench-nov22@sha256:e37eb074d96e6a76ea72261c342a8c7d6ed8a26743c190102ed3c4aafb33a38c
+
+        docker logout ghcr.io'
+    - name: Start CI container
+      run: 'set -euo pipefail
+
+        docker run -d --name linux-ci --network host -e CI=true -e GITHUB_ACTIONS=true -e RUNNER_TEMP=/tmp -v "$PWD:$PWD" -w "$PWD" ghcr.io/gyblos/gyblos-node-ci-bench-nov22@sha256:e37eb074d96e6a76ea72261c342a8c7d6ed8a26743c190102ed3c4aafb33a38c sleep infinity'
+    - run: 'docker exec -i -e ORDINARY_LAB_PR linux-ci bash -eo pipefail <<''BENCH_STEP''
+
+        pnpm install --offline --frozen-lockfile
+
+        BENCH_STEP'
+      name: pnpm install --offline --frozen-lockfile
+    - run: 'docker exec -i -e ORDINARY_LAB_PR linux-ci bash -eo pipefail <<''BENCH_STEP''
+
+        pnpm exec prettier --check .
+
+        BENCH_STEP'
+      name: pnpm exec prettier --check .
+    - run: 'docker exec -i -e ORDINARY_LAB_PR linux-ci bash -eo pipefail <<''BENCH_STEP''
+
+        pnpm docs:build
+
+        BENCH_STEP'
+      name: pnpm docs:build
+    - run: 'docker exec -i -e ORDINARY_LAB_PR linux-ci bash -eo pipefail <<''BENCH_STEP''
+
+        pnpm docs:test
+
+        BENCH_STEP'
+      name: pnpm docs:test
+    - run: 'docker exec -i -e ORDINARY_LAB_PR linux-ci bash -eo pipefail <<''BENCH_STEP''
+
+        node --import tsx --test "tests/docs-*.test.ts"
+
+        BENCH_STEP'
+      name: node --import tsx --test "tests/docs-*.test.ts"
+    permissions:
+      contents: read
+      packages: read
+  static:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        persist-credentials: false
+        ref: 04e1eab01518ebc3247009af8c20e88ca2bbbd01
+    - name: Pull pinned Linux image
+      env:
+        READ_TOKEN: ${{ github.token }}
+      run: 'set -euo pipefail
+
+        export DOCKER_CONFIG="$RUNNER_TEMP/bench-registry"
+
+        mkdir -p "$DOCKER_CONFIG"
+
+        echo "$READ_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+        docker pull ghcr.io/gyblos/gyblos-node-ci-bench-nov22@sha256:e37eb074d96e6a76ea72261c342a8c7d6ed8a26743c190102ed3c4aafb33a38c
+
+        docker logout ghcr.io'
+    - name: Start CI container
+      run: 'set -euo pipefail
+
+        docker run -d --name linux-ci --network host -e CI=true -e GITHUB_ACTIONS=true -e RUNNER_TEMP=/tmp -v "$PWD:$PWD" -w "$PWD" ghcr.io/gyblos/gyblos-node-ci-bench-nov22@sha256:e37eb074d96e6a76ea72261c342a8c7d6ed8a26743c190102ed3c4aafb33a38c sleep infinity'
+    - run: 'docker exec -i -e ORDINARY_LAB_PR linux-ci bash -eo pipefail <<''BENCH_STEP''
+
+        pnpm install --offline --frozen-lockfile
+
+        BENCH_STEP'
+      name: pnpm install --offline --frozen-lockfile
+    - run: 'docker exec -i -e ORDINARY_LAB_PR linux-ci bash -eo pipefail <<''BENCH_STEP''
+
+        pnpm typecheck
+
+        BENCH_STEP'
+      name: pnpm typecheck
+    - run: 'docker exec -i -e ORDINARY_LAB_PR linux-ci bash -eo pipefail <<''BENCH_STEP''
+
+        pnpm lint
+
+        BENCH_STEP'
+      name: pnpm lint
+    permissions:
+      contents: read
+      packages: read
+  test:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard:
+        - 1
+        - 2
+        - 3
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        persist-credentials: false
+        ref: 04e1eab01518ebc3247009af8c20e88ca2bbbd01
+    - name: Pull pinned Linux image
+      env:
+        READ_TOKEN: ${{ github.token }}
+      run: 'set -euo pipefail
+
+        export DOCKER_CONFIG="$RUNNER_TEMP/bench-registry"
+
+        mkdir -p "$DOCKER_CONFIG"
+
+        echo "$READ_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+        docker pull ghcr.io/gyblos/gyblos-node-ci-bench-nov22@sha256:e37eb074d96e6a76ea72261c342a8c7d6ed8a26743c190102ed3c4aafb33a38c
+
+        docker logout ghcr.io'
+    - name: Start CI container
+      run: 'set -euo pipefail
+
+        docker run -d --name linux-ci --network host -e CI=true -e GITHUB_ACTIONS=true -e RUNNER_TEMP=/tmp -v "$PWD:$PWD" -w "$PWD" ghcr.io/gyblos/gyblos-node-ci-bench-nov22@sha256:e37eb074d96e6a76ea72261c342a8c7d6ed8a26743c190102ed3c4aafb33a38c sleep infinity'
+    - run: 'docker exec -i -e ORDINARY_LAB_PR linux-ci bash -eo pipefail <<''BENCH_STEP''
+
+        pnpm install --offline --frozen-lockfile
+
+        BENCH_STEP'
+      name: pnpm install --offline --frozen-lockfile
+    - run: 'docker exec -i -e ORDINARY_LAB_PR linux-ci bash -eo pipefail <<''BENCH_STEP''
+
+        node --import tsx tooling/ci-shards-cli.ts ${{ matrix.shard }}/3 "tests/*.test.ts" "packages/*/test/**/*.test.ts"
+
+        BENCH_STEP'
+      name: node --import tsx tooling/ci-shards-cli.ts ${{ matrix.shard }}/3 "tests/*.test.ts" "packages/*/test/
+    permissions:
+      contents: read
+      packages: read
+  lab:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard:
+        - 1
+        - 2
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        persist-credentials: false
+        ref: 04e1eab01518ebc3247009af8c20e88ca2bbbd01
+    - name: Pull pinned Linux image
+      env:
+        READ_TOKEN: ${{ github.token }}
+      run: 'set -euo pipefail
+
+        export DOCKER_CONFIG="$RUNNER_TEMP/bench-registry"
+
+        mkdir -p "$DOCKER_CONFIG"
+
+        echo "$READ_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+        docker pull ghcr.io/gyblos/gyblos-node-ci-bench-nov22@sha256:e37eb074d96e6a76ea72261c342a8c7d6ed8a26743c190102ed3c4aafb33a38c
+
+        docker logout ghcr.io'
+    - name: Start CI container
+      run: 'set -euo pipefail
+
+        docker run -d --name linux-ci --network host -e CI=true -e GITHUB_ACTIONS=true -e RUNNER_TEMP=/tmp -v "$PWD:$PWD" -w "$PWD" ghcr.io/gyblos/gyblos-node-ci-bench-nov22@sha256:e37eb074d96e6a76ea72261c342a8c7d6ed8a26743c190102ed3c4aafb33a38c sleep infinity'
+    - run: 'docker exec -i -e ORDINARY_LAB_PR linux-ci bash -eo pipefail <<''BENCH_STEP''
+
+        pnpm install --offline --frozen-lockfile
+
+        BENCH_STEP'
+      name: pnpm install --offline --frozen-lockfile
+    - run: 'docker exec -i -e ORDINARY_LAB_PR linux-ci bash -eo pipefail <<''BENCH_STEP''
+
+        node --import tsx tooling/ci-shards-cli.ts ${{ matrix.shard }}/2 "tests/lab/**/*.test.ts"
+
+        BENCH_STEP'
+      env:
+        ORDINARY_LAB_PR: ${{ needs.changes.outputs.windows_full == 'false' }}
+      name: node --import tsx tooling/ci-shards-cli.ts ${{ matrix.shard }}/2 "tests/lab/**/*.test.ts"
+    permissions:
+      contents: read
+      packages: read
+  build:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        persist-credentials: false
+        ref: 04e1eab01518ebc3247009af8c20e88ca2bbbd01
+    - name: Pull pinned Linux image
+      env:
+        READ_TOKEN: ${{ github.token }}
+      run: 'set -euo pipefail
+
+        export DOCKER_CONFIG="$RUNNER_TEMP/bench-registry"
+
+        mkdir -p "$DOCKER_CONFIG"
+
+        echo "$READ_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+        docker pull ghcr.io/gyblos/gyblos-node-ci-bench-nov22@sha256:e37eb074d96e6a76ea72261c342a8c7d6ed8a26743c190102ed3c4aafb33a38c
+
+        docker logout ghcr.io'
+    - name: Start CI container
+      run: 'set -euo pipefail
+
+        docker run -d --name linux-ci --network host -e CI=true -e GITHUB_ACTIONS=true -e RUNNER_TEMP=/tmp -v "$PWD:$PWD" -w "$PWD" ghcr.io/gyblos/gyblos-node-ci-bench-nov22@sha256:e37eb074d96e6a76ea72261c342a8c7d6ed8a26743c190102ed3c4aafb33a38c sleep infinity'
+    - run: 'docker exec -i -e ORDINARY_LAB_PR linux-ci bash -eo pipefail <<''BENCH_STEP''
+
+        pnpm install --offline --frozen-lockfile
+
+        BENCH_STEP'
+      name: pnpm install --offline --frozen-lockfile
+    - run: 'docker exec -i -e ORDINARY_LAB_PR linux-ci bash -eo pipefail <<''BENCH_STEP''
+
+        pnpm desktop:build
+
+        BENCH_STEP'
+      name: pnpm desktop:build
+    - name: Build the packaged seller for linux-x64
+      run: 'docker exec -i -e ORDINARY_LAB_PR linux-ci bash -eo pipefail <<''BENCH_STEP''
+
+        pnpm build:native --version 0.0.0-ci.1 --target linux-x64 --out "$RUNNER_TEMP/native"
+
+        tar -xzf "$RUNNER_TEMP/native/gyblos-0.0.0-ci.1-linux-x64.tar.gz" -C "$RUNNER_TEMP"
+
+        test "$("$RUNNER_TEMP/gyblos-0.0.0-ci.1-linux-x64/bin/gyblos" --version)" = 0.0.0-ci.1
+
+        BENCH_STEP'
+    permissions:
+      contents: read
+      packages: read
+  windows-package:
+    needs: changes
+    if: needs.changes.outputs.windows_full == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        persist-credentials: false
+        ref: 04e1eab01518ebc3247009af8c20e88ca2bbbd01
+    - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+      with:
+        node-version: 24.22.1
+        cache: pnpm
+    - run: pnpm install --frozen-lockfile
+    - run: pnpm build:native --version 0.0.0-ci.1 --target win32-x64 --out dist/windows
+    - run: pnpm build:npm --version 0.0.0-ci.1 --target win32-x64 --archives dist/windows --out dist/windows
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+      with:
+        name: windows-package
+        path: dist/windows
+        retention-days: 1
+        if-no-files-found: error
+  windows:
+    needs:
+    - changes
+    - windows-package
+    if: '!cancelled() && needs.changes.result == ''success'' && needs.changes.outputs.code == ''true'' && ((needs.changes.outputs.windows_full == ''true'' && needs.windows-package.result == ''success'') || (needs.changes.outputs.windows_full == ''false'' && needs.windows-package.result == ''skipped''))'
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        persist-credentials: false
+        ref: 04e1eab01518ebc3247009af8c20e88ca2bbbd01
+    - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+      with:
+        node-version: 24.22.1
+        cache: pnpm
+    - run: pnpm install --frozen-lockfile
+    - name: Desktop seller selection and channel chat
+      run: node --import tsx --test tests/desktop-network-catalog-paid.test.ts tests/desktop-buyer-stream-loopback.test.ts
+    - if: needs.changes.outputs.windows_full == 'true'
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+      with:
+        name: windows-package
+        path: ${{ runner.temp }}/windows-package
+    - if: needs.changes.outputs.windows_full == 'false'
+      run: node --import tsx --test tests/windows-acl.test.ts tests/windows-seller.test.ts tests/windows-service.test.ts
+    - if: needs.changes.outputs.windows_full == 'true'
+      run: node --import tsx --test tests/windows-acl.test.ts tests/windows-seller.test.ts tests/windows-package.test.ts tests/windows-service.test.ts tests/windows-task.test.ts tests/windows-install.test.ts
+      env:
+        GYBLOS_WINDOWS_PACKAGE: ${{ runner.temp }}/windows-package
+        GYBLOS_WINDOWS_VERSION: 0.0.0-ci.1
+    - run: node --import tsx --test tests/lab/seller-daemon-files.test.ts tests/free-execution-iroh.test.ts tests/iroh-transport.test.ts tests/node-startup-failure.test.ts
+  check:
+    if: always()
+    needs:
+    - changes
+    - docs
+    - static
+    - test
+    - lab
+    - build
+    - windows-package
+    - windows
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+    - env:
+        CODE: ${{ needs.changes.outputs.code }}
+        FULL: ${{ needs.changes.outputs.windows_full }}
+        WINDOWS: ${{ needs.windows.result }}
+        PACKAGE: ${{ needs.windows-package.result }}
+        RESULTS: ${{ join(needs.*.result, ' ') }}
+      run: "case \"$CODE/$FULL/$WINDOWS/$PACKAGE\" in\n  true/true/success/success | true/false/success/skipped | false/false/skipped/skipped) ;;\n  *) echo \"Unexpected Windows check results\"; exit 1 ;;\nesac\nfor result in $RESULTS; do\n  case \"$result\" in\n    success | skipped) ;;\n    *) echo \"A CI part ended with: $result\"; exit 1 ;;\n  esac\ndone\n"
+'on':
+  push:
+    branches:
+    - codex/bench-linux-image-nov22
