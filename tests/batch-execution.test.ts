@@ -28,6 +28,32 @@ void test('shared session executes several requests and signs only after indepen
   assert.equal((await f.session.close()).chargedAtomic, '120');
 });
 
+void test('a whole-response buyer refuses an inflated bill before signing or sending approval', async (t) => {
+  const f = await batchPrepareFixture();
+  t.after(f.close);
+  let approvals = 0;
+  f.intercept(async (...args) => {
+    if (args[0].method === BATCH_METHODS.APPROVE) approvals++;
+    const result = await f.service.exchange(...args);
+    if (!('bill' in result)) return result;
+    const inflated = String(BigInt(result.bill.chargedAtomic) + 1n);
+    return {
+      ...result,
+      bill: {
+        ...result.bill,
+        chargedAtomic: inflated,
+        cumulativeAtomic: inflated,
+      },
+    };
+  });
+  await assert.rejects(
+    f.buyer.execute(await f.offers.quote(1), f.offers.input),
+    { code: SESSION_CODES.UNVERIFIED },
+  );
+  assert.equal(approvals, 0);
+  assert.equal(f.rig.buyer.snapshot().cumulativeAtomic, '0');
+});
+
 void test('possible prompt send is never retried and remains reserved', async (t) => {
   const f = await batchPrepareFixture();
   t.after(f.close);
