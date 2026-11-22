@@ -38,14 +38,15 @@ specified in
 ```
 
 `account` is the lowercase GitHub login (at most 39 characters) and `gist` the
-id of a public gist that account owns. That gist must contain, on a line of its
-own, the proof line `gyblos-node=<nodeId>` (`githubProofLine(nodeId)`). Both
-fields `null` cancels the claim. The signing domain is
-`gyblos/identity-claim/v1\n`.
+id of a gist that account owns (public, or unlisted: its id is published
+anyway). Its file `gyblos-proof.txt` must contain, on a line of its own, the
+proof line `gyblos-node=<nodeId>` (`githubProofLine(nodeId)`). Both fields
+`null` cancels the claim. The signing domain is `gyblos/identity-claim/v1\n`.
 
 Anyone can re-check the binding: verify the signature with the NodeId, then
-fetch `https://gist.githubusercontent.com/<account>/<gist>/raw`, which answers
-only when the account owns the gist (the account name is matched
+fetch
+`https://gist.githubusercontent.com/<account>/<gist>/raw/gyblos-proof.txt`,
+which answers only when the account owns the gist (the account name is matched
 case-insensitively), and look for the proof line. The discovery index does this
 for sellers it knows and publishes the result
 ([discovery-index.md](discovery-index.md#github-claims)). Clients must treat an

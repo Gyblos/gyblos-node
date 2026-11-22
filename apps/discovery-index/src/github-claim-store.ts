@@ -3,6 +3,7 @@
 // claim per NodeId (or a cancel's tombstone) and the index's last gist check; nothing here sees an IP
 // or request header.
 import {
+  GITHUB_CLAIM_REASONS,
   GITHUB_CLAIM_STATES,
   type GithubClaimState,
   type StoredGithubClaimReason,
@@ -71,9 +72,23 @@ export interface GithubClaimStore {
     now: number,
     intervalMs: number,
   ): Promise<number>;
-  // Records a check of the claim issued at `issuedAt`. A newer claim stored meanwhile, or a check that
-  // started later and already landed, is left alone.
-  record(nodeId: string, issuedAt: number, check: RecordedCheck): Promise<void>;
+  // Records a conclusive check of the claim issued at `issuedAt`, computed from the snapshot whose
+  // checked_at was `seen`: written only while that snapshot is still current, so a newer claim or a check
+  // that landed meanwhile is never replaced.
+  record(
+    nodeId: string,
+    issuedAt: number,
+    seen: number | null,
+    check: RecordedCheck,
+  ): Promise<void>;
+  // Records an inconclusive check: checked_at moves forward only, next_check_at is not brought earlier, and
+  // only a pending claim's reason becomes GITHUB_UNAVAILABLE. State and verifiedAt never change.
+  touch(
+    nodeId: string,
+    issuedAt: number,
+    checkedAt: number,
+    nextCheckAt: number | null,
+  ): Promise<void>;
   // Claims whose next check is due at `now`, earliest first.
   due(now: number, limit: number): Promise<GithubClaimRow[]>;
   // Verified claims by NodeId, at most `limit`, for GET /v1/network.
@@ -112,15 +127,32 @@ export function createMemoryGithubClaimStore(): GithubClaimStore {
       fetchedAt.set(nodeId, now);
       return 0;
     },
-    async record(nodeId, issuedAt, check) {
+    async record(nodeId, issuedAt, seen, check) {
       const current = entries.get(nodeId);
       if (
         current &&
         isClaim(current) &&
         current.issuedAt === issuedAt &&
-        (current.checkedAt === null || current.checkedAt <= check.checkedAt)
+        current.checkedAt === seen
       )
         entries.set(nodeId, { ...current, ...check });
+    },
+    async touch(nodeId, issuedAt, checkedAt, nextCheckAt) {
+      const current = entries.get(nodeId);
+      if (!current || !isClaim(current) || current.issuedAt !== issuedAt)
+        return;
+      entries.set(nodeId, {
+        ...current,
+        checkedAt: Math.max(current.checkedAt ?? checkedAt, checkedAt),
+        nextCheckAt:
+          current.nextCheckAt === null || nextCheckAt === null
+            ? null
+            : Math.max(current.nextCheckAt, nextCheckAt),
+        reason:
+          current.state === GITHUB_CLAIM_STATES.PENDING
+            ? GITHUB_CLAIM_REASONS.GITHUB_UNAVAILABLE
+            : current.reason,
+      });
     },
     async due(now, limit) {
       return claims()

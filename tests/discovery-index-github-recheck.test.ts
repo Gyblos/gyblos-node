@@ -217,9 +217,9 @@ for (const kind of CLAIM_KINDS) {
       verifiedAt: T0 + 20,
       nextCheckAt: T0 + 20 + GITHUB_CLAIM.recheckAfterMs,
     } as const;
-    await claims.record(stored.nodeId, stored.issuedAt, late);
-    // A check that started earlier lands after the later one: it changes nothing.
-    await claims.record(stored.nodeId, stored.issuedAt, {
+    await claims.record(stored.nodeId, stored.issuedAt, null, late);
+    // A check computed from the same, now outdated, snapshot lands later: it changes nothing.
+    await claims.record(stored.nodeId, stored.issuedAt, null, {
       state: 'pending',
       reason: 'GIST_NOT_FOUND',
       checkedAt: T0 + 10,
@@ -233,7 +233,7 @@ for (const kind of CLAIM_KINDS) {
     const newer = row(1, { issuedAt: T0 + 1, gist: 'ab'.repeat(10) });
     assert.equal(await claims.put(newer), true);
     assert.equal(await claims.put(stored), false);
-    await claims.record(stored.nodeId, stored.issuedAt, {
+    await claims.record(stored.nodeId, stored.issuedAt, null, {
       ...late,
       checkedAt: T0 + 30,
     });
@@ -245,7 +245,7 @@ for (const kind of CLAIM_KINDS) {
     );
     assert.equal(await claims.put(tombstone), true);
     assert.equal(await claims.put(newer), false);
-    await claims.record(stored.nodeId, tombstone.issuedAt, {
+    await claims.record(stored.nodeId, tombstone.issuedAt, null, {
       ...late,
       checkedAt: T0 + 40,
     });

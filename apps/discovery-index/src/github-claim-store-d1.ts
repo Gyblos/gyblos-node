@@ -4,6 +4,7 @@
 import { and, asc, eq, isNotNull, isNull, lt, lte, or } from 'drizzle-orm';
 
 import {
+  GITHUB_CLAIM_REASONS,
   GITHUB_CLAIM_STATES,
   STORED_GITHUB_CLAIM_REASONS,
   type GithubClaimState,
@@ -18,6 +19,11 @@ import {
   type StoredGithubClaim,
 } from './github-claim-store';
 import { githubClaims } from './schema';
+import {
+  laterOrUnscheduled,
+  laterTime,
+  pendingReason,
+} from './sqlite-expressions';
 import type { D1Database, D1Row } from './storage-d1';
 import { integer, text } from './uptime-d1';
 
@@ -137,11 +143,12 @@ function unscheduleQuery(database: DiscoveryDatabase, nodeId: unknown) {
     .where(eq(githubClaims.nodeId, text(nodeId)));
 }
 
-// Writes a check only onto the same claim, and never over a check that started later.
+// Writes a conclusive check only while the snapshot it was computed from (its checked_at) is current.
 function recordQuery(
   database: DiscoveryDatabase,
   nodeId: string,
   issuedAt: number,
+  seen: number | null,
   check: RecordedCheck,
 ) {
   return database
@@ -152,10 +159,38 @@ function recordQuery(
         eq(githubClaims.nodeId, nodeId),
         eq(githubClaims.issuedAt, issuedAt),
         isNotNull(githubClaims.state),
-        or(
-          isNull(githubClaims.checkedAt),
-          lte(githubClaims.checkedAt, check.checkedAt),
-        ),
+        seen === null
+          ? isNull(githubClaims.checkedAt)
+          : eq(githubClaims.checkedAt, seen),
+      ),
+    );
+}
+
+// An inconclusive check: decided in the write, so it never rewinds a check that landed meanwhile.
+function touchQuery(
+  database: DiscoveryDatabase,
+  nodeId: string,
+  issuedAt: number,
+  checkedAt: number,
+  nextCheckAt: number | null,
+) {
+  return database
+    .update(githubClaims)
+    .set({
+      checkedAt: laterTime(githubClaims.checkedAt, checkedAt),
+      nextCheckAt: laterOrUnscheduled(githubClaims.nextCheckAt, nextCheckAt),
+      reason: pendingReason(
+        githubClaims.state,
+        githubClaims.reason,
+        GITHUB_CLAIM_STATES.PENDING,
+        GITHUB_CLAIM_REASONS.GITHUB_UNAVAILABLE,
+      ),
+    })
+    .where(
+      and(
+        eq(githubClaims.nodeId, nodeId),
+        eq(githubClaims.issuedAt, issuedAt),
+        isNotNull(githubClaims.state),
       ),
     );
 }
@@ -186,8 +221,11 @@ export function createD1GithubClaimStore(client: D1Database): GithubClaimStore {
     },
     reserveFetch: (nodeId, issuedAt, now, intervalMs) =>
       reserveFetch(database, nodeId, issuedAt, now, intervalMs),
-    async record(nodeId, issuedAt, check) {
-      await recordQuery(database, nodeId, issuedAt, check);
+    async record(nodeId, issuedAt, seen, check) {
+      await recordQuery(database, nodeId, issuedAt, seen, check);
+    },
+    async touch(nodeId, issuedAt, checkedAt, nextCheckAt) {
+      await touchQuery(database, nodeId, issuedAt, checkedAt, nextCheckAt);
     },
     // A malformed row is unscheduled (next_check_at NULL) and skipped, so it cannot stay first forever.
     async due(now, limit) {
