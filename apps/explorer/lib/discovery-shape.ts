@@ -11,6 +11,7 @@ export interface OfferedModel {
 }
 export interface Uptime {
   firstSeenAt: number;
+  readAt?: number;
   windows: { days: number; ratio: number }[];
 }
 export interface Seller {

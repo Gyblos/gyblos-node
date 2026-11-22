@@ -15,12 +15,15 @@ export function githubByNode(
 const lowestPaidOutput = (seller: Seller) =>
   seller.models.reduce<bigint | null>((lowest, model) => {
     const price = BigInt(model.pricing.outputAtomicPerMtok);
-    if (price <= 0n) return lowest;
+    if (price <= 0n && BigInt(model.pricing.inputAtomicPerMtok) <= 0n)
+      return lowest;
     return lowest === null || price < lowest ? price : lowest;
   }, null);
 
 function uptimeBand(seller: Seller, now: number): number | null {
-  const history = seller.uptime ? now - seller.uptime.firstSeenAt : 0;
+  const history = seller.uptime
+    ? (seller.uptime.readAt ?? now) - seller.uptime.firstSeenAt
+    : 0;
   if (!(history >= DISPLAY.weekWindow * UNITS.msPerDay)) return null;
   const ratio = uptimeRatio(seller, DISPLAY.weekWindow);
   return ratio === undefined ? null : Math.floor(ratio * IDENTITY.bandsPerUnit);
@@ -96,4 +99,14 @@ export function emptySellersMessage(
   return shown.length
     ? SELLERS_EMPTY.noVerifiedOffers
     : SELLERS_EMPTY.noVerified;
+}
+
+export function notOnlineMeta(
+  network: NetworkStatus,
+  verifiedShown: number | null,
+): string {
+  if (verifiedShown !== null)
+    return `${verifiedShown} verified ${verifiedShown === 1 ? 'seller' : 'sellers'} not online`;
+  const { offline, unpublished } = network.counts;
+  return `${offline} offline · ${unpublished} not published`;
 }

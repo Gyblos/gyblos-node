@@ -6,12 +6,16 @@ import test from 'node:test';
 import { gistUrl } from '@gyblos/explorer/config';
 import { DISPLAY, IDENTITY } from '@gyblos/explorer/constants';
 import type { Seller } from '@gyblos/explorer/discovery';
-import { parseNetworkStatus } from '@gyblos/explorer/network-status';
+import {
+  normalizeNetwork,
+  parseNetworkStatus,
+} from '@gyblos/explorer/network-status';
 import { rangeHref } from '@gyblos/explorer/range';
 import {
   emptySellersMessage,
   githubByNode,
   identicon,
+  notOnlineMeta,
   orderSellers,
   verifiedOnly,
 } from '@gyblos/explorer/seller-identity';
@@ -112,10 +116,9 @@ void test('sellers are ordered by whole-percent uptime, then by lowest paid outp
 });
 
 void test('free offers do not win the price tie-break', () => {
-  const ordered = orderSellers(
-    [seller(NODE_A, 0.99, '0'), seller(NODE_B, 0.99, '3')],
-    NOW,
-  );
+  const free = seller(NODE_A, 0.99, '0');
+  free.models[0]!.pricing.inputAtomicPerMtok = '0';
+  const ordered = orderSellers([free, seller(NODE_B, 0.99, '3')], NOW);
   assert.deepEqual(
     ordered.map((entry) => entry.nodeId),
     [NODE_B, NODE_A],
@@ -201,4 +204,41 @@ void test('llms.txt states the verified filter and the ordering window', () => {
   );
   assert.ok(llms.includes(`${DISPLAY.weekWindow} days of history`));
   assert.ok(llms.includes(`${DISPLAY.weekWindow}-day uptime`));
+});
+
+void test('an input-only paid offer counts as a zero output price, not as no offer', () => {
+  const inputOnly = seller(NODE_A, 0.99, '0');
+  inputOnly.models[0]!.pricing.inputAtomicPerMtok = '5';
+  const ordered = orderSellers([seller(NODE_B, 0.99, '3'), inputOnly], NOW);
+  assert.deepEqual(
+    ordered.map((entry) => entry.nodeId),
+    [NODE_A, NODE_B],
+  );
+});
+
+void test('a week of history is counted at the uptime read, not at render time', () => {
+  const read = NOW - 3 * 86_400_000;
+  const young = seller(NODE_A, 1, '9', read - 5 * 86_400_000);
+  (young.uptime as { readAt?: number }).readAt = read;
+  const ordered = orderSellers([young, seller(NODE_B, 0.9, '9')], NOW);
+  assert.deepEqual(
+    ordered.map((entry) => entry.nodeId),
+    [NODE_B, NODE_A],
+  );
+});
+
+void test('a stored network status from before the GitHub field reads as unverified', () => {
+  const stored = parseNetworkStatus(network(null));
+  const old = {
+    ...stored,
+    nodes: stored.nodes.map(({ github: _github, ...rest }) => rest),
+  } as unknown as typeof stored;
+  assert.equal(normalizeNetwork(old)?.nodes[0]?.github, null);
+  assert.equal(normalizeNetwork(null), null);
+});
+
+void test('the not-online counts follow the verified filter', () => {
+  const status = parseNetworkStatus(network(null));
+  assert.equal(notOnlineMeta(status, 2), '2 verified sellers not online');
+  assert.equal(notOnlineMeta(status, null), '0 offline · 0 not published');
 });

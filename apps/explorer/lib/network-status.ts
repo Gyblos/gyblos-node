@@ -90,3 +90,14 @@ export function parseNetworkStatus(value: unknown): NetworkStatus {
 // The sellers not online now, most recently seen first (the index's own order is kept).
 export const notOnline = (status: NetworkStatus) =>
   status.nodes.filter((entry) => entry.state !== 'online');
+
+export const normalizeNetwork = (
+  status: NetworkStatus | null,
+): NetworkStatus | null =>
+  status && {
+    ...status,
+    nodes: status.nodes.map((node) => ({
+      ...node,
+      github: node.github ?? null,
+    })),
+  };

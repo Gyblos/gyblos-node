@@ -20,6 +20,7 @@ import type { RangeDays } from '../lib/range';
 import {
   emptySellersMessage,
   githubByNode,
+  notOnlineMeta,
   orderSellers,
   verifiedOnly,
 } from '../lib/seller-identity';
@@ -109,17 +110,10 @@ export async function NetworkSection({
         accounts={accounts}
         accountsKnown={!!snapshot.network && !snapshot.network.truncated}
       />
-      {snapshot.network ? (
-        <NotOnlineTable
-          network={snapshot.network}
-          accounts={verified ? accounts : null}
-        />
-      ) : (
-        <p className="mt-2 text-xs text-dim">
-          The index&apos;s network status could not be read: offline and not
-          published sellers are unknown.
-        </p>
-      )}
+      <NotOnline
+        network={snapshot.network}
+        accounts={verified ? accounts : null}
+      />
     </>
   );
 }
@@ -309,6 +303,35 @@ function SellersTable({
   );
 }
 
+function NotOnline({
+  network,
+  accounts,
+}: {
+  network: NetworkStatus | null;
+  accounts: Map<string, GithubAccount> | null;
+}) {
+  return (
+    <>
+      {network ? (
+        <>
+          <NotOnlineTable network={network} accounts={accounts} />
+          {network.truncated ? (
+            <p className="mt-2 text-xs text-dim">
+              The index reached one of its limits: these lists and their counts
+              may be incomplete.
+            </p>
+          ) : null}
+        </>
+      ) : (
+        <p className="mt-2 text-xs text-dim">
+          The index&apos;s network status could not be read: offline and not
+          published sellers are unknown.
+        </p>
+      )}
+    </>
+  );
+}
+
 const STATE_LABELS: Record<Exclude<NetworkNode['state'], 'online'>, string> = {
   offline: 'Offline',
   unpublished: 'Not published',
@@ -327,12 +350,11 @@ function NotOnlineTable({
     (node) => !accounts || accounts.has(node.nodeId),
   );
   if (!nodes.length) return null;
-  const { offline, unpublished } = network.counts;
   return (
     <>
       <SectionTitle
         title="Not online"
-        meta={`${count(offline)} offline · ${count(unpublished)} not published`}
+        meta={notOnlineMeta(network, accounts ? nodes.length : null)}
       />
       <Table
         minWidth={DISPLAY.defaultTable}
@@ -360,12 +382,6 @@ function NotOnlineTable({
           </tr>
         ))}
       </Table>
-      {network.truncated ? (
-        <p className="mt-2 text-xs text-dim">
-          The index reached one of its limits: this list and its counts may be
-          incomplete.
-        </p>
-      ) : null}
     </>
   );
 }
