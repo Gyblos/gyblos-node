@@ -5,6 +5,7 @@ import {
   CHAIN_TX_KINDS,
   CHAIN_TX_LABELS,
   chainTxsQuery,
+  chainTxsUrl,
   parseChainTxs,
   rangeSwitchHref,
   sellerOwners,
@@ -237,4 +238,15 @@ void test('switching the date range keeps a valid transaction page', () => {
   assert.equal(rangeSwitchHref('range=7', 90), '/?range=90');
   assert.equal(rangeSwitchHref('range=7&before=bad', RANGE.defaultDays), '/');
   assert.equal(rangeSwitchHref('', 7), '/?range=7');
+});
+
+void test('the newest page URL has no empty query, so it shares the collector cache key', () => {
+  assert.equal(
+    chainTxsUrl('https://c.test/v1', null),
+    'https://c.test/v1/stats/chain/txs',
+  );
+  assert.equal(
+    chainTxsUrl('https://c.test/v1', CURSOR),
+    `https://c.test/v1/stats/chain/txs?before=${CURSOR}`,
+  );
 });

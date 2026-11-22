@@ -108,6 +108,11 @@ export function chainTxsQuery(before: string | null) {
   return params.toString();
 }
 
+export function chainTxsUrl(collector: string, before: string | null) {
+  const query = chainTxsQuery(before);
+  return `${collector}/stats/chain/txs${query ? `?${query}` : ''}`;
+}
+
 export interface ListedOwner {
   nodeId: string;
   owner: string;

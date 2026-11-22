@@ -1,5 +1,5 @@
 import {
-  chainTxsQuery,
+  chainTxsUrl,
   parseChainTxs,
   type ChainTxPage,
 } from './chain-txs-shape';
@@ -11,7 +11,7 @@ export async function getChainTxs(before: string | null): Promise<ChainTxPage> {
     return {
       ...parseChainTxs(
         await fetchJson(
-          `${COLLECTOR_URL}/stats/chain/txs?${chainTxsQuery(before)}`,
+          chainTxsUrl(COLLECTOR_URL, before),
           'collector chain transactions',
         ),
       ),
