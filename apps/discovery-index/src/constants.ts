@@ -1,5 +1,6 @@
 // Owns the discovery index's canonical values: wire error codes, statuses, routes, limits and binding names.
 // It must not hold record formats or signing domains (protocol owns those) or operator URLs (config).
+import { LOOPBACK_HOST_NAMES } from '@gyblos/config/hosts';
 import { PUBLIC_RECORD_LIMITS } from '@gyblos/protocol/constants';
 
 // Static `error` values on the wire (docs/discovery.md, "Running an index").
@@ -208,8 +209,7 @@ export const REDEEM_RESULTS = {
 export type RedeemResult = (typeof REDEEM_RESULTS)[keyof typeof REDEEM_RESULTS];
 export type PublishMode = (typeof PUBLISH_MODES)[keyof typeof PUBLISH_MODES];
 
-// Loopback-only development counters (never used by the Worker entry). The host list is local
-// because the @gyblos/config root also exports Node path helpers that a Worker bundle cannot load.
+// Loopback-only development counters (never used by the Worker entry).
 export const DEVELOPMENT_LIMITS = {
   perMinute: 120,
   windowMs: 60_000,
@@ -220,20 +220,7 @@ export const INDEX_PROTOCOLS = {
   SECURE: 'https:',
   LOOPBACK: 'http:',
 } as const;
-export const LOOPBACK_HOSTS: ReadonlySet<string> = new Set([
-  'localhost',
-  '127.0.0.1',
-  '[::1]',
-]);
-// Rate-limit key used when no client address header is present.
-export const LOCAL_CLIENT_KEY = 'local';
-
-export const IPV6 = {
-  groups: 8,
-  prefixGroups: 4,
-  hexRadix: 16,
-} as const;
-
+export const LOOPBACK_HOSTS: ReadonlySet<string> = new Set(LOOPBACK_HOST_NAMES);
 // Public seller uptime (uptime.ts): five-minute slots, kept for the longest reported window.
 export const UPTIME = {
   // Five minutes.

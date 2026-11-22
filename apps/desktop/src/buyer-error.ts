@@ -39,6 +39,7 @@ type BuyerCode =
   | typeof PAID_EXECUTION_CODES.PEER
   | FreeExecutionCode
   | SellerSelectionCode
+  | typeof SESSION_CODES.REQUEST_DECLINED
   | typeof SESSION_CODES.OPENING_ABSENT
   | typeof SESSION_CODES.OPENING_RETURNED
   | typeof SESSION_CODES.OPENING_PENDING
@@ -57,6 +58,8 @@ export class DesktopBuyerFailure extends Error {
 function explanation(code: BuyerCode, reason: unknown, free: boolean) {
   if (code === BUYER_ROUTING_CODES.BUSY)
     return 'The selected seller or channel is busy. If your buyer uses one channel, settle the existing channel before switching sellers.';
+  if (code === SESSION_CODES.REQUEST_DECLINED)
+    return 'The seller declined this request before charging you. You can send another message using this channel.';
   if (code === SESSION_CODES.OPENING_RETURNED)
     return 'The unused channel deposit was returned. You can send your message again.';
   if (code === SESSION_CODES.OPENING_PENDING)
@@ -140,6 +143,7 @@ export function desktopBuyerFailure(
     );
   const code = [
     BUYER_ROUTING_CODES.BUSY,
+    SESSION_CODES.REQUEST_DECLINED,
     SESSION_CODES.OPENING_ABSENT,
     SESSION_CODES.OPENING_RETURNED,
     SESSION_CODES.OPENING_PENDING,

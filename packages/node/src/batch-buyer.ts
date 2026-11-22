@@ -36,6 +36,7 @@ import type {
 } from './batch-buyer-types';
 import { bounded } from './buyer-operation';
 
+export { DeclinedChannelRequest } from './buyer-declined-request';
 export { UnsentOpeningError } from './buyer-opening-retry';
 export { UnsentChannelPeerError } from './buyer-channel-prepare';
 export type { BuyerBatchSessionOptions } from './batch-buyer-types';
@@ -50,6 +51,7 @@ function createContext<Remote extends BatchDestination>(
   if (options.endpoint.id().toString() !== terms.buyerNodeId)
     return batchFail(PAID_EXECUTION_CODES.PEER);
   const blockMode =
+    !options.declared &&
     isBlockBuyer(options.buyer) &&
     (options.buyer.usesBlocks() ||
       (!options.buyer.snapshot().channelId &&

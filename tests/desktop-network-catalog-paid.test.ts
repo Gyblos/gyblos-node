@@ -194,7 +194,7 @@ void test('the buyer validates the selected seller and rejects expired terms bef
 void test('opening chat discovers free and paid sellers of the same model without a lookup', async () => {
   const { createCatalogSession } =
     await import('@gyblos/desktop/network-catalog-session');
-  const { announcedModels, chatNetworkOptions } =
+  const { announcedModels, chatNetworkOptions, networkModelGroups } =
     await import('@gyblos/desktop/announced-models');
   const free = await priced('0', '0');
   const paid = await priced('52000', '208000');
@@ -226,6 +226,8 @@ void test('opening chat discovers free and paid sellers of the same model withou
     session.resolve(listings[1]?.offerId ?? '')?.nodeId,
     paid.signed.catalog.record.nodeId,
   );
+  const groups = networkModelGroups(listings);
+  assert.deepEqual([...groups], [['qwen3:0.6b', listings]]);
   await session.browse();
   assert.deepEqual(requests, ['/v1/models', '/v1/sellers']);
 });

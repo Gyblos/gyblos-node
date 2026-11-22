@@ -24,13 +24,11 @@ import { EXIT, SERVICE } from './constants';
 import { readEnvironmentFile } from './service-environment';
 import { pipeName, taskName } from './service-windows';
 
-const MILLISECONDS = 1000;
-
 // Asks the supervisor on this pipe to stop the seller and waits until it has; false when none runs.
 export function requestStop(
   pipe: string,
   timeoutMs = (SERVICE.stopTimeoutSeconds + SERVICE.restartSeconds) *
-    MILLISECONDS,
+    SERVICE.secondMs,
 ) {
   return new Promise<boolean>((done, fail) => {
     const socket = connect(pipe);
@@ -130,7 +128,7 @@ class Supervisor {
     const resend = setInterval(send, STOP_RESEND_MS);
     const kill = setTimeout(
       () => child.kill(),
-      SERVICE.stopTimeoutSeconds * MILLISECONDS,
+      SERVICE.stopTimeoutSeconds * SERVICE.secondMs,
     );
     child.once('exit', () => {
       clearInterval(resend);
@@ -151,7 +149,7 @@ class Supervisor {
       failures.push(now);
       while (
         failures[0]! <
-        now - SERVICE.startLimitIntervalSeconds * MILLISECONDS
+        now - SERVICE.startLimitIntervalSeconds * SERVICE.secondMs
       )
         failures.shift();
       if (failures.length >= SERVICE.startLimitBurst) {
@@ -163,7 +161,7 @@ class Supervisor {
       this.log(
         `the seller exited with ${code}; restarting in ${SERVICE.restartSeconds}s`,
       );
-      await delay(SERVICE.restartSeconds * MILLISECONDS, undefined, {
+      await delay(SERVICE.restartSeconds * SERVICE.secondMs, undefined, {
         signal: this.wake.signal,
       }).catch(() => undefined);
     }

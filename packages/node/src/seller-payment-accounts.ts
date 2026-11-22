@@ -1,9 +1,10 @@
 // Paid seller preflight: read the recipient token accounts and fee payer balance on the role's RPC.
 // Startup creates the missing accounts; these probes never send transactions.
-import { address, createSolanaRpc } from '@solana/kit';
+import { address } from '@solana/kit';
 
 import { DEVNET_GENESIS, UPTO_CHANNEL_SETTINGS } from '@gyblos/config';
 import { uptoRecipientTokenAccounts } from '@gyblos/payments-upto';
+import { rateLimitedSolanaRpc } from '@gyblos/payments-upto/rpc-rate-limit';
 
 import {
   DOCTOR_STATUS,
@@ -23,7 +24,7 @@ export interface PaymentAccountsQuery {
 // receive a payout (frozen, say); throws when the RPC cannot say.
 export async function paymentAccountsStatus(query: PaymentAccountsQuery) {
   const { missing, unusable } = await uptoRecipientTokenAccounts(
-    createSolanaRpc(query.rpcUrl),
+    rateLimitedSolanaRpc(query.rpcUrl),
     { ...query, tokenProgram: UPTO_CHANNEL_SETTINGS.tokenProgram },
   );
   return { missing: missing.length, unusable: unusable.length };
@@ -34,7 +35,7 @@ async function feePayerLamports(query: {
   rpcUrl: string;
   address: string;
 }): Promise<bigint> {
-  const { value } = await createSolanaRpc(query.rpcUrl)
+  const { value } = await rateLimitedSolanaRpc(query.rpcUrl)
     .getBalance(address(query.address))
     .send({ abortSignal: AbortSignal.timeout(GENESIS_READ_MS) });
   return value;

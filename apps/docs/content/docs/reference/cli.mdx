@@ -19,21 +19,23 @@ Replace `COMMAND` with a command from the table below. The examples on this page
 
 ## Commands [#command-index]
 
-| Command                           | Options                                                | Exit codes                                           |
-| --------------------------------- | ------------------------------------------------------ | ---------------------------------------------------- |
-| `gyblos start`                    | None                                                   | Runs until stopped                                   |
-| `gyblos setup`                    | `--role seller --mint MINT`                            | 0 keys ready; non-zero on failure                    |
-| `gyblos tokenizer`                | None                                                   | 0 verified; non-zero on failure                      |
-| `gyblos --version`                | None                                                   | 0                                                    |
-| `gyblos --help` / `gyblos -h`     | None                                                   | 0 prints usage to stdout                             |
-| `gyblos config validate`          | `--config PATH`                                        | 0 valid; 1 invalid or usage error                    |
-| `gyblos doctor`                   | `--online`                                             | 0 no failed check, even with warnings; 1 a failure   |
-| `gyblos seller status`            | `--online`                                             | 0 only for `RUNNING`; 1 for any other state or error |
-| `gyblos seller register`          | None                                                   | 0 registered or already registered; 1 failure        |
-| `gyblos seller init`              | See [`seller init`](#init-flags-for-a-native-checkout) | 0 written; 1 failure; 130 prompt cancelled           |
-| `gyblos seller service install`   | `--memory SIZE`, `--cpu PERCENT`, `--dry-run`          | 0 success; 1 failure                                 |
-| `gyblos seller service uninstall` | `--dry-run`                                            | 0 success; 1 failure                                 |
-| `gyblos logs`                     | See [`logs`](#local-operational-logs)                  | 0 read completed; 1 usage error or unreadable data   |
+| Command                                     | Options                                                | Exit codes                                           |
+| ------------------------------------------- | ------------------------------------------------------ | ---------------------------------------------------- |
+| `gyblos start`                              | None                                                   | Runs until stopped                                   |
+| `gyblos setup`                              | `--role seller --mint MINT`                            | 0 keys ready; non-zero on failure                    |
+| `gyblos tokenizer`                          | None                                                   | 0 verified; non-zero on failure                      |
+| `gyblos --version`                          | None                                                   | 0                                                    |
+| `gyblos --help` / `gyblos -h`               | None                                                   | 0 prints usage to stdout                             |
+| `gyblos config validate`                    | `--config PATH`                                        | 0 valid; 1 invalid or usage error                    |
+| `gyblos doctor`                             | `--online`                                             | 0 no failed check, even with warnings; 1 a failure   |
+| `gyblos seller status`                      | `--online`                                             | 0 only for `RUNNING`; 1 for any other state or error |
+| `gyblos seller register`                    | None                                                   | 0 registered or already registered; 1 failure        |
+| `gyblos seller rpc`, `rpc set`, `rpc reset` | None                                                   | 0 shown or saved; 1 failure, nothing changed         |
+| `gyblos seller init`                        | See [`seller init`](#init-flags-for-a-native-checkout) | 0 written; 1 failure; 130 prompt cancelled           |
+| `gyblos seller service install`             | `--memory SIZE`, `--cpu PERCENT`, `--dry-run`          | 0 success; 1 failure                                 |
+| `gyblos seller service uninstall`           | `--dry-run`                                            | 0 success; 1 failure                                 |
+| `gyblos seller service restart`             | `--dry-run`                                            | 0 success; 1 failure or not installed                |
+| `gyblos logs`                               | See [`logs`](#local-operational-logs)                  | 0 read completed; 1 usage error or unreadable data   |
 
 There is no `gyblos stop`, and no general `--home`, `--relay`, `--rpc-url` or `--discovery-url` flag.
 Stop a Docker seller with Compose and a native seller through its service (see
@@ -116,6 +118,11 @@ release build, status also reports when a newer release exists (see
 command-line argument. It asks before it signs and submits a devnet registration that costs SOL, and it
 doesn't change `config.toml` or publish. Read [Register and publish](/en/sellers/register-publish) before
 you run it.
+
+`seller rpc` shows the origin of the Solana RPC the seller uses. `seller rpc set` asks for the URL on an
+interactive terminal (a script without one sets `GYBLOS_RPC_URL`), never takes it as an argument, saves it only after it answers as
+devnet, and changes nothing else; `seller rpc reset` goes back to the public devnet RPC. The seller reads
+it at startup, so restart it afterwards with `gyblos seller service restart` (see [Change the RPC of an installed seller](/en/sellers/beta-guide#change-rpc)).
 
 ## seller init [#init-flags-for-a-native-checkout]
 

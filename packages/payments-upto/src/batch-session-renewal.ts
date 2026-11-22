@@ -20,7 +20,10 @@ import {
 import { batchOpeningAbsent } from './batch-opening-proof';
 import { parseRecord, termsFor } from './batch-session-checks';
 import { initialRecord } from './batch-session-common';
-import { sameBatchParties } from './batch-session-history';
+import {
+  compatibleBuyerGeneration,
+  sameBatchParties,
+} from './batch-session-history';
 import { withBatchState } from './batch-session-io';
 import { priorBatchSpent, readBatchRecord } from './batch-session-state';
 import type {
@@ -37,6 +40,7 @@ export interface BatchRenewalOptions {
   now: () => number;
   observe(channelId: string): Promise<SessionSettlement | undefined>;
   totalBudgetAtomic?: string;
+  switchSeller?: boolean;
 }
 
 export async function renewBatchSession(
@@ -64,7 +68,7 @@ export async function renewBatchSession(
     }
     if (
       previous.channelId !== options.expectedChannelId ||
-      !sameBatchParties(previous.terms, terms)
+      !canRenew(previous, terms, options)
     )
       return sessionFail(SESSION_CODES.BINDING);
     const absent =
@@ -175,5 +179,21 @@ function unsignedPreparation(record: BatchRecord) {
     record.closing === null &&
     record.settlement === null &&
     record.blocks === undefined
+  );
+}
+
+function canRenew(
+  previous: BatchRecord,
+  terms: PaymentSessionTerms,
+  options: BatchRenewalOptions,
+) {
+  return (
+    sameBatchParties(previous.terms, terms) ||
+    (options.switchSeller &&
+      options.totalBudgetAtomic !== undefined &&
+      (previous.settlement ||
+        batchOpeningAbsent(previous) ||
+        unsignedPreparation(previous)) &&
+      compatibleBuyerGeneration(previous.terms, terms))
   );
 }

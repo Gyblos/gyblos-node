@@ -73,6 +73,8 @@ void test(
       feePayer: vm.feePayer,
       authorizer: vm.authorizer,
       signer: vm.signer,
+      // A lost confirmation reaches restart recovery instead of the bounded confirmation wait.
+      openingConfirmMs: 0,
     });
     const invalid = JSON.parse(payload);
     invalid.voucher.signature = Buffer.alloc(64).toString('base64');

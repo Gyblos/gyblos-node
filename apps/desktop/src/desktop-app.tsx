@@ -3,8 +3,11 @@
 import { Check, CheckCircle, X } from '@phosphor-icons/react';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 
+import { MODEL_IDS } from '@gyblos/protocol/constants';
+
 import manifest from '../package.json';
 import { WINDOW_CHROME } from './constants';
+import { autoFundingAvailable, FUNDING } from './funding/model';
 import {
   canSelectPreviewModel,
   canSwitchPaymentMethod,
@@ -262,7 +265,74 @@ export function DesktopApp() {
     const timer = setTimeout(() => setToast(''), DEMO_ACCOUNT.TOAST_MS);
     return () => clearTimeout(timer);
   }, [toast]);
+  const autoAttempt = useRef(0);
+  useEffect(() => {
+    autoAttempt.current++;
+  }, [x402.state.policy?.policyId, view, paymentMethod]);
+  async function chooseAuto(name: string) {
+    const policy = x402.state.policy;
+    if (!policy?.autoRoutes?.some((route) => route.modelId === name)) return;
+    const offers = networkModels.filter((item) => item.name === name);
+    const listing = offers[0];
+    if (!listing) return;
+    const attempt = ++autoAttempt.current;
+    const paid =
+      name === MODEL_IDS.QWEN3_0_6B &&
+      policy.paidAuto &&
+      policy.maxAtomic !== '0';
+    if (!offers.some((item) => item.free)) {
+      if (!paid) {
+        setToast(
+          name === MODEL_IDS.QWEN3_0_6B
+            ? 'Only paid offers are listed. Enable paid Auto in Payments.'
+            : 'No free offers are listed for this model.',
+        );
+        if (name === MODEL_IDS.QWEN3_0_6B) navigate(UI_VIEW.PAYMENTS);
+        return;
+      }
+      setToast('Checking channel funds…');
+      const funding = await Promise.all(
+        offers.map(async (item) =>
+          item.offerId
+            ? ((await window.desktopFunding
+                ?.balance(item.offerId)
+                .catch(() => null)) ?? null)
+            : null,
+        ),
+      );
+      if (attempt !== autoAttempt.current) return;
+      const available = autoFundingAvailable(policy, funding);
+      if (available !== true) {
+        setToast(
+          available === false
+            ? 'Add devnet USDC to open a channel.'
+            : available === FUNDING.channelLimit
+              ? 'Channel capacity cannot cover this response. Review Payments.'
+              : 'Could not confirm channel funds. Check Payments and try again.',
+        );
+        navigate(UI_VIEW.PAYMENTS);
+        if (available === false) setModal(UI_DIALOG.ADD_FUNDS);
+        return;
+      }
+    }
+    setModel({
+      id: 'auto/' + name,
+      automatic: true,
+      name,
+      image: listing.image,
+      family: 'Auto',
+      context: listing.context,
+      category: listing.category,
+      providers: listing.providers,
+      input: 0,
+      output: 0,
+      free: !paid,
+    });
+    setConfirmedPolicy(policy.policyId);
+    setToast(name + ' · Auto selected');
+  }
   function choose(next: Model) {
+    autoAttempt.current++;
     if (paymentMethod === PAYMENT_METHOD.PAYPAL) return;
     if (
       next.id === model.id &&
@@ -414,6 +484,7 @@ export function DesktopApp() {
               models={chatModels}
               confirmedPolicy={confirmedPolicy}
               onDefaultModel={() => setModel(MODELS[0])}
+              onAutoModel={(name) => void chooseAuto(name)}
               onSelectModel={(id) => {
                 const next = chatModels.find((item) => item.id === id);
                 if (next) choose(next);
@@ -430,6 +501,18 @@ export function DesktopApp() {
               canSelect={canSelectPreviewModel(paymentMethod)}
               onSelect={choose}
               catalog={announcements}
+              networkModels={networkModels}
+              auto={
+                x402.state.policy && {
+                  buyerModels:
+                    x402.state.policy.autoRoutes?.map(
+                      (route) => route.modelId,
+                    ) ?? [],
+                  paid: !!x402.state.policy.paidAuto,
+                  selected: !!model.automatic,
+                  choose: (name) => void chooseAuto(name),
+                }
+              }
             />
           )}
           {view === UI_VIEW.CONNECT &&

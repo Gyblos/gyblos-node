@@ -23,6 +23,7 @@ export const DESKTOP_X402 = {
   STOP_MS: 15000,
   MAX_RELAY_TOKEN: 8192,
   MAX_RELAYS_LENGTH: 8192,
+  MAX_COLLECTOR_URL_LENGTH: 8192,
   MAX_TRANSPORT_ADDRESS: 2048,
   SERVICE_FILE: 'buyer-service.cjs',
 } as const;
@@ -35,6 +36,7 @@ export const DESKTOP_X402_STREAM = {
 } as const;
 export const X402_ACTION = {
   STATUS: 'status',
+  REVIEW: 'review-payment',
   CONNECT: 'connect',
   AUTHORIZE: 'authorize',
   SEND: 'send',

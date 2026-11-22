@@ -23,6 +23,17 @@ node --import tsx --test --test-name-pattern "PATTERN" tests/iroh-transport.test
 Report passed, failed, cancelled and skipped counts for product, lab and tooling
 tests separately.
 
+## Linux CI shards
+
+Linux CI distributes the product and lab suites by historical duration. The
+workflow discovers files from the suite globs on each run. Within each suite, it
+assigns heavier files first to the shard with the lowest estimated load. After
+scheduling the measured files, new paths use the middle observed weight for
+their suite. Deleted paths drop out automatically. The weights in
+`tooling/ci-shard-durations.json` are median per-file process times in
+nanoseconds from comparable green Linux runs. Refresh them from file lifetimes
+including startup, since individual test cases can overlap.
+
 ## Layout
 
 Node finds test files by glob; there is no allowlist. Every case is a top-level
@@ -117,7 +128,7 @@ a skip is never a successful acceptance.
 | Read-only 8004 identity               | `pnpm --filter @gyblos/lab-harness acceptance:identity`                                   | [Identity acceptance](../lab/docs/node-discovery-acceptance.md#complete-acceptance-with-read-only-8004-identity)    |
 | Product startup to confirmed receipts | `pnpm acceptance:receipts`                                                                | [Receipt acceptance](../lab/docs/node-discovery-acceptance.md#product-startup-through-private-receipt-confirmation) |
 | Payment-channel program               | `tests/lab/paid-native.test.ts`                                                           | [Payment-channel program acceptance](../lab/docs/paid-native-acceptance.md)                                         |
-| Abrupt exit and journal recovery      | `tests/lab/channel-crash-native.test.ts`, `channel-crash-boundaries.test.ts`              | [Offline abrupt-exit acceptance](../docs/recovery.md#offline-abrupt-exit-acceptance)                                |
+| Abrupt exit and journal recovery      | `tests/lab/batch-recovery-crash.test.ts`, `batch-recovery-locks.test.ts`                  | [Offline abrupt-exit acceptance](../docs/recovery.md#offline-abrupt-exit-acceptance)                                |
 | Two concurrent sellers                | `tests/lab/http-multiseller-acceptance.test.ts`                                           | Below                                                                                                               |
 | Paid session conversations            | `tests/lab/paid-conversation-startup.test.ts`, `tests/lab/paid-session-streaming.test.ts` | Below                                                                                                               |
 | Agent tool loop                       | `tests/lab/tools-acceptance.test.ts`                                                      | Below                                                                                                               |

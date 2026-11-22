@@ -33,6 +33,7 @@ import { waitBatch } from './batch-session-wait';
 import { createBuyerObservationRpc } from './buyer-observation-transport';
 import { BATCH_OPENING_LIMITS } from './constants';
 import { assertFeeWire, limitedFeePayer } from './fee-payer';
+import { rateLimitedFacilitatorRpc } from './rpc-rate-limit';
 import { verifyPaymentNetwork } from './seller-network';
 
 interface Options {
@@ -42,6 +43,8 @@ interface Options {
   rpc?: BatchObserverOptions['rpc'];
   // How long one SDK or RPC operation is awaited (BATCH_SESSION_DEFAULTS.operationMs by default).
   operationMs?: number;
+  // After a deposit was sent, how long its channel is looked for (BATCH_SESSION_DEFAULTS.openingConfirmMs by default).
+  openingConfirmMs?: number;
 }
 async function compatible(options: Options, terms: PaymentSessionTerms) {
   termsFor(terms);
@@ -61,6 +64,7 @@ export function openBatchBuyerBackend(
       expectedChannelId: string,
       terms: PaymentSessionTerms,
       totalBudgetAtomic: string,
+      switchSeller = false,
     ) {
       if (options.payer.address !== terms.buyer)
         return sessionFail(SESSION_CODES.BINDING);
@@ -75,6 +79,7 @@ export function openBatchBuyerBackend(
         expectedChannelId,
         terms,
         totalBudgetAtomic,
+        switchSeller,
         now: options.now ?? Date.now,
         observe: oldObserver.settlement,
       });
@@ -166,9 +171,10 @@ export function openBatchSellerBackend(
 ): BatchSellerBackend {
   const signer =
     options.signer ??
-    toFacilitatorSvmSigner(limitedFeePayer(options.feePayer), {
-      defaultRpcUrl: options.rpcUrl,
-    });
+    toFacilitatorSvmSigner(
+      limitedFeePayer(options.feePayer),
+      rateLimitedFacilitatorRpc(options.rpcUrl),
+    );
   return {
     inspect: () => inspectBatchSession(options.paths),
     async renew(
@@ -222,6 +228,7 @@ export function openBatchSellerBackend(
         observeOpening: (opening) => observer.opening(opening),
         closing: observer.closing,
         operationMs: options.operationMs,
+        openingConfirmMs: options.openingConfirmMs,
         reclaimReleasedSlot: payload !== undefined,
       });
     },

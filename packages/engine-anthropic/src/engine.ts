@@ -68,6 +68,9 @@ export interface AnthropicEngineSettings {
   // The model's context size from config.toml; the API does not report it.
   contextTokens: number;
   apiKey: string;
+  // Whether the model's usage is recounted with its pinned public tokenizer (the Qwen3 family); Claude and
+  // other models are declared by the provider.
+  recountable?: boolean;
 }
 
 export interface AnthropicOptions {
@@ -273,10 +276,14 @@ async function generate(
           'content-type': 'application/json',
           accept: 'text/event-stream',
         },
-        // No thinking parameter: offers list reasoning "off", and thinking is off unless asked for.
+        // Offers list reasoning "off". Claude thinks only when asked; a Qwen3 hybrid (recounted) thinks by
+        // default behind a Messages API, so it is told not to (Ollama and Anthropic honor this).
         body: JSON.stringify({
           model: settings.model,
           max_tokens: input.maxTokens,
+          ...(settings.recountable === true
+            ? { thinking: { type: 'disabled' } }
+            : {}),
           ...(system === undefined ? {} : { system }),
           messages: anthropicTurns(turns),
           ...anthropicTools(input.tools, input.toolChoice),
@@ -325,7 +332,7 @@ export function createAnthropicEngine(
       reportsUsage: true,
       logprobs: false,
       cancellable: true,
-      recountable: false,
+      recountable: settings.recountable === true,
       modelIdentity: MODEL_IDENTITIES.NAME_ONLY,
     }),
     describe: () => describeModel(settings, fetchImpl, describeTimeoutMs),

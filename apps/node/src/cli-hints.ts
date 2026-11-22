@@ -48,8 +48,6 @@ const HINTS: Readonly<Partial<Record<DoctorResultCode, string>>> = {
     'add a free [[offers]] entry to config.toml (examples/seller-daemon.toml)',
   [NODE_ERROR_CODES.SELLER_PAID_EXECUTION_UNAVAILABLE]:
     'paid offers need the payment chain; list the offer as free',
-  [NODE_ERROR_CODES.SELLER_PAID_METERING_UNRECOUNTED]:
-    'a paid offer needs a model recounted with its pinned public tokenizer (qwen3-0.6b)',
   [NODE_ERROR_CODES.SELLER_PAYMENT_ROLE_MISSING]:
     'this seller has no payment keys yet: run `gyblos setup --role seller --mint <mint>` again (installed with install.sh: rerun it); it keeps the NodeId and owner. Then fund the fee payer with devnet SOL',
   [NODE_ERROR_CODES.SELLER_PAYMENT_NETWORK_MISMATCH]:

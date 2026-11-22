@@ -37,7 +37,7 @@ void test('the automatic runtime forwards open zero-price selection to free exec
       const sources={
         './free-selection': "export async function selectWinner(prepared,options,excluded,signal,request,route){globalThis.probe.selections.push({request,route});return globalThis.winner}",
         './free-execution': "export async function executeSelectedBuyerFree(){globalThis.probe.executions++;return {text:'synthetic',usage:{inputTokens:1,outputTokens:1},finishReason:'${ENGINE_DONE_REASONS.STOP}'}}",
-        './session-requirements': "export function endpointToken(){return undefined} export function checkPaidSellerRequest(){throw Error('unexpected paid check')} export function payments(){globalThis.probe.payments++;throw Error('unexpected payments')} export function tokenizer(){throw Error('unexpected tokenizer')}",
+        './session-requirements': "export function endpointToken(){return undefined} export function checkDesktopPool(){throw Error('unexpected channel check')} export function checkPaidSellerRequest(){throw Error('unexpected paid check')} export function payments(){globalThis.probe.payments++;throw Error('unexpected payments')} export function tokenizer(){throw Error('unexpected tokenizer')}",
         '@gyblos/node/buyer-chain': "export async function buyerPaymentsUnresolved(){return false} export function buyerChainPayments(){globalThis.probe.payments++;throw Error('unexpected chain')}"
       };
       registerHooks({resolve(name,context,next){

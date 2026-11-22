@@ -11,6 +11,7 @@ export {
   openBatchBuyerBackend,
   openBatchSellerBackend,
 } from './batch-session-backend';
+export { finalizedRequestCharge } from './batch-request-review';
 export { batchSessionObserver } from './batch-session-observer';
 export {
   openBatchSellerRegistry,
@@ -31,7 +32,12 @@ export type {
   BatchSellerOptions,
 } from './batch-session-types';
 
-export { openBatchBuyerPool, inspectBatchPool } from './batch-pool';
+export {
+  openBatchBuyerPool,
+  inspectBatchPool,
+  poolAllowsSellerDeposit,
+  poolFundingPending,
+} from './batch-pool';
 export type {
   BatchBuyerPool,
   BatchPoolEntry,

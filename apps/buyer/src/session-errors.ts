@@ -3,12 +3,14 @@ import { HTTP_STATUS } from '@gyblos/config';
 import { BuyerRoutingError } from '@gyblos/core/buyer-routing';
 import { BUYER_ROUTING_CODES } from '@gyblos/core/constants';
 import {
+  DeclinedChannelRequest,
   UnsentChannelPeerError,
   UnsentOpeningError,
 } from '@gyblos/node/batch-buyer';
 import { bounded } from '@gyblos/node/buyer-operation';
 import { PaidBuyerError } from '@gyblos/node/buyer-paid-error';
 import { UnsentSellerBusyError } from '@gyblos/node/buyer-routing';
+import { UnsentChannelRequestError } from '@gyblos/node/buyer-session';
 import { UnsentChannelLimitError } from '@gyblos/node/session-policy';
 import { BatchChannelError } from '@gyblos/protocol/batch-channel';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
@@ -35,6 +37,15 @@ const unavailable = (
 
 class UnsentSessionPreflightError extends BatchChannelError {}
 
+export function unaffordableSessionQuote(
+  error: unknown,
+): error is BatchChannelError {
+  return (
+    error instanceof UnsentSessionPreflightError &&
+    error.code === PAID_EXECUTION_CODES.BUDGET_EXHAUSTED
+  );
+}
+
 // Applies only around local recounting and quote verification, before opening a channel or sending input.
 export async function unsentSessionPreflight<T>(
   operation: Promise<T>,
@@ -60,10 +71,13 @@ export function classifyPaidError(error: unknown): ChatErrorView | undefined {
     error instanceof UnsentOpeningError ||
     error instanceof UnsentSessionPreflightError ||
     error instanceof UnsentSellerChoiceError ||
+    error instanceof UnsentChannelRequestError ||
     error instanceof UnsentChannelLimitError ||
     error instanceof UnsentChannelPeerError
   )
     return unavailable(error.code, true);
+  if (error instanceof DeclinedChannelRequest)
+    return unavailable(error.code, false);
   const keyError = buyerApiKeyErrorView(error);
   if (keyError) return keyError;
   if (

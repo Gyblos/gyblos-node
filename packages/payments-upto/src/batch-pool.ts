@@ -7,6 +7,7 @@ import {
   SESSION_CODES,
   SESSION_STATES,
   sessionFail,
+  UnsentChannelLimitError,
   type PaymentSessionTerms,
 } from '@gyblos/protocol/payment-session';
 
@@ -19,6 +20,7 @@ import {
 } from './batch-pool-store';
 import type {
   BatchBuyerPool,
+  BatchPoolEntry,
   BatchPoolOptions,
   PoolRow,
 } from './batch-pool-types';
@@ -63,6 +65,42 @@ export async function inspectBatchPool(
     }),
   );
 }
+export function poolFundingPending(row: BatchPoolEntry) {
+  return (
+    !row.stored ||
+    row.uncertain ||
+    row.requestId !== null ||
+    row.stored.pending ||
+    (row.stored.recoverable &&
+      row.stored.snapshot.state !== SESSION_STATES.CLOSED)
+  );
+}
+export async function poolAllowsSellerDeposit(
+  paths: BatchPoolOptions['paths'],
+  sellerNodeId: string,
+  total: string,
+  deposit: string,
+) {
+  const entries = await inspectBatchPool(paths);
+  if (entries.some(poolFundingPending)) return false;
+  const unfunded = new Set(
+    entries
+      .filter((row) => row.stored?.notCreated)
+      .map((row) => row.terms.sellerNodeId),
+  );
+  const funds = budget(entries, total, unfunded);
+  if (BigInt(funds.committedAtomic) > BigInt(total)) return false;
+  const existing = entries.find(
+    (row) => row.terms.sellerNodeId === sellerNodeId,
+  );
+  if (
+    existing &&
+    !existing.stored?.notCreated &&
+    !existing.stored?.openingReturned
+  )
+    return existing.stored?.empty === true;
+  return BigInt(funds.availableAtomic) >= BigInt(deposit);
+}
 interface PoolContext {
   options: BatchPoolOptions;
   total: string;
@@ -84,7 +122,7 @@ async function replacePoolEntry(
       budget(store.read().entries, total, context.unfunded).availableAtomic,
     ) < BigInt(checked.depositAtomic)
   )
-    return sessionFail(SESSION_CODES.LIMIT);
+    throw new UnsentChannelLimitError(checked.sellerNodeId);
   if (
     !sameBatchParties(row.terms, checked) ||
     checked.expiresAt <= row.terms.expiresAt
@@ -141,7 +179,7 @@ async function allocate(context: PoolContext, terms: PaymentSessionTerms) {
         budget(store.read().entries, total, context.unfunded).availableAtomic,
       ) < BigInt(checked.depositAtomic)
     )
-      return sessionFail(SESSION_CODES.LIMIT);
+      throw new UnsentChannelLimitError(checked.sellerNodeId);
     row = {
       terms: checked,
       legacy: false,
@@ -184,12 +222,21 @@ async function resolve(
     (record.pending[BATCH_BUYER_CHECKPOINTS.OPENING_SENT] === record.channelId
       ? row.requestId
       : undefined);
+  const declined =
+    row.requestId !== null &&
+    record.pending[BATCH_BUYER_CHECKPOINTS.DECLINED_REQUEST] ===
+      row.requestId &&
+    !Object.hasOwn(record.requests, row.requestId);
   const unsent =
     checking === row.requestId &&
     typeof checking === 'string' &&
     !Object.hasOwn(record.requests, checking) &&
     Object.keys(record.pending).every(
-      (key) => key === BATCH_BUYER_CHECKPOINTS.OPENING_SENT,
+      (key) =>
+        key === BATCH_BUYER_CHECKPOINTS.OPENING_SENT ||
+        (unsentRequestId !== undefined &&
+          key === BATCH_BUYER_CHECKPOINTS.DECLINED_REQUEST &&
+          record.pending[key] !== unsentRequestId),
     ) &&
     (pristine ||
       (record.state === SESSION_STATES.OPEN &&
@@ -197,6 +244,7 @@ async function resolve(
   if (
     !closed &&
     !notCreated &&
+    !declined &&
     !unsent &&
     (row.uncertain || row.requestId !== null) &&
     !accepted &&
@@ -274,7 +322,12 @@ export async function openBatchBuyerPool(
         const record = await poolChild(options.paths, row);
         if (batchOpeningAbsent(record))
           return sessionFail(SESSION_CODES.CLOSED);
-        if (row.requestId !== null || Object.hasOwn(record.requests, requestId))
+        if (
+          row.requestId !== null ||
+          record.pending[BATCH_BUYER_CHECKPOINTS.DECLINED_REQUEST] ===
+            requestId ||
+          Object.hasOwn(record.requests, requestId)
+        )
           return sessionFail(SESSION_CODES.UNVERIFIED);
         await store.update((next) => {
           const row = next.entries.find(

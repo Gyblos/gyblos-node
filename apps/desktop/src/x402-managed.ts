@@ -9,6 +9,8 @@ import {
   BUYER_SIDECAR,
   isBuyerSessionConfigFailure,
 } from '@gyblos/protocol/buyer-api';
+import type { TokenPricesV2 } from '@gyblos/protocol/control-types';
+import { isReceiptUploadAppVersion } from '@gyblos/protocol/receipt-upload';
 
 import { BuyerSessionRequired } from './buyer-error';
 import { DESKTOP_X402 } from './x402/constants';
@@ -173,16 +175,22 @@ export class ManagedBuyer {
       home: string,
       relayToken: string | undefined,
       maxAtomic?: string,
+      autoPrices?: TokenPricesV2 | null,
     ) => BuyerWorker,
     private readonly onExit: () => void,
     private readonly startMs: number = DESKTOP_X402.START_MS,
     private readonly stopMs: number = DESKTOP_X402.STOP_MS,
   ) {}
-  async start(home: string, relayToken?: string, maxAtomic?: string) {
+  async start(
+    home: string,
+    relayToken?: string,
+    maxAtomic?: string,
+    autoPrices?: TokenPricesV2 | null,
+  ) {
     if (this.closed || this.running)
       throw new Error('A buyer is already running');
     const operation = supervise(
-      this.fork(home, relayToken, maxAtomic),
+      this.fork(home, relayToken, maxAtomic, autoPrices),
       () => {
         this.running = null;
         this.onExit();
@@ -210,12 +218,12 @@ function uploadEnvironment(
   releaseVersion: string | undefined,
 ): NodeJS.ProcessEnv {
   const result: NodeJS.ProcessEnv = {};
-  if (releaseVersion && DESKTOP_RELEASE_VERSION.test(releaseVersion))
+  if (releaseVersion && isReceiptUploadAppVersion(releaseVersion))
     result[RECEIPT_UPLOADER.releaseEnvironment] = releaseVersion;
   const url = environment[RECEIPT_UPLOADER.urlEnvironment];
   if (
     url &&
-    url.length <= DESKTOP_X402.MAX_RELAYS_LENGTH &&
+    url.length <= DESKTOP_X402.MAX_COLLECTOR_URL_LENGTH &&
     !/[\r\n]/.test(url)
   )
     result[RECEIPT_UPLOADER.urlEnvironment] = url;
@@ -227,4 +235,3 @@ function uploadEnvironment(
       RECEIPT_UPLOADER.observationsOff;
   return result;
 }
-const DESKTOP_RELEASE_VERSION = /^[0-9A-Za-z.+-]{1,32}$/;

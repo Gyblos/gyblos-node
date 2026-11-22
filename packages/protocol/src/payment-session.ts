@@ -24,6 +24,12 @@ export class PaymentSessionError extends Error {
     this.name = 'PaymentSessionError';
   }
 }
+export class UnsentChannelLimitError extends PaymentSessionError {
+  constructor(readonly nodeId: string) {
+    super(SESSION_CODES.LIMIT);
+  }
+}
+
 export function sessionFail(code: SessionCode = SESSION_CODES.INVALID): never {
   throw new PaymentSessionError(code);
 }
@@ -86,6 +92,7 @@ export interface SessionSeller {
   dispose(): Promise<void>;
 }
 export interface SessionBuyer {
+  releaseDeclined?(channelId: string, request: SessionRequest): Promise<void>;
   openingRecovery?: {
     claim(): Promise<boolean>;
     pending(): boolean;

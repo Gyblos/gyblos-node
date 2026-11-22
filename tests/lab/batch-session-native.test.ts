@@ -169,6 +169,8 @@ for (const scenario of [
       },
       minSettlementAtomic: '100',
       idleMs: 1000,
+      // A lost opening reaches restart recovery instead of the bounded confirmation wait.
+      openingConfirmMs: 0,
     };
     let seller = await createBatchSeller(options);
     t.after(async () => {

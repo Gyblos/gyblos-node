@@ -55,11 +55,8 @@ export function Dropdown({
       const gap = Number.parseFloat(
         getComputedStyle(menu).getPropertyValue('--overlay-gap'),
       );
-      const width = Math.min(
-        MENU_GEOMETRY.WIDTH,
-        window.innerWidth - gutter * 2,
-      );
-      menu.style.width = `${width}px`;
+      menu.style.width = `min(var(--seller-menu-width, ${MENU_GEOMETRY.WIDTH}px), ${window.innerWidth - gutter * 2}px)`;
+      const width = menu.getBoundingClientRect().width;
       menu.style.maxHeight = 'none';
       const below = window.innerHeight - bounds.bottom - gutter - gap;
       const above = bounds.top - gutter - gap;

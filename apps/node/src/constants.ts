@@ -1,6 +1,6 @@
 // Canonical values of the node application: the seller background service's names, locations, limits and
 // error codes, `seller init`'s defaults and codes, and `seller status`'s windows, limits and results.
-// Rendering lives in service.ts and the CLIs in cli-service.ts, cli-init.ts and cli-status.ts. The unit and
+// Rendering lives in service.ts and the CLIs in cli-service.ts, cli-init.ts, cli-status.ts and cli-rpc.ts. The unit and
 // agent directories are operating-system locations under the account's home, not product-home paths
 // (config/src/home.ts).
 // 130 is the shell's code for a run stopped with Ctrl-C.
@@ -16,9 +16,13 @@ export type ServiceKind = (typeof SERVICE_KINDS)[keyof typeof SERVICE_KINDS];
 export const SERVICE_COMMANDS = {
   INSTALL: 'install',
   UNINSTALL: 'uninstall',
+  RESTART: 'restart',
 } as const;
 export type ServiceCommand =
   (typeof SERVICE_COMMANDS)[keyof typeof SERVICE_COMMANDS];
+
+// `seller rpc`'s subcommands (cli-rpc.ts); with none it shows the RPC in use.
+export const RPC_COMMANDS = { SET: 'set', RESET: 'reset' } as const;
 
 // Owner read/write only for files the service creates (launchd's log, the daemon's state).
 const SERVICE_UMASK = 0o077;
@@ -26,6 +30,12 @@ const SERVICE_UMASK = 0o077;
 export const SERVICE = {
   unit: 'gyblos-seller.service',
   label: 'com.gyblos.seller',
+  // How long restart waits for a stopped Windows task to end, and how often restart checks any stopped
+  // service.
+  taskStopWaitMs: 30_000,
+  taskStopPollMs: 500,
+  // How long one launchctl status probe may take before it is cut off.
+  agentProbeMs: 5_000,
   description: 'Gyblos seller',
   // Relative to the repository, which is also the working directory so `--import tsx` resolves; the
   // daemon is its `start` command.
@@ -35,6 +45,9 @@ export const SERVICE = {
   launchAgentsDirectory: 'Library/LaunchAgents',
   // The daemon withdraws its listing and writes its public sequence after the first SIGINT.
   stopTimeoutSeconds: 120,
+  secondMs: 1000,
+  // Extra time a macOS restart allows beyond that for launchd to tear the agent down.
+  agentStopMarginSeconds: 15,
   restartSeconds: 10,
   // systemd gives up after this many failed starts within the interval instead of retrying forever.
   startLimitBurst: 5,
@@ -120,6 +133,8 @@ export const SERVICE_ERRORS = {
   ENVIRONMENT_INVALID: 'SERVICE_ENVIRONMENT_INVALID',
   ENVIRONMENT_RESERVED: 'SERVICE_ENVIRONMENT_RESERVED',
   ALREADY_INSTALLED: 'SERVICE_ALREADY_INSTALLED',
+  NOT_INSTALLED: 'SERVICE_NOT_INSTALLED',
+  RESTART_INCOMPLETE: 'SERVICE_RESTART_INCOMPLETE',
   DOCTOR_NOT_READY: 'SERVICE_DOCTOR_NOT_READY',
   COMMAND_FAILED: 'SERVICE_COMMAND_FAILED',
   EPHEMERAL_INSTALL: 'SERVICE_EPHEMERAL_INSTALL',

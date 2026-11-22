@@ -32,6 +32,7 @@ import {
 } from './free-selection';
 import type { BuyerExecutionFactory } from './free-startup';
 import { verifyBuyerIdentity } from './identity';
+import { restoredSellerAddress } from './seller-address';
 import {
   createSessionPreflight,
   prepareChosenMeter,
@@ -129,17 +130,50 @@ function sessionDestination(
       policy.totalDepositAtomic === undefined
     )
       return sessionFail(SESSION_CODES.BINDING);
-    return sellerAddress(
-      seller ??
-        selected ?? {
-          owner: terms.owner,
-          nodeId: terms.sellerNodeId,
-          relayUrl: null,
-          directAddresses: [],
-        },
-      relayOnly,
-    );
+    const known = seller ?? selected;
+    return known
+      ? sellerAddress(known, relayOnly)
+      : restoredSellerAddress(terms.sellerNodeId, terms.owner, relayOnly);
   };
+}
+function desktopPermissions(
+  state: SessionState,
+  paidAuto: boolean,
+): Pick<
+  BuyerSessionOptions<ReturnType<typeof sellerAddress>>,
+  'financialPermission' | 'switchingAllowed' | 'onDeclined' | 'beforeInference'
+> {
+  return {
+    financialPermission(run) {
+      const id = state.openingIntent?.getStore();
+      return id ? desktopOpening(process.env).whileArmed(id, run) : run();
+    },
+    switchingAllowed: async () => {
+      const intent = state.openingIntent?.getStore();
+      return intent ? desktopOpening(process.env).armed(intent) : paidAuto;
+    },
+    onDeclined: async () => {
+      const intent = state.openingIntent?.getStore();
+      if (intent) await desktopOpening(process.env).declined(intent);
+    },
+    beforeInference: async (_id, ref) => {
+      const intent = state.openingIntent?.getStore();
+      if (intent) await desktopOpening(process.env).consume(intent, ref);
+    },
+  };
+}
+async function previousSeller(
+  total: string | undefined,
+  inspect: typeof inspectSingle,
+) {
+  if (total !== undefined) return undefined;
+  const stored = await inspect();
+  return stored && !batchSessionTerminal(stored)
+    ? stored.terms.sellerNodeId
+    : undefined;
+}
+function inspectSingle() {
+  return inspectBatchSession(batchSessionPathsIn(process.env, P2P_ROLES.BUYER));
 }
 export function makeManager(
   context: Context,
@@ -152,10 +186,7 @@ export function makeManager(
     typeof createBuyerSessionManager<ReturnType<typeof sellerAddress>>
   >[0] = {
     policy,
-    beforeInference: async () => {
-      const intent = state.openingIntent?.getStore();
-      if (intent) await desktopOpening(process.env).consume(intent);
-    },
+    ...desktopPermissions(state, prepared.config.discovery?.paidAuto === true),
     openingSupportsBlocks:
       (policy.totalDepositAtomic !== undefined
         ? options.pool
@@ -164,8 +195,7 @@ export function makeManager(
         : undefined,
     endpoint,
     now: Date.now,
-    inspect: () =>
-      inspectBatchSession(batchSessionPathsIn(process.env, P2P_ROLES.BUYER)),
+    inspect: inspectSingle,
     backend: async () => {
       return (options.batch ?? buyerSessionChain)(role);
     },
@@ -211,13 +241,17 @@ export function makeManager(
   );
   return {
     ...manager,
+    previousSeller: () =>
+      previousSeller(policy.totalDepositAtomic, common.inspect),
     preparePaidChat: async () => {
       await loadMeter();
     },
     prepareChoice: (expiresAt: number, signal: AbortSignal) =>
       prepareChosenMeter(expiresAt, loadMeter, signal),
     async preflight(...args: Parameters<typeof check>) {
-      state.meter = await check(...args);
+      // A declared quote loads no meter; keep the one a recounted quote loaded.
+      const meter = await check(...args);
+      if (meter) state.meter = meter;
     },
   };
 }

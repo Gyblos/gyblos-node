@@ -4,13 +4,13 @@ import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
 import { recountSessionInput } from '@gyblos/core/session-input';
 import type { BatchStoredSession } from '@gyblos/payments-upto/batch-session';
 import { verifyBatchQuote } from '@gyblos/protocol/batch-channel';
+import { CONTROL_METERING_MODES } from '@gyblos/protocol/constants';
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
 import type { ChatTokenizer } from '@gyblos/protocol/engine';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import {
   SESSION_CODES,
-  SESSION_STATES,
   sessionFail,
   type PaymentSessionTerms,
   type SessionBuyer,
@@ -25,23 +25,32 @@ import { createBuyerBatchSession } from './batch-buyer';
 import type { BuyerBatchSessionOptions } from './batch-buyer-types';
 import {
   prepareNewChannel,
+  UnsentChannelRequestError,
   type PreparedChannel,
 } from './buyer-channel-prepare';
 import { UnsentOpeningError } from './buyer-opening-retry';
 import { checkPreviousOpening, disposeAbsent } from './buyer-opening-state';
 import { bounded } from './buyer-operation';
 import { UnsentSellerBusyError } from './buyer-routing';
+import { prepareRenewal } from './buyer-session-renewal';
 import { sessionApproval } from './session-accounting';
 import type { BuyerSessionBackend } from './session-backend';
 import {
   newSessionTerms,
   parseBuyerSessionPolicy,
+  replacementTerms,
+  UnsentChannelLimitError,
   type BuyerSessionPolicy,
 } from './session-policy';
 
+export { UnsentChannelRequestError } from './buyer-channel-prepare';
+
 export interface BuyerSessionOptions<Remote extends BatchDestination> {
   // Known capability of the financial adapter. Unspecified adapters negotiate after construction.
+  financialPermission?: BuyerBatchSessionOptions<Remote>['financialPermission'];
+  onDeclined?: BuyerBatchSessionOptions<Remote>['onDeclined'];
   beforeInference?: BuyerBatchSessionOptions<Remote>['beforeInference'];
+  switchingAllowed?(): Promise<boolean>;
   openingSupportsBlocks?: boolean;
   preparation?: PreparedChannel;
   receipt?: BuyerBatchSessionOptions<Remote>['receipt'];
@@ -93,17 +102,12 @@ async function openCurrent<Remote extends BatchDestination>(
     if (!quote) return sessionFail(SESSION_CODES.CLOSED);
     const backend = await getBackend(state, signal);
     if (!backend.renew) return sessionFail(SESSION_CODES.CLOSED);
-    const replacement = newSessionTerms(
+    const replacement = replacementTerms(
+      options.policy,
+      options.now,
       quote,
-      {
-        ...options.policy,
-        depositAtomic: String(
-          BigInt(options.policy.depositAtomic) -
-            BigInt(stored.priorSpentAtomic ?? '0'),
-        ),
-      },
-      options.now(),
-    );
+      stored.priorSpentAtomic,
+    )('0');
     await verifyBatchQuote(
       quote,
       replacement,
@@ -115,6 +119,8 @@ async function openCurrent<Remote extends BatchDestination>(
       stored.snapshot.channelId,
       replacement,
       options.policy.depositAtomic,
+      stored.terms.sellerNodeId !== replacement.sellerNodeId &&
+        (await options.switchingAllowed?.()),
     );
     const renewed = await options.inspect();
     if (!renewed || renewed.notCreated || renewed.openingReturned)
@@ -151,6 +157,7 @@ async function openCurrent<Remote extends BatchDestination>(
       host: createBuyerBatchSession({
         ...options,
         preparation,
+        declared: quote?.offer.meteringMode === CONTROL_METERING_MODES.DECLARED,
         terms,
         buyer: financial,
         destination,
@@ -200,13 +207,16 @@ async function run<Remote extends BatchDestination>(
       state.options.policy.lifetimeMs
   )
     return sessionFail(SESSION_CODES.LIMIT);
-  if (
-    (opened.terms.sellerNodeId !== quote.offer.nodeId ||
-      opened.terms.owner !== quote.offer.owner) &&
-    opened.financial.snapshot().state !== SESSION_STATES.CLOSED
-  )
+  const switching =
+    opened.terms.sellerNodeId !== quote.offer.nodeId ||
+    opened.terms.owner !== quote.offer.owner;
+  if (switching && !(await state.options.switchingAllowed?.()))
     throw new UnsentSellerBusyError(quote.offer.nodeId);
-  const ready = await renewable(state, opened, quote, signal);
+  const renew = () => renewable(state, opened, quote, signal, switching);
+  const ready =
+    switching && state.options.financialPermission
+      ? await state.options.financialPermission(renew)
+      : await renew();
   const before = ready.financial.snapshot();
   const value = await ready.host
     .execute(quote, input, signal, onDelta)
@@ -237,71 +247,37 @@ async function renewable<Remote extends BatchDestination>(
   opened: Current<Remote>,
   quote: SignedOfferV2,
   signal: AbortSignal,
+  switching: boolean,
 ): Promise<Current<Remote>> {
-  const options = state.options;
   const backend = await state.backend!;
-  if (
-    (await checkPreviousOpening(state, opened, signal)) &&
-    options.now() < opened.terms.expiresAt
-  )
-    return opened;
-  if (!backend.renew) return opened;
-  if (opened.financial.snapshot().channelId)
-    await opened.host.reconcile(signal);
-  const snapshot = opened.financial.snapshot();
-  if (
-    (!snapshot.channelId && options.now() < opened.terms.expiresAt) ||
-    (snapshot.state === SESSION_STATES.OPEN &&
-      options.now() < opened.terms.expiresAt &&
-      BigInt(snapshot.cumulativeAtomic) +
-        BigInt(snapshot.reservedAtomic) +
-        BigInt(quote.offer.maxAtomic) <=
-        BigInt(opened.terms.depositAtomic))
-  )
-    return opened;
-  const proposed = newSessionTerms(quote, options.policy, options.now());
-  await verifyBatchQuote(
+  const plan = await prepareRenewal(
+    state,
+    opened,
     quote,
-    proposed,
-    options.endpoint.id().toString(),
-    options.now(),
-  );
-  const stored = await options.inspect();
-  if (!stored || stored.pending) return sessionFail(SESSION_CODES.UNVERIFIED);
-  const authority =
-    BigInt(options.policy.depositAtomic) -
-    BigInt(stored.priorSpentAtomic ?? '0');
-  const replacement = (spent: string) =>
-    newSessionTerms(
-      quote,
-      {
-        ...options.policy,
-        depositAtomic: String(authority - BigInt(spent)),
-      },
-      options.now(),
-    );
-  if (snapshot.state !== SESSION_STATES.CLOSED)
-    replacement(snapshot.cumulativeAtomic);
-  const settlement = snapshot.channelId
-    ? ((await opened.host.reconcile(signal)) ??
-      (await opened.host.close(signal)))
-    : undefined;
-  const terms = replacement(settlement?.chargedAtomic ?? '0');
-  await verifyBatchQuote(
-    quote,
-    terms,
-    options.endpoint.id().toString(),
-    options.now(),
-  );
-  signal.throwIfAborted();
-  await opened.host.disconnect();
-  await opened.host.settled();
-  await opened.financial.dispose();
+    signal,
+    switching,
+    !!backend.renew,
+  ).catch((cause: unknown) => {
+    if (
+      !switching ||
+      cause instanceof UnsentSellerBusyError ||
+      cause instanceof UnsentChannelLimitError
+    )
+      throw cause;
+    throw new UnsentChannelRequestError(quote.offer.nodeId, cause);
+  });
+  if (!plan) return opened;
   state.current = undefined;
-  await backend.renew(snapshot.channelId, terms, options.policy.depositAtomic);
+  await backend.renew!(
+    plan.channelId,
+    plan.terms,
+    state.options.policy.depositAtomic,
+    switching,
+  );
   signal.throwIfAborted();
   return current(state, quote, signal);
 }
+
 async function unresolved<Remote extends BatchDestination>(
   state: State<Remote>,
 ) {

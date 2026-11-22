@@ -336,3 +336,36 @@ void test('closed history is bounded without evicting generations or manufacturi
     await seller.dispose();
   }
 });
+
+void test('a buyer may switch sellers after independently verifying the old refund', async () => {
+  const { options } = await closedGeneration();
+  const next = {
+    ...options.terms,
+    sellerNodeId: 'ab'.repeat(32),
+    owner: options.terms.authorizer,
+    payTo: options.terms.authorizer,
+  };
+  await renewBatchSession({ ...options, terms: next, switchSeller: true });
+  const restored = await inspectBatchSession(options.paths);
+  assert.deepEqual(restored?.terms, next);
+  assert.equal(restored?.priorSpentAtomic, '40');
+});
+
+void test('a buyer may redirect a completely unsigned preparation after the selected seller refuses', async () => {
+  const { options } = await closedGeneration();
+  await renewBatchSession(options);
+  await renewBatchSession({
+    ...options,
+    expectedChannelId: '',
+    terms: {
+      ...options.terms,
+      expiresAt: options.terms.expiresAt + 1,
+      sellerNodeId: 'ab'.repeat(32),
+    },
+    switchSeller: true,
+  });
+  assert.equal(
+    (await inspectBatchSession(options.paths))?.terms.sellerNodeId,
+    'ab'.repeat(32),
+  );
+});

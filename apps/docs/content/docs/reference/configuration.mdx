@@ -108,11 +108,11 @@ ready offers are published.
 | Field                    | Rule                                                                                                                         |
 | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
 | `model`                  | Catalog ID or alias, such as `qwen3:0.6b`; an ID outside the catalog needs `custom = true`                                   |
-| `custom`                 | Boolean; must not be `true` for a catalog model                                                                              |
+| `custom`                 | Boolean; on a catalog model it is ignored, with the warning `CUSTOM_MODEL_NOW_IN_CATALOG`                                    |
 | `reasoning`              | Distinct levels from `off`, `low`, `medium`, `high`; defaults to the catalog's, or `off`. The seller serves `["off"]` only   |
 | `engine.kind`            | Required: `ollama`, `openai` or `anthropic`                                                                                  |
 | `engine.url`             | Required base URL; HTTPS, or HTTP for loopback or `host.docker.internal`; see [Engines](#engine-compatibility-at-startup)    |
-| `engine.upstream_model`  | Optional provider model name, up to 256 characters; defaults to `model`                                                      |
+| `engine.upstream_model`  | Optional provider model name, up to 256 characters; defaults to `model` as written                                           |
 | `engine.api_key_env`     | Name of the API key variable; required for Anthropic; must not start with `GYBLOS_` or reuse the relay-token variable        |
 | `engine.context_tokens`  | Integer 1024 to 2,000,000; required for OpenAI and Anthropic; for Ollama it sets the context (default 8,192, at most 32,768) |
 | `free.daily_token_cap`   | Required for a free offer; integer 1 to 1,000,000,000,000; input plus output tokens per UTC day                              |
@@ -124,7 +124,8 @@ Each offer has exactly one of `free` or `price`. Free counters reset when the se
 To charge for an offer, replace `free` with `price`: `price.input_per_mtok` and `price.output_per_mtok`
 are decimal strings in devnet USDC per million tokens, with `price.currency = "USDC"`. At least one rate
 must be positive. Write no sign, exponent or leading zero, and at most four integer and six decimal
-digits. Only `qwen3:0.6b` can be priced. See [Get paid](/en/sellers/get-paid) before you price an offer.
+digits. Any model can be priced: the Qwen3 family is recounted by the buyer, other models bill the usage your
+provider reports within byte limits the buyer checks. See [Get paid](/en/sellers/get-paid) before you price an offer.
 
 ### Engines [#engine-compatibility-at-startup]
 
@@ -138,7 +139,7 @@ digits. Only `qwen3:0.6b` can be priced. See [Get paid](/en/sellers/get-paid) be
 - **Anthropic-compatible:** reasoning `off`, a context size and a non-empty API key. Use the API root
   without `/v1`; the provider must support model lookup and Messages.
 
-For models other than the pinned Qwen, the seller reports the provider's token counts without recounting
+For models other than the catalog's Qwen3 hybrid models, the seller reports the provider's token counts without recounting
 them. A remote provider can charge you and receives buyers' prompts, even for a free offer.
 
 ## Environment variables [#environment-overrides]
@@ -148,23 +149,23 @@ default. The Docker seller gets its environment from `seller.env`; a variable se
 doesn't reach the container. The native service also reads only its `seller.env`. After editing
 `seller.env`, restart the seller as [Operate and update](/en/sellers/operate) describes.
 
-| Variable                    | Meaning                                                                                      |
-| --------------------------- | -------------------------------------------------------------------------------------------- |
-| `GYBLOS_CONFIG`             | The file `start`, `doctor` and `seller init` read; `config validate` uses `--config` instead |
-| `GYBLOS_HOME`               | The seller's home (keys and state); fixed to `/data` in the Docker image                     |
-| `GYBLOS_RELAYS`             | Comma-separated relay origins                                                                |
-| `GYBLOS_RELAY_TOKEN`        | Optional relay token, only for a relay that requires one; keep it in `seller.env`            |
-| `GYBLOS_RELAY_ONLY`         | `1` turns relay-only on, `0` off; any other value turns it off with a warning                |
-| `GYBLOS_IROH_BIND`          | Overrides `transport.bind`; empty is ignored                                                 |
-| `GYBLOS_IROH_EXTERNAL_ADDR` | Overrides `transport.external_addr`; empty is ignored                                        |
-| `GYBLOS_DISCOVERY_PUBLISH`  | Strict `1` or `0` override of `discovery.publish`; any other value is an error               |
-| `GYBLOS_DISCOVERY_URL`      | Overrides `discovery.url`; checked when publication is on                                    |
-| `GYBLOS_OBSERVATIONS`       | `off` stops uploading telemetry observations; receipts still upload                          |
-| `GYBLOS_COLLECTOR_URL`      | Another metrics collector (HTTPS, or HTTP on loopback); any other value turns uploading off  |
-| `GYBLOS_UPDATE_CHECK`       | `0` stops `gyblos seller status` from checking for a newer release                           |
-| `GYBLOS_INVITE`             | The invite code for `gyblos seller register`; never put it in TOML or shell history          |
-| `GYBLOS_BUYER_RELAY_ONLY`   | A buyer setting; the seller ignores it                                                       |
-| `GYBLOS_RPC_URL`            | Accepted by validation but ignored by the seller; its role files set the RPC                 |
+| Variable                    | Meaning                                                                                                                                                            |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GYBLOS_CONFIG`             | The file `start`, `doctor` and `seller init` read; `config validate` uses `--config` instead                                                                       |
+| `GYBLOS_HOME`               | The seller's home (keys and state); fixed to `/data` in the Docker image                                                                                           |
+| `GYBLOS_RELAYS`             | Comma-separated relay origins                                                                                                                                      |
+| `GYBLOS_RELAY_TOKEN`        | Optional relay token, only for a relay that requires one; keep it in `seller.env`                                                                                  |
+| `GYBLOS_RELAY_ONLY`         | `1` turns relay-only on, `0` off; any other value turns it off with a warning                                                                                      |
+| `GYBLOS_IROH_BIND`          | Overrides `transport.bind`; empty is ignored                                                                                                                       |
+| `GYBLOS_IROH_EXTERNAL_ADDR` | Overrides `transport.external_addr`; empty is ignored                                                                                                              |
+| `GYBLOS_DISCOVERY_PUBLISH`  | Strict `1` or `0` override of `discovery.publish`; any other value is an error                                                                                     |
+| `GYBLOS_DISCOVERY_URL`      | Overrides `discovery.url`; checked when publication is on                                                                                                          |
+| `GYBLOS_OBSERVATIONS`       | `off` stops uploading telemetry observations; receipts still upload                                                                                                |
+| `GYBLOS_COLLECTOR_URL`      | Another metrics collector (HTTPS, or HTTP on loopback); any other value turns uploading off                                                                        |
+| `GYBLOS_UPDATE_CHECK`       | `0` stops `gyblos seller status` from checking for a newer release                                                                                                 |
+| `GYBLOS_INVITE`             | The invite code for `gyblos seller register`; never put it in TOML or shell history                                                                                |
+| `GYBLOS_BUYER_RELAY_ONLY`   | A buyer setting; the seller ignores it                                                                                                                             |
+| `GYBLOS_RPC_URL`            | Ignored by the running seller, whose role file sets the RPC; read by the installer's first run and by [`gyblos seller rpc set`](/en/sellers/beta-guide#change-rpc) |
 
 `[limits]`, offers, `[telemetry]` and `[diagnostics]` have no environment override.
 

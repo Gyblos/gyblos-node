@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
 import {
   BATCH_CHANNEL,
   BATCH_METHODS,
@@ -211,4 +212,68 @@ void test('batch PREPARE refuses expiry during stream opening before any write',
   assert.equal(f.writes(), 0);
   await client.close();
   await client.settled();
+});
+
+// A seller that already sent the deposit may take up to its opening window to confirm the channel, longer
+// than ordinary operations; the buyer waits for OPEN that long instead of dropping the connection.
+function silentSeller() {
+  const f = fixture();
+  // Reads wait until the connection closes, then fail, as Iroh streams do.
+  const closed = () =>
+    f.connection.closed().then(() => {
+      throw new Error('Synthetic closed connection');
+    });
+  f.connection.openBi = async () => ({
+    recv: { readExact: closed, read: closed },
+    send: { async writeAll() {}, async finish() {} },
+  });
+  return f;
+}
+async function elapsed(run: () => Promise<unknown>) {
+  const start = performance.now();
+  await assert.rejects(run());
+  return performance.now() - start;
+}
+
+void test('batch OPEN waits for its own opening deadline, longer than other operations', async () => {
+  const operationMs = 20;
+  const openMs = 200;
+  const source = await batchQuote();
+  const exchange = async (method: string, params: unknown) => {
+    const client = createBatchChannelClient(
+      silentSeller().endpoint,
+      destination,
+      seller,
+      { operationMs, openMs, now: source.now },
+    );
+    try {
+      return await elapsed(() =>
+        client.exchange({
+          version: BATCH_CHANNEL.version,
+          requestId: '12'.repeat(16),
+          method,
+          params,
+        } as BatchChannelRequest),
+      );
+    } finally {
+      await client.close();
+      await client.settled();
+    }
+  };
+  const channelId = '11111111111111111111111111111111';
+  assert.ok((await exchange(BATCH_METHODS.SNAPSHOT, { channelId })) < openMs);
+  assert.ok(
+    (await exchange(BATCH_METHODS.OPEN, {
+      payload: 'x'.repeat(8),
+      quote: source.quote,
+    })) >=
+      openMs - 5,
+  );
+});
+
+void test('the default OPEN deadline covers the seller opening window', () => {
+  const { operationMs, openingConfirmMs, openMs } = BATCH_SESSION_DEFAULTS;
+  // Verify the first deposit, observe, settle and verify the voucher, each bounded by operationMs, plus
+  // the confirmation window (packages/payments-upto/src/batch-session-seller.ts openSeller).
+  assert.ok(openMs > 4 * operationMs + openingConfirmMs);
 });

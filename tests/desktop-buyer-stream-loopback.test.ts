@@ -278,10 +278,16 @@ void test('a free-only owner request clamps its quote policy while ordinary infe
     maxAtomic: '100',
     priceCeilings: { inputAtomicPerMtok: '123', outputAtomicPerMtok: '456' },
   };
+  const extra = {
+    modelId: 'second-network-model',
+    id: 'local-second',
+    maxTokens: 8,
+  };
   const caps: string[] = [];
   const token = 'synthetic-local-buyer-token';
   const host = await startFreeBuyerHttp(
     async (_input, _signal, _delta, route) => {
+      assert.equal(route?.sellerChoice, undefined);
       const request = routedRequest(paid, route);
       caps.push(
         [
@@ -297,7 +303,26 @@ void test('a free-only owner request clamps its quote policy while ordinary infe
         execution: OFFER_PRICING_KINDS.FREE,
       };
     },
-    { selection: paid.selection, maxTokens: 10, sellerChoice: true },
+    {
+      selection: paid.selection,
+      models: [
+        {
+          id: paid.selection.modelId,
+          aliases: [],
+          selection: paid.selection,
+          maxTokens: 10,
+        },
+        {
+          id: extra.id,
+          aliases: [],
+          selection: { ...paid.selection, modelId: extra.modelId },
+          maxTokens: extra.maxTokens,
+        },
+      ],
+      maxTokens: 10,
+      sellerChoice: true,
+      paidAuto: true,
+    },
     {
       port: 0,
       token,
@@ -306,6 +331,10 @@ void test('a free-only owner request clamps its quote policy while ordinary infe
         mint: DEVNET_USDC,
         payer: '11111111111111111111111111111111',
         maxAtomic: paid.maxAtomic,
+        depositAtomic: '1000000',
+        lifetimeMs: 3600000,
+        paidAuto: true,
+        autoRoutes: [extra],
       },
     },
   );
@@ -322,6 +351,33 @@ void test('a free-only owner request clamps its quote policy while ordinary infe
       undefined,
       OFFER_PRICING_KINDS.FREE,
     );
+    const auto = await client.send(
+      'auto-turn',
+      'choose automatically',
+      undefined,
+      BUYER_API.AUTO,
+    );
+    assert.equal(auto.summary.records.at(-1)?.free, true);
+    const frame = {};
+    const contents = {};
+    const handle = createX402Handlers(
+      client,
+      ledger,
+      { contents, mainFrame: () => frame, destroyed: () => false },
+      async () => {},
+    );
+    const scoped = await handle({ sender: contents, senderFrame: frame }, [
+      {
+        action: X402_ACTION.SEND,
+        id: 'second-auto',
+        prompt: 'second model',
+        auto: true,
+        model: extra.modelId,
+        policyId: client.policy()?.policyId,
+      },
+    ]);
+    assert.equal(scoped.reply?.model, extra.id);
+    assert.equal(scoped.summary.records.at(-1)?.free, true);
     const result = await fetch(host.url, {
       method: 'POST',
       headers: {
@@ -334,7 +390,7 @@ void test('a free-only owner request clamps its quote policy while ordinary infe
       }),
     });
     assert.equal(result.ok, true);
-    assert.deepEqual(caps, ['0/0/0', '100/123/456']);
+    assert.deepEqual(caps, ['0/0/0', '100/123/456', '0/0/0', '100/123/456']);
   } finally {
     await client.close();
     await host.close();

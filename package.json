@@ -50,6 +50,7 @@
     "buyer:chat": "node --import tsx apps/buyer/src/chat-cli.ts",
     "buyer:free": "node --import tsx apps/buyer/src/free-main.ts",
     "acceptance:receipts": "pnpm --filter @gyblos/lab-harness acceptance:receipts",
+    "buyer:auto": "node --import tsx apps/buyer/src/auto-cli.ts",
     "buyer:init": "node --import tsx apps/buyer/src/init.ts",
     "explorer:dev": "pnpm --filter @gyblos/explorer dev",
     "explorer:build": "pnpm --filter @gyblos/explorer build",

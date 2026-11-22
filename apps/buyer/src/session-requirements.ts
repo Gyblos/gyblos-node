@@ -14,17 +14,23 @@ import {
 import type { BatchBuyerPool } from '@gyblos/payments-upto/batch-session';
 import { batchFail, verifyBatchQuote } from '@gyblos/protocol/batch-channel';
 import {
+  CONTROL_METERING_MODES,
   MODEL_IDS,
   P2P_ROLES,
   REASONING_LEVELS,
 } from '@gyblos/protocol/constants';
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
 import type { ChatTokenizer, RecountTokenizer } from '@gyblos/protocol/engine';
+import { usesPinnedTokenizer } from '@gyblos/protocol/models';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
-import { SESSION_CODES } from '@gyblos/protocol/payment-session';
+import { SESSION_CODES, sessionFail } from '@gyblos/protocol/payment-session';
 import type { bindEndpoint } from '@gyblos/transport-iroh/endpoint';
 
-import { FREE_BUYER_STARTUP, PAID_BUYER } from './constants';
+import {
+  FREE_BUYER_STARTUP,
+  PAID_BUYER,
+  PAID_BUYER_HTTP_MS,
+} from './constants';
 import { refuse } from './free-startup';
 import { paidToken } from './paid-token';
 import { UnsentSellerChoiceError } from './seller-choice-error';
@@ -43,10 +49,16 @@ export function checkPaidSellerRequest(
     request.lowestReasoning !== null
   )
     refuse(FREE_BUYER_STARTUP.REASONING);
-  if (request.selection.modelId !== MODEL_IDS.QWEN3_0_6B)
-    refuse(FREE_BUYER_STARTUP.PAID_MODEL);
   if (request.network !== DEVNET || request.asset !== role.mint)
     refuse(FREE_BUYER_STARTUP.PAID_NETWORK);
+  // Any model can be bought on declared usage, except one this buyer can recount: a recounted quote needs
+  // the pinned tokenizer, and a recountable model is never bought on the seller's word.
+  if (quote) {
+    const recounted =
+      quote.offer.meteringMode === CONTROL_METERING_MODES.RECOUNTED;
+    const recountable = usesPinnedTokenizer(quote.offer.selection.modelId);
+    if (recounted !== recountable) refuse(FREE_BUYER_STARTUP.PAID_MODEL);
+  }
   if (quote)
     checkPaidSellerRequest(
       {
@@ -140,6 +152,13 @@ export async function prepareChosenMeter(
     throw new UnsentSellerChoiceError(SESSION_CODES.BINDING);
 }
 
+// A declared quote is checked by bytes, so its preflight never needs the meter; one that reaches it anyway
+// is refused rather than counted.
+const NO_METER = {
+  chat: () => batchFail(PAID_EXECUTION_CODES.UNSUPPORTED),
+  output: () => batchFail(PAID_EXECUTION_CODES.UNSUPPORTED),
+};
+
 export function createSessionPreflight(
   load: ReturnType<typeof sessionMeter>,
   policy: BuyerSessionPolicy,
@@ -149,8 +168,12 @@ export function createSessionPreflight(
     quote: SignedOfferV2,
     input: Parameters<typeof recountSessionInput>[1],
   ) => {
-    const meter = await load();
-    recountSessionInput(quote, input, meter);
+    // Only a recounted quote needs the pinned tokenizer; a declared one is bounded by bytes.
+    const meter =
+      quote.offer.meteringMode === CONTROL_METERING_MODES.DECLARED
+        ? undefined
+        : await load();
+    recountSessionInput(quote, input, meter ?? NO_METER);
     const now = Date.now();
     await verifyBatchQuote(
       quote,
@@ -165,4 +188,16 @@ export function createSessionPreflight(
     input: Parameters<typeof recountSessionInput>[1],
     signal: AbortSignal,
   ) => unsentSessionPreflight(check(quote, input), signal);
+}
+
+export async function checkDesktopPool(
+  manager: {
+    reconcile(signal: AbortSignal): Promise<unknown>;
+    unresolved(): Promise<boolean>;
+  },
+  busy: () => boolean,
+) {
+  if (busy()) return sessionFail(SESSION_CODES.BUSY);
+  await manager.reconcile(AbortSignal.timeout(PAID_BUYER_HTTP_MS));
+  if (await manager.unresolved()) return sessionFail(SESSION_CODES.UNVERIFIED);
 }

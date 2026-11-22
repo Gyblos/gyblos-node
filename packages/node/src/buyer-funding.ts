@@ -1,13 +1,18 @@
 // Read-only desktop funding observations use the active buyer role, never the wallet selector.
+import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
 import {
+  batchPoolChannelPaths,
   batchPoolPathsIn,
   batchSessionPathsIn,
   type HomeEnvironment,
 } from '@gyblos/config/home';
 import { DEVNET, DEVNET_USDC } from '@gyblos/config/network';
 import {
+  finalizedRequestCharge,
   inspectBatchPool,
   inspectBatchSession,
+  poolAllowsSellerDeposit,
+  poolFundingPending,
   type BatchStoredSession,
 } from '@gyblos/payments-upto/batch-session';
 import type {
@@ -72,18 +77,7 @@ export async function channelFundingRemaining(
   });
   if (entries.length) {
     // A durable intent on any seller can block the whole pool until reconciled.
-    if (
-      entries.some(
-        (entry) =>
-          !entry.ready ||
-          !entry.stored ||
-          entry.uncertain ||
-          entry.requestId !== null ||
-          entry.stored.pending ||
-          entry.stored.recoverable,
-      )
-    )
-      return null;
+    if (entries.some(poolFundingPending)) return null;
     const match = entries.find(
       (entry) => entry.terms.sellerNodeId === seller.nodeId,
     );
@@ -93,4 +87,78 @@ export async function channelFundingRemaining(
     batchSessionPathsIn(environment, P2P_ROLES.BUYER),
   );
   return available(root, policy, seller, Date.now());
+}
+
+export async function switchingCredit(
+  environment: HomeEnvironment,
+  policy: BuyerApiPolicy,
+  seller: BuyerSellerChoice,
+) {
+  const pool = batchPoolPathsIn(environment);
+  if (policy.totalDepositAtomic && policy.depositAtomic) {
+    const allowed = await poolAllowsSellerDeposit(
+      pool,
+      seller.nodeId,
+      policy.totalDepositAtomic,
+      policy.depositAtomic,
+    );
+    return allowed ? null : { poolLimited: true as const };
+  }
+  if ((await inspectBatchPool(pool, { includeLegacy: false })).length)
+    return null;
+  const root = await inspectBatchSession(pool.legacy);
+  if (
+    !root ||
+    root.terms.sellerNodeId === seller.nodeId ||
+    !policy.depositAtomic ||
+    root.openingPending
+  )
+    return null;
+  if (
+    root.pending ||
+    root.recoverable ||
+    root.terms.buyer !== policy.payer ||
+    root.terms.network !== policy.network ||
+    root.terms.mint !== policy.mint ||
+    root.snapshot.reservedAtomic !== '0'
+  )
+    return null;
+  const funded =
+    !!root.snapshot.channelId && root.snapshot.state === SESSION_STATES.OPEN;
+  if (!funded && !root.archivedProof && !root.empty) return null;
+  const spent = BigInt(root.snapshot.cumulativeAtomic);
+  const authority =
+    BigInt(policy.depositAtomic) - BigInt(root.priorSpentAtomic ?? '0') - spent;
+  if (authority < 0n) return null;
+  const replacementAtomic = String(authority);
+  if (
+    !funded ||
+    authority < BigInt(BATCH_SESSION_DEFAULTS.minDepositAtomic) ||
+    authority > BigInt(root.terms.depositAtomic) - spent
+  )
+    return { replacementAtomic };
+  return { switchingAtomic: replacementAtomic };
+}
+
+export async function reviewDesktopCharge(
+  environment: HomeEnvironment,
+  ref: import('./desktop-opening').DesktopRequestBinding,
+  policy: BuyerApiPolicy,
+) {
+  const role = await localFundingRole(environment, policy);
+  if (!role) return undefined;
+  const pool = batchPoolPathsIn(environment);
+  for (const paths of [
+    pool.legacy,
+    batchPoolChannelPaths(pool, ref.sellerNodeId),
+  ]) {
+    const result = await finalizedRequestCharge(
+      paths,
+      role.rpcUrl,
+      ref,
+      policy,
+    );
+    if (result) return result;
+  }
+  return undefined;
 }

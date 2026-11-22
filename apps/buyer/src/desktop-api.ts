@@ -16,10 +16,20 @@ import type { BuyerSelectionConfig } from './selection-config';
 
 export interface BuyerDesktopOptions {
   token?: string;
+  reconcilePool?: () => Promise<void>;
   preparePaidChat?: () => Promise<void>;
   desktopPolicy?: Pick<
     BuyerApiPolicy,
-    'network' | 'mint' | 'payer' | 'maxAtomic' | 'depositAtomic' | 'lifetimeMs'
+    | 'network'
+    | 'mint'
+    | 'payer'
+    | 'maxAtomic'
+    | 'depositAtomic'
+    | 'lifetimeMs'
+    | 'totalDepositAtomic'
+    | 'paidAuto'
+    | 'autoPrices'
+    | 'autoRoutes'
   >;
 }
 export function configuredBuyerAccess(
@@ -27,6 +37,10 @@ export function configuredBuyerAccess(
   role: RoleConfig | undefined,
   token: string | undefined,
   session?: BuyerSelectionConfig['session'],
+  config?: Pick<
+    BuyerSelectionConfig,
+    'discovery' | 'identity' | 'models' | 'sellers' | 'pinnedNodeId'
+  >,
 ): BuyerDesktopOptions {
   return {
     token,
@@ -36,7 +50,30 @@ export function configuredBuyerAccess(
             ...(session && {
               depositAtomic: session.depositAtomic,
               lifetimeMs: session.lifetimeMs,
+              ...(session.totalDepositAtomic !== undefined && {
+                totalDepositAtomic: session.totalDepositAtomic,
+              }),
             }),
+            ...(config?.discovery?.open &&
+              config.identity &&
+              !config.pinnedNodeId &&
+              !config.sellers.length && {
+                autoPrices: request.priceCeilings,
+                autoRoutes: config.models?.map(
+                  ({ id, selection, maxTokens }) => ({
+                    id,
+                    modelId: selection.modelId,
+                    maxTokens,
+                  }),
+                ) ?? [
+                  {
+                    id: request.selection.modelId,
+                    modelId: request.selection.modelId,
+                    maxTokens: request.maxTokens,
+                  },
+                ],
+                ...(config.discovery.paidAuto && { paidAuto: true }),
+              }),
             network: request.network,
             mint: request.asset,
             payer: role.buyer,
@@ -65,6 +102,7 @@ function metadataRequest(
   policy: BuyerApiPolicy | undefined,
   authenticated: boolean,
   preparePaidChat: boolean,
+  reconcilePool: boolean,
 ) {
   if (!authenticated || request.headers.origin !== undefined) return false;
   const path = request.url?.split('?')[0];
@@ -73,6 +111,9 @@ function metadataRequest(
       .writeHead(HTTP_STATUS.ok, {
         'content-type': 'application/json',
         'cache-control': 'no-store',
+        ...(reconcilePool && {
+          [BUYER_API.RECONCILE_POOL_HEADER]: BUYER_API.RECONCILE_POOL_PATH,
+        }),
         ...(preparePaidChat && {
           [BUYER_API.PAID_PREPARATION_HEADER]: BUYER_API.PAID_PREPARATION_PATH,
         }),
@@ -120,7 +161,8 @@ async function prepareRequest(
     !owner ||
     request.headers.origin !== undefined ||
     !policy ||
-    policy.maxAtomic === '0' ||
+    (policy.maxAtomic === '0' &&
+      request.url !== BUYER_API.RECONCILE_POOL_PATH) ||
     !prepare
   ) {
     response.writeHead(HTTP_STATUS.forbidden).end();
@@ -151,6 +193,7 @@ export function createDesktopApi(
   policy: BuyerApiPolicy | undefined,
   authenticated: boolean,
   preparePaidChat?: () => Promise<void>,
+  reconcilePool?: () => Promise<void>,
 ) {
   return {
     async handled(
@@ -158,13 +201,14 @@ export function createDesktopApi(
       response: ServerResponse,
       owner: boolean,
     ) {
-      if (request.url === BUYER_API.PAID_PREPARATION_PATH) {
+      const reconcile = request.url === BUYER_API.RECONCILE_POOL_PATH;
+      if (reconcile || request.url === BUYER_API.PAID_PREPARATION_PATH) {
         await prepareRequest(
           request,
           response,
           policy,
           authenticated && owner,
-          preparePaidChat,
+          reconcile ? reconcilePool : preparePaidChat,
         );
         return true;
       }
@@ -174,6 +218,7 @@ export function createDesktopApi(
         policy,
         authenticated,
         !!preparePaidChat && owner,
+        !!reconcilePool && owner,
       );
     },
     accepts(request: IncomingMessage, json: boolean) {

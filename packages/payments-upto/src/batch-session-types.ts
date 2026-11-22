@@ -39,6 +39,7 @@ export interface BatchBuyerBackend {
     expectedChannelId: string,
     terms: PaymentSessionTerms,
     totalBudgetAtomic: string,
+    switchSeller?: boolean,
   ): Promise<void>;
 }
 export interface BatchSellerBackend {
@@ -149,6 +150,7 @@ export interface BatchSellerOptions extends BatchCommonOptions {
   minSettlementAtomic?: string;
   pollMs?: number;
   operationMs?: number;
+  openingConfirmMs?: number;
 }
 
 export interface BatchSellerContext {

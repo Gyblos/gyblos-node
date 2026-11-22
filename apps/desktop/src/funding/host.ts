@@ -6,6 +6,7 @@ import {
   buyerUsdcBalance,
   channelFundingRemaining,
   localFundingRole,
+  switchingCredit,
 } from '@gyblos/node/buyer-funding';
 import type {
   BuyerApiPolicy,
@@ -19,6 +20,7 @@ export function registerFunding(
   window: BrowserWindow,
   environment: HomeEnvironment,
   policy: () => BuyerApiPolicy | null,
+  managed: () => boolean,
   resolveOffer: (id: string) => BuyerSellerChoice | undefined,
 ) {
   const handlers = fundingHandlers({
@@ -31,6 +33,10 @@ export function registerFunding(
       (await localFundingRole(environment, current))?.rpcUrl ?? null,
     balance: buyerUsdcBalance,
     resolveOffer,
+    switching: (current, seller) =>
+      managed()
+        ? switchingCredit(environment, current, seller)
+        : Promise.resolve(null),
     remaining: (current, seller) =>
       channelFundingRemaining(environment, current, seller),
     copy: (text) => clipboard.writeText(text),

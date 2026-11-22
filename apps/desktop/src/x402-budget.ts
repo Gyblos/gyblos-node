@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import {
   isOpeningIntent,
   type desktopOpening,
+  type DesktopRequestBinding,
 } from '@gyblos/node/desktop-opening';
 import { buyerAtomic, type BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 
@@ -12,8 +13,8 @@ import {
   DESKTOP_X402,
   emptyX402,
   parseX402Summary,
+  spendingPolicy,
   x402Id,
-  x402Policy,
   type X402Summary,
 } from './x402-model';
 
@@ -27,6 +28,7 @@ interface State {
   pending: string | null;
   openingIntent?: string;
 }
+export class LegacyPaymentReview extends Error {}
 export class X402Budget {
   private state: State | null = null;
   private failed = false;
@@ -40,7 +42,7 @@ export class X402Budget {
     if (
       state.pending &&
       state.openingIntent &&
-      (await this.opening?.retire(state.openingIntent))
+      (await this.opening?.retire(state.openingIntent).catch(() => false))
     ) {
       await this.save({
         ...state,
@@ -50,6 +52,43 @@ export class X402Budget {
       });
     }
     return this.state!;
+  }
+  async review(
+    observe: (
+      ref: DesktopRequestBinding,
+      policy: BuyerApiPolicy,
+    ) => Promise<
+      { chargeAtomic: string; transaction: string | null } | undefined
+    >,
+  ) {
+    const state = await this.serial(async () =>
+      this.recoverIfIdle(await this.load()),
+    );
+    if (!state.pending) return true;
+    if (!state.openingIntent) throw new LegacyPaymentReview();
+    if (this.liveIntent === state.openingIntent || !state.summary.policy)
+      return false;
+    const ref = await this.opening?.reference(state.openingIntent);
+    if (!ref) throw new LegacyPaymentReview();
+    const result = await observe(ref, state.summary.policy);
+    if (!result) return false;
+    if (result.transaction === null) {
+      if (result.chargeAtomic !== '0') return false;
+      await this.cancelUnsent(state.pending, state.openingIntent);
+      return true;
+    }
+    await this.complete(
+      state.pending,
+      { ...result, free: false },
+      undefined,
+      state.openingIntent,
+    );
+    return true;
+  }
+  private recoverIfIdle(state: State) {
+    return state.openingIntent && state.openingIntent !== this.liveIntent
+      ? this.recover(state)
+      : state;
   }
   recoverOpening() {
     return this.serial(async () => {
@@ -126,7 +165,7 @@ export class X402Budget {
       const state = await this.load();
       if (this.failed || state.pending || state.summary.active)
         throw new Error('Finish or review the existing chat budget first');
-      const policy = x402Policy(input);
+      const policy = spendingPolicy(input);
       if (
         !buyerAtomic(limitAtomic) ||
         BigInt(limitAtomic) < BigInt(policy.maxAtomic)
@@ -158,7 +197,7 @@ export class X402Budget {
         ? {
             ...state.summary,
             sessionId: randomUUID(),
-            policy: single,
+            policy: spendingPolicy(single),
             limitAtomic: single.maxAtomic,
             spentAtomic: '0',
           }
@@ -222,6 +261,7 @@ export class X402Budget {
     id: string,
     result: { chargeAtomic: string; transaction: string | null; free: boolean },
     selectedModel?: string,
+    expectedIntent?: string,
   ) {
     return this.serial(async () => {
       const state = await this.load();
@@ -229,6 +269,8 @@ export class X402Budget {
       if (
         this.failed ||
         state.pending !== id ||
+        (expectedIntent !== undefined &&
+          expectedIntent !== state.openingIntent) ||
         !current.policy ||
         !current.sessionId ||
         !buyerAtomic(result.chargeAtomic) ||
@@ -263,10 +305,14 @@ export class X402Budget {
     });
   }
   // Only a trusted buyer response can prove non-transmission; never exposed as a renderer action.
-  cancelUnsent(id: string) {
+  cancelUnsent(id: string, expectedIntent?: string) {
     return this.serial(async () => {
       const state = await this.load();
-      if (this.failed || state.pending !== id)
+      if (
+        this.failed ||
+        state.pending !== id ||
+        (expectedIntent !== undefined && state.openingIntent !== expectedIntent)
+      )
         throw new Error('Payment needs review');
       await this.save({
         ...state,

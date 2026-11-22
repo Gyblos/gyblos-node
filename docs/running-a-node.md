@@ -1029,13 +1029,15 @@ With an OpenAI SDK, set `baseURL` (`base_url` in Python) to
 > `api-token` and start it again; `pnpm buyer:free` needs no token.
 
 Startup reasons beyond the free ones: `BUYER_PAYMENT_NETWORK_MISMATCH` (RPC,
-network or asset not devnet USDC), `BUYER_PAID_MODEL_UNSUPPORTED`,
-`BUYER_PAID_MODELS_UNSUPPORTED` (the explicit paid entry `startPaidBuyer` serves
-only `request.selection`; the automatic buyer serves the `models` list),
-`BUYER_WALLET_KEY_INVALID`, `BUYER_TOKENIZER_UNAVAILABLE`,
-`BUYER_PAYMENT_JOURNAL_UNAVAILABLE` and `BUYER_API_TOKEN_INVALID` (`api-token`
-is not a private 0600 regular file with one link, owned by you and holding a
-token; it is never repaired, since its token may already have been read).
+network or asset not devnet USDC), `BUYER_PAID_MODEL_UNSUPPORTED` (a recounted
+quote for a model outside the Qwen3 family, or a declared quote for one;
+declared quotes buy any other model), `BUYER_PAID_MODELS_UNSUPPORTED` (the
+explicit paid entry `startPaidBuyer` serves only `request.selection`; the
+automatic buyer serves the `models` list), `BUYER_WALLET_KEY_INVALID`,
+`BUYER_TOKENIZER_UNAVAILABLE`, `BUYER_PAYMENT_JOURNAL_UNAVAILABLE` and
+`BUYER_API_TOKEN_INVALID` (`api-token` is not a private 0600 regular file with
+one link, owned by you and holding a token; it is never repaired, since its
+token may already have been read).
 
 ## Control queries
 
@@ -1156,8 +1158,9 @@ sent, and nothing on this channel authorizes payment.
 
 Every quote carries the offer's metering mode:
 
-- **Recounted**: the model's public tokenizer is pinned (Qwen3 0.6B). The seller
-  counts the prompt and output with it, as the buyer can.
+- **Recounted**: the model's public tokenizer is pinned (the catalog's Qwen3
+  hybrid models). The seller counts the prompt and output with it, as the buyer
+  can.
 - **Declared**: any other model, served through the `openai` or `anthropic`
   engine. The usage is the provider's, which the buyer cannot check. The seller
   therefore:

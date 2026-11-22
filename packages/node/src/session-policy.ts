@@ -9,11 +9,13 @@ import {
   controlObject,
 } from '@gyblos/protocol/control-validation';
 import {
-  PaymentSessionError,
   SESSION_CODES,
   sessionFail,
+  UnsentChannelLimitError,
   type PaymentSessionTerms,
 } from '@gyblos/protocol/payment-session';
+
+export { UnsentChannelLimitError } from '@gyblos/protocol/payment-session';
 
 export interface BuyerSessionPolicy {
   depositAtomic: string;
@@ -97,12 +99,6 @@ export function sessionTerms(
   return matchBatchTerms(terms, terms);
 }
 
-export class UnsentChannelLimitError extends PaymentSessionError {
-  constructor(readonly nodeId: string) {
-    super(SESSION_CODES.LIMIT);
-  }
-}
-
 // Existing journals retain their original terms; only fresh generations require a minimum deposit.
 export function newSessionTerms(
   quote: SignedOfferV2,
@@ -122,4 +118,23 @@ function positiveTotal(value: unknown) {
   const total = controlAtomic(value);
   if (total === '0') return sessionFail();
   return total;
+}
+
+export function replacementTerms(
+  policy: BuyerSessionPolicy,
+  now: () => number,
+  quote: SignedOfferV2,
+  priorSpentAtomic?: string,
+) {
+  const authority =
+    BigInt(policy.depositAtomic) - BigInt(priorSpentAtomic ?? '0');
+  return (spent: string) =>
+    newSessionTerms(
+      quote,
+      {
+        ...policy,
+        depositAtomic: String(authority - BigInt(spent)),
+      },
+      now(),
+    );
 }

@@ -18,6 +18,7 @@ import {
   BUYER_OBSERVATION_RPC_METHODS,
   BUYER_RECOVERY_RPC_METHODS,
 } from './constants';
+import { rateLimitedFetch } from './rpc-rate-limit';
 
 export type BuyerObservationFetch = (
   url: string,
@@ -165,6 +166,7 @@ function boundedRpc(
   now: () => number,
   methods: readonly BuyerRpcMethod[],
 ) {
+  const send = rateLimitedFetch(fetcher);
   function transport<TResponse>(
     request: Parameters<RpcTransport>[0],
   ): Promise<TResponse>;
@@ -190,7 +192,7 @@ function boundedRpc(
       )
         return invalid();
       response = await beforeAbort(signal, () => {
-        const pending = fetcher(url, {
+        const pending = send(url, {
           method: 'POST',
           body: stringifyJsonWithBigInts(payload),
           signal,

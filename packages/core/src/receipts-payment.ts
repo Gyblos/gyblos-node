@@ -51,7 +51,8 @@ export function matchPaidReceipt(
   if (
     record.pricing.kind !== OFFER_PRICING_KINDS.PAID ||
     record.outcome !== RECEIPT_OUTCOMES.COMPLETED ||
-    record.metering !== CONTROL_METERING_MODES.RECOUNTED ||
+    (record.metering !== CONTROL_METERING_MODES.RECOUNTED &&
+      record.metering !== CONTROL_METERING_MODES.DECLARED) ||
     canonicalJson(record.pricing) !== canonicalJson(payment.pricing) ||
     record.amountAtomic !== payment.amountAtomic ||
     record.feeAtomic !== payment.feeAtomic
@@ -68,5 +69,13 @@ export function matchPaidReceipt(
         ),
       )
     : '0';
-  if (record.amountAtomic !== charge) return controlFail(CONTROL_CODES.POLICY);
+  // A declared bill is capped at the request's maxAtomic, which the record does not carry: its amount may be
+  // anything up to the price of its usage, never above. A recounted bill is exactly that price.
+  const declared = record.metering === CONTROL_METERING_MODES.DECLARED;
+  if (
+    declared
+      ? BigInt(record.amountAtomic) > BigInt(charge)
+      : record.amountAtomic !== charge
+  )
+    return controlFail(CONTROL_CODES.POLICY);
 }

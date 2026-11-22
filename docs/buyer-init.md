@@ -56,7 +56,8 @@ profiles must add the session settings before starting. See
 
 With no seller, setup saves an open-network buyer: no configured sellers and
 `"discovery": { "open": true }`. It then uses any seller the index lists whose
-8004 agent registry entry matches, for free answers only (see
+8004 agent registry entry matches. Short setup accepts free offers. Advanced
+open setup with a positive request maximum and paid rates enables paid Auto (see
 [discovery.md](discovery.md#open-discovery)). Short setup does not discover a
 model or check a seller's availability.
 
