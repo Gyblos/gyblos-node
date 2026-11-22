@@ -40,6 +40,7 @@ void test('the status bar shows the version and an update button only when a new
   assert.match(kit, /observeDesktopUpdates\(/);
   assert.match(kit, /DESKTOP_UPDATE\.OPEN/);
   assert.match(kit, /useSyncExternalStore\(subscribeUpdate, readUpdate\)/);
+  assert.match(kit, /stopUpdates = undefined;\n\s*availableUpdate = null;/);
   assert.match(kit, /available && available !== version/);
   assert.match(kit, /<NewerVersion\.Provider value=\{newer\}>/);
   const host = await read('host.ts');

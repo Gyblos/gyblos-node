@@ -436,6 +436,7 @@ function subscribeUpdate(listener: () => void) {
     if (updateListeners.size) return;
     stopUpdates?.();
     stopUpdates = undefined;
+    availableUpdate = null;
   };
 }
 const readUpdate = () => availableUpdate;
