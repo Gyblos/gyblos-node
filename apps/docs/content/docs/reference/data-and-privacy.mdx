@@ -213,11 +213,14 @@ a Solana explorer. Buyers and the desktop app also read the 8004 agent registry 
 (by default `https://api.devnet.solana.com`) to check each seller's identity. The RPC provider sees
 those requests and your IP address.
 
-The Gyblos explorer (`explorer.gyblos.com`) lists the on-chain transactions of channels whose opening
-carries a Gyblos memo, newest first: time, instruction type, channel, USDC amount and signature, from
-the metrics collector's public `GET /v1/stats/chain/txs`. When a channel pays the owner address that a
-listed seller publishes in the discovery index, the row shows that seller's NodeId, so your NodeId is
-linked to the channels that paid you and to the amounts.
+The Gyblos explorer (`explorer.gyblos.com`) lists the latest on-chain transactions of Gyblos channels
+(those whose open carries a Gyblos memo, or whose distribute pays the Gyblos treasury), newest first: time,
+instruction type, USDC amount, signature, seller and channel, from the metrics collector's public
+`GET /v1/stats/chain/txs`. The seller column shows a listed seller when the channel's payout recipient
+(its first split recipient) equals the owner address that one, and only one, listed seller publishes in
+the discovery index; otherwise it says "Unlisted seller". That owner address is self-declared, so the
+column is a display hint, not proof of who was paid. It does link a listed seller's owner address to the
+channels that paid it and to the amounts.
 
 ## Update checks [#update-checks]
 

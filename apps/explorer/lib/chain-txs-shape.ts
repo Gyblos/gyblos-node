@@ -1,7 +1,6 @@
 import { explorerTxUrl } from './config';
 import { CHAIN_TXS, DISPLAY, RANGE } from './constants';
-import type { Seller } from './discovery-shape';
-import { short, usdc, utcMinute } from './format';
+import { short, usdcFixed, utcMinute } from './format';
 import type { RangeDays } from './range';
 import {
   integerText,
@@ -24,6 +23,18 @@ export const CHAIN_TX_KINDS = [
   'reclaim',
 ] as const;
 export type ChainTxKind = (typeof CHAIN_TX_KINDS)[number];
+export const CHAIN_TX_LABELS: Record<ChainTxKind, string> = {
+  open: 'Deposit',
+  top_up: 'Top-up',
+  settle: 'Settle',
+  settle_and_seal: 'Settle and close',
+  request_close: 'Close requested',
+  seal: 'Closed',
+  distribute: 'Paid out',
+  reclaim: 'Refunded',
+};
+const SETTLING: readonly ChainTxKind[] = ['settle', 'settle_and_seal'];
+const NO_CHANGE = 'no change';
 
 export interface ChainTx {
   signature: string;
@@ -38,12 +49,14 @@ export interface ChainTx {
 }
 export interface ChainTxPage {
   programId: string;
+  treasury: string;
   transactions: ChainTx[];
   next: string | null;
   error: string | null;
 }
 
-const CURSOR = /^\d{1,15}-[1-9A-HJ-NP-Za-km-z]{32,88}-\d{1,3}$/;
+const CURSOR =
+  /^(0|[1-9]\d{0,14})-[1-9A-HJ-NP-Za-km-z]{32,88}-(0|[1-9]\d{0,2})$/;
 
 export function txCursor(value: unknown): string | null {
   return typeof value === 'string' && CURSOR.test(value) ? value : null;
@@ -81,6 +94,7 @@ export function parseChainTxs(value: unknown): Omit<ChainTxPage, 'error'> {
   const body = record(value, 'txs');
   return {
     programId: text(body.programId, 'txs.programId'),
+    treasury: text(body.treasury, 'txs.treasury'),
     transactions: list(body.transactions, 'txs.transactions').map(transaction),
     next: nullable(body.next, (present) => {
       const cursor = txCursor(present);
@@ -90,20 +104,54 @@ export function parseChainTxs(value: unknown): Omit<ChainTxPage, 'error'> {
   };
 }
 
-export const sellerOwners = (sellers: Pick<Seller, 'nodeId' | 'owner'>[]) =>
-  new Map(sellers.map((seller) => [seller.owner, seller.nodeId]));
+export function chainTxsQuery(before: string | null) {
+  const params = new URLSearchParams();
+  if (before) params.set(CHAIN_TXS.param, before);
+  params.set('limit', String(CHAIN_TXS.pageSize));
+  return params.toString();
+}
 
-export function txRow(tx: ChainTx, owners: ReadonlyMap<string, string>) {
-  const paid = [...tx.recipients, ...(tx.payee ? [tx.payee] : [])];
-  const owner = paid.find((address) => owners.has(address));
+export interface ListedOwner {
+  nodeId: string;
+  owner: string;
+}
+
+export function sellerOwners(sellers: ListedOwner[]) {
+  const nodes = new Map<string, Set<string>>();
+  for (const seller of sellers)
+    nodes.set(
+      seller.owner,
+      (nodes.get(seller.owner) ?? new Set()).add(seller.nodeId),
+    );
+  return new Map(
+    [...nodes].flatMap(([owner, ids]) =>
+      ids.size === 1 ? [[owner, { nodeId: [...ids][0]!, owner }] as const] : [],
+    ),
+  );
+}
+
+function amountText(tx: ChainTx) {
+  if (tx.amount === null) return '—';
+  if (tx.amount === 0n && SETTLING.includes(tx.kind)) return NO_CHANGE;
+  return usdcFixed(tx.amount);
+}
+
+export function txRow(
+  tx: ChainTx,
+  owners: ReadonlyMap<string, ListedOwner>,
+  treasury: string,
+) {
+  const payTo = tx.recipients[0] ?? null;
   return {
     key: `${tx.signature}:${tx.instructionIndex}`,
     time: utcMinute(tx.blockTime),
     kind: tx.kind,
+    label: CHAIN_TX_LABELS[tx.kind],
     channel: tx.channel,
-    seller: owner ? (owners.get(owner) ?? null) : null,
-    payee: tx.payee,
-    amount: tx.amount === null ? '—' : usdc(tx.amount),
+    payTo,
+    seller: payTo && payTo !== treasury ? (owners.get(payTo) ?? null) : null,
+    amount: amountText(tx),
+    muted: tx.amount === null || amountText(tx) === NO_CHANGE,
     signature: short(
       tx.signature,
       DISPLAY.signatureEdge,

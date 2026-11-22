@@ -6,7 +6,6 @@ import { sellerOwners, txPageHref, txRow } from '../lib/chain-txs-shape';
 import { explorerAddressUrl, PAYMENT_PROGRAM_SOURCE_URL } from '../lib/config';
 import { DISPLAY } from '../lib/constants';
 import { getDiscovery } from '../lib/discovery-render';
-import { short } from '../lib/format';
 import type { RangeDays } from '../lib/range';
 import {
   Addr,
@@ -21,41 +20,98 @@ import {
 
 const TITLE = 'Channel transactions';
 const link = 'inline-flex items-center gap-1 hover:text-brand';
+const muted = `${td} text-muted`;
 const HEAD = [
   { label: 'Time (UTC)' },
   { label: 'Type' },
-  { label: 'Channel' },
-  { label: 'Seller' },
   { label: 'Amount (USDC)', right: true },
   { label: 'Transaction' },
+  { label: 'Seller' },
+  { label: 'Channel' },
 ];
+type Row = ReturnType<typeof txRow>;
 
-function Links({ programId }: { programId: string }) {
+function Meta({ programId }: { programId: string }) {
   return (
-    <span className="flex gap-4">
+    <span className="flex flex-wrap gap-4">
+      <span>Latest, all time · not filtered by range</span>
       <a className={link} href={explorerAddressUrl(programId)}>
         Payments program
         <ArrowUpRight aria-hidden className="size-3" />
       </a>
       <a className={link} href={PAYMENT_PROGRAM_SOURCE_URL}>
-        Source
+        Upstream source
         <ArrowUpRight aria-hidden className="size-3" />
       </a>
     </span>
   );
 }
 
-function Seller({ row }: { row: ReturnType<typeof txRow> }) {
+function Seller({ row, lookup }: { row: Row; lookup: boolean }) {
+  if (!lookup)
+    return <span className="text-muted">Seller lookup unavailable</span>;
   if (row.seller)
     return (
-      <span className="font-mono" title={`Node ${row.seller}`}>
-        {short(row.seller)}
+      <span className="font-mono" title={`Node ${row.seller.nodeId}`}>
+        <Addr value={row.seller.owner} />
       </span>
     );
   return (
-    <span className="text-muted" title={row.payee ?? undefined}>
-      Unknown payee
+    <span className="text-muted" title={row.payTo ?? undefined}>
+      Unlisted seller
     </span>
+  );
+}
+
+function TxLine({ row, lookup }: { row: Row; lookup: boolean }) {
+  return (
+    <tr className="border-t border-line">
+      <td className={timeCell}>{row.time}</td>
+      <td className={td} title={row.kind}>
+        {row.label}
+      </td>
+      <td className={row.muted ? `${numberCell} text-muted` : moneyCell}>
+        {row.amount}
+      </td>
+      <td className={`${td} font-mono`}>
+        <a className={link} href={row.href}>
+          {row.signature}
+          <ArrowUpRight aria-hidden className="size-3" />
+        </a>
+      </td>
+      <td className={td}>
+        <Seller row={row} lookup={lookup} />
+      </td>
+      <td className={`${td} font-mono`}>
+        <Addr value={row.channel} />
+      </td>
+    </tr>
+  );
+}
+
+function Pager({
+  days,
+  newest,
+  older,
+}: {
+  days: RangeDays;
+  newest: boolean;
+  older: string | null;
+}) {
+  if (!newest && !older) return null;
+  return (
+    <nav className="my-3 flex justify-end gap-4 font-mono text-xs text-muted">
+      {newest ? (
+        <Link className={link} href={txPageHref(days, null)} scroll={false}>
+          Newest
+        </Link>
+      ) : null}
+      {older ? (
+        <Link className={link} href={txPageHref(days, older)} scroll={false}>
+          Older
+        </Link>
+      ) : null}
+    </nav>
   );
 }
 
@@ -72,62 +128,32 @@ export async function ChannelTxs({
   ]);
   if (page.error) return <Unavailable title={TITLE} />;
   const owners = sellerOwners(discovery.sellers);
+  const lookup = discovery.error === null;
   return (
     <>
-      <SectionTitle title={TITLE} meta={<Links programId={page.programId} />} />
+      <SectionTitle title={TITLE} meta={<Meta programId={page.programId} />} />
+      <p className="-mt-2 mb-3 text-xs text-muted">
+        Amounts are per row: deposit in for Deposit and Top-up, newly settled
+        for Settle, paid out of the channel for Paid out and Refunded. Do not
+        add them up.
+      </p>
+      <Pager days={days} newest={before !== null} older={null} />
       <Table minWidth={DISPLAY.wideTable} head={HEAD}>
         {page.transactions.length ? null : (
           <tr>
-            <td className={`${td} text-muted`} colSpan={HEAD.length}>
-              No Gyblos channel transactions.
+            <td className={muted} colSpan={HEAD.length}>
+              {before
+                ? 'No older transactions.'
+                : 'No Gyblos channel transactions.'}
             </td>
           </tr>
         )}
         {page.transactions.map((tx) => {
-          const row = txRow(tx, owners);
-          return (
-            <tr key={row.key} className="border-t border-line">
-              <td className={timeCell}>{row.time}</td>
-              <td className={`${td} font-mono`}>{row.kind}</td>
-              <td className={`${td} font-mono`}>
-                <Addr value={row.channel} />
-              </td>
-              <td className={td}>
-                <Seller row={row} />
-              </td>
-              <td
-                className={
-                  tx.amount === null ? `${numberCell} text-muted` : moneyCell
-                }
-              >
-                {row.amount}
-              </td>
-              <td className={`${td} font-mono`}>
-                <a className={link} href={row.href}>
-                  {row.signature}
-                  <ArrowUpRight aria-hidden className="size-3" />
-                </a>
-              </td>
-            </tr>
-          );
+          const row = txRow(tx, owners, page.treasury);
+          return <TxLine key={row.key} row={row} lookup={lookup} />;
         })}
       </Table>
-      <nav className="mt-3 flex justify-end gap-4 font-mono text-xs text-muted">
-        {before ? (
-          <Link className={link} href={txPageHref(days, null)} scroll={false}>
-            Newest
-          </Link>
-        ) : null}
-        {page.next ? (
-          <Link
-            className={link}
-            href={txPageHref(days, page.next)}
-            scroll={false}
-          >
-            Older
-          </Link>
-        ) : null}
-      </nav>
+      <Pager days={days} newest={before !== null} older={page.next} />
     </>
   );
 }
