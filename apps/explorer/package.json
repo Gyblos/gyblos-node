@@ -20,6 +20,7 @@
     "./network-status": "./lib/network-status.ts",
     "./offers": "./lib/offers.ts",
     "./range": "./lib/range.ts",
+    "./seller-identity": "./lib/seller-identity.ts",
     "./usage": "./lib/usage.ts"
   },
   "scripts": {

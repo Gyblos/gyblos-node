@@ -1,22 +1,31 @@
 // Owns the Network section: sellers online and offline, the models offered and their cheapest prices,
 // each online seller's offers and uptime, and the registered sellers not online now, from the discovery
 // index. The per-model table lives in the Models section.
-import { Activity, Boxes, Server, Tag } from 'lucide-react';
+import { Activity, BadgeCheck, Boxes, Server, Tag } from 'lucide-react';
+import Link from 'next/link';
 
-import { DISPLAY } from '../lib/constants';
+import { DISPLAY, IDENTITY, RANGE } from '../lib/constants';
 import type { DiscoverySnapshot, Seller } from '../lib/discovery';
 import { getDiscovery } from '../lib/discovery-render';
 import { count, percent, pricePerMtok, short, usdc, utc } from '../lib/format';
 import {
   notOnline,
+  type GithubAccount,
   type NetworkNode,
   type NetworkStatus,
 } from '../lib/network-status';
 import { summarizeOffers, uptimeRatio } from '../lib/offers';
+import type { RangeDays } from '../lib/range';
+import {
+  githubByNode,
+  orderSellers,
+  verifiedOnly,
+} from '../lib/seller-identity';
 import { Flow } from './board/animated-number';
 import { Chip } from './board/chip';
 import { StatCard } from './board/stat-card';
 import { StatusDot } from './board/status-dot';
+import { SellerCell } from './seller-cell';
 import {
   Addr,
   ModelName,
@@ -34,10 +43,19 @@ const ratioText = (ratio: number | undefined | null) =>
 const priceText = (value: bigint | null) =>
   value === null ? '—' : usdc(value);
 
-export async function NetworkSection() {
+export async function NetworkSection({
+  days,
+  verified,
+}: {
+  days: RangeDays;
+  verified: boolean;
+}) {
   const snapshot = await getDiscovery();
   if (snapshot.error) return <Unavailable title="Network" />;
   const summary = summarizeOffers(snapshot);
+  const accounts = githubByNode(snapshot.network);
+  const ordered = orderSellers(snapshot.sellers);
+  const shown = verified ? verifiedOnly(ordered, accounts) : ordered;
   return (
     <>
       <SectionTitle title="Network" meta={utc(snapshot.generatedAt)} />
@@ -82,8 +100,12 @@ export async function NetworkSection() {
         />
       </div>
 
-      <SectionTitle title="Sellers" />
-      <SellersTable sellers={snapshot.sellers} />
+      <SellersBlock
+        days={days}
+        verified={verified}
+        sellers={shown}
+        accounts={accounts}
+      />
       {snapshot.network ? (
         <NotOnlineTable network={snapshot.network} />
       ) : (
@@ -122,7 +144,90 @@ function SellersOnline({ snapshot }: { snapshot: DiscoverySnapshot }) {
   );
 }
 
-function SellersTable({ sellers }: { sellers: Seller[] }) {
+function SellersBlock({
+  days,
+  verified,
+  sellers,
+  accounts,
+}: {
+  days: RangeDays;
+  verified: boolean;
+  sellers: Seller[];
+  accounts: Map<string, GithubAccount>;
+}) {
+  return (
+    <>
+      <SectionTitle
+        title="Sellers"
+        meta={<VerifiedFilter days={days} verified={verified} />}
+      />
+      <SellersTable sellers={sellers} accounts={accounts} verified={verified} />
+      <p className="mt-2 flex items-center gap-1 text-xs text-dim">
+        <BadgeCheck
+          aria-hidden="true"
+          className="size-3.5 shrink-0 text-brand"
+        />
+        <span>
+          The discovery index checked that this GitHub account published the
+          seller&apos;s NodeId. It says who runs the seller, not how good it is.{' '}
+          <a
+            className="text-muted hover:text-brand"
+            href={IDENTITY.howToVerifyUrl}
+          >
+            How to verify
+          </a>
+        </span>
+      </p>
+    </>
+  );
+}
+
+function filterHref(days: RangeDays, verified: boolean) {
+  const query = new URLSearchParams();
+  if (days !== RANGE.defaultDays) query.set(RANGE.param, String(days));
+  if (verified) query.set(IDENTITY.verifiedParam, IDENTITY.verifiedValue);
+  const search = query.toString();
+  return search ? `/?${search}` : '/';
+}
+
+function VerifiedFilter({
+  days,
+  verified,
+}: {
+  days: RangeDays;
+  verified: boolean;
+}) {
+  const option = (label: string, href: string, current: boolean) => (
+    <Link
+      href={href}
+      scroll={false}
+      aria-current={current ? 'true' : undefined}
+      className={
+        current
+          ? 'rounded-md bg-raised px-1.5 py-0.5 text-ink'
+          : 'rounded-md px-1.5 py-0.5 hover:text-ink'
+      }
+    >
+      {label}
+    </Link>
+  );
+  return (
+    <span className="flex items-center gap-1">
+      {option('All', filterHref(days, false), !verified)}
+      {option('Verified only', filterHref(days, true), verified)}
+    </span>
+  );
+}
+
+function SellersTable({
+  sellers,
+  accounts,
+  verified,
+}: {
+  sellers: Seller[];
+  accounts: Map<string, GithubAccount>;
+  verified: boolean;
+}) {
   const head = [
     { label: 'Seller' },
     { label: 'Status' },
@@ -138,7 +243,9 @@ function SellersTable({ sellers }: { sellers: Seller[] }) {
       {sellers.some((seller) => seller.models.length > 0) ? null : (
         <tr>
           <td className={`${td} text-muted`} colSpan={head.length}>
-            No offers from online sellers.
+            {verified
+              ? 'No online seller has a verified GitHub account yet.'
+              : 'No offers from online sellers.'}
           </td>
         </tr>
       )}
@@ -149,7 +256,12 @@ function SellersTable({ sellers }: { sellers: Seller[] }) {
             className="border-t border-line"
           >
             <td className={`${td} font-mono`} title={`Node ${seller.nodeId}`}>
-              <Addr value={seller.owner} />
+              <SellerCell
+                nodeId={seller.nodeId}
+                github={accounts.get(seller.nodeId) ?? null}
+              >
+                <Addr value={seller.owner} />
+              </SellerCell>
             </td>
             <td className={td}>
               <Chip tone="brand">
@@ -214,7 +326,9 @@ function NotOnlineTable({ network }: { network: NetworkStatus }) {
         {nodes.map((node) => (
           <tr key={node.nodeId} className="border-t border-line">
             <td className={`${td} font-mono`} title={`Node ${node.nodeId}`}>
-              {short(node.nodeId)}
+              <SellerCell nodeId={node.nodeId} github={node.github}>
+                {short(node.nodeId)}
+              </SellerCell>
             </td>
             <td className={td}>
               <Chip>
