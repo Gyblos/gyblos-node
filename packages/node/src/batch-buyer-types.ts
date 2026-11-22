@@ -15,7 +15,8 @@ import type {
 import type { BuyerReceiptEvidence } from './receipt-buyer';
 
 export interface BuyerBatchSessionOptions<Remote extends BatchDestination> {
-  // The seller's offer declares usage: blocks need the model's tokenizer, so this channel runs without them.
+  // The first quote declares usage: blocks need the model's tokenizer, so a channel it opens runs without
+  // them. A channel that already checkpoints keeps doing so.
   declared?: boolean;
   financialPermission?<T>(run: () => Promise<T>): Promise<T>;
   onDeclined?(): Promise<void>;

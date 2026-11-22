@@ -111,11 +111,13 @@ function createContext<Remote extends BatchDestination>(
   const terms = options.terms;
   if (options.endpoint.id().toString() !== terms.buyerNodeId)
     return batchFail(PAID_EXECUTION_CODES.PEER);
+  // A channel that already checkpoints keeps doing so whatever the first new quote is (a declared one
+  // runs whole-response per request); `declared` only picks the mode of a channel not opened yet.
   const blockMode =
-    !options.declared &&
     isBlockBuyer(options.buyer) &&
     (options.buyer.usesBlocks() ||
-      (!options.buyer.snapshot().channelId &&
+      (!options.declared &&
+        !options.buyer.snapshot().channelId &&
         typeof options.meter.stablePrefix === 'function'));
   // One client per protocol. A channel that checkpoints keeps a second, whole-response client for the
   // requests that cannot (a declared offer has no tokenizer to certify prefixes). The seller admits one

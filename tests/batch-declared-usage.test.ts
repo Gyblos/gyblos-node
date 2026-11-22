@@ -9,6 +9,7 @@ import {
   buildPaidSellerReceipt,
   type PaidSellerReceiptInput,
 } from '@gyblos/core/receipts';
+import { createBuyerBatchSession } from '@gyblos/node/batch-buyer';
 import { createBuyerSessionPool } from '@gyblos/node/buyer-session-pool';
 import { FREE_METERING } from '@gyblos/node/constants';
 import { DECLARED_METER } from '@gyblos/node/free-meter';
@@ -187,6 +188,37 @@ void test('a declared approval lost on a checkpointing channel is recovered with
     BigInt(f.f.seller().snapshot().cumulativeAtomic) - afterBlocks,
     charged,
   );
+});
+
+void test('a restored checkpointing channel keeps checkpoints when its first new request is declared', async (t) => {
+  // After a restart the host is rebuilt from the first new quote; the channel's saved mode must win.
+  const f = await blockProduct({ perConnection: true });
+  t.after(f.close);
+  await f.buyer.execute(await f.offers.quote(1), f.offers.input);
+  await f.buyer.disconnect();
+  await f.buyer.settled();
+  const restored = createBuyerBatchSession({
+    ...f.wire,
+    terms: f.f.terms,
+    buyer: f.f.buyer,
+    meter: blockTestMeter,
+    now: f.f.now,
+    unresolved: async () => false,
+    verify: async () => {},
+    observe: f.f.sellerOptions.observe,
+    declared: true,
+  });
+  t.after(async () => {
+    await restored.disconnect();
+    await restored.settled();
+  });
+  declaredSeller(4)(f.offers);
+  await restored.execute(await f.offers.quote(2, DECLARED), input(f.offers));
+  configureBlockEngine(f.offers);
+  f.offers.live.meteringMode = CONTROL_METERING_MODES.RECOUNTED;
+  const blocks = t.mock.method(f.f.buyer, 'beginBlocks');
+  await restored.execute(await f.offers.quote(3), f.offers.input);
+  assert.equal(blocks.mock.callCount(), 1);
 });
 
 void test('a recounted offer still requires the buyer recount', async (t) => {
