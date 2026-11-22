@@ -102,3 +102,20 @@ void test('the seller holds a provider count to the same bounds, and the charge 
   );
   assert.equal(declaredCharge(bounded, { prices, maxAtomic: '5' }), '5');
 });
+
+void test('a delivery whose byte floor exceeds maxTokens has no billable usage', () => {
+  // 3,300 bytes of tool arguments need at least 104 tokens, but the request allows 100: no bill inside
+  // the bounds exists, so the seller reports an invalid response instead of a bill the buyer refuses.
+  const capped = {
+    messages: [{ role: FREE_CHAT_ROLES.USER, content: 'hola' }],
+    tools: [{ name: 'f', parameters: '{}' }],
+    maxTokens: 100,
+  } as never;
+  const oversized = {
+    text: '',
+    toolCalls: [{ id: 'a', name: 'f', arguments: 'z'.repeat(3300) }],
+    usage: { inputTokens: 3, outputTokens: 110 },
+  } as never;
+  assert.equal(boundDeclaredUsage(capped, oversized), undefined);
+  refused(() => verifyDeclaredUsage(capped, oversized));
+});

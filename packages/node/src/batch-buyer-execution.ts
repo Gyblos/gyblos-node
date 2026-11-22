@@ -256,6 +256,10 @@ async function openVerified<Remote extends BatchDestination>(
     verify,
     signal,
   );
+  // An opening may outlast the quote (openMs exceeds its lifetime): check it again before any payment is
+  // reserved, so an expired quote leaves the funded channel open for the next request instead of an
+  // interrupted reservation that recovery would close.
+  await verify(signal);
   await options.beforeInference?.(request.requestId, {
     requestId: request.requestId,
     channelId,
