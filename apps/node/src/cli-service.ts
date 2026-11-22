@@ -62,6 +62,8 @@ const HINTS: Readonly<Record<ServiceErrorCode, string>> = {
     'the environment file may not set GYBLOS_HOME, GYBLOS_CONFIG, GYBLOS_CONTAINER, GYBLOS_PACKAGED, GYBLOS_LAUNCHER, PATH, HOME, shell variables (UID, IFS, BASH*, …) or NODE_*/LD_*/DYLD_*/TSX_*/OPENSSL_* variables',
   [SERVICE_ERRORS.ALREADY_INSTALLED]:
     'run `gyblos seller service uninstall` first',
+  [SERVICE_ERRORS.RESTART_INCOMPLETE]:
+    'the seller stopped but its task did not end in time to start again; run the schtasks /Run command above, or `gyblos seller service restart` again',
   [SERVICE_ERRORS.NOT_INSTALLED]:
     'Not installed: no background service to restart; restart `gyblos start` yourself, or run `gyblos seller service install`',
   [SERVICE_ERRORS.DOCTOR_NOT_READY]:
@@ -331,7 +333,14 @@ async function restart(
   }
   if (kind === SERVICE_KINDS.SCHEDULED_TASK) {
     await system.stopWindowsService(sellerHome(output));
-    await waitForTaskStop(system, taskName(system.accountHome));
+    const task = taskName(system.accountHome);
+    try {
+      await waitForTaskStop(system, task);
+    } catch {
+      // A failed state query or a task that will not end: say how to start the stopped seller.
+      output.stderr(`schtasks /Run /TN "${task}"\n`);
+      throw new ServiceError(SERVICE_ERRORS.RESTART_INCOMPLETE);
+    }
   }
   // A launch agent that was booted out has nothing to kickstart: load it again from its plist.
   if (
