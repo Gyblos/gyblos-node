@@ -15,7 +15,7 @@ import {
   STATUS_ERROR_MAP,
 } from './constants';
 import { discoveryFail } from './errors';
-import { readClaimBody } from './github-claims';
+import { readClaimBody, SIGNATURE_HEX } from './github-claims';
 import {
   failStatus,
   indexUrl,
@@ -47,10 +47,6 @@ export interface SellerProfileView {
   issuedAt: number;
   signature: string;
 }
-
-const SIGNATURE_HEX = new RegExp(
-  `^[0-9a-f]{${CONTROL_LIMITS.signatureBytes * 2}}$`,
-);
 
 function malformed(): never {
   return discoveryFail(DISCOVERY_ERROR_CODES.MALFORMED_RESPONSE);
@@ -118,18 +114,28 @@ export async function fetchSellerProfile(
     ...(input.signal ? { signal: input.signal } : {}),
   };
   return withDeadline(request, async (response, aborted) => {
-    if (response.status === CONFIG_HTTP_STATUS.notFound) {
-      const missing = await readJson(
+    if (
+      response.status === CONFIG_HTTP_STATUS.notFound ||
+      response.status === HTTP_STATUS.FORBIDDEN
+    ) {
+      const refusal = await readJson(
         response,
         DISCOVERY_LIMITS.maxClaimResponseBytes,
         aborted,
       ).catch(() => undefined);
+      const wire = isPlainObject(refusal, ['error']) ? refusal.error : null;
       if (
-        isPlainObject(missing, ['error']) &&
-        missing.error === INDEX_WIRE_ERRORS.NO_PROFILE
+        response.status === CONFIG_HTTP_STATUS.notFound &&
+        wire === INDEX_WIRE_ERRORS.NO_PROFILE
       )
         return null;
-      failStatus(response, DISCOVERY_ERROR_CODES.HTTP_STATUS);
+      failStatus(
+        response,
+        response.status === HTTP_STATUS.FORBIDDEN &&
+          wire === INDEX_WIRE_ERRORS.PROFILE_HELD
+          ? DISCOVERY_ERROR_CODES.PROFILE_HELD
+          : DISCOVERY_ERROR_CODES.HTTP_STATUS,
+      );
     }
     if (response.status !== HTTP_STATUS.OK)
       failStatus(

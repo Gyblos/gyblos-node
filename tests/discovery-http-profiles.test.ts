@@ -209,3 +209,26 @@ void test('a profile is read back, a 404 is none and a bad NodeId is refused bef
     DISCOVERY_ERROR_CODES.INVALID_INPUT,
   );
 });
+
+void test('a held name reads as PROFILE_HELD, and another 403 as an HTTP status', async () => {
+  assert.equal(
+    await code(
+      fetchSellerProfile({
+        baseUrl: BASE,
+        nodeId: NODE,
+        fetch: reply(403, { error: 'PROFILE_HELD' }),
+      }),
+    ),
+    DISCOVERY_ERROR_CODES.PROFILE_HELD,
+  );
+  assert.equal(
+    await code(
+      fetchSellerProfile({
+        baseUrl: BASE,
+        nodeId: NODE,
+        fetch: reply(403, { error: 'NOPE' }),
+      }),
+    ),
+    DISCOVERY_ERROR_CODES.HTTP_STATUS,
+  );
+});

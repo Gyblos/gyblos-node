@@ -186,7 +186,7 @@ const OLDER_VIEW_KEYS = [
   'verifiedAt',
 ] as const;
 const VIEW_KEYS = [...OLDER_VIEW_KEYS, 'issuedAt', 'signature'] as const;
-const SIGNATURE_HEX = new RegExp(
+export const SIGNATURE_HEX = new RegExp(
   `^[0-9a-f]{${CONTROL_LIMITS.signatureBytes * 2}}$`,
 );
 const signatureOf = (value: unknown): value is string | null =>
