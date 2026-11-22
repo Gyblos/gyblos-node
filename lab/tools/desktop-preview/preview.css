@@ -629,7 +629,7 @@ html .app.desktop-frame > .preview-status-bar {
   gap: 12px;
   min-width: 0;
   padding: 0 8px;
-  background: var(--pk-side);
+  background: var(--pk-rail);
   color: var(--muted);
   font-size: 12px;
 }
@@ -2592,6 +2592,7 @@ html .app.desktop-frame .preview-pin[aria-pressed='true'] {
   --pk-info: color-mix(in srgb, var(--accent) 70%, var(--ink));
   --pk-neutral: var(--muted);
   --pk-side: var(--panel);
+  --pk-rail: color-mix(in srgb, var(--pk-side) 55%, var(--bg));
   --pk-radius-tag: 6px;
   --pk-menu-motion: 150ms;
   --pk-status-bar: 28px;
@@ -2749,7 +2750,14 @@ html .app.desktop-frame {
 }
 html .app.desktop-frame > .ui-window-chrome {
   border-bottom: 0;
-  background: var(--pk-side);
+  background: linear-gradient(
+    to right,
+    var(--pk-rail) 0,
+    var(--pk-rail) var(--navigation-rail-width),
+    var(--line) var(--navigation-rail-width),
+    var(--line) calc(var(--navigation-rail-width) + 1px),
+    var(--pk-side) calc(var(--navigation-rail-width) + 1px)
+  );
 }
 html .app.desktop-frame > .app-body {
   overflow: hidden;
@@ -3717,7 +3725,7 @@ html .app.desktop-frame .preview-rail {
   gap: var(--space-1);
   min-height: 0;
   padding: var(--space-2) 0 var(--space-3);
-  background: color-mix(in srgb, var(--pk-side) 55%, var(--bg));
+  background: var(--pk-rail);
   border-inline-end: 1px solid var(--line);
 }
 .desktop-frame .preview-rail-spacer {
