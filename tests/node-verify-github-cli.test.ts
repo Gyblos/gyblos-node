@@ -270,7 +270,7 @@ void test('verify github: unknown sellers, a missing proof line and a missing gi
     assert.equal(gone.code, 1);
     assert.match(
       gone.stderr,
-      /^GitHub shows no public gist .*--gist <gist URL>\. \[VERIFY_GIST_NOT_FOUND\]$/m,
+      /^GitHub shows no gist .* with a file named gyblos-proof\.txt\..*--gist <gist URL>\. \[VERIFY_GIST_NOT_FOUND\]$/m,
     );
     assert.equal(gone.posted.length, 0);
   }));

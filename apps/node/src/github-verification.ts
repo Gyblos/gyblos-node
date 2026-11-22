@@ -150,27 +150,30 @@ export async function checkGist(
   nodeId: string,
   stop?: AbortSignal,
 ): Promise<GistCheck> {
+  const read = (path: string) =>
+    fetcher(`${VERIFY_GITHUB.gistRawOrigin}/${account}/${gist}/raw${path}`, {
+      method: 'GET',
+      redirect: 'manual',
+      signal: AbortSignal.any([
+        AbortSignal.timeout(VERIFY_GITHUB.gistTimeoutMs),
+        ...(stop ? [stop] : []),
+      ]),
+    });
   try {
-    const response = await fetcher(
-      `${VERIFY_GITHUB.gistRawOrigin}/${account}/${gist}/raw/${IDENTITY_CLAIM.proofFile}`,
-      {
-        method: 'GET',
-        redirect: 'manual',
-        signal: AbortSignal.any([
-          AbortSignal.timeout(VERIFY_GITHUB.gistTimeoutMs),
-          ...(stop ? [stop] : []),
-        ]),
-      },
-    );
-    if (response.status !== HTTP_STATUS.ok) {
-      await response.body?.cancel().catch(() => undefined);
-      return response.status === HTTP_STATUS.notFound
-        ? GIST_CHECKS.NOT_FOUND
-        : GIST_CHECKS.UNKNOWN;
-    }
-    return (await readGithubProof(response.body, nodeId))
-      ? GIST_CHECKS.FOUND
-      : GIST_CHECKS.MISSING;
+    const response = await read(`/${IDENTITY_CLAIM.proofFile}`);
+    if (response.status === HTTP_STATUS.ok)
+      return (await readGithubProof(response.body, nodeId))
+        ? GIST_CHECKS.FOUND
+        : GIST_CHECKS.MISSING;
+    await response.body?.cancel().catch(() => undefined);
+    if (response.status !== HTTP_STATUS.notFound) return GIST_CHECKS.UNKNOWN;
+    // No proof file: the bare raw URL (the gist's first file) says whether the account owns the gist.
+    const gistItself = await read('');
+    await gistItself.body?.cancel().catch(() => undefined);
+    if (gistItself.status === HTTP_STATUS.ok) return GIST_CHECKS.WRONG_FILE;
+    return gistItself.status === HTTP_STATUS.notFound
+      ? GIST_CHECKS.NOT_FOUND
+      : GIST_CHECKS.UNKNOWN;
   } catch {
     return GIST_CHECKS.UNKNOWN;
   }

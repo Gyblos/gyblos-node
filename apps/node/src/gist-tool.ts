@@ -1,7 +1,8 @@
 // Owns the optional GitHub CLI (`gh`) step of `gyblos seller verify github`: which account gh is signed in
-// as, finding a public gist by its description, and creating one public gist. gh runs with a fixed argv, no shell, a timeout and bounded output; the
-// gist text goes through a file in a fresh private temporary directory that is removed afterwards. The
-// same calls work on Windows, macOS and Linux. Tests replace this module's tool.
+// as, finding its proof gist by description, and creating one public gist. gh runs with a fixed argv, no
+// shell, a timeout and bounded output; the gist text goes through a file in a fresh private temporary
+// directory that is removed afterwards. The same calls work on Windows, macOS and Linux. Tests replace this
+// module's tool.
 import { execFile } from 'node:child_process';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';

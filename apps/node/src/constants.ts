@@ -252,11 +252,21 @@ export const VERIFY_STEPS = {
   GIST_MISSING: 'gist-missing',
 } as const;
 export type VerifyStep = (typeof VERIFY_STEPS)[keyof typeof VERIFY_STEPS];
+// Where the gist a run uses came from.
+export const GIST_SOURCES = {
+  GIVEN: 'given',
+  SAVED: 'saved',
+  INDEX: 'index',
+  CREATED: 'created',
+} as const;
+export type GistSource = (typeof GIST_SOURCES)[keyof typeof GIST_SOURCES];
 // What reading a gist's raw text found.
 export const GIST_CHECKS = {
   FOUND: 'found',
   MISSING: 'missing',
   NOT_FOUND: 'not-found',
+  // The gist exists for the account but has no file named IDENTITY_CLAIM.proofFile.
+  WRONG_FILE: 'wrong-file',
   // Any other answer (403, 5xx, a timeout): the index is asked anyway.
   UNKNOWN: 'unknown',
 } as const;
@@ -267,6 +277,7 @@ export const VERIFY_ERRORS = {
   GIST_OWNER: 'VERIFY_GIST_OWNER_MISMATCH',
   NO_GIST: 'VERIFY_NO_GIST',
   PROOF_MISSING: 'VERIFY_PROOF_MISSING',
+  PROOF_FILE_MISSING: 'VERIFY_PROOF_FILE_MISSING',
   GIST_NOT_FOUND: 'VERIFY_GIST_NOT_FOUND',
   CONFIG_INVALID: 'VERIFY_CONFIG_INVALID',
   STATE_FAILED: 'VERIFY_STATE_FAILED',

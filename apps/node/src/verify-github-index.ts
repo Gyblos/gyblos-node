@@ -65,7 +65,7 @@ const AGAIN = 'Run the same command again';
 // Why a claim is not verified, and what to do, by the index's reason.
 export const REASON_TEXT: Readonly<Record<GithubClaimReason, string>> = {
   [GITHUB_CLAIM_REASONS.GIST_NOT_FOUND]:
-    'GitHub has no public gist with that id owned by this account. Check the account name and that the gist is public',
+    'GitHub has no gist with that id and a file named gyblos-proof.txt owned by this account. Check the account name and the file name',
   [GITHUB_CLAIM_REASONS.NODE_ID_MISSING]:
     'the gist does not contain the proof line. Add it on a line of its own, then run the same command again',
   [GITHUB_CLAIM_REASONS.GITHUB_UNAVAILABLE]: `the index could not reach GitHub. ${AGAIN} in a few minutes`,
