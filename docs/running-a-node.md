@@ -417,9 +417,11 @@ seller's publication, the discovery line adds `publishing refused:` and the
 static code the daemon keeps in `status.json`. While a model is served, an
 `uptime` line then asks the index for this NodeId's public uptime (the share of
 five-minute slots with an accepted presence over 24 hours, 7 and 30 days) and
-says `online, last presence … ago` or `offline since …`; this is the only
-request that carries the NodeId, which the daemon already publishes to the same
-index. The output is described in the
+says `online, last presence … ago` or `offline since …`, and a `github` line
+shows the GitHub account the index links to this seller and its state (see
+[GitHub verification](#github-verification)); these two are the only requests
+that carry the NodeId, which the daemon already publishes to the same index. The
+output is described in the
 [CLI reference](https://docs.gyblos.com/en/reference/cli#status-and-registration).
 
 `Result: RUNNING` (exit 0) needs an active service and a ready daemon.
@@ -440,6 +442,57 @@ Read local operational logs with `pnpm gyblos logs --role seller` (`--follow`,
 `--json` and filters); see
 [the CLI reference](https://docs.gyblos.com/en/reference/cli#local-operational-logs)
 and [diagnostics.md](diagnostics.md).
+
+### GitHub verification
+
+```sh
+pnpm gyblos seller verify github <user>
+pnpm gyblos seller verify github <user> --gist <gist URL or id>
+pnpm gyblos seller verify github --status
+pnpm gyblos seller verify github --cancel
+```
+
+`seller verify github` shows buyers which GitHub account runs this seller. It
+needs a seller the index already knows (registered with `seller register`, or
+publishing). The binding has two public halves that anyone can re-check: a
+**public** gist owned by `<user>` that contains the line `gyblos-node=<NodeId>`,
+and a claim signed by the node key naming the account and the gist, which the
+discovery index checks ([discovery-index.md](discovery-index.md#github-claims)).
+
+1. The account is lowercased and checked (letters, digits and single hyphens, at
+   most 39 characters).
+2. The gist: `--gist` if given; otherwise the one this home saved earlier, or
+   the one the index already holds for this account. Failing that, if the GitHub
+   CLI (`gh`) is installed and signed in as `<user>`, it creates the public
+   gist; if not, the command prints the text to paste into a new public gist at
+   gist.github.com and asks for its URL on a terminal (or, without a terminal,
+   tells you to run it again with `--gist`). A gist URL naming another owner is
+   refused (`VERIFY_GIST_OWNER_MISMATCH`).
+3. It reads the gist's raw text at `<user>`'s own URL and stops with
+   `VERIFY_PROOF_MISSING` or `VERIFY_GIST_NOT_FOUND` when the proof line is not
+   there yet.
+4. It signs the claim with the node key and sends it to the index, which checks
+   the gist itself. `Verified` exits 0. Anything else exits 1 with the state and
+   what to do: `GIST_NOT_FOUND`, `NODE_ID_MISSING`, or `GITHUB_UNAVAILABLE` (the
+   claim stays pending; run it again later). When the index checked this seller
+   less than a minute ago (`CHECK_DEFERRED`), a wait of up to 2 minutes is
+   waited out once and the claim sent again; a longer one is reported. A
+   `DISCOVERY_STALE_CLAIM` answer is re-signed once with a newer time. A
+   `DISCOVERY_UNKNOWN_NODE` refusal means the index does not know the seller
+   yet: register or publish first.
+
+Progress (account, gist id and last step) is saved in
+`<GYBLOS_HOME>/seller/github-verification.json`, owner-only and written
+atomically. Each run first asks the index and reads the gist, so stopping it
+with Ctrl+C at any point is safe: the next run skips what is done. A finished
+verification run again just says `Already verified`.
+
+`--status` prints the index's view: account, gist URL, state, reason and when it
+was last checked. `--cancel` signs a cancel claim, so the index stops linking
+the seller to the account, and removes the progress file. The gist stays on
+GitHub; delete it yourself. Only `verified` means the index found the proof. The
+command prints public identifiers only (NodeId, account, gist URL and the index
+origin), never a key or the home location.
 
 ### Docker
 

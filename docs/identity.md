@@ -51,6 +51,9 @@ for sellers it knows and publishes the result
 ([discovery-index.md](discovery-index.md#github-claims)). Clients must treat an
 account as proven only when the index reports `state` `verified`.
 
+A seller creates and sends its claim with `gyblos seller verify github <user>`
+([running-a-node.md](running-a-node.md#github-verification)).
+
 A GitHub claim is a public label, not buyer trust: it is not the 8004 binding
 and no buyer admission policy reads it.
 

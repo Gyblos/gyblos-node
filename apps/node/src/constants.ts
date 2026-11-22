@@ -224,3 +224,42 @@ export const LOG_ROLES = {
   SELLER: 'seller',
   LAB: 'lab',
 } as const;
+
+// `gyblos seller verify github` (cli-verify-github.ts): its steps, bounds and codes.
+export const VERIFY_GITHUB = {
+  gistWebOrigin: 'https://gist.github.com',
+  gistRawOrigin: 'https://gist.githubusercontent.com',
+  gistFile: 'gyblos-node.txt',
+  gistDescription: 'Gyblos seller identity proof',
+  indexTimeoutMs: 15_000,
+  gistTimeoutMs: 5_000,
+  maxGistBytes: 16_384,
+  ghTimeoutMs: 30_000,
+  ghOutputCharacters: 64 * 1024,
+  // The private progress file, in the seller role directory (config/src/home.ts rolePathIn).
+  progressFile: 'github-verification.json',
+  stateVersion: 1,
+  stateBytes: 4_096,
+  // A CHECK_DEFERRED wait this short is waited out once; a longer one is left to a later run.
+  maxWaitSeconds: 120,
+  msPerSecond: 1000,
+} as const;
+// What a local verification has done so far; every run checks the index and the gist again first.
+export const VERIFY_STEPS = {
+  GIST: 'gist',
+  POSTED: 'posted',
+  VERIFIED: 'verified',
+} as const;
+export type VerifyStep = (typeof VERIFY_STEPS)[keyof typeof VERIFY_STEPS];
+export const VERIFY_ERRORS = {
+  USAGE: 'VERIFY_USAGE',
+  ACCOUNT_INVALID: 'VERIFY_ACCOUNT_INVALID',
+  GIST_INVALID: 'VERIFY_GIST_INVALID',
+  GIST_OWNER: 'VERIFY_GIST_OWNER_MISMATCH',
+  NO_GIST: 'VERIFY_NO_GIST',
+  PROOF_MISSING: 'VERIFY_PROOF_MISSING',
+  GIST_NOT_FOUND: 'VERIFY_GIST_NOT_FOUND',
+  CONFIG_INVALID: 'VERIFY_CONFIG_INVALID',
+  STATE_UNREADABLE: 'VERIFY_STATE_UNREADABLE',
+  NOT_VERIFIED: 'VERIFY_NOT_VERIFIED',
+} as const;
