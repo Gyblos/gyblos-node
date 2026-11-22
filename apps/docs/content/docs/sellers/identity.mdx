@@ -209,7 +209,7 @@ that failed.
 - **Change the account or the gist.** Run the command again with the new `USER`, or with `--gist` and the new
   gist. The claim goes back to `pending` until the index checks the new gist.
 - **Keep the gist.** The index checks it again about every 6 hours. If you delete the gist, rename its file or
-  remove the line, the state becomes `lost`.
+  remove the line, a verified link becomes `lost`; a `pending` one stays `pending`.
 - **Several sellers.** One GitHub account can verify several sellers, each with its own
   `gyblos-node=NODEID` line. With `gh`, the command makes one gist per seller. By hand, the simplest is one
   gist: add each seller's line, on its own line, to the same `gyblos-proof.txt` and pass that gist to each
@@ -242,7 +242,7 @@ gyblos seller verify github --cancel
 
 The index stops linking your seller to the account and the command removes its progress file. The gist
 stays on GitHub: delete it yourself at [gist.github.com](https://gist.github.com) if you no longer want it. If
-other sellers share that gist, remove only this seller's line instead: deleting the gist turns their links
+other sellers share that gist, remove only this seller's line instead: deleting the gist turns their verified links
 `lost` at their next check.
 
 ### Common errors [#github-errors]

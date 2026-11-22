@@ -436,7 +436,7 @@ at most 1024 bytes). The index checks, in this order:
    NodeId the index no longer knows can still withdraw its claim.
 
 A cancel (`account` and `gist` both `null`) replaces the claim with a tombstone
-that keeps only the NodeId and `issuedAt`, and answers
+that keeps only the NodeId, `issuedAt` and `last_fetch_at`, and answers
 `200 {"ok":true,"state":null,"reason":null}`. A cancel from a NodeId with
 nothing stored that the index does not know writes nothing. Any other claim is
 stored and its gist checked at once:

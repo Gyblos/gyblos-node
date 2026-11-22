@@ -116,7 +116,7 @@ del rol, recibos, logs completos ni capturas del aviso de registro. Pide ayuda e
 
 Puedes mostrar a los compradores qué cuenta de GitHub opera tu vendedor. Es opcional. El índice ya tiene que
 conocer tu vendedor: tiene que estar registrado, o haber publicado sus modelos para que el índice guarde su
-catálogo. El índice puede guardar un catálogo un tiempo después de que el vendedor deja de publicar, aunque ya
+catálogo. El índice puede guardar un catálogo un tiempo después de que el vendedor deje de publicar, aunque ya
 no aparezca en la lista, pero no cuentes con eso: registra el vendedor o mantenlo publicando. El vínculo tiene dos
 partes: un gist de tu cuenta de GitHub con un archivo llamado `gyblos-proof.txt` que contiene la línea
 `gyblos-node=NODEID`, y una declaración firmada con la llave de tu nodo que nombra la cuenta y el gist. El
@@ -212,14 +212,14 @@ aunque haya fallado.
 - **Cambiar la cuenta o el gist.** Ejecuta el comando otra vez con el nuevo `USER`, o con `--gist` y el nuevo
   gist. La declaración vuelve a `pending` hasta que el índice revise el nuevo gist.
 - **No borres el gist.** El índice lo revisa otra vez cada 6 horas más o menos. Si borras el gist, cambias el
-  nombre del archivo o quitas la línea, el estado pasa a `lost`.
+  nombre del archivo o quitas la línea, un vínculo verificado pasa a `lost`; uno `pending` sigue `pending`.
 - **Varios vendedores.** Una cuenta de GitHub puede verificar varios vendedores, cada uno con su propia línea
   `gyblos-node=NODEID`. Con `gh`, el comando crea un gist por vendedor. A mano, lo más simple es un solo gist:
   agrega la línea de cada vendedor, cada una en su propio renglón, al mismo `gyblos-proof.txt` y pasa ese gist
   a cada vendedor con `--gist`. Si quitas una línea del archivo compartido, solo afecta a ese vendedor. El índice lee solo los
   primeros 16 KiB del archivo, unas 200 líneas, y el comando lee esa misma parte antes de enviar una
   declaración. Si la línea de un vendedor queda más allá, el comando se detiene con `VERIFY_PROOF_MISSING` y no
-  envía nada; si la línea queda ahí después de que el vendedor se verificó, la siguiente revisión lo pasa a `lost`.
+  envía nada; si la línea pasa a quedar más allá después de que el vendedor se verificó, la siguiente revisión lo pasa a `lost`.
 
 ### Comprueba el estado [#comprobar-github]
 
@@ -246,7 +246,7 @@ gyblos seller verify github --cancel
 
 El índice deja de vincular tu vendedor con la cuenta y el comando borra su archivo de avance. El gist sigue en
 GitHub: bórralo tú en [gist.github.com](https://gist.github.com) si ya no lo quieres. Si otros vendedores
-usan ese mismo gist, quita solo la línea de este vendedor: si borras el gist, sus vínculos pasan a `lost` en
+usan ese mismo gist, quita solo la línea de este vendedor: si borras el gist, sus vínculos verificados pasan a `lost` en
 su siguiente revisión.
 
 ### Errores comunes [#errores-github]
@@ -260,7 +260,7 @@ Cada error empieza con una frase que dice qué hacer y termina con un código en
 | `VERIFY_GIST_OWNER_MISMATCH`                            | El gist es de otra cuenta de GitHub. Crea el gist con la sesión iniciada como `USER`.                                                                                                        |
 | `VERIFY_GIST_NOT_FOUND`                                 | GitHub no tiene ese gist para `USER`: revisa la dirección y el nombre de usuario. Si borraste el gist, ejecuta el comando otra vez para crear uno nuevo, o pasa otra dirección con `--gist`. |
 | `VERIFY_NOT_VERIFIED` con `could not reach GitHub`      | El índice no pudo llegar a GitHub. Tu declaración mantiene su estado. Ejecuta el comando otra vez en unos minutos.                                                                           |
-| `VERIFY_NOT_VERIFIED` con `checked this seller moments` | El índice revisó tu vendedor hace un momento, y la espera es de más de 2 minutos o el índice seguía diciéndolo después de la única espera. Ejecuta el comando otra vez en un minuto.         |
+| `VERIFY_NOT_VERIFIED` con `checked this seller moments` | El índice revisó tu vendedor hace un momento, y la espera es de más de 2 minutos o el índice seguía diciéndolo después de esa única espera. Ejecuta el comando otra vez en un minuto.        |
 | `VERIFY_GH_FAILED`                                      | La CLI de GitHub no pudo crear el gist. Créalo a mano y ejecuta el comando con `--gist`.                                                                                                     |
 | `DISCOVERY_UNKNOWN_NODE`                                | El índice aún no conoce tu vendedor. Primero [regístralo](/es/sellers/register-publish), o publica sus modelos.                                                                              |
 | `DISCOVERY_STALE_CLAIM`                                 | El índice tiene una declaración más nueva de este vendedor. El comando ya probó una vez más. Revisa el reloj de este equipo y ejecuta el comando otra vez.                                   |
