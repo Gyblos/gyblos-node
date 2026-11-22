@@ -26,9 +26,9 @@ Read `AGENTS.md`, `docs/code-standards.md`, the contributor workflow and the PR 
 
 ## Maintain the ratchet
 
-Use the repository's no-new-comments lint rule and per-file source-comment budget. Existing comments are grandfathered only by that checked-in budget. New files have a budget of zero unless an approved exception is recorded by maintainers.
+Use the repository's no-new-comments lint rule and per-file source-comment budget. Existing comments are grandfathered only by that checked-in budget. New files have a budget of zero, and `pnpm comments:check` rejects any comment whose text is not in the base version of a changed file.
 
-After deletions, reduce the affected file budgets in the same change. Never raise a budget, add an inline suppression, or move a comment to another file to bypass the rule. Keep non-source documentation, ADRs and examples outside the source-comment scanner unless the task explicitly includes them.
+After deletions, reduce the affected file budgets in the same change. Never raise a budget to admit a comment, add an inline suppression, or move a comment to another file to bypass the rule. A budget rises only when a scanner fix starts counting comments that already existed. Keep non-source documentation, ADRs and examples outside the source-comment scanner unless the task explicitly includes them.
 
 ## Report and validate
 
