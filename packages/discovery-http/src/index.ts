@@ -28,6 +28,14 @@ export {
   type SubmitGithubClaimInput,
 } from './github-claims';
 export {
+  fetchSellerProfile,
+  submitSellerProfile,
+  type FetchSellerProfileInput,
+  type SellerProfileAnswer,
+  type SellerProfileView,
+  type SubmitSellerProfileInput,
+} from './profiles';
+export {
   fetchUptime,
   type FetchUptimeInput,
   type SellerUptime,

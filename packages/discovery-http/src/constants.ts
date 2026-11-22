@@ -122,6 +122,7 @@ export const DISCOVERY_PATHS = {
   registrations: '/registrations',
   uptime: '/uptime',
   githubIdentity: '/identity/github',
+  profile: '/profile',
 } as const;
 
 // A beta invite as `gyblos index:invite` prints it, and a NodeId (lowercase hex of its Ed25519 key);
