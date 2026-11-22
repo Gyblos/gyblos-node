@@ -42,6 +42,26 @@ async function reconcileFreePermission(
     await client.authorize('0');
   check();
 }
+function checkAutoLimits(
+  policy: ReturnType<X402Client['policy']>,
+  maxAtomic: string,
+  autoPrices?: TokenPricesV2 | null,
+) {
+  if (autoPrices !== undefined && !policy?.autoRoutes?.length)
+    throw new PaidSellerLimitError(
+      'This buyer does not support changing Auto in Payments.',
+    );
+  if (
+    autoPrices &&
+    BigInt(maxAtomic) >
+      BigInt(
+        policy?.depositAtomic ?? BUYER_SESSION_DEFAULT_POLICY.depositAtomic,
+      )
+  )
+    throw new PaidSellerLimitError(
+      'The maximum per response exceeds the channel deposit.',
+    );
+}
 function assertConfigurableBudget(
   current: Awaited<ReturnType<X402Budget['summary']>>,
 ) {
@@ -148,21 +168,7 @@ export function automaticBuyer(
         check();
         assertConfigurableBudget(await budget.summary());
         check();
-        if (autoPrices !== undefined && !client.policy()?.autoRoutes?.length)
-          throw new PaidSellerLimitError(
-            'This buyer does not support changing Auto in Payments.',
-          );
-        if (
-          autoPrices &&
-          BigInt(maxAtomic) >
-            BigInt(
-              client.policy()?.depositAtomic ??
-                BUYER_SESSION_DEFAULT_POLICY.depositAtomic,
-            )
-        )
-          throw new PaidSellerLimitError(
-            'The maximum per response exceeds the channel deposit.',
-          );
+        checkAutoLimits(client.policy(), maxAtomic, autoPrices);
         client.disconnectForPolicyChange(owned, policyId);
         ready = null;
         owned = undefined;
