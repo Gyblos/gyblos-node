@@ -220,6 +220,7 @@ export const githubClaims = sqliteTable(
     }),
     reason: text('reason'),
     checkedAt: integer('checked_at'),
+    verdictAt: integer('verdict_at'),
     verifiedAt: integer('verified_at'),
     lastFetchAt: integer('last_fetch_at'),
     nextCheckAt: integer('next_check_at'),

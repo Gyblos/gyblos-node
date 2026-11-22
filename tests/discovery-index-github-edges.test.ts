@@ -35,6 +35,7 @@ for (const kind of CLAIM_KINDS) {
       state: 'verified',
       reason: null,
       checkedAt: now,
+      verdictAt: now,
       verifiedAt: now,
       nextCheckAt: now,
     });

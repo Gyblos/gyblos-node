@@ -4,7 +4,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { wranglerLaunch } from '@gyblos/discovery-index/wrangler-d1';
+import {
+  wranglerD1,
+  wranglerLaunch,
+} from '@gyblos/discovery-index/wrangler-d1';
 
 const ARGS = [
   'd1',
@@ -80,5 +83,35 @@ void test('on Windows without npm beside node.exe the launch is refused with a s
   assert.throws(
     () => wranglerLaunch('win32', 'C:\\node\\node.exe', ARGS, () => false),
     /npm's npx was not found next to this Node\.js/,
+  );
+});
+
+void test('Homebrew-style Node with npm in another prefix falls back to npx on PATH', () => {
+  assert.deepEqual(
+    wranglerLaunch(
+      'darwin',
+      '/opt/homebrew/Cellar/node/24.22.1/bin/node',
+      ARGS,
+      (path) => path === '/opt/homebrew/lib/node_modules/npm/bin/npx-cli.js',
+    ),
+    { file: 'npx', args: ['wrangler@4.151.1', ...ARGS] },
+  );
+});
+
+void test('a failed Wrangler launch throws a static error without the SQL or its values', () => {
+  const sql =
+    "INSERT INTO discovery_invites VALUES ('hash', 'seller@example.com')";
+  assert.throws(
+    () =>
+      wranglerD1(sql, { target: '--remote', json: false }, () => {
+        throw new Error(
+          `Command failed: npx wrangler@4.151.1 d1 execute --command ${sql}\nspawn npx ENOENT`,
+        );
+      }),
+    (error: unknown) =>
+      error instanceof Error &&
+      error.message === 'Wrangler could not run the D1 command.' &&
+      !error.message.includes('seller@example.com') &&
+      error.cause === undefined,
   );
 });
