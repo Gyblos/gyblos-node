@@ -24,6 +24,7 @@ import { CollectorError, statusOf } from './errors';
 import { rejection } from './http';
 import { ingestUpload, StaleUploadError } from './ingest';
 import { ingestObservations } from './ingest-observations';
+import type { ChainTxReader } from './stats-chain-txs';
 import { statsRoutes } from './stats-routes';
 import type { StatsReader } from './stats-store';
 import type { CollectorStorage } from './storage';
@@ -42,6 +43,7 @@ export interface MetricsCollectorOptions {
   limiters?: CollectorLimiters;
   // Public aggregate reads; missing answers 503 COLLECTOR_UNAVAILABLE on the stats routes only.
   stats?: StatsReader;
+  chainTransactions?: ChainTxReader;
   now?: () => number;
   // Loopback hosts only: plain http is accepted. Storage and limiters are never relaxed.
   development?: boolean;
@@ -181,7 +183,7 @@ export function createMetricsCollector(options: MetricsCollectorOptions) {
     ] as const;
   app.post(COLLECTOR_ROUTES.RECEIPTS, ...upload(ingestUpload));
   app.post(COLLECTOR_ROUTES.OBSERVATIONS, ...upload(ingestObservations));
-  statsRoutes(app, options.stats, now);
+  statsRoutes(app, options.stats, now, options.chainTransactions);
   probeRoute(app, options.probe);
 
   app.notFound((context) => rejection(context, COLLECTOR_ERRORS.NOT_FOUND));

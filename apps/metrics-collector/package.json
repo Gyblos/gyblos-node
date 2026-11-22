@@ -22,6 +22,8 @@
     "./stats-shape": "./src/stats-shape.ts",
     "./stats": "./src/stats.ts",
     "./stats-chain": "./src/stats-chain.ts",
+    "./stats-chain-txs": "./src/stats-chain-txs.ts",
+    "./stats-chain-txs-read": "./src/stats-chain-txs-read.ts",
     "./rpc-probe": "./src/rpc-probe.ts",
     "./chain/base58": "./src/chain/base58.ts",
     "./chain/channel-account": "./src/chain/channel-account.ts",

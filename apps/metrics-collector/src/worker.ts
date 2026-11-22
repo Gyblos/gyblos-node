@@ -28,6 +28,7 @@ import {
   COLLECTOR_STATUS,
 } from './constants';
 import { rpcProbe } from './rpc-probe';
+import { chainTxReader } from './stats-chain-txs-read';
 import { statsReader } from './stats-read';
 import { createD1Storage, type D1Database } from './storage-d1';
 
@@ -60,6 +61,9 @@ function appFor(bindings: unknown) {
   return createMetricsCollector({
     storage: isDatabase(database) ? createD1Storage(database) : undefined,
     stats: isDatabase(database) ? statsReader(database) : undefined,
+    chainTransactions: isDatabase(database)
+      ? chainTxReader(database)
+      : undefined,
     limiters,
     development: false,
     probe: (request) => rpcProbe(request, bindings),
