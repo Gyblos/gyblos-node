@@ -48,12 +48,12 @@ export function checkPaidSellerRequest(
     refuse(FREE_BUYER_STARTUP.PAID_NETWORK);
   // Any model can be bought on declared usage, except one this buyer can recount: a recounted quote needs
   // the pinned tokenizer, and a recountable model is never bought on the seller's word.
-  if (
-    quote &&
-    (quote.offer.meteringMode === CONTROL_METERING_MODES.RECOUNTED) !==
-      (quote.offer.selection.modelId === MODEL_IDS.QWEN3_0_6B)
-  )
-    refuse(FREE_BUYER_STARTUP.PAID_MODEL);
+  if (quote) {
+    const recounted =
+      quote.offer.meteringMode === CONTROL_METERING_MODES.RECOUNTED;
+    const recountable = quote.offer.selection.modelId === MODEL_IDS.QWEN3_0_6B;
+    if (recounted !== recountable) refuse(FREE_BUYER_STARTUP.PAID_MODEL);
+  }
   if (quote)
     checkPaidSellerRequest(
       {

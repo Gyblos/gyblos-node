@@ -13,6 +13,7 @@ import {
 import {
   parseBuyerReceipt,
   parseSellerReceipt,
+  receiptMember,
   sellerReceiptDigest,
   signBuyerReceipt,
   signSellerReceipt,
@@ -71,12 +72,6 @@ export async function createFreeSellerReceipt(
   const record = buildFreeSellerReceipt(value);
   return { seller: await signSellerReceipt(record, signer) };
 }
-function paidMetering(value: unknown) {
-  return value === CONTROL_METERING_MODES.RECOUNTED ||
-    value === CONTROL_METERING_MODES.DECLARED
-    ? value
-    : controlFail();
-}
 async function prepareBuyerReceipt(value: unknown, paid = false) {
   const input = controlObject(value, [
     'seller',
@@ -86,7 +81,9 @@ async function prepareBuyerReceipt(value: unknown, paid = false) {
   ]);
   const payment = paid ? receiptPayment(input.payment) : undefined;
   // The metering the buyer's quote named: a seller cannot relabel a declared sale as recounted.
-  const metering = paid ? paidMetering(input.metering) : undefined;
+  const metering = paid
+    ? receiptMember(input.metering, CONTROL_METERING_MODES)
+    : undefined;
   const context = receiptContext(input.context);
   // Parse observations now, before yielding; replace this valid digest with the seller signing digest below.
   const snapshot = parseBuyerReceipt({

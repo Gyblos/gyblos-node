@@ -80,7 +80,13 @@ filesystem, transport, engine or payment. Callers inject their node signer.
   `createFreeBuyerReceipt(input, signer)` adds the buyer's signed observation.
 - `buildPaidSellerReceipt`, `createPaidSellerReceipt`, `buildPaidBuyerReceipt`
   and `createPaidBuyerReceipt` do the same with a validated payment block
-  (pricing, `amountAtomic`, `feeAtomic`).
+  (pricing, `amountAtomic`, `feeAtomic`). A recounted record's `amountAtomic`
+  must equal the price of its usage; a declared one may be lower (the bill is
+  capped at the request's `maxAtomic`), never higher. The paid buyer builders
+  also take the quote's `metering` and refuse a seller record that names
+  another, so a declared sale cannot be published as recounted. A declared
+  record's usage is the seller's bounded count, which the buyer did not recount:
+  read `metering: declared` as unverified usage.
 - `receiptTextSizes(input, output)` returns UTF-8 byte and Unicode code-point
   counts and keeps no text.
 

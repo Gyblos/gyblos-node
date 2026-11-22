@@ -69,7 +69,8 @@ export function matchPaidReceipt(
         ),
       )
     : '0';
-  // A declared bill is capped at the request's maxAtomic, so it can be below the price of its usage.
+  // A declared bill is capped at the request's maxAtomic, which the record does not carry: its amount may be
+  // anything up to the price of its usage, never above. A recounted bill is exactly that price.
   const declared = record.metering === CONTROL_METERING_MODES.DECLARED;
   if (
     declared

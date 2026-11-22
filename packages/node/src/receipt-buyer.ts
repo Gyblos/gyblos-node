@@ -43,6 +43,9 @@ export interface BuyerReceiptEvidence {
   // The paid quote's metering, bound into the buyer's half.
   metering?: ControlMeteringMode;
 }
+// Paid evidence always names its quote's metering.
+export type PaidBuyerReceiptEvidence = BuyerReceiptEvidence &
+  Required<Pick<BuyerReceiptEvidence, 'payment' | 'metering'>>;
 async function receiptQuery(
   client: ReturnType<typeof createReceiptTransport<EndpointAddr>>,
   request: ReceiptChannelRequest,

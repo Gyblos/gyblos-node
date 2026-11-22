@@ -328,3 +328,34 @@ void test('paid verification snapshots caller-owned financial fields before cryp
   f.payment.pricing.prices.outputAtomicPerMtok = '999';
   assert.ok((await verifyReceipt(await pending)).buyer);
 });
+void test('the paid buyer refuses a seller record whose metering differs from its own quote, both ways', async () => {
+  const f = fixture();
+  let signed = 0;
+  const signer = async (bytes: Uint8Array) => {
+    signed++;
+    return f.buyer.sign(bytes);
+  };
+  for (const [record, quoted] of [
+    [CONTROL_METERING_MODES.RECOUNTED, CONTROL_METERING_MODES.DECLARED],
+    [CONTROL_METERING_MODES.DECLARED, CONTROL_METERING_MODES.RECOUNTED],
+  ] as const) {
+    const seller = await signSellerReceipt(
+      { ...f.expected, metering: record },
+      f.seller.sign,
+    );
+    await assert.rejects(
+      createPaidBuyerReceipt(
+        {
+          seller,
+          context: f.context,
+          observed: f.observed,
+          payment: f.payment,
+          metering: quoted,
+        },
+        signer,
+      ),
+      { code: CONTROL_CODES.POLICY },
+    );
+  }
+  assert.equal(signed, 0);
+});

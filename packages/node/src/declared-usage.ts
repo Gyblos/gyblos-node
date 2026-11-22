@@ -48,9 +48,11 @@ export function boundDeclaredUsage(
   const bounds = declaredBounds(input, result);
   return {
     inputTokens: Math.max(1, Math.min(result.usage.inputTokens, bounds.input)),
-    outputTokens: Math.max(
-      bounds.outputFloor,
-      Math.min(result.usage.outputTokens, bounds.output),
+    // A count below the delivered text's floor is refused earlier (DECLARED_METER.usage); this only keeps
+    // the bill inside both bounds.
+    outputTokens: Math.min(
+      Math.max(bounds.outputFloor, result.usage.outputTokens),
+      bounds.output,
     ),
   };
 }
