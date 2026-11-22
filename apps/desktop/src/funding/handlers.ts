@@ -23,7 +23,7 @@ interface FundingPorts {
     seller: BuyerSellerChoice,
   ): Promise<Pick<
     BuyerFunding,
-    'switchingAtomic' | 'replacementAtomic'
+    'switchingAtomic' | 'replacementAtomic' | 'poolLimited'
   > | null>;
   remaining(
     policy: BuyerApiPolicy,

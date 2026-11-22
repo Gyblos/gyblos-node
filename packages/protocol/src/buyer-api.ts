@@ -17,7 +17,7 @@ export interface BuyerApiPolicy {
   model: string;
   maxTokens: number;
   maxAtomic: string;
-  pooledChannels?: true;
+  totalDepositAtomic?: string;
   paidAuto?: true;
   autoPrices?: TokenPricesV2;
   autoRoutes?: { id: string; modelId: string; maxTokens: number }[];
@@ -85,7 +85,8 @@ export function parseBuyerApiPolicy(input: unknown): BuyerApiPolicy {
     value.maxTokens <= 0 ||
     !buyerAtomic(value.maxAtomic) ||
     (value.autoRoutes !== undefined && !Array.isArray(value.autoRoutes)) ||
-    (value.pooledChannels !== undefined && value.pooledChannels !== true) ||
+    (value.totalDepositAtomic !== undefined &&
+      !buyerAtomic(value.totalDepositAtomic)) ||
     (value.paidAuto !== undefined && value.paidAuto !== true) ||
     typeof value.network !== 'string' ||
     value.network.length > BUYER_API.MAX_MODEL_LENGTH ||
@@ -112,7 +113,9 @@ export function parseBuyerApiPolicy(input: unknown): BuyerApiPolicy {
     model: value.model,
     maxTokens: value.maxTokens,
     maxAtomic: value.maxAtomic,
-    ...(value.pooledChannels === true && { pooledChannels: true }),
+    ...(value.totalDepositAtomic !== undefined && {
+      totalDepositAtomic: value.totalDepositAtomic,
+    }),
     ...(value.paidAuto === true && { paidAuto: true }),
     network: value.network,
     mint: value.mint,

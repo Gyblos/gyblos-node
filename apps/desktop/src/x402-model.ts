@@ -109,7 +109,7 @@ export function spendingPolicy(input: unknown) {
     autoRoutes: _routes,
     autoPrices: _prices,
     paidAuto: _auto,
-    pooledChannels: _pooled,
+    totalDepositAtomic: _poolLimit,
     ...policy
   } = x402Policy(input);
   return policy;

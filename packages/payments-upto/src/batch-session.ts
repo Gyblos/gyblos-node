@@ -32,7 +32,11 @@ export type {
   BatchSellerOptions,
 } from './batch-session-types';
 
-export { openBatchBuyerPool, inspectBatchPool } from './batch-pool';
+export {
+  openBatchBuyerPool,
+  inspectBatchPool,
+  poolAllowsSellerDeposit,
+} from './batch-pool';
 export type {
   BatchBuyerPool,
   BatchPoolEntry,

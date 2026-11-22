@@ -63,6 +63,31 @@ export async function inspectBatchPool(
     }),
   );
 }
+export async function poolAllowsSellerDeposit(
+  paths: BatchPoolOptions['paths'],
+  sellerNodeId: string,
+  total: string,
+  deposit: string,
+) {
+  const entries = await inspectBatchPool(paths);
+  const unfunded = new Set(
+    entries
+      .filter((row) => row.stored?.notCreated)
+      .map((row) => row.terms.sellerNodeId),
+  );
+  const funds = budget(entries, total, unfunded);
+  if (BigInt(funds.committedAtomic) > BigInt(total)) return false;
+  const existing = entries.find(
+    (row) => row.terms.sellerNodeId === sellerNodeId,
+  );
+  if (
+    existing &&
+    !existing.stored?.notCreated &&
+    !existing.stored?.openingReturned
+  )
+    return true;
+  return BigInt(funds.availableAtomic) >= BigInt(deposit);
+}
 interface PoolContext {
   options: BatchPoolOptions;
   total: string;

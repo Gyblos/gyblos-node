@@ -281,12 +281,42 @@ void test('a pooled buyer keeps its full deposit for B before migrating its lega
       environment,
       {
         ...policy,
-        pooledChannels: true,
+        totalDepositAtomic: '20000',
         depositAtomic: rig.terms.depositAtomic,
       },
       { ...seller, nodeId: '56'.repeat(32) },
     ),
     null,
+  );
+});
+
+void test('another seller needs a full deposit of shared authority even when the wallet is funded', async (t) => {
+  const { rig, environment, policy, seller } = await fundedChannel(t, '10000');
+  const credit = await switchingCredit(
+    environment,
+    {
+      ...policy,
+      totalDepositAtomic: '15000',
+      depositAtomic: rig.terms.depositAtomic,
+    },
+    { ...seller, nodeId: '56'.repeat(32) },
+  );
+  assert.deepEqual(credit, { poolLimited: true });
+  assert.equal(
+    autoFundingAvailable(
+      { ...policy, depositAtomic: rig.terms.depositAtomic },
+      [
+        {
+          network: DEVNET,
+          payer: policy.payer,
+          balanceAtomic: '10000',
+          channelRemainingAtomic: null,
+          faucetAvailable: true,
+          ...credit,
+        },
+      ],
+    ),
+    FUNDING.channelLimit,
   );
 });
 

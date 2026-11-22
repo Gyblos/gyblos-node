@@ -22,6 +22,7 @@ export interface BuyerFunding {
   channelRemainingAtomic: string | null;
   switchingAtomic?: string;
   replacementAtomic?: string;
+  poolLimited?: true;
 }
 export function sellerResponseLimit(
   funding: BuyerFunding | null,
@@ -42,6 +43,7 @@ export function autoFundingAvailable(
   if (!deposit || !observations.length) return null;
   const capacity = observations.map((item) => {
     if (!item || item.payer !== policy.payer) return null;
+    if (item.poolLimited) return FUNDING.channelLimit;
     const escrow = item.channelRemainingAtomic ?? item.switchingAtomic;
     if (escrow != null && BigInt(escrow) >= BigInt(policy.maxAtomic))
       return true;
@@ -77,6 +79,11 @@ export function parseBuyerFunding(value: unknown): BuyerFunding | null {
       'channelRemainingAtomic',
       ...(value &&
       typeof value === 'object' &&
+      Object.hasOwn(value, 'poolLimited')
+        ? ['poolLimited']
+        : []),
+      ...(value &&
+      typeof value === 'object' &&
       Object.hasOwn(value, 'switchingAtomic')
         ? ['switchingAtomic']
         : []),
@@ -87,12 +94,14 @@ export function parseBuyerFunding(value: unknown): BuyerFunding | null {
         : []),
     ]);
     if (
+      (row.poolLimited !== undefined && row.poolLimited !== true) ||
       row.network !== DEVNET ||
       row.faucetAvailable !== (row.balanceAtomic !== null)
     )
       return null;
     return {
       network: DEVNET,
+      ...(row.poolLimited === true && { poolLimited: true }),
       ...(row.replacementAtomic !== undefined && {
         replacementAtomic: controlAtomic(row.replacementAtomic),
       }),

@@ -11,6 +11,7 @@ import {
   finalizedRequestCharge,
   inspectBatchPool,
   inspectBatchSession,
+  poolAllowsSellerDeposit,
   type BatchStoredSession,
 } from '@gyblos/payments-upto/batch-session';
 import type {
@@ -103,8 +104,16 @@ export async function switchingCredit(
   policy: BuyerApiPolicy,
   seller: BuyerSellerChoice,
 ) {
-  if (policy.pooledChannels) return null;
   const pool = batchPoolPathsIn(environment);
+  if (policy.totalDepositAtomic && policy.depositAtomic) {
+    const allowed = await poolAllowsSellerDeposit(
+      pool,
+      seller.nodeId,
+      policy.totalDepositAtomic,
+      policy.depositAtomic,
+    );
+    return allowed ? null : { poolLimited: true as const };
+  }
   if ((await inspectBatchPool(pool, { includeLegacy: false })).length)
     return null;
   const root = await inspectBatchSession(pool.legacy);
