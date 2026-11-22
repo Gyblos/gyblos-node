@@ -629,6 +629,7 @@ html .app.desktop-frame > .preview-status-bar {
   gap: 12px;
   min-width: 0;
   padding: 0 8px;
+  border-start-start-radius: var(--radius-panel);
   background: var(--pk-rail);
   color: var(--muted);
   font-size: 12px;
@@ -2761,10 +2762,10 @@ html .app.desktop-frame > .ui-window-chrome {
   background: linear-gradient(
     to right,
     var(--pk-rail) 0,
-    var(--pk-rail) var(--navigation-rail-width),
+    var(--pk-rail) calc(var(--navigation-rail-width) - 1px),
+    var(--line) calc(var(--navigation-rail-width) - 1px),
     var(--line) var(--navigation-rail-width),
-    var(--line) calc(var(--navigation-rail-width) + 1px),
-    var(--pk-side) calc(var(--navigation-rail-width) + 1px)
+    var(--pk-side) var(--navigation-rail-width)
   );
 }
 html .app.desktop-frame > .app-body {
