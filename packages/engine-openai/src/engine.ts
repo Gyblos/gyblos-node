@@ -59,6 +59,9 @@ export interface OpenAiEngineSettings {
   apiKey?: string;
   // True when the seller recounts this model's output with its pinned public tokenizer.
   recountable: boolean;
+  // Ask the server to keep a Qwen3 hybrid's thinking off, as the recount renders it. Only the seller's own
+  // local server gets the switch: a strict hosted provider could refuse an unknown field.
+  disableThinking?: boolean;
 }
 
 export interface OpenAiOptions {
@@ -230,6 +233,11 @@ async function generate(
             input.maxTokens,
           stream: true,
           stream_options: { include_usage: true },
+          // vLLM, SGLang and llama.cpp honor this switch; Ollama's /v1 and LM Studio ignore it, so thinking
+          // must also be off on such servers (docs/configuration.md).
+          ...(settings.disableThinking
+            ? { chat_template_kwargs: { enable_thinking: false } }
+            : {}),
         }),
         signal,
       },

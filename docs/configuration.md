@@ -314,6 +314,11 @@ model with only a thinking on/off switch uses `off` and `high`.
 | `qwen3-30b-a3b`       | `off`, `high`           | `off`   | [Qwen3-30B-A3B model card](https://huggingface.co/Qwen/Qwen3-30B-A3B): `enable_thinking` switch                                                                                                      |
 | `qwen3-235b-a22b`     | `off`, `high`           | `off`   | [Qwen3-235B-A22B model card](https://huggingface.co/Qwen/Qwen3-235B-A22B): same switch                                                                                                               |
 | `qwen3-0.6b`          | `off`, `high`           | `off`   | [Qwen3-0.6B model card](https://huggingface.co/Qwen/Qwen3-0.6B): same switch                                                                                                                         |
+| `qwen3-1.7b`          | `off`, `high`           | `off`   | [Qwen3-1.7B model card](https://huggingface.co/Qwen/Qwen3-1.7B): same switch                                                                                                                         |
+| `qwen3-4b`            | `off`, `high`           | `off`   | [Qwen3-4B model card](https://huggingface.co/Qwen/Qwen3-4B): same switch                                                                                                                             |
+| `qwen3-8b`            | `off`, `high`           | `off`   | [Qwen3-8B model card](https://huggingface.co/Qwen/Qwen3-8B): same switch                                                                                                                             |
+| `qwen3-14b`           | `off`, `high`           | `off`   | [Qwen3-14B model card](https://huggingface.co/Qwen/Qwen3-14B): same switch                                                                                                                           |
+| `qwen3-32b`           | `off`, `high`           | `off`   | [Qwen3-32B model card](https://huggingface.co/Qwen/Qwen3-32B): same switch                                                                                                                           |
 | `gpt-oss-120b`        | `low`, `medium`, `high` | `low`   | [gpt-oss model card](https://cdn.openai.com/pdf/419b6906-9da6-406c-a19d-1bb078ac7637/oai_gpt-oss_model_card.pdf) and [harmony guide](https://developers.openai.com/cookbook/articles/openai-harmony) |
 | `gpt-oss-20b`         | `low`, `medium`, `high` | `low`   | Same, and the [gpt-oss-20b model card](https://huggingface.co/openai/gpt-oss-20b)                                                                                                                    |
 | `llama-3.3-70b`       | `off`                   | `off`   | [Llama-3.3-70B-Instruct model card](https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct): no reasoning mode                                                                                     |
@@ -339,7 +344,8 @@ thinking off, so it is not an alias: `model = "qwen3:30b-a3b"` fails with
 `UNKNOWN_MODEL`. Use `model = "qwen3-30b-a3b"` and set
 `upstream_model = "qwen3:30b-a3b-q4_K_M"`. Because the validator does not check
 `upstream_model`, pointing it at the thinking-only tag would serve a model that
-ignores `off`.
+ignores `off`. For the same reason there is no `qwen3:4b` alias: use
+`model = "qwen3-4b"` and set `upstream_model` to the hybrid tag.
 
 The JSON Schema checks only the closed set; the validator enforces the per-model
 rule.
@@ -380,11 +386,11 @@ start succeeds.
 
 ### Engine compatibility
 
-| Engine      | Allowed `url`                                                                                                     | Required keys                   | Usage counted by                                                   | Readiness check                                            |
-| ----------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------- |
-| `ollama`    | `http://127.0.0.1:PORT/` or `http://[::1]:PORT/`, no path                                                         | none; no `api_key_env`          | The pinned public tokenizer                                        | Warmup generation and memory check                         |
-| `openai`    | API base ending in its version: `https://...` on any host, or `http://127.0.0.1:PORT/v1` / `http://[::1]:PORT/v1` | `context_tokens`                | The pinned tokenizer for Qwen3 0.6B; the provider for other models | Loopback: warmup and memory check. Remote: lists the model |
-| `anthropic` | API root without `/v1` (`https://api.anthropic.com`), or a literal loopback proxy                                 | `api_key_env`, `context_tokens` | The provider, input including cached prompt tokens                 | `GET /v1/models/{model}`, even on loopback                 |
+| Engine      | Allowed `url`                                                                                                     | Required keys                   | Usage counted by                                                                                | Readiness check                                            |
+| ----------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `ollama`    | `http://127.0.0.1:PORT/` or `http://[::1]:PORT/`, no path                                                         | none; no `api_key_env`          | The pinned public tokenizer                                                                     | Warmup generation and memory check                         |
+| `openai`    | API base ending in its version: `https://...` on any host, or `http://127.0.0.1:PORT/v1` / `http://[::1]:PORT/v1` | `context_tokens`                | The pinned Qwen3 tokenizer for the catalog's Qwen3 hybrid models; the provider for other models | Loopback: warmup and memory check. Remote: lists the model |
+| `anthropic` | API root without `/v1` (`https://api.anthropic.com`), or a literal loopback proxy                                 | `api_key_env`, `context_tokens` | The provider, input including cached prompt tokens                                              | `GET /v1/models/{model}`, even on loopback                 |
 
 Every engine refuses plain `http` to `localhost`, `host.docker.internal` or any
 host other than a literal loopback address, and a URL with a query or fragment,
@@ -411,8 +417,11 @@ OpenAI-compatible APIs):
 - A remote API is ready once it lists the model, so readiness never spends the
   seller's credit.
 - Turn reasoning off on the server, for example with a non-thinking chat
-  template. An answer whose whole budget went to hidden reasoning is refused as
-  invalid.
+  template. For the catalog's Qwen3 hybrid models the seller also sends
+  `chat_template_kwargs: { enable_thinking: false }`, which vLLM, SGLang and
+  llama.cpp honor; Ollama's `/v1`, LM Studio and hosted routers may ignore it,
+  so turn thinking off on the server too. An answer whose whole budget went to
+  hidden reasoning is refused as invalid.
 - OpenAI's own API (`api.openai.com` and its regional hosts) gets
   `max_completion_tokens`; other servers get `max_tokens`.
 
@@ -443,7 +452,7 @@ Buyers pay the seller's price plus the protocol fee (`PROTOCOL_FEE` in
 when:
 
 - Its engine meters it: recounted with the model's pinned public tokenizer (only
-  the catalog model `qwen3-0.6b` has one), or the provider's declared usage,
+  the catalog's Qwen3 hybrid models have one), or the provider's declared usage,
   which the buyer accepts only within the request's byte bounds.
 - The seller role was set up with a payout and payment keys
   (`SELLER_PAYMENT_ROLE_MISSING` otherwise), and the payout is neither the fee

@@ -21,6 +21,7 @@ import {
 } from '@gyblos/protocol/constants';
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
 import type { ChatTokenizer, RecountTokenizer } from '@gyblos/protocol/engine';
+import { usesPinnedTokenizer } from '@gyblos/protocol/models';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 import type { bindEndpoint } from '@gyblos/transport-iroh/endpoint';
@@ -51,7 +52,7 @@ export function checkPaidSellerRequest(
   if (quote) {
     const recounted =
       quote.offer.meteringMode === CONTROL_METERING_MODES.RECOUNTED;
-    const recountable = quote.offer.selection.modelId === MODEL_IDS.QWEN3_0_6B;
+    const recountable = usesPinnedTokenizer(quote.offer.selection.modelId);
     if (recounted !== recountable) refuse(FREE_BUYER_STARTUP.PAID_MODEL);
   }
   if (quote)

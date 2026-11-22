@@ -60,6 +60,7 @@ export const OPENAI_ENGINE_FACTORY: EngineFactory = {
           model: upstreamModel ?? offer.model.id,
           contextTokens,
           recountable: recounted,
+          disableThinking: recounted && isLocalEngineUrl(url),
           ...(apiKey ? { apiKey } : {}),
         },
         fetch,

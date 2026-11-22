@@ -238,7 +238,7 @@ export const FREE_BUYER_STARTUP = {
   PORT_IN_USE: 'BUYER_PORT_IN_USE',
   // Paid mode: the role's RPC, or the request's network or asset, is not the devnet test token.
   PAID_NETWORK: 'BUYER_PAYMENT_NETWORK_MISMATCH',
-  // A recounted quote for a model this buyer has no pinned tokenizer for; declared quotes buy any model.
+  // A recounted quote for a model without the pinned tokenizer, or a declared quote for one with it.
   PAID_MODEL: 'BUYER_PAID_MODEL_UNSUPPORTED',
   // The explicit paid entry serves only `request.selection`; a `models` list needs the automatic buyer.
   PAID_MODELS: 'BUYER_PAID_MODELS_UNSUPPORTED',

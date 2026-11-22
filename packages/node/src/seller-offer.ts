@@ -9,6 +9,7 @@ import {
   type ReasoningLevel,
 } from '@gyblos/protocol/constants';
 import type { TokenPricesV2 } from '@gyblos/protocol/control-types';
+import { usesPinnedTokenizer } from '@gyblos/protocol/models';
 import { grossAtomicPerMtok } from '@gyblos/protocol/payment-binding';
 
 import type { OfferModel } from './node-config';
@@ -40,11 +41,12 @@ export const SERVED_OFFER = {
   reasoning: [REASONING_LEVELS.OFF] satisfies readonly ReasoningLevel[],
 } as const;
 
-// The served model's public tokenizer is pinned, so its usage is recounted whatever engine serves it.
+// A catalog model whose pinned public tokenizer is the recount's (the Qwen3 family) is recounted whatever
+// engine serves it.
 export function recountsWithPinnedTokenizer(model: OfferModel) {
   return (
     model.kind === MODEL_CLASSIFICATIONS.CATALOG &&
-    model.id === SERVED_OFFER.modelId
+    usesPinnedTokenizer(model.id)
   );
 }
 
