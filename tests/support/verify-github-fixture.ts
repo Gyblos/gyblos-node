@@ -66,11 +66,12 @@ export interface World {
   claim: Record<string, unknown> | null | 'throw';
   // Answers to POSTs, in order; a thrown network error for 'throw'.
   posts: (Response | 'throw')[];
-  // The raw gist text by URL; anything else is 404.
-  gists: Map<string, string>;
-  // The GitHub CLI's signed-in login, and the URL it prints on create.
+  // The raw gist text (or a bare status) by URL; anything else is 404.
+  gists: Map<string, string | { status: number }>;
+  // The GitHub CLI's signed-in login, the URL it prints on create, and its public gists by description.
   ghLogin?: string;
   ghCreates?: string;
+  ghGists?: Map<string, string>;
 }
 
 export function world(patch: Partial<World> = {}): World {
@@ -85,6 +86,7 @@ export async function verifyRun(
 ) {
   const requests: { url: string; init: RequestInit }[] = [];
   const created: string[] = [];
+  const descriptions: string[] = [];
   const sleeps: number[] = [];
   let stdout = '';
   let stderr = '';
@@ -106,8 +108,13 @@ export async function verifyRun(
       },
       gist: {
         login: async () => state.ghLogin,
-        create: async (content) => {
+        find: async (description) => state.ghGists?.get(description),
+        create: async (content, description) => {
           created.push(content);
+          descriptions.push(description);
+          // The new gist is listed from now on, as on GitHub.
+          const id = (state.ghCreates ?? '').trim().split('/').pop();
+          if (id) (state.ghGists ??= new Map()).set(description, id);
           return state.ghCreates ?? '';
         },
       },
@@ -126,9 +133,10 @@ export async function verifyRun(
         return next;
       }
       const text = state.gists.get(input);
-      return text === undefined
-        ? new Response('', { status: 404 })
-        : new Response(text, { status: 200 });
+      if (text === undefined) return new Response('', { status: 404 });
+      return typeof text === 'string'
+        ? new Response(text, { status: 200 })
+        : new Response('', text);
     },
   });
   const output = stdout + stderr;
@@ -136,5 +144,14 @@ export async function verifyRun(
   const posted = requests
     .filter((request) => request.url === INDEX)
     .map((request) => JSON.parse(String(request.init.body)) as unknown);
-  return { code, stdout, stderr, requests, posted, created, sleeps };
+  return {
+    code,
+    stdout,
+    stderr,
+    requests,
+    posted,
+    created,
+    descriptions,
+    sleeps,
+  };
 }

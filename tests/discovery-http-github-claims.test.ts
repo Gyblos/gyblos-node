@@ -155,6 +155,13 @@ void test('a claim view is read back, 404 is none, and a foreign or malformed vi
     { ...view, nodeId: 'cd'.repeat(32) },
     { ...view, state: 'odd' },
     { ...view, extra: 1 },
+    // Terminal control data and newlines in index fields never reach the caller.
+    { ...view, account: 'octo\u001b[2Jcat' },
+    { ...view, account: 'octo\ncat' },
+    { ...view, account: `a${'-b'.repeat(38)}` },
+    { ...view, gist: 'ABCDEF0123456789ABCD' },
+    { ...view, gist: `${'a'.repeat(32)}\n` },
+    { ...view, gist: 'a'.repeat(33) },
   ])
     assert.equal(
       await code(

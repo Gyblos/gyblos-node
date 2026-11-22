@@ -18,17 +18,22 @@ import { githubProofLine } from '@gyblos/protocol/identity-claim';
 import { urlOrigin } from './cli-format';
 import type { Prompt } from './cli-init';
 import { commandsFor } from './cli-next';
-import { EXIT, VERIFY_ERRORS, VERIFY_GITHUB, VERIFY_STEPS } from './constants';
+import {
+  EXIT,
+  GIST_CHECKS,
+  VERIFY_ERRORS,
+  VERIFY_GITHUB,
+  VERIFY_STEPS,
+} from './constants';
 import { githubCli } from './gist-tool';
 import {
   checkGist,
-  GIST_CHECKS,
+  gistDescription,
   gistWebUrl,
   parseGistReference,
   proofText,
   readProgress,
   validAccount,
-  writeProgress,
   type VerifyProgress,
 } from './github-verification';
 import {
@@ -44,6 +49,7 @@ import {
   lookUp,
   post,
   REASON_TEXT,
+  saveProgress,
   statusOf,
   type Session,
   type VerifyOptions,
@@ -65,63 +71,100 @@ export interface VerifyContext {
 const USAGE =
   'Usage: gyblos seller verify github <user> [--gist <url|id>]\n       gyblos seller verify github --status\n       gyblos seller verify github --cancel\n';
 
-// The gist to use: --gist, the saved one, the index's for this account, a new one through gh, or one the
-// seller creates and pastes. Undefined after printing why there is none.
-async function gistFor(
-  session: Session,
+const GIST_SOURCES = {
+  GIVEN: 'given',
+  SAVED: 'saved',
+  INDEX: 'index',
+  CREATED: 'created',
+} as const;
+type GistSource = (typeof GIST_SOURCES)[keyof typeof GIST_SOURCES];
+interface ChosenGist {
+  id: string;
+  source: GistSource;
+}
+
+function parseGist(
+  output: SellerOutput,
   account: string,
-  given: string | undefined,
-  saved: VerifyProgress | undefined,
-  view: GithubClaimView | null,
-): Promise<{ id: string; created: boolean } | number> {
+  text: string,
+  source: GistSource,
+): ChosenGist | number {
+  const reference = parseGistReference(text);
+  if (!reference)
+    return fail(
+      output,
+      VERIFY_ERRORS.GIST_INVALID,
+      'That is not a gist address or id. Copy the address of your gist from gist.github.com',
+    );
+  if (reference.owner !== null && reference.owner !== account)
+    return fail(
+      output,
+      VERIFY_ERRORS.GIST_OWNER,
+      `That gist belongs to ${reference.owner}, not ${account}. Create the gist while signed in as ${account}`,
+    );
+  return { id: reference.id, source };
+}
+
+// A gist through the GitHub CLI when it is signed in as the account: the one an earlier, interrupted run
+// made (found by its description) or a new one. Undefined when gh cannot be used.
+async function gistByCli(session: Session, account: string) {
   const { output } = session;
-  const parse = (text: string) => {
-    const reference = parseGistReference(text);
-    if (!reference)
-      return fail(
-        output,
-        VERIFY_ERRORS.GIST_INVALID,
-        'that is not a gist URL or id; copy the address of your gist from gist.github.com',
-      );
-    if (reference.owner !== null && reference.owner !== account)
-      return fail(
-        output,
-        VERIFY_ERRORS.GIST_OWNER,
-        `that gist belongs to ${reference.owner}, not ${account}; create the gist while signed in as ${account}`,
-      );
-    return { id: reference.id, created: false };
-  };
-  if (given !== undefined) return parse(given);
-  if (saved?.account === account && saved.gist)
-    return { id: saved.gist, created: false };
-  if (view?.account === account) return { id: view.gist, created: false };
-  const text = proofText(session.nodeId);
   const tool = session.system.gist ?? githubCli;
   const login = await tool.login();
   if (login !== undefined && login !== account)
     output.stdout(
       `The GitHub CLI is signed in as ${login}, not ${account}, so it is not used.\n`,
     );
-  if (login === account) {
+  if (login !== account) return undefined;
+  const description = gistDescription(session.nodeId);
+  const existing = await tool.find(description);
+  if (existing) {
     output.stdout(
-      `Creating a public gist as ${account} with the GitHub CLI...\n`,
+      `Using your existing proof gist ${gistWebUrl(account, existing)}\n`,
     );
-    const created = parse(await tool.create(text));
-    return typeof created === 'number'
-      ? created
-      : { ...created, created: true };
+    return { id: existing, source: GIST_SOURCES.CREATED };
   }
   output.stdout(
-    `Create a PUBLIC gist at ${VERIFY_GITHUB.gistWebOrigin} while signed in as ${account}, with this text:\n\n${text}\n`,
+    `Creating a public gist as ${account} with the GitHub CLI...\n`,
+  );
+  return parseGist(
+    output,
+    account,
+    await tool.create(proofText(session.nodeId), description),
+    GIST_SOURCES.CREATED,
+  );
+}
+
+// The gist to use: --gist, the saved one, the index's for this account (unless the last run found it gone),
+// one through gh, or one the seller creates and pastes. A number after printing why there is none.
+async function gistFor(
+  session: Session,
+  account: string,
+  given: string | undefined,
+  saved: VerifyProgress | undefined,
+  view: GithubClaimView | null,
+): Promise<ChosenGist | number> {
+  const { output } = session;
+  if (given !== undefined)
+    return parseGist(output, account, given, GIST_SOURCES.GIVEN);
+  const mine = saved?.account === account ? saved : undefined;
+  const gone = mine?.step === VERIFY_STEPS.GIST_MISSING ? mine.gist : null;
+  if (mine?.gist && !gone) return { id: mine.gist, source: GIST_SOURCES.SAVED };
+  if (view?.account === account && view.gist !== gone)
+    return { id: view.gist, source: GIST_SOURCES.INDEX };
+  const byCli = await gistByCli(session, account);
+  if (byCli) return byCli;
+  output.stdout(
+    `Create a PUBLIC gist at ${VERIFY_GITHUB.gistWebOrigin} while signed in as ${account}, with this text:\n\n${proofText(session.nodeId)}\n`,
   );
   if (!session.system.prompt)
     return fail(
       output,
       VERIFY_ERRORS.NO_GIST,
-      `then run \`gyblos seller verify github ${account} --gist <gist URL>\``,
+      `Then run \`gyblos seller verify github ${account} --gist <gist URL>\``,
     );
   const answer = await session.system.prompt('Gist URL (after creating it): ');
-  return parse(answer);
+  return parseGist(output, account, answer, GIST_SOURCES.GIVEN);
 }
 
 function reportAnswer(
@@ -143,8 +186,48 @@ function reportAnswer(
   return fail(
     session.output,
     VERIFY_ERRORS.NOT_VERIFIED,
-    `${answer.state ?? 'not stored'}: ${REASON_TEXT[reason]}${wait}. Gist: ${url}`,
+    `Not verified yet: ${REASON_TEXT[reason]}${wait}. Gist: ${url}`,
   );
+}
+
+// The gist is not on GitHub: it is never used again without --gist, and the seller is told what to do.
+async function gistGone(session: Session, account: string, gist: ChosenGist) {
+  if (
+    !(await saveProgress(session, {
+      account,
+      gist: gist.id,
+      step: VERIFY_STEPS.GIST_MISSING,
+    }))
+  )
+    return EXIT.failure;
+  const url = gistWebUrl(account, gist.id);
+  return fail(
+    session.output,
+    VERIFY_ERRORS.GIST_NOT_FOUND,
+    gist.source === GIST_SOURCES.GIVEN
+      ? `GitHub shows no public gist ${url}. Check the address and that the gist is public, then run again with --gist <gist URL>`
+      : `The gist ${url} is no longer on GitHub. Run the same command again to make a new one, or run again with --gist <new gist URL>`,
+  );
+}
+
+// Already verified for this account: nothing to send.
+async function alreadyVerified(
+  session: Session,
+  account: string,
+  gist: string,
+) {
+  if (
+    !(await saveProgress(session, {
+      account,
+      gist,
+      step: VERIFY_STEPS.VERIFIED,
+    }))
+  )
+    return EXIT.failure;
+  session.output.stdout(
+    `Already verified: GitHub account ${account} is linked to seller ${session.nodeId}.\n  Proof: ${gistWebUrl(account, gist)}\n`,
+  );
+  return EXIT.ok;
 }
 
 async function verify(
@@ -163,40 +246,29 @@ async function verify(
     given === undefined &&
     view?.account === account &&
     view.state === GITHUB_CLAIM_STATES.VERIFIED
-  ) {
-    await writeProgress(environment, {
-      nodeId,
-      account,
-      gist: view.gist,
-      step: VERIFY_STEPS.VERIFIED,
-    });
-    output.stdout(
-      `Already verified: GitHub account ${account} is linked to seller ${nodeId}.\n  Proof: ${gistWebUrl(account, view.gist)}\n`,
-    );
-    return EXIT.ok;
-  }
+  )
+    return alreadyVerified(session, account, view.gist);
   const saved = await readProgress(environment, nodeId);
   const gist = await gistFor(session, account, given, saved, view);
   if (typeof gist === 'number') return gist;
-  await writeProgress(environment, {
-    nodeId,
-    account,
-    gist: gist.id,
-    step: VERIFY_STEPS.GIST,
-  });
+  if (
+    !(await saveProgress(session, {
+      account,
+      gist: gist.id,
+      step: VERIFY_STEPS.GIST,
+    }))
+  )
+    return EXIT.failure;
   const found = await checkGist(session.system.fetch, account, gist.id, nodeId);
   const url = gistWebUrl(account, gist.id);
-  if (found === GIST_CHECKS.NOT_FOUND && !gist.created)
-    return fail(
-      output,
-      VERIFY_ERRORS.GIST_NOT_FOUND,
-      `GitHub shows no public gist ${url}; check the account and that the gist is public, then run this again (or pass --gist)`,
-    );
+  // A gist made moments ago may not be served yet; the index checks it anyway.
+  if (found === GIST_CHECKS.NOT_FOUND && gist.source !== GIST_SOURCES.CREATED)
+    return gistGone(session, account, gist);
   if (found === GIST_CHECKS.MISSING)
     return fail(
       output,
       VERIFY_ERRORS.PROOF_MISSING,
-      `the gist ${url} does not contain the line\n  ${githubProofLine(nodeId)}\nAdd it on a line of its own, then run this again`,
+      `The gist ${url} does not contain the line\n  ${githubProofLine(nodeId)}\nAdd it on a line of its own, then run the same command again`,
     );
   output.stdout(
     `Asking ${urlOrigin(session.baseUrl)} to check ${url} for seller ${nodeId}...\n`,
@@ -207,15 +279,15 @@ async function verify(
   } catch (error) {
     return indexFailure(session, error);
   }
-  await writeProgress(environment, {
-    nodeId,
-    account,
-    gist: gist.id,
-    step:
-      answer.state === GITHUB_CLAIM_STATES.VERIFIED
-        ? VERIFY_STEPS.VERIFIED
-        : VERIFY_STEPS.POSTED,
-  });
+  if (
+    answer.state === GITHUB_CLAIM_STATES.VERIFIED &&
+    !(await saveProgress(session, {
+      account,
+      gist: gist.id,
+      step: VERIFY_STEPS.VERIFIED,
+    }))
+  )
+    return EXIT.failure;
   return reportAnswer(session, account, gist.id, answer);
 }
 
@@ -270,7 +342,7 @@ export async function verifyCommand(
     return fail(
       output,
       VERIFY_ERRORS.ACCOUNT_INVALID,
-      'that is not a GitHub user name (letters, digits and single hyphens, at most 39 characters)',
+      'That is not a GitHub user name (letters, digits and single hyphens, at most 39 characters)',
     );
   const environment = homeEnvironmentOf(output);
   const identity = await sellerIdentity(environment, output);
@@ -282,7 +354,7 @@ export async function verifyCommand(
       VERIFY_ERRORS.CONFIG_INVALID,
       commandsFor(
         runMode(output.env),
-        'configuration invalid; run `gyblos doctor`',
+        'The configuration is invalid. Run `gyblos doctor`',
       ),
     );
   const session: Session = {

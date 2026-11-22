@@ -285,7 +285,7 @@ export const GITHUB_CLAIM_REASONS = {
   // Any status but 200, 403, 429, 451 or 5xx, redirects included (a renamed account redirects): no
   // such gist, or the account does not own it.
   GIST_NOT_FOUND: 'GIST_NOT_FOUND',
-  // The gist exists but its first GITHUB_CLAIM.maxGistBytes hold no proof line for the NodeId.
+  // The gist exists but its first IDENTITY_CLAIM.maxProofBytes hold no proof line for the NodeId.
   NODE_ID_MISSING: 'NODE_ID_MISSING',
   // 403, 429, 451, 5xx, a timeout or a network error: inconclusive. 403 and 429 are GitHub limiting
   // the index; 451 is a legal block that may apply only where the request ran. Stored only on a
@@ -315,7 +315,6 @@ export const GITHUB_CLAIM = {
   maxAgeMs: 60_000,
   gistOrigin: 'https://gist.githubusercontent.com',
   fetchTimeoutMs: 3000,
-  maxGistBytes: 16_384,
   // At most one gist fetch per NodeId per interval from POSTs, reserved atomically in storage.
   minFetchIntervalMs: 60_000,
   // The scheduled run checks claims whose next check is due, at most `recheckBatch` per run, and

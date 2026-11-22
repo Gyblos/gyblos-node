@@ -94,6 +94,41 @@ export function githubProofLine(nodeId: string): string {
   return IDENTITY_CLAIM.proofPrefix + controlHex(nodeId);
 }
 
+// Whether a gist's text carries the NodeId's proof line on a line of its own (surrounding whitespace
+// ignored), reading at most IDENTITY_CLAIM.maxProofBytes of `body`. When the text is longer, its last,
+// possibly cut, line is dropped, so the bound can only hide a proof line, never make one. Every verifier
+// (the discovery index, the seller's own pre-check) uses this one rule.
+export async function readGithubProof(
+  body: ReadableStream<Uint8Array> | null,
+  nodeId: string,
+): Promise<boolean> {
+  const proof = githubProofLine(nodeId);
+  const reader = body?.getReader();
+  if (!reader) return false;
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    size += value.byteLength;
+    if (size > IDENTITY_CLAIM.maxProofBytes) {
+      await reader.cancel().catch(() => undefined);
+      break;
+    }
+  }
+  const bytes = new Uint8Array(Math.min(size, IDENTITY_CLAIM.maxProofBytes));
+  let offset = 0;
+  for (const chunk of chunks) {
+    const part = chunk.subarray(0, bytes.length - offset);
+    bytes.set(part, offset);
+    offset += part.length;
+  }
+  const lines = new TextDecoder().decode(bytes).split('\n');
+  if (size > IDENTITY_CLAIM.maxProofBytes) lines.pop();
+  return lines.some((line) => line.trim() === proof);
+}
+
 export async function signIdentityClaim(
   value: IdentityClaimV1,
   signer: Signer,

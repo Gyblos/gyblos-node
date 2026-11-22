@@ -2,7 +2,10 @@
 // claim back (GET /identity/github/<nodeId>). Signing belongs to the caller; this client only checks the
 // answers' shape. What the index reports is its own check of the gist, not proof on its own.
 import { HTTP_STATUS as CONFIG_HTTP_STATUS } from '@gyblos/config';
-import type { SignedIdentityClaim } from '@gyblos/protocol/identity-claim';
+import {
+  IDENTITY_CLAIM,
+  type SignedIdentityClaim,
+} from '@gyblos/protocol/identity-claim';
 
 import {
   CLAIM_ERROR_MAP,
@@ -75,6 +78,16 @@ const stateOf = (value: unknown) =>
   Object.values(GITHUB_CLAIM_STATES).find((state) => state === value);
 const reasonOf = (value: unknown) =>
   Object.values(GITHUB_CLAIM_REASONS).find((reason) => reason === value);
+// The index's account and gist must be what a claim may carry: anything else (an escape sequence, a
+// newline) never reaches a terminal.
+const githubAccount = (value: unknown): value is string =>
+  typeof value === 'string' &&
+  value.length <= IDENTITY_CLAIM.maxAccountCharacters &&
+  IDENTITY_CLAIM.githubAccount.test(value);
+const gistId = (value: unknown): value is string =>
+  typeof value === 'string' &&
+  value.length <= IDENTITY_CLAIM.maxGistCharacters &&
+  IDENTITY_CLAIM.gistId.test(value);
 const time = (value: unknown): value is number | null =>
   value === null ||
   (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0);
@@ -174,8 +187,8 @@ function checkView(body: unknown, nodeId: string): GithubClaimView {
   const reason = body.reason === null ? null : reasonOf(body.reason);
   if (
     body.nodeId !== nodeId ||
-    typeof account !== 'string' ||
-    typeof gist !== 'string' ||
+    !githubAccount(account) ||
+    !gistId(gist) ||
     !state ||
     reason === undefined ||
     !time(checkedAt) ||

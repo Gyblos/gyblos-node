@@ -10,13 +10,20 @@ import type { DiscoveryFetch } from '@gyblos/discovery-http';
 import {
   githubProofLine,
   IDENTITY_CLAIM,
+  readGithubProof,
 } from '@gyblos/protocol/identity-claim';
 import {
   readPrivateFile,
   writePrivateFile,
 } from '@gyblos/runtime/private-file';
 
-import { VERIFY_GITHUB, VERIFY_STEPS, type VerifyStep } from './constants';
+import {
+  GIST_CHECKS,
+  VERIFY_GITHUB,
+  VERIFY_STEPS,
+  type GistCheck,
+  type VerifyStep,
+} from './constants';
 
 type HomeEnvironment = Readonly<Record<string, string | undefined>>;
 
@@ -127,37 +134,15 @@ export function parseGistReference(
 export const gistWebUrl = (account: string, gist: string) =>
   `${VERIFY_GITHUB.gistWebOrigin}/${account}/${gist}`;
 
+// The gist's description: it names the NodeId, so the same gist is found again after an interruption.
+export const gistDescription = (nodeId: string) =>
+  `${VERIFY_GITHUB.gistDescription} ${nodeId}`;
+
 // The text the gist must hold: a short note and the proof line on its own line.
 export const proofText = (nodeId: string) =>
   `This GitHub account runs the Gyblos seller below.\n${githubProofLine(nodeId)}\n`;
 
-export const GIST_CHECKS = {
-  FOUND: 'found',
-  MISSING: 'missing',
-  NOT_FOUND: 'not-found',
-  UNKNOWN: 'unknown',
-} as const;
-export type GistCheck = (typeof GIST_CHECKS)[keyof typeof GIST_CHECKS];
-
-async function readPrefix(response: Response) {
-  const reader = response.body?.getReader();
-  if (!reader) return '';
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    size += value.byteLength;
-    if (size >= VERIFY_GITHUB.maxGistBytes) {
-      await reader.cancel().catch(() => undefined);
-      break;
-    }
-  }
-  return new TextDecoder().decode(Buffer.concat(chunks));
-}
-
-// Whether the account's gist carries this NodeId's proof line, as the index will check it.
+// Whether the account's gist carries this NodeId's proof line, by the same rule the index applies.
 export async function checkGist(
   fetcher: DiscoveryFetch,
   account: string,
@@ -179,9 +164,7 @@ export async function checkGist(
         ? GIST_CHECKS.NOT_FOUND
         : GIST_CHECKS.UNKNOWN;
     }
-    const proof = githubProofLine(nodeId);
-    const lines = (await readPrefix(response)).split('\n');
-    return lines.some((line) => line.trim() === proof)
+    return (await readGithubProof(response.body, nodeId))
       ? GIST_CHECKS.FOUND
       : GIST_CHECKS.MISSING;
   } catch {

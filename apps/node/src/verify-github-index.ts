@@ -1,6 +1,7 @@
 // The index side of `gyblos seller verify github`: signing and posting claims (a stale answer re-signed once,
-// a short CHECK_DEFERRED waited out once), reading this seller's claim back, `--status` and `--cancel`, and
-// the plain-English text for each index answer. Prints only public identifiers and static codes.
+// a short CHECK_DEFERRED waited out once), reading this seller's claim back, `--status` and `--cancel`, saving
+// progress, and the plain-English text for each answer. Failures lead with a sentence saying what to do and
+// end with a static code in brackets. Prints only public identifiers.
 import {
   DISCOVERY_ERROR_CODES,
   DiscoveryError,
@@ -15,6 +16,7 @@ import {
 } from '@gyblos/discovery-http';
 import { nodeKeySigner } from '@gyblos/node/roles';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
+import { ControlError } from '@gyblos/protocol/control-validation';
 import {
   IDENTITY_CLAIM,
   IDENTITY_CLAIM_KINDS,
@@ -23,9 +25,15 @@ import {
 
 import { urlOrigin } from './cli-format';
 import type { Prompt } from './cli-init';
-import { EXIT, VERIFY_ERRORS, VERIFY_GITHUB } from './constants';
+import { EXIT, VERIFY_ERRORS, VERIFY_GITHUB, VERIFY_STEPS } from './constants';
 import type { GistTool } from './gist-tool';
-import { clearProgress, gistWebUrl, readProgress } from './github-verification';
+import {
+  clearProgress,
+  gistWebUrl,
+  readProgress,
+  writeProgress,
+  type VerifyProgress,
+} from './github-verification';
 import type { SellerOutput } from './seller-home';
 
 // What tests replace besides fetch and the prompt: the GitHub CLI, the clock and the wait.
@@ -39,44 +47,51 @@ export interface VerifySystem extends VerifyOptions {
   prompt?: Prompt;
 }
 
+const AGAIN = 'Run the same command again';
+// Why a claim is not verified, and what to do, by the index's reason.
 export const REASON_TEXT: Readonly<Record<GithubClaimReason, string>> = {
   [GITHUB_CLAIM_REASONS.GIST_NOT_FOUND]:
-    'GitHub has no public gist with that id owned by this account; check the account name and that the gist is public',
+    'GitHub has no public gist with that id owned by this account. Check the account name and that the gist is public',
   [GITHUB_CLAIM_REASONS.NODE_ID_MISSING]:
-    'the gist does not contain the proof line; add it on a line of its own',
-  [GITHUB_CLAIM_REASONS.GITHUB_UNAVAILABLE]:
-    'the index could not reach GitHub; the claim is saved as pending, run this again later',
-  [GITHUB_CLAIM_REASONS.CHECK_DEFERRED]:
-    'the index checked this seller less than a minute ago; run this again in a minute',
+    'the gist does not contain the proof line. Add it on a line of its own, then run the same command again',
+  [GITHUB_CLAIM_REASONS.GITHUB_UNAVAILABLE]: `the index could not reach GitHub. ${AGAIN} in a few minutes`,
+  [GITHUB_CLAIM_REASONS.CHECK_DEFERRED]: `the index checked this seller moments ago. ${AGAIN} in a minute`,
 };
 const INDEX_HINTS: ReadonlyMap<string, string> = new Map([
   [
     DISCOVERY_ERROR_CODES.UNKNOWN_NODE,
-    'the index does not know this seller yet: register it with `gyblos seller register` or start it with publishing on, then run this again',
+    'The index does not know this seller yet. Register it with `gyblos seller register`, or start it with publishing on, then run the same command again',
   ],
   [
     DISCOVERY_ERROR_CODES.RATE_LIMITED,
-    'too many attempts; wait a minute and try again',
+    'The index got too many attempts. Wait a minute and run the same command again',
   ],
   [
     DISCOVERY_ERROR_CODES.UNAVAILABLE,
-    'the index does not take GitHub claims now; try again later',
+    `The index does not take GitHub claims right now. ${AGAIN} later`,
   ],
   [
     DISCOVERY_ERROR_CODES.STALE_CLAIM,
-    "the index holds a newer claim from this seller; check this computer's clock and run this again",
+    "The index holds a newer claim from this seller. Check this computer's clock, then run the same command again",
   ],
   [
     DISCOVERY_ERROR_CODES.CLAIM_REJECTED,
-    "the index refused the claim; check this computer's clock and run this again",
+    "The index refused the claim. Check this computer's clock, then run the same command again",
   ],
   [
     DISCOVERY_ERROR_CODES.INVALID_SIGNATURE,
-    'the index refused the signature; run `gyblos doctor`',
+    'The index refused the signature. Run `gyblos doctor`',
+  ],
+  [
+    DISCOVERY_ERROR_CODES.HTTP_STATUS,
+    'This index does not take GitHub claims. Check discovery.url in config.toml',
+  ],
+  [
+    DISCOVERY_ERROR_CODES.MALFORMED_RESPONSE,
+    'The index sent an answer this version cannot read. Update gyblos, or try again later',
   ],
 ]);
-export const RETRY_LATER =
-  'the index could not answer; try again in a few minutes';
+export const RETRY_LATER = `The index could not answer. ${AGAIN} in a few minutes`;
 
 export interface Session {
   output: SellerOutput;
@@ -87,35 +102,70 @@ export interface Session {
   now: () => number;
 }
 
-export function fail(output: SellerOutput, code: string, hint: string) {
-  output.stderr(`${code}: ${hint}\n`);
+// One line: what happened and what to do, then the static code for support.
+export function fail(output: SellerOutput, code: string, message: string) {
+  output.stderr(`${message}. [${code}]\n`);
   return EXIT.failure;
 }
+
+// The node key could not be read, or what it signed does not match this seller's NodeId.
+class SigningFailed extends Error {}
+
 export function indexFailure(session: Session, error: unknown) {
+  if (error instanceof SigningFailed)
+    return fail(
+      session.output,
+      VERIFY_ERRORS.SIGNING_FAILED,
+      "This seller's node key could not sign the claim. Run `gyblos doctor`",
+    );
   if (!(error instanceof DiscoveryError)) throw error;
-  const hint =
-    error.code === DISCOVERY_ERROR_CODES.HTTP_STATUS
-      ? 'this index does not take GitHub claims; check discovery.url'
-      : (INDEX_HINTS.get(error.code) ?? RETRY_LATER);
-  return fail(session.output, error.code, hint);
+  return fail(
+    session.output,
+    error.code,
+    INDEX_HINTS.get(error.code) ?? RETRY_LATER,
+  );
+}
+
+// Saves progress; false after printing why it could not.
+export async function saveProgress(
+  session: Session,
+  progress: Omit<VerifyProgress, 'nodeId'>,
+) {
+  try {
+    await writeProgress(session.environment, {
+      nodeId: session.nodeId,
+      ...progress,
+    });
+    return true;
+  } catch {
+    fail(
+      session.output,
+      VERIFY_ERRORS.STATE_FAILED,
+      'Could not save progress in the seller home. Check that the seller directory is yours and writable (`gyblos doctor`), then run the same command again',
+    );
+    return false;
+  }
 }
 
 const iso = (time: number) =>
   new Date(time).toISOString().replace(/\.\d+Z$/, 'Z');
 
-// Signs and posts one claim; a stale answer is re-signed once with a fresh time, and a short
-// CHECK_DEFERRED is waited out once.
-export async function post(
+async function signer(session: Session) {
+  try {
+    return await nodeKeySigner(P2P_ROLES.SELLER, session.environment);
+  } catch {
+    throw new SigningFailed();
+  }
+}
+async function signClaim(
   session: Session,
+  sign: Awaited<ReturnType<typeof signer>>,
   account: string | null,
   gist: string | null,
-): Promise<GithubClaimAnswer> {
-  const sign = await nodeKeySigner(P2P_ROLES.SELLER, session.environment);
-  let issuedAt = session.now();
-  let resigned = false;
-  let waited = false;
-  for (;;) {
-    const signed = await signIdentityClaim(
+  issuedAt: number,
+) {
+  try {
+    return await signIdentityClaim(
       {
         schemaVersion: IDENTITY_CLAIM.schemaVersion,
         kind: IDENTITY_CLAIM_KINDS.GITHUB,
@@ -126,6 +176,25 @@ export async function post(
       },
       sign,
     );
+  } catch (error) {
+    if (error instanceof ControlError) throw new SigningFailed();
+    throw error;
+  }
+}
+
+// Signs and posts one claim; a stale answer is re-signed once with a fresh time, and a short
+// CHECK_DEFERRED is waited out once.
+export async function post(
+  session: Session,
+  account: string | null,
+  gist: string | null,
+): Promise<GithubClaimAnswer> {
+  const sign = await signer(session);
+  let issuedAt = session.now();
+  let resigned = false;
+  let waited = false;
+  for (;;) {
+    const signed = await signClaim(session, sign, account, gist, issuedAt);
     let answer: GithubClaimAnswer;
     try {
       answer = await submitGithubClaim({
@@ -196,22 +265,22 @@ export async function statusOf(session: Session) {
     return indexFailure(session, error);
   }
   const progress = await readProgress(session.environment, session.nodeId);
-  if (!view) {
+  const where = `seller ${session.nodeId} in ${urlOrigin(session.baseUrl)}`;
+  if (view)
+    session.output.stdout(`GitHub claim for ${where}:\n${viewLines(view)}`);
+  else session.output.stdout(`No GitHub claim for ${where}.\n`);
+  if (
+    progress &&
+    progress.step !== VERIFY_STEPS.VERIFIED &&
+    view?.state !== GITHUB_CLAIM_STATES.VERIFIED
+  )
     session.output.stdout(
-      `No GitHub claim for seller ${session.nodeId} in ${urlOrigin(session.baseUrl)}.\n`,
+      `  In progress here: ${progress.account}. Run \`gyblos seller verify github ${progress.account}\` to continue.\n`,
     );
-    if (progress)
-      session.output.stdout(
-        `  In progress here: ${progress.account}; run \`gyblos seller verify github ${progress.account}\` to continue.\n`,
-      );
-    return EXIT.ok;
-  }
-  session.output.stdout(
-    `GitHub claim for seller ${session.nodeId} in ${urlOrigin(session.baseUrl)}:\n${viewLines(view)}`,
-  );
   return EXIT.ok;
 }
 
+// Local progress is cleared only once the index has accepted the cancel.
 export async function cancel(session: Session) {
   let answer: GithubClaimAnswer;
   try {
@@ -219,10 +288,10 @@ export async function cancel(session: Session) {
   } catch (error) {
     return indexFailure(session, error);
   }
-  const progress = await readProgress(session.environment, session.nodeId);
-  await clearProgress(session.environment);
   if (answer.state !== null)
     return fail(session.output, VERIFY_ERRORS.NOT_VERIFIED, RETRY_LATER);
+  const progress = await readProgress(session.environment, session.nodeId);
+  await clearProgress(session.environment).catch(() => undefined);
   const gist = progress?.gist
     ? ` The gist ${gistWebUrl(progress.account, progress.gist)} is still on GitHub; delete it yourself if you no longer want it.`
     : ' Any proof gist is still on GitHub; delete it yourself if you no longer want it.';

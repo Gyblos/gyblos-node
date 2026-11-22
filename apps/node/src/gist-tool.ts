@@ -1,5 +1,5 @@
 // Owns the optional GitHub CLI (`gh`) step of `gyblos seller verify github`: which account gh is signed in
-// as, and creating one public gist. gh runs with a fixed argv, no shell, a timeout and bounded output; the
+// as, finding a public gist by its description, and creating one public gist. gh runs with a fixed argv, no shell, a timeout and bounded output; the
 // gist text goes through a file in a fresh private temporary directory that is removed afterwards. The
 // same calls work on Windows, macOS and Linux. Tests replace this module's tool.
 import { execFile } from 'node:child_process';
@@ -14,8 +14,10 @@ import { VERIFY_GITHUB } from './constants';
 export interface GistTool {
   // The GitHub login gh is signed in as (lowercase), or undefined when gh is missing or signed out.
   login(): Promise<string | undefined>;
-  // Creates a public gist holding `content`; resolves the gist's web URL as gh prints it.
-  create(content: string): Promise<string>;
+  // The id of the signed-in account's public gist with exactly this description, if any.
+  find(description: string): Promise<string | undefined>;
+  // Creates a public gist holding `content` with `description`; resolves its web URL as gh prints it.
+  create(content: string, description: string): Promise<string>;
 }
 
 function gh(args: readonly string[]) {
@@ -43,7 +45,27 @@ export const githubCli: GistTool = {
       return undefined;
     }
   },
-  async create(content) {
+  // `gh gist list` prints one gist per line: id, description, files, visibility and time, tab-separated.
+  async find(description) {
+    let output: string;
+    try {
+      output = await gh([
+        'gist',
+        'list',
+        '--public',
+        '--limit',
+        String(VERIFY_GITHUB.ghListLimit),
+      ]);
+    } catch {
+      return undefined;
+    }
+    for (const row of output.split(/\r?\n/)) {
+      const [id, text] = row.split('\t');
+      if (id && text === description) return id.toLowerCase();
+    }
+    return undefined;
+  },
+  async create(content, description) {
     const directory = await mkdtemp(join(tmpdir(), 'gyblos-gist-'));
     try {
       const file = join(directory, VERIFY_GITHUB.gistFile);
@@ -53,7 +75,7 @@ export const githubCli: GistTool = {
         'create',
         '--public',
         '--desc',
-        VERIFY_GITHUB.gistDescription,
+        description,
         file,
       ]);
       return output.trim().split(/\r?\n/).pop() ?? '';

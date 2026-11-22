@@ -84,7 +84,7 @@ void test('verify github: without the CLI it prints the text, takes --gist or a 
     );
     assert.equal(stuck.created.length, 0);
     assert.ok(stuck.stdout.includes(githubProofLine(home.nodeId)));
-    assert.match(stuck.stderr, /^VERIFY_NO_GIST: .*--gist/m);
+    assert.match(stuck.stderr, /--gist <gist URL>`\. \[VERIFY_NO_GIST\]$/m);
     assert.equal(stuck.posted.length, 0);
     const other = await verifyRun(
       home,
@@ -94,7 +94,7 @@ void test('verify github: without the CLI it prints the text, takes --gist or a 
     assert.equal(other.code, 1);
     assert.match(
       other.stderr,
-      /^VERIFY_GIST_OWNER_MISMATCH: that gist belongs to someone/m,
+      /^That gist belongs to someone, not octo-cat\..*\[VERIFY_GIST_OWNER_MISMATCH\]$/m,
     );
     assert.equal(other.posted.length, 0);
     const asked: string[] = [];
@@ -129,7 +129,10 @@ void test('verify github: a run stopped after the gist step resumes without a se
     });
     const stopped = await verifyRun(home, ['github', ACCOUNT], state);
     assert.equal(stopped.code, 1);
-    assert.match(stopped.stderr, /^DISCOVERY_NETWORK_FAILED: /m);
+    assert.match(
+      stopped.stderr,
+      /^The index could not answer\. Run the same command again in a few minutes\. \[DISCOVERY_NETWORK_FAILED\]$/m,
+    );
     assert.equal((await progressOf(home.seller)).step, 'gist');
     state.posts = [verified()];
     const resumed = await verifyRun(home, ['github', ACCOUNT], state);
@@ -154,9 +157,9 @@ void test('verify github: a run stopped after posting finds the index verified a
     assert.equal(pending.code, 1);
     assert.match(
       pending.stderr,
-      /pending: the index could not reach GitHub.*run this again later/,
+      /^Not verified yet: the index could not reach GitHub\. Run the same command again in a few minutes\. Gist: .*\[VERIFY_NOT_VERIFIED\]$/m,
     );
-    assert.equal((await progressOf(home.seller)).step, 'posted');
+    assert.equal((await progressOf(home.seller)).step, 'gist');
     state.claim = view(home.nodeId);
     const again = await verifyRun(home, ['github', ACCOUNT], state);
     assert.equal(again.code, 0, again.stderr);
@@ -230,7 +233,7 @@ void test('verify github: a stale answer is re-signed once with a newer time', (
       world({ gists, posts: [stale(), stale()] }),
     );
     assert.equal(twice.code, 1);
-    assert.match(twice.stderr, /^DISCOVERY_STALE_CLAIM: .*clock/m);
+    assert.match(twice.stderr, /clock.*\[DISCOVERY_STALE_CLAIM\]$/m);
     assert.equal(twice.posted.length, 2);
   }));
 
@@ -247,7 +250,7 @@ void test('verify github: unknown sellers, a missing proof line and a missing gi
     assert.equal(unknown.code, 1);
     assert.match(
       unknown.stderr,
-      /^DISCOVERY_UNKNOWN_NODE: .*gyblos seller register/m,
+      /^The index does not know this seller yet\. Register it with `gyblos seller register`.*\[DISCOVERY_UNKNOWN_NODE\]$/m,
     );
     const missing = await verifyRun(
       home,
@@ -255,7 +258,7 @@ void test('verify github: unknown sellers, a missing proof line and a missing gi
       world({ gists: new Map([[rawUrl(ACCOUNT, OTHER_GIST), 'hello\n']]) }),
     );
     assert.equal(missing.code, 1);
-    assert.match(missing.stderr, /^VERIFY_PROOF_MISSING: /m);
+    assert.match(missing.stderr, /\[VERIFY_PROOF_MISSING\]$/m);
     assert.ok(missing.stderr.includes(githubProofLine(home.nodeId)));
     assert.equal(missing.posted.length, 0);
     const gone = await verifyRun(
@@ -264,7 +267,10 @@ void test('verify github: unknown sellers, a missing proof line and a missing gi
       world(),
     );
     assert.equal(gone.code, 1);
-    assert.match(gone.stderr, /^VERIFY_GIST_NOT_FOUND: /m);
+    assert.match(
+      gone.stderr,
+      /^GitHub shows no public gist .*--gist <gist URL>\. \[VERIFY_GIST_NOT_FOUND\]$/m,
+    );
     assert.equal(gone.posted.length, 0);
   }));
 
@@ -319,7 +325,10 @@ void test('verify github: usage and account mistakes are refused before anything
     }
     for (const account of ['bad-', 'a--b', 'x'.repeat(40), 'a_b']) {
       const result = await verifyRun(home, ['github', account], world());
-      assert.match(result.stderr, /^VERIFY_ACCOUNT_INVALID: /m);
+      assert.match(
+        result.stderr,
+        /^That is not a GitHub user name .*\[VERIFY_ACCOUNT_INVALID\]$/m,
+      );
       assert.equal(result.requests.length, 0);
     }
   }));
