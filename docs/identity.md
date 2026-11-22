@@ -43,13 +43,14 @@ anyway). Its file `gyblos-proof.txt` must contain, on a line of its own, the
 proof line `gyblos-node=<nodeId>` (`githubProofLine(nodeId)`). Both fields
 `null` cancels the claim. The signing domain is `gyblos/identity-claim/v1\n`.
 
-Anyone can re-check the binding: verify the signature with the NodeId, then
-fetch
+The binding can be re-checked: verify the signature with the NodeId, then fetch
 `https://gist.githubusercontent.com/<account>/<gist>/raw/gyblos-proof.txt`,
 which answers only when the account owns the gist (the account name is matched
 case-insensitively), and look for the proof line. The discovery index does this
 for sellers it knows and publishes the result
-([discovery-index.md](discovery-index.md#github-claims)). Clients must treat an
+([discovery-index.md](discovery-index.md#github-claims)). The index checks the
+signature on submission but neither keeps nor serves it, so a third party can
+re-check only the gist half from what the index publishes. Clients must treat an
 account as proven only when the index reports `state` `verified`.
 
 A seller creates and sends its claim with `gyblos seller verify github <user>`

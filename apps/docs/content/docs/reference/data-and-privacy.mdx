@@ -171,7 +171,7 @@ Linking a GitHub account to your seller is optional. Nothing is sent unless you 
 
 **What becomes public.** The index publishes your claim at `GET /v1/identity/github/<NodeId>`: your
 NodeId, your GitHub account name, the gist id, the state (`pending`, `verified` or `lost`), the reason for
-the last result, when the index last checked and since when the account is verified. Anyone can read it,
+the last result, when the index last tried to check (even if GitHub didn't answer) and since when it was last verified (still shown after it turns `lost`). Anyone can read it,
 whatever the state. While the state is `verified`, the network list (`/v1/network`) also shows the account
 and the gist next to your seller. The gist itself is public on GitHub. A secret gist works too, but its id
 is published, so treat it as public.
@@ -186,18 +186,24 @@ your machine.
 **What your machine sends.** The command signs the claim with the node key and sends it to the index:
 your NodeId, the account, the gist id and the time. It also reads the same gist file from your machine (and,
 when that file is missing, the gist's bare raw URL, to tell a wrong file name from a missing gist), so
-GitHub sees your IP address. If you use the GitHub CLI (`gh`), it uses your signed-in GitHub session to
-read your account name, list your public gists and create the proof gist. `gyblos seller status --online`
+GitHub sees your IP address. If the GitHub CLI (`gh`) is installed, the command asks GitHub through `gh`
+which account `gh` is signed in as, but only when it has no gist to reuse for that account: no `--gist`,
+none saved for that account and none at the index (a saved gist that was found deleted doesn't count). It asks even if it then
+doesn't use `gh`. When that is the account you named, it uses your signed-in GitHub session to list your
+public gists and create the proof gist. `gyblos seller status --online`
 and `--status` ask the index for your claim by NodeId.
 
 **On your machine.** The command saves its progress (a format version, your NodeId, the account, the gist id and the last step) in
 `github-verification.json` in the seller home's `seller/` folder, readable only by you.
 
 **Remove it.** Run `gyblos seller verify github --cancel`. The index stops showing the account, the GET
-route answers `404`, and the command deletes the progress file. The index keeps only your NodeId, the time of the
-cancel and the time of the last check you asked for with the command (scheduled checks don't change
-it), and never serves them; this stops an old claim from being sent
-again. The gist stays on GitHub: delete it yourself.
+route answers `404`, and the command deletes the progress file. The index keeps only three things, and never
+serves them: your NodeId, the signed time of the cancel, and the last time a claim reserved a read of your
+gist. That reservation is written before the index contacts GitHub, even if the read then fails, and
+scheduled checks don't change it. The cancel's time makes the index refuse any older claim, so an old claim
+can't be sent again; the reservation time keeps a new claim from making the index read GitHub more than once
+a minute. The gist stays on GitHub: delete it yourself, or, if other sellers share it, remove only this
+seller's line.
 Copies that others made while it was public are outside Gyblos's control.
 
 ## Solana devnet [#solana]

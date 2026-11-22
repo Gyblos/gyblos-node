@@ -129,8 +129,8 @@ it at startup, so restart it afterwards with `gyblos seller service restart` (se
 
 ## seller verify github [#verify-github]
 
-`seller verify github USER` shows buyers which GitHub account runs this seller. The seller must already be
-registered, or have published so the index stores its catalog. It needs a gist owned by `USER` with a file named `gyblos-proof.txt` that contains the line `gyblos-node=NODEID` (an unlisted gist works too; its id is published anyway); the node key then signs a claim naming the account and the gist, and the index checks
+`seller verify github USER` shows buyers which GitHub account runs this seller. The index must already know the
+seller: registered, or with a catalog the index still keeps from publishing its models. It needs a gist owned by `USER` with a file named `gyblos-proof.txt` that contains the line `gyblos-node=NODEID` (an unlisted gist works too; its id is published anyway); the node key then signs a claim naming the account and the gist, and the index checks
 the gist itself. If the GitHub CLI (`gh`) is signed in as `USER`, the command creates the gist. Otherwise
 it prints the text to put in a file named `gyblos-proof.txt` in a new gist at gist.github.com and asks for the gist's address, or
 takes it from `--gist`. A gist owned by another account is refused.
