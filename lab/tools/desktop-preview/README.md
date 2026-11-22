@@ -72,6 +72,12 @@ Open `?screen=payments&review=wallet-backup&backup=needed` to inspect the
 recovery warning, or use `backup=verified` to see the green check. Both use
 synthetic wallet metadata.
 
+The status bar at the bottom of the window shows the system status summary, the
+app version and, with `update=available`, an "Update to" button for a synthetic
+newer version. The button opens a dialog; nothing is downloaded and no release
+page is opened. Open `review=system-status` to start with the checklist open,
+combined with `node-state=error` or `backup=needed`.
+
 ## Validation and limits
 
 Run `node --import tsx --test "tests/lab/desktop-preview*.test.ts"` for the

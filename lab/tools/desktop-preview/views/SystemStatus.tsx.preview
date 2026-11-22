@@ -1,0 +1,115 @@
+// One readiness checklist in the status bar: local node, wallet, backup, app version and network.
+// It only reads host summaries; it never starts payments, changes wallet custody or installs updates.
+import { CheckCircle, Info, Warning, WarningCircle } from '@phosphor-icons/react';
+import { useState } from 'react';
+
+import { LOCAL_NODE_STATE, type LocalNodeState } from '../node-status';
+import { WALLET_STATUS } from '../wallet/model';
+import { LOCAL_NODE_LABELS } from './constants';
+import { Modal } from './Modal';
+import { MotionPresence } from './Motion';
+import { NetworkStatus } from './NetworkStatus';
+import { openPreviewUpdate, TONE, usePreviewNetwork, usePreviewUpdate, type Tone } from './PreviewKit';
+import { Button } from './UI';
+import { useDesktopWallet } from './WalletState';
+
+type StatusCheck = { label: string; value: string; tone: Tone; action?: { label: string; run(): void } };
+const ISSUE: readonly Tone[] = [TONE.WARNING, TONE.DANGER];
+const GLYPH = { [TONE.SUCCESS]: CheckCircle, [TONE.WARNING]: Warning, [TONE.DANGER]: WarningCircle, [TONE.INFO]: Info, [TONE.NEUTRAL]: Info };
+
+function nodeTone(state: LocalNodeState): Tone {
+  if (state === LOCAL_NODE_STATE.READY) return TONE.SUCCESS;
+  if (state === LOCAL_NODE_STATE.ERROR || state === LOCAL_NODE_STATE.STOPPED) return TONE.DANGER;
+  return TONE.INFO;
+}
+
+export function SystemStatus({ state, onRetry, onPayments }: { state: LocalNodeState; onRetry(): void; onPayments(): void }) {
+  const [open, setOpen] = useState(() => new URLSearchParams(location.search).get('review') === 'system-status');
+  const wallet = useDesktopWallet();
+  const network = usePreviewNetwork();
+  const update = usePreviewUpdate();
+  const manage = { label: 'Manage', run: () => { setOpen(false); onPayments(); } };
+  const checks: StatusCheck[] = [
+    wallet.status === WALLET_STATUS.READY
+      ? { label: 'Wallet', value: 'Ready', tone: TONE.SUCCESS }
+      : wallet.status === WALLET_STATUS.LOCKED
+        ? { label: 'Wallet', value: 'Locked · free chat still works', tone: TONE.NEUTRAL, action: manage }
+        : wallet.status === WALLET_STATUS.LOADING
+          ? { label: 'Wallet', value: 'Loading', tone: TONE.INFO }
+          : wallet.status === WALLET_STATUS.RECOVERY_REQUIRED
+            ? { label: 'Wallet', value: 'Recovery required', tone: TONE.DANGER, action: manage }
+            : { label: 'Wallet', value: 'Unavailable', tone: TONE.DANGER, action: manage },
+  ];
+  if (wallet.status === WALLET_STATUS.READY)
+    checks.push(
+      wallet.backupVerified
+        ? { label: 'Recovery backup', value: 'Verified', tone: TONE.SUCCESS }
+        : { label: 'Recovery backup', value: 'Not verified yet', tone: TONE.WARNING, action: { ...manage, label: 'Back up' } },
+    );
+  checks.push(
+    update
+      ? { label: 'Desktop app', value: 'Gyblos ' + update + ' is available', tone: TONE.INFO, action: { label: 'View update', run: () => { setOpen(false); openPreviewUpdate(); } } }
+      : { label: 'Desktop app', value: 'Up to date', tone: TONE.SUCCESS },
+    { label: 'Network', value: network === 'Testnet' ? 'Testnet · test funds only' : 'Mainnet', tone: network === 'Testnet' ? TONE.INFO : TONE.SUCCESS },
+  );
+  const nodeIssue = nodeTone(state) === TONE.DANGER;
+  const issues = checks.filter((check) => ISSUE.includes(check.tone)).length + (nodeIssue ? 1 : 0);
+  const tone = nodeIssue || checks.some((check) => check.tone === TONE.DANGER)
+    ? TONE.DANGER
+    : issues
+      ? TONE.WARNING
+      : state === LOCAL_NODE_STATE.READY
+        ? TONE.SUCCESS
+        : TONE.INFO;
+  const summary = issues > 1
+    ? issues + ' items need attention'
+    : nodeIssue
+      ? LOCAL_NODE_LABELS[state]
+      : issues
+        ? 'Backup needed'
+        : state === LOCAL_NODE_STATE.READY
+          ? 'All systems ready'
+          : LOCAL_NODE_LABELS[state];
+  return (
+    <>
+      <Button
+        className="preview-status-trigger"
+        data-tone={tone}
+        aria-label={'System status: ' + summary}
+        aria-haspopup="dialog"
+        onClick={() => setOpen(true)}
+      >
+        <span className="pk-dot" aria-hidden="true" />
+        <span>{summary}</span>
+      </Button>
+      <MotionPresence>
+        {open && (
+          <Modal title="System status" close={() => setOpen(false)}>
+            <div className="ui-section">
+              <section className="ui-status-item">
+                <h3>Local node</h3>
+                <NetworkStatus state={state} onRetry={onRetry} />
+              </section>
+              <ul className="preview-status-list" aria-label="Checks">
+                {checks.map((check) => {
+                  const Glyph = GLYPH[check.tone];
+                  return (
+                    <li key={check.label} className="preview-status-row" data-tone={check.tone}>
+                      <Glyph size={18} weight="fill" aria-hidden="true" />
+                      <span className="preview-status-copy">
+                        <strong>{check.label}</strong>
+                        <small>{check.value}</small>
+                      </span>
+                      {check.action && <Button onClick={check.action.run}>{check.action.label}</Button>}
+                    </li>
+                  );
+                })}
+              </ul>
+              <p className="ui-help-text">Sellers are checked when you send a message.</p>
+            </div>
+          </Modal>
+        )}
+      </MotionPresence>
+    </>
+  );
+}

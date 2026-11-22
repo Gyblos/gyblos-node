@@ -13,6 +13,7 @@ import {
   RESPONSE_COST_KIND,
   RESPONSE_COST_UNIT,
 } from '@gyblos/desktop/response-metrics';
+import type { DesktopUpdate } from '@gyblos/desktop/update-check';
 import {
   emptyUsdcApi,
   parseUsdcApiState,
@@ -212,6 +213,11 @@ export function createPreviewHost(
       return nodeState;
     },
   };
+  const update: DesktopUpdate = {
+    current: PREVIEW.installedVersion,
+    available: query.get('update') === 'available' ? PREVIEW.nextVersion : null,
+  };
+  const desktopUpdate = { run: async () => update };
   const desktopCatalog = previewDesktopCatalog(model, now);
 
   const accountBudget = () =>
@@ -378,6 +384,7 @@ export function createPreviewHost(
     desktopConversations,
     desktopWallet,
     desktopNode,
+    desktopUpdate,
     desktopCatalog,
     desktopX402,
     previewAccountBudget: { current: accountBudget, baseline: accountBudget() },

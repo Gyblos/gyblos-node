@@ -2,6 +2,8 @@
 export const PREVIEW = {
   platform: 'darwin',
   nodeStartupMs: 3000,
+  installedVersion: '0.1.0',
+  nextVersion: '0.2.0',
   apiOnlyEvery: 3,
   chatBaseTokens: 182,
   chatTokenStep: 11,

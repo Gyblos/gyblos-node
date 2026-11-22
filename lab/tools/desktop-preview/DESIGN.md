@@ -50,7 +50,8 @@ in the same change. Agents load this through the
 This table governs the mockup. `CodeBlock`, `DetailSummary`, `Tag`,
 `statusTone`, `FilterChips`, `Delta`, `Savings`, `SegmentedBar`, `StatGrid`,
 `Panel`, `TableRow`, `AmountEditor`, `CompactAmount`, `PreviewAnswerSkeleton`,
-`Notice`, `Switch` and `PreviewFundsDialog`
+`Notice`, `Switch`, `PreviewFundsDialog`, `PreviewStatusBar` and
+`PreviewUpdateButton`
 exist only in the preview views until a port is approved; shipped desktop code
 follows [`apps/desktop/DESIGN.md`](../../../apps/desktop/DESIGN.md).
 
@@ -78,6 +79,7 @@ follows [`apps/desktop/DESIGN.md`](../../../apps/desktop/DESIGN.md).
 | Dialog                            | `Modal` with `size` `sm` / `md` / `lg` and `origin` `center` / `top` / `bottom` / `left` / `right`, inside `MotionPresence` | custom overlays, fixed widths or per-dialog animations |
 | Grouped block, settings card      | `Panel`, `Section`, settings rows                                                                                           | new card classes                                       |
 | Page and side panel layout        | `WorkspaceLayout`, `PageBody`                                                                                               | a second page gutter                                   |
+| App status, version, new version  | `PreviewStatusBar` (status trigger, version, `PreviewUpdateButton` when `usePreviewUpdate` reports one)                     | status rows in the sidebar, a toolbar update banner    |
 
 - `Tag`: status or label with a tinted background; `dot` for live states.
 - `Delta`: signed percentage; set `lowerIsBetter` for prices and latency.

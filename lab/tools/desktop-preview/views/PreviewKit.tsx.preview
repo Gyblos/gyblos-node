@@ -1,11 +1,13 @@
 // Preview-only shared components: every mockup view composes these instead of route-local markup.
-import { CaretRight, Check, Copy, CreditCard, Info, Minus, PaypalLogo, Plus, Wallet, Warning } from '@phosphor-icons/react';
+import { ArrowCircleUp, CaretRight, Check, Copy, CreditCard, Info, Minus, PaypalLogo, Plus, Wallet, Warning } from '@phosphor-icons/react';
 import { useEffect, useMemo, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react';
 
 import { AGENT_TOOLS, type AgentTool } from '@gyblos/node/agent-setup-constants';
 
+import { DESKTOP_UPDATE } from '../constants';
+import { observeDesktopUpdates } from '../update-session';
 import { AddBuyerFunds } from './BuyerFunding';
-import { CopyField } from './Form';
+import { CopyField, FormActions } from './Form';
 import { useDesktopWallet } from './WalletState';
 import { CODE_LANGUAGE, codeLanguageLabel, highlightCode, type CodeLanguage } from './code-highlight';
 import { BUTTON_VARIANT, UI_VIEW } from './constants';
@@ -298,6 +300,12 @@ export function PreviewKitShowcase() {
           ]}
         />
       </Panel>
+      <Panel title="Status bar">
+        <div className="pk-row">
+          <PreviewUpdateButton version="0.2.0" onClick={() => {}} />
+          <span className="preview-version">Gyblos 0.1.0</span>
+        </div>
+      </Panel>
       <Panel title="Filter chips">
         <FilterChips
           label="Usage source"
@@ -410,8 +418,74 @@ export function previewSetting<K extends keyof PreviewSettings>(key: K) {
   return settingsState()[key];
 }
 
-export const PREVIEW_EVENT = { NETWORK: 'preview:network' } as const;
+export const PREVIEW_EVENT = { NETWORK: 'preview:network', UPDATE: 'preview:update' } as const;
 export const PREVIEW_NETWORKS = ['Testnet', 'Mainnet'] as const;
+
+/** Newer desktop version reported by the host update bridge (synthetic in the preview), or null. */
+export function usePreviewUpdate(): string | null {
+  const [available, setAvailable] = useState<string | null>(null);
+  useEffect(() => {
+    const bridge = window.desktopUpdate;
+    if (!bridge) return;
+    return observeDesktopUpdates(() => bridge.run(DESKTOP_UPDATE.STATUS), (update) => setAvailable(update.available));
+  }, []);
+  return available;
+}
+export function openPreviewUpdate() {
+  window.dispatchEvent(new Event(PREVIEW_EVENT.UPDATE));
+}
+/** The one "new version" affordance: an info pill that opens the update dialog. */
+export function PreviewUpdateButton({ version, onClick }: { version: string; onClick(): void }) {
+  return (
+    <Button className="pk-update" onClick={onClick}>
+      <ArrowCircleUp size={14} weight="fill" aria-hidden="true" />
+      Update to {version}
+    </Button>
+  );
+}
+function PreviewUpdateDialog({ current, available, close }: { current: string; available: string; close(): void }) {
+  return (
+    <Modal title={'Gyblos ' + available} description="A new desktop version is available." size="sm" close={close}>
+      <p className="ui-help-text">
+        You have {current}. Your chats, API keys and wallet stay on this computer when you update.
+      </p>
+      <FormActions>
+        <Button onClick={close}>Later</Button>
+        <Button
+          variant={BUTTON_VARIANT.PRIMARY}
+          onClick={() => {
+            close();
+            void window.desktopUpdate?.run(DESKTOP_UPDATE.OPEN).catch(() => {});
+          }}
+        >
+          Open download page
+        </Button>
+      </FormActions>
+    </Modal>
+  );
+}
+/** Bottom bar of the desktop window: system status on the left, update and version on the right. */
+export function PreviewStatusBar({ status, version }: { status: ReactNode; version: string }) {
+  const available = usePreviewUpdate();
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const show = () => setOpen(true);
+    window.addEventListener(PREVIEW_EVENT.UPDATE, show);
+    return () => window.removeEventListener(PREVIEW_EVENT.UPDATE, show);
+  }, []);
+  return (
+    <footer className="preview-status-bar" aria-label="App status">
+      {status}
+      <span className="preview-status-end">
+        {available && <PreviewUpdateButton version={available} onClick={() => setOpen(true)} />}
+        <span className="preview-version">Gyblos {version}</span>
+      </span>
+      <MotionPresence>
+        {open && available && <PreviewUpdateDialog current={version} available={available} close={() => setOpen(false)} />}
+      </MotionPresence>
+    </footer>
+  );
+}
 export type PreviewNetworkName = (typeof PREVIEW_NETWORKS)[number];
 
 function subscribeNetwork(listener: () => void) {
