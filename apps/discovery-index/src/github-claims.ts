@@ -96,15 +96,19 @@ export function nextCheck(
   };
 }
 
-// Checks the stored claim's gist and records the outcome against that exact claim.
+// Checks the stored claim's gist and records the outcome against that exact claim. A conclusive outcome is
+// written only onto the snapshot it was computed from; an inconclusive one only moves checked_at forward.
 async function check(
   claims: GithubClaimStore,
   fetcher: GistFetch,
   row: GithubClaimRow,
   now: number,
 ): Promise<GithubClaimResult> {
-  const next = nextCheck(row, await checkGist(fetcher, row), now);
-  await claims.record(row.nodeId, row.issuedAt, next);
+  const outcome = await checkGist(fetcher, row);
+  const next = nextCheck(row, outcome, now);
+  if (outcome === GITHUB_CLAIM_REASONS.GITHUB_UNAVAILABLE)
+    await claims.touch(row.nodeId, row.issuedAt, now, next.nextCheckAt);
+  else await claims.record(row.nodeId, row.issuedAt, row.checkedAt, next);
   return { state: next.state, reason: next.reason };
 }
 

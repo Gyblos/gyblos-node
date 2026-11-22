@@ -393,8 +393,12 @@ anyone can re-check both:
 1. a claim signed by the node key: "my GitHub account is `account`, and gist
    `gist` proves it" (the [identity claim](identity.md#github-account-claim) in
    `@gyblos/protocol/identity-claim`);
-2. a **public** gist owned by that account whose text contains, on a line of its
-   own, `gyblos-node=<NodeId>`.
+2. a gist owned by that account with a file named `gyblos-proof.txt` that
+   contains, on a line of its own, `gyblos-node=<NodeId>`.
+
+An unlisted (secret) gist is accepted by design: GitHub serves its raw file the
+same way, and the index publishes the gist id, so the proof is public either
+way.
 
 The claim is a separate message. It is never part of a public record, so record
 parsers and older nodes are unaffected.
@@ -406,12 +410,13 @@ the last check; it says nothing about the code the seller runs, the quality of
 its answers or who controls the account later.
 
 **Ownership check.** The index reads
-`https://gist.githubusercontent.com/<account>/<gist>/raw`. GitHub answers that
-URL only when `<account>` owns the gist; for any other account name it answers
-`404`. The account name is matched case-insensitively, and claims carry it
-lowercase. The index therefore needs no GitHub API call or token. It follows no
-redirect, waits at most 3 seconds and reads at most the first 16 KiB; a line cut
-at that bound never counts.
+`https://gist.githubusercontent.com/<account>/<gist>/raw/gyblos-proof.txt` (only
+that file, so a gist with several files works). GitHub answers that URL only
+when `<account>` owns the gist; for any other account name it answers `404`. The
+account name is matched case-insensitively, and claims carry it lowercase. The
+index therefore needs no GitHub API call or token. It follows no redirect, waits
+at most 3 seconds and reads at most the first 16 KiB; a line cut at that bound
+never counts.
 
 ### Submitting a claim
 
@@ -469,7 +474,10 @@ is `null` while `verified` (an outage never shows a reason on a verified claim);
 `GIST_NOT_FOUND` or `NODE_ID_MISSING` after a conclusive miss; and
 `GITHUB_UNAVAILABLE` only when an outage hits a `pending` claim. A `lost` claim
 keeps its miss reason through an outage. A check records only onto the claim it
-started for, and never over a check that started later.
+started for. A conclusive result is written only while the row it was computed
+from is unchanged, so a result from an older snapshot never replaces a newer
+one; an inconclusive result only moves `checkedAt` forward (and sets the pending
+reason), never the state or `verifiedAt`.
 
 ### Reading a claim
 
@@ -510,8 +518,9 @@ skipped, so it never blocks the batch.
 (`apps/discovery-index/scripts/github-claims.ts`) lists claims, without
 tombstones: NodeId, account, gist, state, reason, `issuedAt` and `checkedAt`,
 newest first within each state, at most 1000 rows. It is read-only and runs
-`wrangler d1 execute --json` against the local database, or the remote one with
-`--remote` (a maintainer action).
+`wrangler d1 execute --json` (through npm's npx script under the same Node.js,
+so it works the same on Windows, macOS and Linux) against the local database, or
+the remote one with `--remote` (a maintainer action).
 
 ### What is stored
 
@@ -556,6 +565,7 @@ The only handwritten SQL expressions live in `src/sqlite-expressions.ts`:
 | `INDEXED BY`             | No index-hint builder. Without it SQLite reads tables holding signed JSON before pagination; a key-only `EXPLAIN` test pins it. |
 | `(VALUES (1))`           | The select builder needs a `FROM`; initial admission must still check capacity and references atomically on empty tables.       |
 | Two-argument `min`/`max` | Drizzle's versions are aggregates; retention, quota windows and uptime sightings need the scalar form inside atomic updates.    |
+| `coalesce`               | No builder; an inconclusive GitHub check moves `checked_at` forward from `NULL` in the same write.                              |
 | `CASE`                   | No conditional builder; quota resets and uptime admission use it atomically.                                                    |
 | `length`                 | No scalar builder; the schema keeps the database text-length checks.                                                            |
 | Bitwise OR               | No bitwise builder; concurrent uptime observations combine slot bits in one write.                                              |

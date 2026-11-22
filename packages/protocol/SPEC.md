@@ -1843,9 +1843,9 @@ GitHub login (`^[a-z0-9](?:-?[a-z0-9])*$`, at most 39 characters) and `gist` a l
 id of 20 to 32 characters. Both are set, or both are `null`, which cancels the
 node's claim; anything else is `INVALID`.
 
-The claim is one half of a two-way binding. The other half is a public gist
-owned by `account` whose text contains, on a line of its own, the proof line
-`gyblos-node=<nodeId>` (`githubProofLine`). This contract owns shape and the
+The claim is one half of a two-way binding. The other half is a gist owned by
+`account` whose file `gyblos-proof.txt` (`IDENTITY_CLAIM.proofFile`) contains,
+on a line of its own, the proof line `gyblos-node=<nodeId>` (`githubProofLine`). This contract owns shape and the
 node signature only; checking the gist, freshness and replay (keeping the newest
 `issuedAt` per node) belong to the verifier, such as the discovery index. It is
 not part of any public discovery record, so record parsers are unchanged.

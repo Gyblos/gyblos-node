@@ -75,3 +75,24 @@ export const publicationCount = (
 // Drizzle cannot place a correlated subquery in a SELECT list. The network read takes each NodeId's
 // newest uptime row this way: one primary-key lookup per NodeId instead of an aggregate over its history.
 export const scalarSubquery = (query: SQLWrapper) => sql<unknown>`(${query})`;
+
+// An inconclusive gist check must not rewind a newer check landed meanwhile: checked_at only moves
+// forward, a claim still unscheduled stays so (SQLite's scalar max is NULL when any argument is), and only
+// a pending claim records that GitHub could not answer. Decided in the write, never from a snapshot.
+export const laterTime = (
+  column: AnySQLiteColumn<{ data: number }>,
+  value: number,
+) => sql<number>`max(coalesce(${column}, ${value}), ${value})`;
+export const laterOrUnscheduled = (
+  column: AnySQLiteColumn<{ data: number }>,
+  value: number | null,
+) => sql<number | null>`max(${column}, ${value})`;
+export const pendingReason = (
+  state: AnySQLiteColumn,
+  reason: AnySQLiteColumn,
+  pending: string,
+  unavailable: string,
+) =>
+  sql<
+    string | null
+  >`case when ${state} = ${pending} then ${unavailable} else ${reason} end`;

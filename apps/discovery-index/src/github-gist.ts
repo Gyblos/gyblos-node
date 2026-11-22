@@ -1,8 +1,12 @@
 // Owns the gist check behind a seller GitHub claim. The raw URL gist.githubusercontent.com/<account>/
-// <gist>/raw answers 200 only when <account> owns the gist, so ownership needs no GitHub API or token.
+// <gist>/raw/<proof file> answers 200 only when <account> owns the gist, so ownership needs no GitHub API
+// or token; reading one named file keeps a gist with several files reliable.
 // The account name is matched case-insensitively; claims carry it lowercase. No redirect is followed (a
 // redirect is not found), the wait and the bytes read are bounded, and nothing is logged or echoed.
-import { githubProofLine } from '@gyblos/protocol/identity-claim';
+import {
+  githubProofLine,
+  IDENTITY_CLAIM,
+} from '@gyblos/protocol/identity-claim';
 
 import {
   GITHUB_CLAIM,
@@ -57,7 +61,7 @@ export async function checkGist(
   fetcher: GistFetch,
   claim: { nodeId: string; account: string; gist: string },
 ): Promise<GistOutcome> {
-  const url = `${GITHUB_CLAIM.gistOrigin}/${claim.account}/${claim.gist}/raw`;
+  const url = `${GITHUB_CLAIM.gistOrigin}/${claim.account}/${claim.gist}/raw/${IDENTITY_CLAIM.proofFile}`;
   try {
     const response = await fetcher(url, {
       method: 'GET',

@@ -62,8 +62,10 @@ export function fakeGists(
   };
 }
 
+// The proof file's raw URL: one fixed file name, so a gist with several files is read reliably. GitHub
+// serves it only when the account owns the gist (checked live).
 export const gistUrl = (account: string, gist: string) =>
-  `https://gist.githubusercontent.com/${account}/${gist}/raw`;
+  `https://gist.githubusercontent.com/${account}/${gist}/raw/gyblos-proof.txt`;
 
 // A gist text with the NodeId's proof line among other lines, CRLF endings and padding.
 export const proofText = (nodeId: string) =>

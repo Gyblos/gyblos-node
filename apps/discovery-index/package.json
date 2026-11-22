@@ -6,6 +6,7 @@
   "exports": {
     "./admin": "./scripts/admin.ts",
     "./github-claims-admin": "./scripts/github-claims.ts",
+    "./wrangler-d1": "./scripts/wrangler-d1.ts",
     "./app": "./src/app.ts",
     "./constants": "./src/constants.ts",
     "./github-claim-store": "./src/github-claim-store.ts",

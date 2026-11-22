@@ -7,6 +7,10 @@ export const IDENTITY_CLAIM = {
   schemaVersion: 1,
   domain: 'gyblos/identity-claim/v1\n',
   proofPrefix: 'gyblos-node=',
+  // The gist file that holds the proof line. Verifiers read only this file, at
+  // gist.githubusercontent.com/<account>/<gist>/raw/<proofFile>, which GitHub serves only to the owner's
+  // account name, so a gist with several files is read reliably.
+  proofFile: 'gyblos-proof.txt',
   // A GitHub login, lowercase only: alphanumerics with single hyphens between them, and at most
   // `maxAccountCharacters` characters in all (checked separately; the pattern alone has no length cap).
   githubAccount: /^[a-z0-9](?:-?[a-z0-9])*$/,
