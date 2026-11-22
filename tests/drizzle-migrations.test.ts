@@ -7,8 +7,10 @@ import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
+import { isDeepStrictEqual } from 'node:util';
 
 import { generateSQLiteDrizzleJson } from 'drizzle-kit/api';
+import { getTableConfig } from 'drizzle-orm/sqlite-core';
 
 import * as discovery from '@gyblos/discovery-index/schema';
 import * as collector from '@gyblos/metrics-collector/schema';
@@ -166,4 +168,50 @@ for (const app of APPS) {
     // A drizzle-kit table rebuild (`__new_<table>`) would recreate it as an ordinary rowid table.
     for (const table of before) assert.ok(after.has(table), table);
   });
+
+  // A `drizzle-kit generate --custom` file leaves the snapshot unchanged; it may only move data.
+  void test(`${app.name}: custom (data-only) migrations hold no schema statements`, () => {
+    const entries = journal(app.name).entries;
+    entries.slice(1).forEach((entry, position) => {
+      const previous = entries[position];
+      assert.ok(previous);
+      const schemaChanged = !isDeepStrictEqual(
+        described(snapshot(app.name, entry.idx)),
+        described(snapshot(app.name, previous.idx)),
+      );
+      if (schemaChanged) return;
+      const statements = read(new URL(`${entry.tag}.sql`, migrations(app.name)))
+        .replaceAll(/--.*$/gm, '')
+        .replaceAll(/\/\*[\s\S]*?\*\//g, '');
+      assert.doesNotMatch(
+        statements,
+        /\b(create|alter|drop)\b/i,
+        `${entry.tag} is a custom migration: schema changes must be generated from schema.ts`,
+      );
+    });
+  });
 }
+
+// collector_envelopes enforces (uploader_node_id, nonce) with the inline UNIQUE of 0001, but the
+// drizzle-kit snapshot records a named index collector_envelopes_uploader_node_id_nonce_unique. Removing
+// or changing this unique() would generate `DROP INDEX collector_envelopes_uploader_node_id_nonce_unique`,
+// which fails on D1 because that index does not exist. Change it only through a hand-reviewed table
+// rebuild approved by the founder, then update this test.
+void test('metrics-collector: the envelopes (uploader, nonce) unique stays as the live table has it', () => {
+  const uniques = getTableConfig(collector.envelopes).uniqueConstraints.map(
+    (constraint) => ({
+      name: constraint.getName(),
+      columns: constraint.columns.map((column) => column.name),
+    }),
+  );
+  assert.deepEqual(
+    uniques,
+    [
+      {
+        name: 'collector_envelopes_uploader_node_id_nonce_unique',
+        columns: ['uploader_node_id', 'nonce'],
+      },
+    ],
+    'the live inline UNIQUE cannot be dropped with the DROP INDEX drizzle-kit would generate; see the comment above this test',
+  );
+});
