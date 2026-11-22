@@ -8,16 +8,10 @@ import {
   DEVNET_USDC,
 } from '@gyblos/config/network';
 import { runAggregation } from '@gyblos/metrics-collector/aggregate';
-import { createMetricsCollector } from '@gyblos/metrics-collector/app';
 import { runChainIndex } from '@gyblos/metrics-collector/chain/indexer';
-import { COLLECTOR_LIMITERS } from '@gyblos/metrics-collector/constants';
 import type { ChainStats } from '@gyblos/metrics-collector/stats-chain';
 import type { ChainTxPage } from '@gyblos/metrics-collector/stats-chain-txs';
-import { chainTxReader } from '@gyblos/metrics-collector/stats-chain-txs-read';
-import { statsReader } from '@gyblos/metrics-collector/stats-read';
-import { createD1Storage } from '@gyblos/metrics-collector/storage-d1';
 
-import { fakeLimiter } from './support/metrics-collector';
 import { endpoints, fakeChainRpc } from './support/metrics-collector-chain';
 import {
   channel,
@@ -28,46 +22,16 @@ import {
   tx,
 } from './support/metrics-collector-chain-rows';
 import {
-  createCollectorD1,
-  type SqliteD1,
-} from './support/metrics-collector-d1';
+  collector,
+  get,
+  ORIGIN,
+  sig,
+  summary,
+} from './support/metrics-collector-chain-txs';
+import { createCollectorD1 } from './support/metrics-collector-d1';
 
-const ORIGIN = 'https://collector.test';
-const ROUTE = '/v1/stats/chain/txs';
-const sig = (label: string) => label.padEnd(87, 'z');
 const SELLER_OWNER = 'SeLLerOwner1111111111111111111111111111111';
 const FEE_PAYER = 'FeePayer11111111111111111111111111111111111';
-
-function collector(
-  database: SqliteD1,
-  options: { withReader?: boolean; read?: boolean } = {},
-) {
-  const read = fakeLimiter(options.read ?? true);
-  const ip = fakeLimiter();
-  const app = createMetricsCollector({
-    storage: createD1Storage(database),
-    stats: statsReader(database),
-    ...(options.withReader === false
-      ? {}
-      : { chainTransactions: chainTxReader(database) }),
-    limiters: {
-      [COLLECTOR_LIMITERS.IP]: ip,
-      [COLLECTOR_LIMITERS.NODE]: fakeLimiter(),
-      [COLLECTOR_LIMITERS.GLOBAL]: fakeLimiter(),
-      [COLLECTOR_LIMITERS.READ]: read,
-    },
-    now: () => Date.UTC(2026, 10, 20),
-  });
-  return { app, read, ip };
-}
-async function get(app: ReturnType<typeof collector>['app'], query = '') {
-  const response = await app.request(`${ORIGIN}${ROUTE}${query}`);
-  return {
-    status: response.status,
-    cache: response.headers.get('Cache-Control'),
-    body: (await response.json()) as ChainTxPage & { error?: string },
-  };
-}
 
 function seeded() {
   const database = createCollectorD1();
@@ -124,14 +88,6 @@ const EXPECTED = [
   ['B', 0, 'top_up', 'G', '500'],
   ['A', 0, 'open', 'G', '1000'],
 ] as const;
-const summary = (rows: ChainTxPage['transactions']) =>
-  rows.map((row) => [
-    row.signature,
-    row.instructionIndex,
-    row.kind,
-    row.channel,
-    row.amountAtomic,
-  ]);
 const expected = (rows: readonly (typeof EXPECTED)[number][]) =>
   rows.map(([label, index, kind, address, amount]) => [
     sig(label),
@@ -248,8 +204,16 @@ void test('the route only reads, spends the read budget, and fails closed withou
   database.log.length = 0;
   assert.equal((await get(app, `?before=150-${sig('Fa')}-0`)).status, 200);
   assert.ok(database.log.length > 0);
-  for (const entry of database.log)
-    assert.match(entry.sql.trimStart(), /^(select|with) /i);
+  for (const entry of database.log) {
+    assert.match(
+      entry.sql.trimStart(),
+      /^with "page" as \(select [\s\S]*\) select [\s\S]* from "page" /i,
+    );
+    assert.doesNotMatch(
+      entry.sql,
+      /\b(insert|update|delete|replace|upsert|create|drop|alter)\b/i,
+    );
+  }
   assert.equal(database.log.length, 1);
   assert.equal(database.log[0]!.sql.match(/\blimit\b/gi)?.length, 1);
   assert.equal(read.keys.length, 1);
@@ -333,64 +297,4 @@ void test('settles in one slot count in the order of the daily aggregate', async
     await app.request(`${ORIGIN}/v1/stats/chain?from=2026-11-10&to=2026-11-10`)
   ).json()) as ChainStats;
   assert.equal(stats.days[0]!.gyblosClaimed!.usdc.settledAtomic, '800');
-});
-
-void test('a channel with thousands of settles still answers a page quickly and exactly', async () => {
-  const database = createCollectorD1();
-  channel(database, 'G', { mint: DEVNET_USDC });
-  tx(database, sig('Open'), 1000, 1, { slot: 1 });
-  instruction(database, sig('Open'), 0, 'open', 'G', { amount: '100000' });
-  const settles = 4000;
-  for (let i = 1; i <= settles; i += 1) {
-    tx(database, sig(`S${i}`), 1000 + i, 1, { slot: 1 + i });
-    instruction(database, sig(`S${i}`), 0, 'settle', 'G', {
-      cumulative: String(i * 10),
-    });
-  }
-  const { app } = collector(database);
-  const started = performance.now();
-  const { status, body } = await get(app, '?limit=50');
-  const elapsed = performance.now() - started;
-  assert.equal(status, 200);
-  assert.equal(body.transactions.length, 50);
-  assert.ok(body.transactions.every((row) => row.amountAtomic === '10'));
-  assert.ok(elapsed < 3000, `${elapsed} ms`);
-});
-
-void test('a page without settles reads no settle history of its channels', async () => {
-  const database = createCollectorD1();
-  channel(database, 'G', { mint: DEVNET_USDC });
-  tx(database, sig('Open'), 1000, 1, { slot: 1 });
-  instruction(database, sig('Open'), 0, 'open', 'G', { amount: '100000000' });
-  database.raw.exec('BEGIN');
-  for (let i = 1; i <= 40000; i += 1) {
-    tx(database, sig(`S${i}`), 1000 + i, 1, { slot: 1 + i });
-    instruction(database, sig(`S${i}`), 0, 'settle', 'G', {
-      cumulative: String(i),
-    });
-  }
-  database.raw.exec('COMMIT');
-  const { app } = collector(database);
-  const timed = async (query: string) => {
-    const runs = [];
-    for (let run = 0; run < 5; run += 1) {
-      const started = performance.now();
-      const answer = await get(app, query);
-      runs.push({ ...answer, ms: performance.now() - started });
-    }
-    return runs.reduce((best, run) => (run.ms < best.ms ? run : best));
-  };
-  const newest = await timed('?limit=2');
-  assert.deepEqual(
-    newest.body.transactions.map((row) => row.amountAtomic),
-    ['1', '1'],
-  );
-  const deposits = await timed(`?before=2-${sig('S1')}-0`);
-  assert.deepEqual(summary(deposits.body.transactions), [
-    [sig('Open'), 0, 'open', 'G', '100000000'],
-  ]);
-  assert.ok(
-    deposits.ms < newest.ms / 4,
-    `${deposits.ms} ms vs ${newest.ms} ms`,
-  );
 });
