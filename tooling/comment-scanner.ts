@@ -46,6 +46,7 @@ type CommentOptions = {
   python?: boolean;
   shell?: boolean;
   yaml?: boolean;
+  lineQuotes?: boolean;
   noQuotes?: boolean;
   singleQuoteEscapes?: boolean;
   lineMarkers: string[];
@@ -56,6 +57,7 @@ type Scanner = {
   index: number;
   quote: string;
   quoteLength: number;
+  quoteEscapes: boolean;
   heredocs: { tag: string; dash: boolean }[];
   ranges: CommentRange[];
 };
@@ -77,6 +79,7 @@ const SHELL_COMMENT_PREFIX = /[\s;|&(]/;
 const POWERSHELL_HERE_STRING = /^@(['"])\r?\n/;
 const PATCH_OPTIONS: CommentOptions = {
   singleQuoteEscapes: true,
+  lineQuotes: true,
   blockMarkers: [{ start: '/*', end: '*/' }],
   lineMarkers: ['//'],
 };
@@ -124,7 +127,7 @@ function advanceInQuote(scanner: Scanner): void {
   const character = text[scanner.index];
   const escape = options.powershell
     ? quote === '"' && character === '`'
-    : character === '\\' && (quote !== "'" || options.singleQuoteEscapes);
+    : character === '\\' && (quote !== "'" || scanner.quoteEscapes);
   if (escape) {
     scanner.index += 2;
     return;
@@ -134,7 +137,7 @@ function advanceInQuote(scanner: Scanner): void {
     (quoteLength === 1 ||
       text.slice(scanner.index, scanner.index + quoteLength) ===
         quote.repeat(quoteLength));
-  if (options.yaml && character === '\n') {
+  if (options.lineQuotes && character === '\n') {
     scanner.quote = '';
     return;
   }
@@ -173,6 +176,9 @@ function opensQuote(scanner: Scanner): boolean {
     (!options.powershell && !options.yaml && character === '`');
   if (!opens) return false;
   scanner.quote = character;
+  scanner.quoteEscapes =
+    options.singleQuoteEscapes === true ||
+    (options.shell === true && text[index - 1] === '$');
   scanner.quoteLength =
     character !== '`' &&
     text.slice(index, index + TRIPLE_QUOTE) === character.repeat(TRIPLE_QUOTE)
@@ -253,7 +259,7 @@ function takeComment(scanner: Scanner): boolean {
     text[index] === options.hashMarker &&
     (options.adjacentHash ||
       index === 0 ||
-      (options.shell ? SHELL_COMMENT_PREFIX : /\s/).test(
+      (options.shell && !options.yaml ? SHELL_COMMENT_PREFIX : /\s/).test(
         text[index - 1] ?? '',
       ));
   if (!hash && !options.lineMarkers.some((m) => text.startsWith(m, index)))
@@ -274,6 +280,7 @@ function delimitedCommentRanges(
     index: 0,
     quote: '',
     quoteLength: 1,
+    quoteEscapes: false,
     heredocs: [],
     ranges: [],
   };
@@ -372,6 +379,7 @@ export function commentRanges(text: string, path: string): CommentRange[] {
     python: extension === '.py',
     singleQuoteEscapes: extension === '.py',
     yaml: extension === '.yaml' || extension === '.yml',
+    lineQuotes: extension === '.yaml' || extension === '.yml',
     shell: SHELL_EXTENSIONS.has(extension),
     adjacentHash: extension === '.py' || extension === '.toml',
     hashMarker: '#',

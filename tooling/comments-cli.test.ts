@@ -216,3 +216,21 @@ void test('a block comment cut by a patch hunk ends with the hunk', () => {
     '@@ -1 +1,2 @@\n /**\n+ * added\ndiff --git a/y.js b/y.js\n@@ -1 +1 @@\n+const c = 3; // next\n';
   assert.deepEqual(commentTexts(text, 'x.patch'), ['/** + * added', '// next']);
 });
+
+void test('YAML anchors, ANSI-C quotes and patch regex quotes', () => {
+  assert.deepEqual(
+    commentTexts('d: see [docs](#usage) and a?b=1&#frag\n# actual', 'a.yml'),
+    ['# actual'],
+  );
+  assert.deepEqual(commentTexts("printf $'a\\'' # one\necho # two", 'a.sh'), [
+    '# one',
+    '# two',
+  ]);
+  assert.deepEqual(
+    commentTexts(
+      "@@ -1,3 +1,3 @@\n x.replace(/'/g, '');\n+y(); // in\n",
+      'a.patch',
+    ),
+    ['// in'],
+  );
+});
