@@ -126,8 +126,11 @@ never edit or rename a migration that has been applied, and apply migrations to
 the remote databases only with founder approval. The hand-written `0001`–`0007`
 files of each app predate drizzle-kit and stay byte-for-byte unchanged.
 
-Commit the generated `.sql` file together with `migrations/meta/` (journal and
-snapshot). `pnpm lint` runs `drizzle-kit check`, and
+Commit the generated `.sql` file together with `migrations/meta/` (journal,
+snapshot and `_sha256.json`). The generate scripts record each new file's
+SHA-256 once in `_sha256.json` (`tooling/d1-migrations.ts`); recorded hashes are
+never rewritten, so editing any existing migration fails the tests, because
+Wrangler would never re-apply it. `pnpm lint` runs `drizzle-kit check`, and
 `tests/drizzle-migrations.test.ts` fails when `schema.ts` changed without a
 generated migration. Schema checks inline their values (`.inlineParams()`),
 since a bound parameter would be written to the migration as `?`.
@@ -135,9 +138,10 @@ since a bound parameter would be written to the migration as `?`.
 The single exception to generated SQL is a data-only change (an `UPDATE`,
 `DELETE` or backfill that drizzle-kit cannot derive): create it with
 `pnpm index:db:generate --custom --name <change>` (or the collector script), so
-drizzle-kit numbers and journals it, and write only data statements in its body.
-It is reviewed like code, and a test rejects schema statements (`CREATE`,
-`ALTER`, `DROP`) in it. Schema changes are always generated.
+drizzle-kit numbers and journals it, write only data statements in its body,
+then run `pnpm db:hashes` to record it. It is reviewed like code, and a test
+rejects schema statements (`CREATE`, `ALTER`, `DROP`) in it. Schema changes are
+always generated.
 
 - Tables created by generated migrations are ordinary rowid tables; Drizzle
   cannot declare the `WITHOUT ROWID` layout of the hand-written baseline tables.
