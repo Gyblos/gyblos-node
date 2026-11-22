@@ -102,13 +102,11 @@ export function fundingHandlers(ports: FundingPorts) {
           : undefined;
         const [balanceAtomic, channelRemainingAtomic] = await Promise.all([
           sharedBalance(target.policy.payer, target.url),
-          seller
-            ? ports.remaining(target.policy, seller).catch(() => null)
-            : null,
+          seller ? ports.remaining(target.policy, seller) : null,
         ]);
         const switching =
           seller && channelRemainingAtomic === null
-            ? await ports.switching?.(target.policy, seller).catch(() => null)
+            ? await ports.switching?.(target.policy, seller)
             : null;
         return target.current()
           ? {

@@ -70,6 +70,17 @@ export async function poolAllowsSellerDeposit(
   deposit: string,
 ) {
   const entries = await inspectBatchPool(paths);
+  if (
+    entries.some(
+      (row) =>
+        !row.ready ||
+        row.uncertain ||
+        row.requestId !== null ||
+        row.stored?.pending ||
+        row.stored?.recoverable,
+    )
+  )
+    return false;
   const unfunded = new Set(
     entries
       .filter((row) => row.stored?.notCreated)
@@ -85,7 +96,7 @@ export async function poolAllowsSellerDeposit(
     !existing.stored?.notCreated &&
     !existing.stored?.openingReturned
   )
-    return true;
+    return existing.stored?.empty === true;
   return BigInt(funds.availableAtomic) >= BigInt(deposit);
 }
 interface PoolContext {

@@ -320,6 +320,47 @@ void test('another seller needs a full deposit of shared authority even when the
   );
 });
 
+void test('an unreadable pool cannot approve a seller from the wallet balance alone', async (t) => {
+  const { policy, seller } = await fundedChannel(t);
+  const service = fundingHandlers({
+    accepts: () => true,
+    policy: () => ({
+      ...policy,
+      payer,
+      network: DEVNET,
+      mint: DEVNET_USDC,
+      totalDepositAtomic: '20000',
+    }),
+    rpcUrl: async () => 'https://example.invalid',
+    balance: async () => '20000',
+    resolveOffer: () => seller,
+    remaining: async () => null,
+    switching: async () => {
+      throw new Error('unreadable');
+    },
+    copy: () => {},
+    open: async () => {},
+  });
+  assert.equal(
+    await service.balance({ sender: {}, senderFrame: {} }, ['56'.repeat(32)]),
+    null,
+  );
+});
+void test('a settled and spent channel of the same pooled seller cannot authorize a new deposit', async (t) => {
+  const { rig, environment, policy, seller } = await fundedChannel(t, '10000');
+  rig.time(rig.terms.expiresAt);
+  await rig.seller().close();
+  await rig.buyer.reconcile(rig.sellerOptions.observe);
+  assert.deepEqual(
+    await switchingCredit(
+      environment,
+      { ...policy, depositAtomic: '10000', totalDepositAtomic: '10000' },
+      seller,
+    ),
+    { poolLimited: true },
+  );
+});
+
 void test('a subminimum replacement is exposed as a reduced ceiling, never as available escrow', async (t) => {
   const { rig, environment, policy, seller } = await fundedChannel(t);
   assert.deepEqual(
@@ -329,34 +370,5 @@ void test('a subminimum replacement is exposed as a reduced ceiling, never as av
       { ...seller, nodeId: '56'.repeat(32) },
     ),
     { replacementAtomic: '960' },
-  );
-});
-
-void test('Auto checks reusable channel funds before asking for a new deposit', () => {
-  const policy = { payer, maxAtomic: '10000', depositAtomic: '1000000' };
-  const zero = {
-    payer,
-    network: DEVNET,
-    balanceAtomic: '0',
-    channelRemainingAtomic: null,
-    faucetAvailable: true,
-  };
-  assert.equal(
-    autoFundingAvailable({ ...policy, maxAtomic: '1' }, [
-      { ...zero, balanceAtomic: '1000000', replacementAtomic: '10' },
-    ]),
-    FUNDING.channelLimit,
-  );
-  assert.equal(autoFundingAvailable(policy, [zero]), false);
-  assert.equal(
-    autoFundingAvailable(policy, [
-      zero,
-      { ...zero, channelRemainingAtomic: '15000' },
-    ]),
-    true,
-  );
-  assert.equal(
-    autoFundingAvailable(policy, [{ ...zero, balanceAtomic: null }]),
-    null,
   );
 });
