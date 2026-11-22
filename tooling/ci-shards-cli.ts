@@ -22,9 +22,12 @@ const files = globSync(patterns, {
   exclude: (name) => name === 'node_modules',
 }).filter((path) => statSync(path).isFile());
 if (!files.length) throw new Error('No test files matched the suite');
-const selected = assignShards(files, new Map(Object.entries(history)), count)[
-  index - 1
-];
+const selected = assignShards(
+  files,
+  new Map(Object.entries(history)),
+  count,
+  process.env.ORDINARY_LAB_PR === 'true',
+)[index - 1];
 if (!selected) throw new Error('Invalid shard');
 if (selected.length) {
   const results = run({

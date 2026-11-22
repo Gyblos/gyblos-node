@@ -12,6 +12,7 @@ for (const cut of [
   CRASH_CUTS.OPEN_BEFORE_CHECKPOINT,
   CRASH_CUTS.OPEN_SIGNED,
   CRASH_CUTS.OPEN_CHECKPOINTED,
+  CRASH_CUTS.OPEN_INFLIGHT,
   CRASH_CUTS.OPEN_INCLUDED,
 ]) {
   void test(`batch opening resumes its original authority after SIGKILL at ${cut}`, async (t) => {
@@ -50,9 +51,11 @@ for (const cut of [
 for (const cut of [
   CRASH_CUTS.CLOSE_BEFORE_CHECKPOINT,
   CRASH_CUTS.CLOSE_CHECKPOINTED,
+  CRASH_CUTS.CLOSE_INFLIGHT,
   CRASH_CUTS.CLOSE_INCLUDED,
   CRASH_CUTS.REFUND_BEFORE_CHECKPOINT,
   CRASH_CUTS.REFUND_CHECKPOINTED,
+  CRASH_CUTS.REFUND_INFLIGHT,
   CRASH_CUTS.REFUND_INCLUDED,
 ]) {
   void test(`batch buyer-only recovery survives SIGKILL at ${cut}`, async (t) => {
@@ -89,3 +92,35 @@ for (const cut of [
     );
   });
 }
+
+void test('a second buyer crash during batch recovery preserves the original close', async (t) => {
+  const rig = await batchRecoveryCrash();
+  await rig.fund();
+  const first = rig.start(CRASH_ACTIONS.WITHDRAW, CRASH_CUTS.CLOSE_INCLUDED);
+  t.after(() => first.kill());
+  await first.reached();
+  assert.equal(await first.kill(), 'SIGKILL');
+  const path = batchSessionPathsIn(
+    { GYBLOS_HOME: rig.financial.root },
+    'buyer',
+  ).state;
+  const original = await readFile(path);
+  const signs = rig.signs();
+  const sends = rig.financial.vm.sends();
+  const second = rig.start(CRASH_ACTIONS.WITHDRAW, CRASH_CUTS.RECOVERY_LOCKED);
+  t.after(() => second.kill());
+  await second.reached();
+  assert.equal(await second.kill(), 'SIGKILL');
+  assert.deepEqual(await readFile(path), original);
+  await rig.start(CRASH_ACTIONS.WITHDRAW).result();
+  assert.deepEqual(rig.signs(), signs);
+  assert.equal(rig.financial.vm.sends(), sends);
+  rig.grace();
+  const done = await rig.start(CRASH_ACTIONS.WITHDRAW).result();
+  assert.equal(
+    done.financial?.refundedAtomic,
+    rig.financial.terms.depositAtomic,
+  );
+  assert.equal(done.runtimeBlocked, false);
+  assert.equal(rig.financial.vm.sends(), 3);
+});

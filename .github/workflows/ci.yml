@@ -133,6 +133,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: node --import tsx tooling/ci-shards-cli.ts ${{ matrix.shard }}/2 "tests/lab/**/*.test.ts"
+        env:
+          ORDINARY_LAB_PR: ${{ github.event_name == 'pull_request' && github.base_ref == 'develop' && needs.changes.outputs.windows_full == 'false' }}
 
   build:
     needs: changes
