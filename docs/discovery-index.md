@@ -546,8 +546,9 @@ is checked and not kept. No IP or request data is stored or logged.
   tests and local runs. `src/storage-d1.ts` is the D1 adapter, using Drizzle ORM
   (pinned in the app manifest).
 - `src/schema.ts` declares every table, column, key, secondary index and check
-  constraint, including registrations and uptime. Schema changes start there;
-  tests check its metadata against the migrations.
+  constraint, including registrations and uptime. Schema changes start there,
+  and the migration is generated from it (see the migrations below); tests check
+  its metadata against the migrations.
 - `storage-queries.ts`, `storage-writes.ts`, `registration-queries.ts`,
   `uptime-d1.ts` and `github-claim-store-d1.ts` build every query through
   Drizzle. `d1-client.ts` runs only ORM-generated statements and native
@@ -592,10 +593,32 @@ Migrations, applied in order:
 | `0006_presence_version.sql`   | Current presence release and attested sequence. Apply before rolling out the new index. |
 | `0007_github_claims.sql`      | Seller GitHub claims. Apply before deploying the claim routes and the cron trigger.     |
 
-Apply a migration before deploying code that needs it. Each migration adds
-tables, columns (with defaults) or indexes; `0002` also drops one unused index.
-The running version therefore keeps working while a migration applies, and a
-code rollback leaves the additions unused. Never edit an applied migration.
+Migrations are generated with drizzle-kit from `src/schema.ts`
+(`pnpm index:db:generate --name <change>`, configured in
+`apps/discovery-index/drizzle.config.ts`); never write migration SQL by hand.
+`0001`–`0007` were written by hand before drizzle-kit, are applied in production
+and stay byte-for-byte unchanged. `migrations/meta/` holds drizzle-kit's journal
+and snapshots. Its baseline, `0007_snapshot.json`, describes the schema after
+`0007` and its journal entry names `0007_github_claims`, so the next generated
+file is `0008_<change>.sql`. Wrangler applies `.sql` files only, records them by
+file name, and therefore applies only the new ones.
+
+Drizzle cannot declare the tables' `WITHOUT ROWID` layout, so tables created by
+generated migrations are ordinary rowid tables. A change SQLite cannot make with
+`ALTER TABLE` (for example making a column nullable) makes drizzle-kit rebuild a
+baseline table as a rowid table; a test rejects that, and such a change needs a
+founder decision first. Never run drizzle-kit `push`, `pull` or `introspect`
+against the D1 database: they would rebuild every table the same way (the config
+has no credentials). A data-only change (`UPDATE`, `DELETE`, backfill) is the
+one exception to generated SQL:
+`pnpm index:db:generate --custom --name <change>` creates the journaled file,
+whose body holds only reviewed data statements.
+
+Apply a migration before deploying code that needs it, and apply it to the
+remote database only with founder approval. Each migration adds tables, columns
+(with defaults) or indexes; `0002` also drops one unused index. The running
+version therefore keeps working while a migration applies, and a code rollback
+leaves the additions unused. Never edit an applied migration.
 
 Tests run the same HTTP cases against the in-memory adapter and a `node:sqlite`
 D1 double that applies every real migration in order

@@ -1,0 +1,52 @@
+
+// Preview-only network selector; it changes no routing, wallet or payment state.
+function PreviewNetwork() {
+  const showTestnet = usePreviewSetting('showTestnet');
+  const network = usePreviewNetwork();
+  const choose = (next: (typeof PREVIEW_NETWORKS)[number]) => {
+    const params = new URLSearchParams(location.search);
+    if (next === 'Mainnet') params.set('network', 'mainnet');
+    else params.delete('network');
+    history.replaceState(null, '', '?' + params.toString());
+    window.dispatchEvent(new Event(PREVIEW_EVENT.NETWORK));
+  };
+  if (!showTestnet)
+    return (
+      <div className="preview-network" role="group" aria-label="Network">
+        <span className="preview-network-single" data-network="mainnet">
+          <span className="preview-network-dot" aria-hidden="true" />
+          Mainnet
+        </span>
+      </div>
+    );
+  return (
+    <div
+      className="preview-network"
+      role="radiogroup"
+      aria-label="Network"
+      title={network === 'Testnet' ? 'Testnet uses test funds. After December 9 it stays available for developers through Settings.' : 'Mainnet is shown for review; the preview keeps example data.'}
+      onKeyDown={(event) => {
+        if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+        event.preventDefault();
+        const next = network === 'Testnet' ? 'Mainnet' : 'Testnet';
+        choose(next);
+        event.currentTarget.querySelector<HTMLButtonElement>('[data-network="' + next.toLowerCase() + '"]')?.focus();
+      }}
+    >
+      {PREVIEW_NETWORKS.map((item) => (
+        <button
+          key={item}
+          type="button"
+          role="radio"
+          aria-checked={network === item}
+          tabIndex={network === item ? 0 : -1}
+          data-network={item.toLowerCase()}
+          onClick={() => choose(item)}
+        >
+          <span className="preview-network-dot" aria-hidden="true" />
+          {item}
+        </button>
+      ))}
+    </div>
+  );
+}

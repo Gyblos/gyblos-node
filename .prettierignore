@@ -6,6 +6,8 @@ node_modules/
 .env
 .env.*
 pnpm-lock.yaml
+# drizzle-kit journals and schema snapshots (pnpm index:db:generate / collector:db:generate)
+apps/*/migrations/meta/
 dist/
 coverage/
 tests/fixtures/tokenizer_config.json

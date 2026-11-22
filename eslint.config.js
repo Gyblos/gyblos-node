@@ -58,6 +58,7 @@ export default [
     rules: {
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-floating-promises': 'error',
+      'gyblos/no-new-comments': 'error',
       'gyblos/import-extensions': 'error',
       '@typescript-eslint/consistent-type-assertions': [
         'error',

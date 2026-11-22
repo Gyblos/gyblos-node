@@ -1,0 +1,536 @@
+// Groups network offers by model. Clicking a model with several sellers opens a side panel
+// with the seller strategy (Auto first); choosing a strategy keeps the menu open.
+import {
+  CaretDown,
+  CaretRight,
+  Check,
+  CurrencyCircleDollar,
+  Lightning,
+  Plus,
+  ShieldCheck,
+  Sparkle,
+  Wallet,
+  type Icon,
+} from '@phosphor-icons/react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from 'react';
+
+import { MENU_GEOMETRY, MODEL_SOURCE } from './constants';
+import { Dropdown } from './Dropdown';
+import { Modal } from './Modal';
+import { MotionPresence } from './Motion';
+import type { ModelOption } from './model-types';
+import { ModelImage } from './ModelImage';
+import { priceRange, usdPerMtok } from './model-price';
+import { feeLabel, openPreviewFunds, PREVIEW_COPY, previewUsdc, READY_SELLER_MODES, Tag, TONE, usePreviewBalance, usePreviewSetting, type SellerMode } from './PreviewKit';
+import { Badge, Button, MenuItem } from './UI';
+
+export type { ModelOption } from './model-types';
+
+const automatic = new Set<string>();
+function Selected() {
+  return (
+    <span className="preview-check-circle" aria-hidden="true">
+      <Check size={11} weight="bold" />
+    </span>
+  );
+}
+const chosenTag = new Map<string, string>();
+function priceLabel(model: ModelOption) {
+  return model.free
+    ? 'Free'
+    : `${usdPerMtok(model.input)} in · ${usdPerMtok(model.output)} out / 1M`;
+}
+// Word joiners and a no-break space keep a shortened seller id on one line.
+function sellerName(model: ModelOption) {
+  const seller = model.family
+    ?.split(' · ')
+    .find((part) => part.startsWith('Seller '));
+  if (!seller) return model.free ? 'Community node' : 'Signed seller';
+  return seller.replace('Seller ', 'Seller\u00a0').replace(/\.\.\.|…/, '\u2060…\u2060');
+}
+function offerPrice(model: ModelOption) {
+  return model.free ? 'Free' : `${usdPerMtok(model.input)} / ${usdPerMtok(model.output)}`;
+}
+function quantization(model: ModelOption) {
+  return (
+    model.family
+      ?.split(' · ')
+      .filter((part) => !part.startsWith('Seller '))
+      .join(' · ') ?? ''
+  );
+}
+function best(offers: readonly ModelOption[]) {
+  return (
+    offers.find((item) => item.free) ??
+    [...offers].sort((a, b) => a.input + a.output - (b.input + b.output))[0]
+  );
+}
+function latencyOf(model: ModelOption) {
+  let hash = 0;
+  for (const char of model.id) hash = (hash * 31 + char.charCodeAt(0)) % 997;
+  return 180 + (hash % 420);
+}
+function recommended(offers: readonly ModelOption[]) {
+  const sorted = (score: (item: ModelOption) => number) => [...offers].sort((a, b) => score(a) - score(b))[0];
+  const picks: { label: SellerMode; icon: Icon; item: ModelOption | undefined }[] = [
+    { label: 'Cheapest', icon: CurrencyCircleDollar, item: sorted((item) => (item.free ? -1 : item.input + item.output)) },
+    { label: 'Fastest', icon: Lightning, item: sorted(latencyOf) },
+    { label: 'Most reliable', icon: ShieldCheck, item: sorted((item) => -((latencyOf(item) * 7) % 13)) },
+  ];
+  return picks.filter((pick): pick is { label: SellerMode; icon: Icon; item: ModelOption } => !!pick.item);
+}
+function sellerCount(offers: readonly ModelOption[]) {
+  return offers.length + (offers.length === 1 ? ' seller' : ' sellers');
+}
+function fromPrice(offers: readonly ModelOption[]) {
+  const cheapest = offers.filter((item) => !item.free).sort((a, b) => a.input - b.input)[0];
+  return cheapest ? (offers.length > 1 ? 'from ' : '') + usdPerMtok(cheapest.input) + '/M' : null;
+}
+/** Free or Paid pill, then the input price and the number of sellers on the line below. */
+function ModelBadges({ offers, locked }: { offers: readonly ModelOption[]; locked: boolean }) {
+  const free = offers.some((item) => item.free);
+  const price = fromPrice(offers);
+  return (
+    <>
+      <Tag pill tone={free ? TONE.SUCCESS : TONE.NEUTRAL}>{free ? 'Free' : 'Paid'}</Tag>
+      <span className="pk-badge-line">
+        {!free && price && <Tag>{price}</Tag>}
+        <Tag>{sellerCount(offers)}</Tag>
+        {locked && <span className="sr-only">Needs funds</span>}
+      </span>
+    </>
+  );
+}
+function group(models: readonly ModelOption[]) {
+  const groups = new Map<string, ModelOption[]>();
+  for (const item of models) {
+    const list = groups.get(item.name) ?? [];
+    list.push(item);
+    groups.set(item.name, list);
+  }
+  return [...groups.entries()];
+}
+
+const FLYOUT = { GAP: 6, REPOSITION: 'preview:reposition' } as const;
+
+function moveFocus(event: KeyboardEvent<HTMLElement>, selector: string) {
+  if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return false;
+  const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(selector)).filter((item) => !item.matches(':disabled'));
+  if (!items.length) return false;
+  event.preventDefault();
+  event.stopPropagation();
+  const index = items.findIndex((item) => item === document.activeElement);
+  const next =
+    event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? items.length - 1
+        : event.key === 'ArrowDown'
+          ? (index + 1) % items.length
+          : (index - 1 + items.length) % items.length;
+  items[next]?.focus();
+  return true;
+}
+
+function StrategyRow({
+  icon: Glyph,
+  label,
+  detail,
+  price,
+  checked,
+  soon = false,
+  locked = false,
+  onChoose,
+}: {
+  icon: Icon;
+  label: string;
+  detail: string;
+  price: string;
+  checked: boolean;
+  soon?: boolean;
+  locked?: boolean;
+  onChoose: () => void;
+}) {
+  return (
+    <MenuItem
+      role="menuitemradio"
+      checked={checked}
+      disabled={soon || locked}
+      title={soon ? PREVIEW_COPY.sellerModeSoon : locked ? PREVIEW_COPY.needsFunds : detail}
+      data-strategy
+      label={label}
+      detail={soon ? PREVIEW_COPY.sellerModeSoonShort : locked ? 'Needs funds · ' + detail : detail}
+      leading={
+        <span className="preview-strategy-icon" aria-hidden="true">
+          <Glyph size={16} weight={checked ? 'fill' : 'regular'} />
+        </span>
+      }
+      badge={soon ? <Tag>Soon</Tag> : <span className="preview-offer-price">{price}</span>}
+      trailing={checked ? <Selected /> : <span className="preview-check-slot" aria-hidden="true" />}
+      onClick={onChoose}
+    />
+  );
+}
+
+export function ModelDropdown({
+  model,
+  models,
+  onSelect,
+  onBrowse,
+  toolbar = false,
+  label,
+  showBrowse = true,
+  networkOnly = false,
+  contextLabel,
+}: {
+  model: ModelOption;
+  models: readonly ModelOption[];
+  onSelect: (id: string) => void;
+  onBrowse: () => void;
+  toolbar?: boolean;
+  label?: string;
+  showBrowse?: boolean;
+  networkOnly?: boolean;
+  contextLabel?: string;
+}) {
+  const network =
+    networkOnly ||
+    models.some((item) => item.source === MODEL_SOURCE.ANNOUNCED);
+  const [active, setActive] = useState<string | null>(null);
+  const [compare, setCompare] = useState<string | null>(null);
+  const balance = usePreviewBalance();
+  const broke = balance === 0 && !contextLabel;
+  // Without funds and with the account-wide free fallback off, paid-only models cannot be chosen.
+  const fallback = usePreviewSetting('freeFallback');
+  const needsFunds = (list: readonly ModelOption[]) => broke && !fallback && !list.some((item) => item.free);
+  const [, refresh] = useState(0);
+  const flyout = useRef<HTMLDivElement>(null);
+  const listed = models.some((item) => item.id === model.id);
+  const isAuto = (name: string) =>
+    automatic.has(name) || (!chosenTag.has(name) && models.filter((item) => item.name === name).length > 1);
+  const auto = isAuto(model.name);
+  const ordered = network
+    ? models
+    : [model, ...models.filter((item) => item.id !== model.id)];
+  const remember = (item: ModelOption, byAutomatic: boolean, tag?: string) => {
+    if (tag) chosenTag.set(item.name, tag);
+    else chosenTag.delete(item.name);
+    if (byAutomatic) automatic.add(item.name);
+    else automatic.delete(item.name);
+    refresh((value) => value + 1);
+    onSelect(item.id);
+  };
+  const rowFor = (name: string) =>
+    flyout.current?.parentElement
+      ?.closest('.compact-dropdown')
+      ?.querySelector<HTMLElement>('[data-model-row="' + CSS.escape(name) + '"]') ?? undefined;
+  const focusFlyout = () =>
+    requestAnimationFrame(() =>
+      (
+        flyout.current?.querySelector<HTMLElement>('[aria-checked="true"]') ??
+        flyout.current?.querySelector<HTMLElement>("[role^='menuitem']")
+      )?.focus(),
+    );
+  const back = () => {
+    const row = active ? rowFor(active) : undefined;
+    setActive(null);
+    requestAnimationFrame(() => row?.focus());
+  };
+
+  useEffect(() => {
+    const pickFirst = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== 'Enter' || event.isComposing || event.defaultPrevented || !(event.target instanceof HTMLInputElement)) return;
+      const first = event.target
+        .closest('.preview-model-menu')
+        ?.querySelector<HTMLElement>('[data-model-row]:not(:disabled)');
+      if (!first) return;
+      event.preventDefault();
+      first.click();
+    };
+    document.addEventListener('keydown', pickFirst, true);
+    return () => document.removeEventListener('keydown', pickFirst, true);
+  }, []);
+
+  useLayoutEffect(() => {
+    const panel = flyout.current;
+    const row = active ? rowFor(active) : undefined;
+    const menu = (row ?? panel)?.closest<HTMLElement>('.compact-dropdown:not(.preview-seller-flyout)');
+    if (!panel || !menu) return;
+    const reposition = () => menu.dispatchEvent(new Event(FLYOUT.REPOSITION));
+    if (!row) {
+      if (panel.matches(':popover-open')) panel.hidePopover();
+      if (menu.dataset.split) {
+        delete menu.dataset.split;
+        reposition();
+      }
+      return;
+    }
+    function place() {
+      if (!panel || !menu) return;
+      reposition();
+      sync();
+    }
+    function sync() {
+      if (!panel || !menu) return;
+      const box = menu.getBoundingClientRect();
+      panel.style.width = box.width + 'px';
+      panel.style.maxHeight = (Number.parseFloat(menu.style.maxHeight) || window.innerHeight) + 'px';
+      panel.style.left = box.right + FLYOUT.GAP + 'px';
+      panel.style.top = menu.style.top;
+      panel.style.bottom = menu.style.bottom;
+    }
+    menu.dataset.split = 'true';
+    if (!panel.matches(':popover-open')) panel.showPopover();
+    place();
+    const closed = (event: Event) => {
+      if (event instanceof ToggleEvent && event.newState === 'closed') setActive(null);
+    };
+    const outside = (event: Event) => {
+      if (!(event.target instanceof Node && (menu.contains(event.target) || panel.contains(event.target)))) place();
+    };
+    const observer = new ResizeObserver(sync);
+    observer.observe(menu);
+    menu.addEventListener('toggle', closed);
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', outside, true);
+    return () => {
+      observer.disconnect();
+      menu.removeEventListener('toggle', closed);
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', outside, true);
+    };
+  }, [active]);
+
+  const compareOffers = compare ? (group(models).find(([name]) => name === compare)?.[1] ?? []) : [];
+  return (
+    <>
+    <MotionPresence>{compare && (
+      <Modal title={compare} size="lg" close={() => setCompare(null)}>
+        <p className="ui-help-text">{compareOffers.length + ' sellers · price per 1M tokens ' + feeLabel + ', in / out'}</p>
+        <div className="preview-simple-table-region">
+          <table className="preview-simple-table">
+            <caption className="sr-only">{'Sellers for ' + compare}</caption>
+            <thead><tr>
+              <th scope="col">Seller</th><th scope="col">Quant</th>
+              <th scope="col" className="preview-num">In / out · 1M</th>
+              <th scope="col" className="preview-num">Latency</th>
+            </tr></thead>
+            <tbody>
+              {compareOffers.map((item) => (
+                <tr key={item.id} data-active={item.id === model.id}>
+                  <th scope="row">{sellerName(item)}{item.id === model.id && <span className="preview-model-mode">In use</span>}</th>
+                  <td>{quantization(item)}</td>
+                  <td className="preview-num preview-tabular">{offerPrice(item)}</td>
+                  <td className="preview-num preview-tabular">{latencyOf(item)} ms</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Modal>
+    )}</MotionPresence>
+    <Dropdown
+      searchLabel="Search models"
+      label={(label ?? (toolbar ? 'Choose chat model' : 'Choose composer model')) + ': ' + model.name + (auto ? ', Auto' : chosenTag.has(model.name) ? ', ' + chosenTag.get(model.name) : model.free ? ', Free' : '')}
+      className={toolbar ? 'model-picker' : 'ui-model-trigger'}
+      panelClassName="preview-model-menu"
+      trigger={
+        <>
+          <ModelImage artwork={model.image} name={model.name} />
+          {model.name}
+          {contextLabel ? (
+            <Badge>Local</Badge>
+          ) : network && !listed ? null : auto ? (
+            <Badge>Auto</Badge>
+          ) : chosenTag.has(model.name) ? (
+            <Badge>{chosenTag.get(model.name)}</Badge>
+          ) : model.free ? (
+            <Badge>Free</Badge>
+          ) : (
+            <span className="model-trigger-price" title={priceLabel(model)}>
+              {priceRange(model)} /M
+            </span>
+          )}
+          <CaretDown size={12} weight="bold" className="preview-trigger-caret" aria-hidden="true" />
+        </>
+      }
+    >
+      {(close, query) => {
+        const needle = query.trim().toLowerCase();
+        const filtered = ordered.filter((item) =>
+          `${item.name} ${item.family ?? ''}`.toLowerCase().includes(needle),
+        );
+        const groups = group(filtered);
+        const visible =
+          network || needle ? groups : groups.slice(0, MENU_GEOMETRY.QUICK_MODELS);
+        const offers = active ? (group(models).find(([name]) => name === active)?.[1] ?? []) : [];
+        const top = best(offers);
+        const current = !!active && (active === model.name || offers.some((item) => item.id === model.id));
+        return (
+          <>
+            {!contextLabel && (
+              <p className="pk-balance-line">
+                <Wallet size={14} aria-hidden="true" />
+                <span>Balance</span>
+                <strong>{previewUsdc(balance)}</strong>
+                <Button
+                  className="pk-balance-add"
+                  onClick={() => {
+                    close();
+                    openPreviewFunds();
+                  }}
+                >
+                  <Plus size={12} weight="bold" aria-hidden="true" />
+                  Add funds
+                </Button>
+              </p>
+            )}
+            <div
+              className="preview-model-list"
+              onKeyDown={(event) => {
+                if (moveFocus(event, '.preview-model-list > [role^="menuitem"]')) return;
+                const name = event.target instanceof HTMLElement ? event.target.dataset.model : undefined;
+                if (event.key === 'ArrowRight' && name) {
+                  event.preventDefault();
+                  setActive(name);
+                  focusFlyout();
+                }
+              }}
+            >
+              {visible.map(([name, list]) => {
+                const first = list[0];
+                if (!first) return null;
+                const selected = name === model.name || list.some((item) => item.id === model.id);
+                const several = list.length > 1 && !contextLabel;
+                const locked = needsFunds(list) && !selected;
+                return (
+                  <MenuItem
+                    key={name}
+                    data-model-row={name}
+                    data-model={several ? name : undefined}
+                    data-active={active === name || undefined}
+                    role="menuitemradio"
+                    checked={selected}
+                    aria-haspopup={several ? 'menu' : undefined}
+                    aria-expanded={several && !locked ? active === name : undefined}
+                    disabled={locked}
+                    title={locked ? PREVIEW_COPY.needsFunds : undefined}
+                    label={name}
+                    detail={contextLabel}
+                    badge={contextLabel ? undefined : <ModelBadges offers={list} locked={locked} />}
+                    leading={<ModelImage artwork={first.image} name={name} />}
+                    trailing={
+                      <span className="preview-menu-trail">
+                        {selected ? <Selected /> : <span className="preview-check-slot" aria-hidden="true" />}
+                        {several && !locked ? (
+                          <CaretRight size={13} className="preview-menu-caret" />
+                        ) : (
+                          <span className="preview-caret-slot" aria-hidden="true" />
+                        )}
+                      </span>
+                    }
+                    onClick={() => {
+                      if (!several) {
+                        close();
+                        onSelect(first.id);
+                        return;
+                      }
+                      setActive(active === name ? null : name);
+                    }}
+                  />
+                );
+              })}
+            </div>
+            {!visible.length && (
+              <p className="dropdown-note" role="status">
+                No models found
+              </p>
+            )}
+            {showBrowse && (
+              <MenuItem
+                footer
+                label="View all models"
+                onClick={() => {
+                  close();
+                  onBrowse();
+                }}
+              />
+            )}
+            <div
+              ref={flyout}
+              popover="manual"
+              role="menu"
+              aria-label={(active ?? '') + ' seller'}
+              className="compact-dropdown preview-seller-flyout"
+              onToggle={(event) => event.stopPropagation()}
+              onKeyDown={(event) => {
+                if (moveFocus(event, "[role^='menuitem']")) return;
+                if (event.key === 'ArrowLeft' || event.key === 'Escape') {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  back();
+                }
+              }}
+            >
+              {active && top && (
+                <>
+                  <p className="preview-flyout-title">
+                    <strong>{active}</strong>
+                    <small>{offers.length} sellers · in / out per 1M {feeLabel}</small>
+                  </p>
+                  <StrategyRow
+                    icon={Sparkle}
+                    label="Auto"
+                    detail={(broke && top.free ? 'Free · ' : 'Recommended · ') + sellerName(top)}
+                    price={offerPrice(top)}
+                    checked={current && isAuto(active)}
+                    onChoose={() => remember(top, true)}
+                  />
+                  {recommended(offers).map(({ label: tag, icon, item }, index, picks) => {
+                    const earlier = [{ label: 'Auto', item: top }, ...picks.slice(0, index)].find(
+                      (pick) => pick.item.id === item.id,
+                    );
+                    const soon = !READY_SELLER_MODES.includes(tag);
+                    const unpayable = broke && !fallback && !item.free;
+                    return (
+                      <StrategyRow
+                        key={tag}
+                        icon={icon}
+                        label={tag}
+                        detail={
+                          earlier
+                            ? 'Same seller as ' + earlier.label
+                            : [sellerName(item), quantization(item)].filter(Boolean).join(' · ')
+                        }
+                        price={offerPrice(item)}
+                        soon={soon}
+                        locked={!soon && unpayable}
+                        checked={current && !isAuto(active) && chosenTag.get(active) === tag}
+                        onChoose={() => remember(item, false, tag)}
+                      />
+                    );
+                  })}
+                  <MenuItem
+                    footer
+                    label={'Compare ' + offers.length + ' sellers'}
+                    onClick={() => {
+                      setCompare(active);
+                      close();
+                    }}
+                  />
+                </>
+              )}
+            </div>
+          </>
+        );
+      }}
+    </Dropdown>
+    </>
+  );
+}

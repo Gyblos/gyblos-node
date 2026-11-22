@@ -5,7 +5,7 @@
 // run stops reading when its call budget is spent.
 import { and, eq, isNull, lt, or } from 'drizzle-orm';
 
-import { CHAIN_INDEX } from '../constants';
+import { CHAIN_CURSOR_ID, CHAIN_INDEX } from '../constants';
 import {
   createD1Orm,
   type CollectorDatabase,
@@ -14,7 +14,7 @@ import {
 import { chainCursor } from '../schema';
 import type { ChainEndpoints } from './endpoints';
 import { followChannels, refreshChannels } from './follow';
-import { CHAIN_CURSOR_ID, fillGap, readBackfill, readForward } from './list';
+import { fillGap, readBackfill, readForward } from './list';
 import type { ChainRun } from './run';
 import type { ChainCursorState } from './writes';
 

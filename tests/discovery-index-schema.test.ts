@@ -46,18 +46,19 @@ void test('discovery ORM schema matches migrated columns and primary keys', asyn
   }
 });
 
-void test('discovery ORM schema owns every migrated secondary index and its column order', async (context) => {
+void test('discovery ORM schema owns every migrated secondary index, its uniqueness and column order', async (context) => {
   const database = await createSqliteD1();
   if (!database) return context.skip('node:sqlite unavailable');
   for (const table of Object.values(schema)) {
     const config = getTableConfig(table);
     const actual: readonly unknown[] = database.raw
       .prepare(
-        "SELECT name FROM pragma_index_list(?) WHERE origin = 'c' ORDER BY name",
+        'SELECT name, "unique" FROM pragma_index_list(?) WHERE origin = \'c\' ORDER BY name',
       )
       .all(config.name)
       .map((index) => ({
         name: String(index.name),
+        unique: index.unique === 1,
         columns: database.raw
           .prepare('SELECT name FROM pragma_index_info(?) ORDER BY seqno')
           .all(String(index.name))
@@ -66,12 +67,15 @@ void test('discovery ORM schema owns every migrated secondary index and its colu
     const declared = config.indexes
       .map(({ config: index }) => ({
         name: index.name,
+        unique: index.unique,
         columns: index.columns.map((column) => {
           assert.ok(is(column, Column), index.name);
           return column.name;
         }),
       }))
-      .sort((left, right) => left.name.localeCompare(right.name));
+      .sort((left, right) =>
+        left.name < right.name ? -1 : left.name > right.name ? 1 : 0,
+      );
     assert.deepEqual(declared, actual, config.name);
   }
 });

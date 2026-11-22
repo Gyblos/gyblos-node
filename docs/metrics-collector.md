@@ -701,8 +701,15 @@ is signed:
 
 ## Storage
 
-D1 tables are declared once with Drizzle and created by the migrations; a test
-keeps both identical:
+D1 tables are declared once with Drizzle and created by the migrations; tests
+keep both identical. Migrations are generated with drizzle-kit from
+`src/schema.ts` (`pnpm collector:db:generate --name <change>`, configured in
+`apps/metrics-collector/drizzle.config.ts`); never write migration SQL by hand.
+The files below were written by hand before drizzle-kit, are applied in
+production and stay byte-for-byte unchanged. drizzle-kit's baseline
+(`migrations/meta/`, journal entry `0007_model_observed`) makes the next
+generated file `0008_<change>.sql`, the only one Wrangler then applies. Apply
+migrations to the remote database only with founder approval.
 
 | Schema file                    | Migration                     | Tables                                                    |
 | ------------------------------ | ----------------------------- | --------------------------------------------------------- |
@@ -710,6 +717,22 @@ keeps both identical:
 | `src/schema-aggregates.ts`     | `0002_metrics_aggregates.sql` | `collector_agg_*`, `collector_first_seen`                 |
 | `src/schema-chain.ts`          | `0003_chain_index.sql`        | `collector_chain_*`                                       |
 | `src/schema-model-observed.ts` | `0007_model_observed.sql`     | `collector_agg_model_observed_daily`                      |
+
+Drizzle cannot declare `WITHOUT ROWID`, so tables created by generated
+migrations are ordinary rowid tables, and a change that makes drizzle-kit
+rebuild a baseline table (one SQLite cannot `ALTER`) is rejected by a test and
+needs a founder decision. Never run drizzle-kit `push`, `pull` or `introspect`
+against the D1 database: they would rebuild every table the same way (the config
+has no credentials). A data-only change (`UPDATE`, `DELETE`, backfill, like
+`0006`) is the one exception to generated SQL:
+`pnpm collector:db:generate --custom --name <change>` creates the journaled
+file, whose body holds only reviewed data statements.
+
+Drizzle records the envelopes' unique (uploader, nonce) as an index named
+`collector_envelopes_uploader_node_id_nonce_unique`, while the live table
+enforces it with the inline `UNIQUE` of `0001`. Removing or changing that
+`unique()` would generate a `DROP INDEX` that fails on D1, so a test pins it;
+changing it needs a hand-reviewed table rebuild approved by the founder.
 
 Raw rows are append-only. Envelopes are never pruned: a conflict's signed
 receipt is kept only in its envelope's `signed_json`. Nothing stores an IP, a
