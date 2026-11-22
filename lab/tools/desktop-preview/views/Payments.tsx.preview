@@ -15,7 +15,7 @@ import { X402_ACTION, x402Amount, x402Asset, x402BudgetInput } from '../x402-mod
 import type { BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 import { WALLET_STATUS } from '../wallet/model';
 import { BUTTON_VARIANT } from './constants';
-import { SegmentedBar, Tag, TONE, useSpending } from './PreviewKit';
+import { CompactAmount, SegmentedBar, Tag, TONE, useSpending } from './PreviewKit';
 import { FormActions } from './Form';
 import { Modal } from './Modal';
 import { MotionPresence } from './Motion';

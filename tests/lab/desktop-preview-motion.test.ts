@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 const preview = new URL('../../lab/tools/desktop-preview/', import.meta.url);
@@ -72,4 +72,28 @@ void test('shared amount fields live in the preview kit without import cycles or
       await view(`${name}.tsx.preview`),
       /from '\.\/Payments'/,
     );
+});
+
+void test('every preview view imports the preview kit components it renders', async () => {
+  const kit = await view('PreviewKit.tsx.preview');
+  const exported = [...kit.matchAll(/export function ([A-Z]\w*)\(/g)].map(
+    (match) => match[1] ?? '',
+  );
+  for (const file of await readdir(views)) {
+    if (file === 'PreviewKit.tsx.preview') continue;
+    const source = await view(file);
+    // Spliced views take their imports from the build transform.
+    if (!/^import /m.test(source)) continue;
+    const imported =
+      /import \{([^}]*)\} from '\.\/PreviewKit'/.exec(source)?.[1] ?? '';
+    for (const name of exported) {
+      if (!new RegExp(`<${name}[\\s/>]`).test(source)) continue;
+      if (new RegExp(`function ${name}\\(`).test(source)) continue;
+      assert.match(
+        imported,
+        new RegExp(`\\b${name}\\b`),
+        `${file} renders ${name}`,
+      );
+    }
+  }
 });
