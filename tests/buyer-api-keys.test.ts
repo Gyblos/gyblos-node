@@ -214,14 +214,17 @@ void test('the private disk ledger locks concurrent hosts and reopens with origi
 });
 
 void test('overlapping recovery checks share one proof and complete the abandoned reservation exactly once', async () => {
-  const proof = Promise.withResolvers<boolean>();
+  let confirm = () => {};
+  const proof = new Promise<boolean>((resolve) => {
+    confirm = () => resolve(true);
+  });
   let checks = 0;
   const keys = await createBuyerApiKeys({
     files: storage(),
     scope,
     confirmUncharged: () => {
       checks++;
-      return proof.promise;
+      return proof;
     },
   });
   const key = await keys.create('Probe', '100');
@@ -232,7 +235,7 @@ void test('overlapping recovery checks share one proof and complete the abandone
   operation.abandon();
   const before = keys.reconcileAbandoned();
   const during = keys.reconcileAbandoned();
-  proof.resolve(true);
+  confirm();
   await Promise.all([before, during]);
   assert.equal(checks, 1);
   assert.equal((await keys.snapshot()).keys[0]?.reservedAtomic, '0');

@@ -235,17 +235,20 @@ void test(
   },
   async (t) => {
     const request = globalThis.fetch;
-    const started = Promise.withResolvers<void>();
+    let ready = () => {};
+    const started = new Promise<void>((resolve) => {
+      ready = resolve;
+    });
     const host = await sessionProductHost(undefined, undefined, {
       meter: paidAcceptanceMeter,
-      observe: () => started.resolve(),
+      observe: ready,
     });
     t.after(host.close);
     const { ask, owner } = await buyerClient(host, request);
     host.engine.hold();
     const active = ask(64);
     try {
-      await started.promise;
+      await started;
       const cancel = new AbortController();
       const competing = [ask(64, cancel.signal), ask(64, cancel.signal)];
       const done = Promise.allSettled(competing);
