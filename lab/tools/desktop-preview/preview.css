@@ -2418,15 +2418,86 @@ html .app.desktop-frame .preview-strategy button[aria-checked='true'] {
 .desktop-frame .preview-simple-table th .preview-model-mode {
   margin-left: 8px;
 }
-.desktop-frame .preview-pager {
+.desktop-frame .preview-route {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--panel);
+  transition:
+    border-color var(--pk-menu-motion) ease,
+    background-color var(--pk-menu-motion) ease;
+}
+.desktop-frame .preview-route[data-pinned='true'] {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: color-mix(in srgb, var(--accent) 8%, var(--panel));
+}
+.desktop-frame .preview-route-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-circle);
+  background: var(--raised);
+  color: var(--muted);
+}
+.desktop-frame .preview-route[data-pinned='true'] .preview-route-icon {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+}
+.desktop-frame .preview-route-copy {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+}
+.desktop-frame .preview-route-copy strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+.desktop-frame .preview-route-copy small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.desktop-frame .preview-seller-name {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.desktop-frame .preview-simple-table tr[data-pinned='true'] > th {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+html .app.desktop-frame .preview-pin {
+  color: var(--muted);
+}
+html .app.desktop-frame .preview-pin[aria-pressed='true'] {
+  color: var(--accent);
+}
+.desktop-frame .preview-catalog-filters {
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.desktop-frame .preview-catalog-filters .ui-help-text {
+  margin-left: auto;
+  font-size: 12px;
+}
+.desktop-frame .preview-fund-options {
+  display: grid;
   gap: 8px;
 }
-.desktop-frame .preview-pager .ui-help-text {
-  margin-right: auto;
-  font-size: 12px;
+.desktop-frame .preview-fund-options > span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  font-size: 13px;
 }
 @media (max-width: 900px) {
   html .app.desktop-frame .content .preview-model-summary {

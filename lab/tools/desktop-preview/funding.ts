@@ -8,10 +8,11 @@ declare global {
 
 const READY_ATOMIC = 2_000_000;
 
-export function previewFunding(query: URLSearchParams, payer: string) {
+export function previewFunding(payer: string) {
   return {
-    balance: async () =>
-      query.get('network') && query.get('network') !== 'devnet'
+    balance: async () => {
+      const query = new URLSearchParams(location.search);
+      return query.get('network') && query.get('network') !== 'devnet'
         ? null
         : {
             network: DEVNET,
@@ -22,7 +23,8 @@ export function previewFunding(query: URLSearchParams, payer: string) {
             ),
             faucetAvailable: true,
             channelRemainingAtomic: null,
-          },
+          };
+    },
     copyAddress: async (current: string) => {
       if (current !== payer) return false;
       await navigator.clipboard.writeText(payer);

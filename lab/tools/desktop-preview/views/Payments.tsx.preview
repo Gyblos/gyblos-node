@@ -15,7 +15,7 @@ import { X402_ACTION, x402Amount, x402Asset, x402BudgetInput } from '../x402-mod
 import type { BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 import { WALLET_STATUS } from '../wallet/model';
 import { BUTTON_VARIANT } from './constants';
-import { CompactAmount, SegmentedBar, Tag, TONE, useSpending } from './PreviewKit';
+import { CompactAmount, FUNDS_HOST, openPreviewFunds, PreviewFundsDialog, SegmentedBar, Tag, TONE, useSpending } from './PreviewKit';
 import { FormActions } from './Form';
 import { Modal } from './Modal';
 import { MotionPresence } from './Motion';
@@ -102,7 +102,7 @@ export function Payments(props: Props) {
           <section className="ui-section" aria-label="Payment methods">
             <div className="ui-section-title"><h2>Payment methods</h2></div>
             <ul className="preview-method-list">
-              <WalletOverview buyer={props.x402} onAddFunds={props.onAddFunds} onDetails={() => setWalletOpen(true)} />
+              <WalletOverview buyer={props.x402} onAddFunds={() => openPreviewFunds(FUNDS_HOST.PAYMENTS)} onDetails={() => setWalletOpen(true)} />
               <li className="preview-method-row" aria-label="PayPal">
                 <span className="ui-icon-tile" aria-hidden="true"><PaypalLogo size={18} /></span>
                 <div className="preview-method-copy">
@@ -146,6 +146,7 @@ export function Payments(props: Props) {
           />
         </Modal>
       )}</MotionPresence>
+      <PreviewFundsDialog host={FUNDS_HOST.PAYMENTS} />
       <MotionPresence>{walletOpen && (
         <Modal title="Wallet details" size="lg" close={() => setWalletOpen(false)}>
           <WalletDetails
@@ -155,7 +156,7 @@ export function Payments(props: Props) {
             }}
             onAddFunds={() => {
               setWalletOpen(false);
-              props.onAddFunds();
+              openPreviewFunds(FUNDS_HOST.PAYMENTS);
             }}
           />
         </Modal>
@@ -351,7 +352,7 @@ function WalletOverview({
       <div className="preview-method-actions">
         <Button
           variant={BUTTON_VARIANT.PRIMARY}
-          disabled={!wallet.fundingEnabled}
+          disabled={!address}
           onClick={onAddFunds}
         >
           Add funds

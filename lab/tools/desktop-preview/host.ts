@@ -373,7 +373,7 @@ export function createPreviewHost(
   };
 
   return {
-    desktopFunding: previewFunding(query, payer),
+    desktopFunding: previewFunding(payer),
     desktopWindow,
     desktopConversations,
     desktopWallet,

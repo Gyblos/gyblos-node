@@ -159,7 +159,7 @@ void test('preview Models screen keeps one selectable row per model', async () =
   const models =
     transformBrand(await readFile(file, 'utf8'), file, 'apps/desktop') ?? '';
   assert.doesNotMatch(models, /<NetworkSellerMenu/);
-  assert.match(models, /<PreviewRows[^>]*canSelect=\{canSelect\}/);
+  assert.match(models, /<PreviewCatalog[^>]*canSelect=\{canSelect\}/);
   assert.doesNotMatch(models, /canSelect=\{false\}/);
 });
 
