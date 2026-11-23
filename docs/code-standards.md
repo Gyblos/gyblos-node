@@ -47,8 +47,9 @@ or, if the rule is wrong, change the rule in a separate tooling PR with a test.
 
 - Keep functions focused on one named step. Use descriptive names; `i` and `tx`
   are permitted.
-- All code is TypeScript, including scripts, tooling and configuration. Do not
-  add `.mjs`, `.cjs` or `.js` files.
+- JavaScript-family code is always TypeScript, including scripts, tooling and
+  configuration. Do not add `.mjs`, `.cjs` or `.js` files. Rust sidecars follow
+  [the stack guide](stack.md#when-to-use-rust).
 - Use four import groups separated by blank lines: Node builtins, external
   packages, `@gyblos/*` packages, then relative imports. `pnpm format` sorts
   them.

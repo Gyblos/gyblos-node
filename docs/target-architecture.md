@@ -26,8 +26,11 @@ use the same operations, on either role.
 
 ## Non-goals
 
-- No change to protocol, core, inference or the adapters. Their boundaries stay
-  as [architecture.md](architecture.md) describes them.
+- No change to protocol, core, inference or the adapters, with two stated
+  exceptions: the local operator API is defined in protocol (step 7), and the
+  router leaves core for its own package behind a `Router` port in protocol
+  (step 9). Every other boundary stays as [architecture.md](architecture.md)
+  describes it.
 - No new payment path. Paid inference uses USDC payment channels on Solana
   through the x402 `batch-settlement` scheme
   ([payment-sessions.md](payment-sessions.md)).
@@ -291,6 +294,10 @@ Rules the buyer enforces on every router, local or not:
 
 - A returned NodeId outside the eligible set is discarded. A router cannot add a
   seller, widen a ceiling, override a pin or authorize spending.
+- A router cannot lower the reasoning level the buyer asked for. Candidates at
+  the exact level stay ahead of downgrades whatever order a router returns, and
+  the offer race never accepts a downgrade while an exact-level offer is pending
+  or available.
 - A router has a deadline. On a timeout, an error or an empty answer the buyer
   falls back to the built-in router. A router failure never fails a request.
 - A router is never asked again for a paid request that may already have been
@@ -327,6 +334,8 @@ Each of these is checkable, by `pnpm boundaries`, a lint rule or a test.
 4. Every failure code in a result comes from one owning catalog.
 5. The local operator API accepts only loopback hosts and the operator token.
 6. No result, log or diagnostic contains a key, a token or a payment payload.
+   The one exception is the result of the operation that creates a delegated
+   key, which carries that key once; no log or diagnostic ever does.
 7. The desktop app stores no budget, reservation or journal of its own.
 
 ## Sequence
