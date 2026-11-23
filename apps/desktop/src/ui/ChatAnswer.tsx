@@ -106,7 +106,13 @@ export function ChatAnswer(props: Props) {
             />
           }
         >
-          {message.text ? 'Writing…' : 'Preparing response'}
+          {run?.phase === CHAT_PHASE.TOOLS
+            ? 'Using tools…'
+            : run?.phase === CHAT_PHASE.CONNECTING
+              ? 'Connecting…'
+              : message.text || run?.phase === CHAT_PHASE.RESPONDING
+                ? 'Writing…'
+                : 'Preparing response'}
         </AssistantProgress>
       )}
       {message.text ? (
