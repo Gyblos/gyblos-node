@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, useSyn
 
 import { AGENT_TOOLS, type AgentTool } from '@gyblos/node/agent-setup-constants';
 
-import { PREVIEW_DENSITY } from '../../../../lab/tools/desktop-preview/constants';
+import { CHAT_FILTER, CHAT_STATE, PREVIEW_DENSITY } from '../../../../lab/tools/desktop-preview/constants';
 import { DESKTOP_UPDATE } from '../constants';
 import { observeDesktopUpdates } from '../update-session';
 import { AddBuyerFunds } from './BuyerFunding';
@@ -944,10 +944,8 @@ const DAY_GROUPS = ['Today', 'Yesterday', 'Previous 7 days', 'Older'] as const;
 function dayGroup(days: number): (typeof DAY_GROUPS)[number] {
   return days < 1 ? 'Today' : days < 2 ? 'Yesterday' : days < 8 ? 'Previous 7 days' : 'Older';
 }
-const CHAT_FILTER = { ALL: 'All chats', UNREAD: 'Unread', PINNED: 'Pinned' } as const;
 type ChatFilter = (typeof CHAT_FILTER)[keyof typeof CHAT_FILTER];
 const CHAT_FILTERS = Object.values(CHAT_FILTER);
-const CHAT_STATE = { RUNNING: 'running', UNREAD: 'unread' } as const;
 type ChatState = (typeof CHAT_STATE)[keyof typeof CHAT_STATE];
 
 function PreviewChatState({ state }: { state: ChatState }) {

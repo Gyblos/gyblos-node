@@ -3,6 +3,12 @@ export const PREVIEW_DENSITY = {
   COMPACT: 'compact',
   COMFORTABLE: 'comfortable',
 } as const;
+export const CHAT_FILTER = {
+  ALL: 'All chats',
+  UNREAD: 'Unread',
+  PINNED: 'Pinned',
+} as const;
+export const CHAT_STATE = { RUNNING: 'running', UNREAD: 'unread' } as const;
 export const PREVIEW = {
   platform: 'darwin',
   nodeStartupMs: 3000,
