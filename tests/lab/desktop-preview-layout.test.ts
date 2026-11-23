@@ -343,7 +343,10 @@ void test('connection tool cards stretch with the sheet instead of snapping to e
     '.preview-tool-card',
     'grid-template-columns: minmax(0, 1fr);',
   );
-  assertCompact(css, '.preview-tool-card', 'width: 28px;');
+  assert.match(
+    css,
+    /html\[data-density='compact'\][^{]*\.preview-tool-card[^{]*\.preview-tool-logo \{[^}]*width: 28px;/,
+  );
   assertCompact(
     css,
     '.preview-tool-card .preview-tool-logo',
