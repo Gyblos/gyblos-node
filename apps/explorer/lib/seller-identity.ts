@@ -1,4 +1,4 @@
-import { DISPLAY, IDENTITY, UNITS } from './constants';
+import { DISPLAY, IDENTITY, SELLER_PAGE, UNITS } from './constants';
 import type { Seller } from './discovery-shape';
 import type { GithubAccount, NetworkStatus } from './network-status';
 import { uptimeRatio } from './offers';
@@ -110,4 +110,8 @@ export function notOnlineMeta(
     return `${verifiedShown} verified ${verifiedShown === 1 ? 'seller' : 'sellers'} not online`;
   const { offline, unpublished } = network.counts;
   return `${offline} offline · ${unpublished} not published`;
+}
+
+export function sellerHref(nodeId: string): string {
+  return `${SELLER_PAGE.path}/${encodeURIComponent(nodeId)}`;
 }

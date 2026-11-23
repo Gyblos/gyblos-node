@@ -15,6 +15,8 @@ Gyblos is an open market where anyone can sell, buy or give away AI inference. T
 - A seller is online when it has a live signed presence in the discovery index, offline when it was seen before but has none now, and not published when it was never seen or withdrew its catalog.
 - Channel transactions list the latest instructions of Gyblos payment channels on chain (channels whose open carries a Gyblos memo or whose distribute pays the Gyblos treasury), all time and newest first, not filtered by the range; `?before=<cursor>` pages to older ones. Each amount is per row (deposit in, newly settled, paid out or refunded) and must not be added up. The seller is shown when the channel's payout recipient equals the owner address of exactly one listed seller; that owner is self-declared, so it is a display hint, not proof. Otherwise the row says "Unlisted seller".
 - The page shows the last 7, 30 or 90 days (`?range=7`, `?range=30`, `?range=90`); 30 is the default.
+- Every table shows 25 rows per page, with its page in its own parameter: `sellersPage` (Sellers, after the verified filter and ordering), `offlinePage` (Not online), `modelsPage` (Models), `dailyPage` (Usage daily), `demandPage` (Unserved demand), `chainDailyPage` (Daily on chain) and `txPage` (Channel transactions, numbered alongside its `before` cursor). A missing, invalid or out-of-range page shows page 1, and every page link keeps the other parameters.
+- Each seller links to its own page at `/sellers/<NodeId>`; the ✓ links to the GitHub proof gist.
 
 ## Public data sources
 

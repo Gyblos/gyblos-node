@@ -21,11 +21,12 @@ import {
 import { getChainStats } from '../lib/chain-stats';
 import { DISPLAY, UNITS } from '../lib/constants';
 import { count, settlementCount, usdc, usdcDecimal, utc } from '../lib/format';
-import type { RangeDays } from '../lib/range';
+import { tablePage, tablePager, type ExplorerQuery } from '../lib/paging';
 import { Flow } from './board/animated-number';
 import { BarChartCard } from './board/bar-chart-card';
 import { delta, type Delta } from './board/delta';
 import { StatCard } from './board/stat-card';
+import { Pager } from './pager';
 import {
   moneyCell,
   numberCell,
@@ -60,7 +61,8 @@ function changes(current: ChainSummary['totals'], before: ChainSnapshot) {
   };
 }
 
-export async function PaymentsSection({ days }: { days: RangeDays }) {
+export async function PaymentsSection({ query }: { query: ExplorerQuery }) {
+  const { days } = query;
   const [chain, before] = await Promise.all([
     getChainStats(days),
     getChainStats(days, 1),
@@ -85,7 +87,7 @@ export async function PaymentsSection({ days }: { days: RangeDays }) {
         total={totals.settled}
         change={change?.settled[0]}
       />
-      <DailyTable summary={summary} />
+      <DailyTable query={query} summary={summary} />
     </>
   );
 }
@@ -186,8 +188,15 @@ function SettledChart({
   );
 }
 
-function DailyTable({ summary }: { summary: ChainSummary }) {
+function DailyTable({
+  query,
+  summary,
+}: {
+  query: ExplorerQuery;
+  summary: ChainSummary;
+}) {
   if (!summary.days.length) return null;
+  const page = tablePage(query, 'chainDaily', [...summary.days].reverse());
   return (
     <>
       <SectionTitle title="Daily on chain" />
@@ -204,7 +213,7 @@ function DailyTable({ summary }: { summary: ChainSummary }) {
           { label: 'All program txs', right: true },
         ]}
       >
-        {[...summary.days].reverse().map(({ day, gyblos, program }) => (
+        {page.rows.map(({ day, gyblos, program }) => (
           <tr key={day} className="border-t border-line">
             <td className={`${td} font-mono`}>{day}</td>
             <td className={numberCell}>{count(gyblos.opens)}</td>
@@ -221,6 +230,10 @@ function DailyTable({ summary }: { summary: ChainSummary }) {
           </tr>
         ))}
       </Table>
+      <Pager
+        label="Daily on chain"
+        view={tablePager(query, 'chainDaily', page)}
+      />
     </>
   );
 }

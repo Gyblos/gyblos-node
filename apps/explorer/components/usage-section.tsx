@@ -17,7 +17,7 @@ import {
 } from '../lib/collector';
 import { DISPLAY } from '../lib/constants';
 import { count, usdcDecimal } from '../lib/format';
-import type { RangeDays } from '../lib/range';
+import { tablePage, tablePager, type ExplorerQuery } from '../lib/paging';
 import {
   countText,
   dailyRequests,
@@ -34,6 +34,7 @@ import { Flow, FlowPair } from './board/animated-number';
 import { BarChartCard } from './board/bar-chart-card';
 import { delta, type Delta } from './board/delta';
 import { StatCard } from './board/stat-card';
+import { Pager } from './pager';
 import { numberCell, SectionTitle, Table, td, Unavailable } from './ui';
 
 const buyersText = (side: NetworkSide | null) =>
@@ -96,7 +97,8 @@ function changes(
   };
 }
 
-export async function UsageSection({ days }: { days: RangeDays }) {
+export async function UsageSection({ query }: { query: ExplorerQuery }) {
+  const { days } = query;
   const [snapshot, before] = await Promise.all([
     getCollector(days),
     getCollector(days, 1),
@@ -164,8 +166,8 @@ export async function UsageSection({ days }: { days: RangeDays }) {
         />
       </div>
       <RequestCharts days={snapshot.days} change={change?.requests ?? null} />
-      <DailyTable days={usage.active} />
-      <DemandTable demand={usage.demand} />
+      <DailyTable query={query} days={usage.active} />
+      <DemandTable query={query} demand={usage.demand} />
     </>
   );
 }
@@ -207,7 +209,14 @@ function RequestCharts({
   );
 }
 
-function DailyTable({ days }: { days: NetworkDay[] }) {
+function DailyTable({
+  query,
+  days,
+}: {
+  query: ExplorerQuery;
+  days: NetworkDay[];
+}) {
+  const page = tablePage(query, 'daily', [...days].reverse());
   const head = [
     { label: 'Day (UTC)' },
     ...figureHead('Seller first token'),
@@ -225,7 +234,7 @@ function DailyTable({ days }: { days: NetworkDay[] }) {
             </td>
           </tr>
         )}
-        {[...days].reverse().map((day) => (
+        {page.rows.map((day) => (
           <tr key={day.day} className="border-t border-line">
             <td className={`${td} font-mono`}>{day.day}</td>
             <FigureCells
@@ -240,12 +249,20 @@ function DailyTable({ days }: { days: NetworkDay[] }) {
           </tr>
         ))}
       </Table>
+      <Pager label="Daily" view={tablePager(query, 'daily', page)} />
     </>
   );
 }
 
-function DemandTable({ demand }: { demand: [string, number][] }) {
+function DemandTable({
+  query,
+  demand,
+}: {
+  query: ExplorerQuery;
+  demand: [string, number][];
+}) {
   if (!demand.length) return null;
+  const page = tablePage(query, 'demand', demand);
   return (
     <>
       <SectionTitle title="Unserved demand" />
@@ -256,7 +273,7 @@ function DemandTable({ demand }: { demand: [string, number][] }) {
           { label: 'Requests', right: true },
         ]}
       >
-        {demand.map(([model, requests]) => (
+        {page.rows.map(([model, requests]) => (
           <tr key={model} className="border-t border-line">
             <td className={td} title={model}>
               <span className="block max-w-full truncate">{model}</span>
@@ -265,6 +282,7 @@ function DemandTable({ demand }: { demand: [string, number][] }) {
           </tr>
         ))}
       </Table>
+      <Pager label="Unserved demand" view={tablePager(query, 'demand', page)} />
     </>
   );
 }

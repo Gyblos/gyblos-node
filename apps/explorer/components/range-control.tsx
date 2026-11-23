@@ -6,8 +6,8 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTransition } from 'react';
 
-import { rangeSwitchHref } from '../lib/chain-txs-shape';
 import { RANGE } from '../lib/constants';
+import { rangeSwitchHref } from '../lib/paging';
 import type { RangeDays } from '../lib/range';
 import { SegmentedControl } from './board/segmented-control';
 

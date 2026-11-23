@@ -88,6 +88,25 @@ export const DISPLAY = {
 
 export const CHAIN_TXS = {
   param: 'before',
+  pageRows: 25,
+} as const;
+
+export const PAGING = {
+  rowsPerPage: 25,
+  maxPageDigits: 6,
+  params: {
+    sellers: 'sellersPage',
+    offline: 'offlinePage',
+    models: 'modelsPage',
+    daily: 'dailyPage',
+    demand: 'demandPage',
+    chainDaily: 'chainDailyPage',
+    transactions: 'txPage',
+  },
+} as const;
+
+export const SELLER_PAGE = {
+  path: '/sellers',
 } as const;
 
 // The date range control: preset spans of UTC days ending today. The collector answers at most 92 days

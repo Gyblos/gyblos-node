@@ -7,14 +7,13 @@ import {
   chainTxsQuery,
   chainTxsUrl,
   parseChainTxs,
-  rangeSwitchHref,
   sellerOwners,
   txCursor,
-  txPageHref,
   txRow,
   type ChainTx,
 } from '@gyblos/explorer/chain-txs-shape';
 import { CHAIN_TXS, RANGE } from '@gyblos/explorer/constants';
+import { queryHref, rangeSwitchHref, readQuery } from '@gyblos/explorer/paging';
 import {
   CHAIN_INSTRUCTIONS,
   CHAIN_TX_PAGE,
@@ -218,6 +217,15 @@ void test('the seller is only the listed, unique owner of the channel payout rec
   );
   assert.equal(credited(distribute(), sellerOwners([])), null);
 });
+
+const txPageHref = (days: number, before: string | null, verified = false) =>
+  queryHref(
+    readQuery({
+      range: String(days),
+      verified: verified ? '1' : undefined,
+    }),
+    { before },
+  );
 
 void test('pager links keep the range and carry the cursor', () => {
   assert.equal(txPageHref(RANGE.defaultDays, null), '/');

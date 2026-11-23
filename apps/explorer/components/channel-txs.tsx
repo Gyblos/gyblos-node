@@ -2,11 +2,12 @@ import { ArrowUpRight } from 'lucide-react';
 import Link from 'next/link';
 
 import { getChainTxs } from '../lib/chain-txs';
-import { sellerOwners, txPageHref, txRow } from '../lib/chain-txs-shape';
+import { sellerOwners, txRow } from '../lib/chain-txs-shape';
 import { explorerAddressUrl, PAYMENT_PROGRAM_SOURCE_URL } from '../lib/config';
 import { DISPLAY } from '../lib/constants';
 import { getDiscovery } from '../lib/discovery-render';
-import type { RangeDays } from '../lib/range';
+import { queryHref, txPager, type ExplorerQuery } from '../lib/paging';
+import { Pager } from './pager';
 import {
   Addr,
   moneyCell,
@@ -89,51 +90,23 @@ function TxLine({ row, lookup }: { row: Row; lookup: boolean }) {
   );
 }
 
-function Pager({
-  days,
-  verified,
-  newest,
-  older,
-}: {
-  days: RangeDays;
-  verified: boolean;
-  newest: boolean;
-  older: string | null;
-}) {
-  if (!newest && !older) return null;
+function NewestLink({ query }: { query: ExplorerQuery }) {
+  if (!query.before) return null;
   return (
     <nav className="my-3 flex justify-end gap-4 font-mono text-xs text-muted">
-      {newest ? (
-        <Link
-          className={link}
-          href={txPageHref(days, null, verified)}
-          scroll={false}
-        >
-          Newest
-        </Link>
-      ) : null}
-      {older ? (
-        <Link
-          className={link}
-          href={txPageHref(days, older, verified)}
-          scroll={false}
-        >
-          Older
-        </Link>
-      ) : null}
+      <Link
+        className={link}
+        href={queryHref(query, { before: null })}
+        scroll={false}
+      >
+        Newest
+      </Link>
     </nav>
   );
 }
 
-export async function ChannelTxs({
-  days,
-  before,
-  verified,
-}: {
-  days: RangeDays;
-  before: string | null;
-  verified: boolean;
-}) {
+export async function ChannelTxs({ query }: { query: ExplorerQuery }) {
+  const { before } = query;
   const [page, discovery] = await Promise.all([
     getChainTxs(before),
     getDiscovery(),
@@ -149,12 +122,7 @@ export async function ChannelTxs({
         for Settle, paid out of the channel for Paid out and Refunded. Do not
         add them up.
       </p>
-      <Pager
-        days={days}
-        verified={verified}
-        newest={before !== null}
-        older={null}
-      />
+      <NewestLink query={query} />
       <Table minWidth={DISPLAY.wideTable} head={HEAD}>
         {page.transactions.length ? null : (
           <tr>
@@ -171,10 +139,8 @@ export async function ChannelTxs({
         })}
       </Table>
       <Pager
-        days={days}
-        verified={verified}
-        newest={before !== null}
-        older={page.next}
+        label={TITLE}
+        view={txPager(query, page.transactions.length, page.next)}
       />
     </>
   );

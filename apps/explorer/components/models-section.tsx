@@ -19,8 +19,9 @@ import {
   type Served,
 } from '../lib/model-table';
 import { summarizeOffers } from '../lib/offers';
-import type { RangeDays } from '../lib/range';
+import { tablePage, tablePager, type ExplorerQuery } from '../lib/paging';
 import { pair } from '../lib/usage';
+import { Pager } from './pager';
 import {
   ModelName,
   moneyCell,
@@ -52,7 +53,8 @@ function price(now: ModelRow['now']): { text: string; money: boolean } {
   };
 }
 
-export async function ModelsSection({ days }: { days: RangeDays }) {
+export async function ModelsSection({ query }: { query: ExplorerQuery }) {
+  const { days } = query;
   const [discovery, collector] = await Promise.all([
     getDiscovery(),
     getCollector(days),
@@ -63,6 +65,7 @@ export async function ModelsSection({ days }: { days: RangeDays }) {
     offersKnown ? summarizeOffers(discovery).models : new Map(),
     collector.error ? [] : collector.models,
   );
+  const page = tablePage(query, 'models', rows);
   return (
     <>
       <SectionTitle
@@ -91,7 +94,7 @@ export async function ModelsSection({ days }: { days: RangeDays }) {
             </td>
           </tr>
         )}
-        {rows.map((row) => (
+        {page.rows.map((row) => (
           <ModelRowView
             key={`${row.modelId}:${row.variant}:${row.quantization}`}
             row={row}
@@ -99,6 +102,7 @@ export async function ModelsSection({ days }: { days: RangeDays }) {
           />
         ))}
       </Table>
+      <Pager label="Models" view={tablePager(query, 'models', page)} />
       {discovery.datedAt ? (
         <p className="mt-1 text-xs text-dim">
           Offers as of {utc(discovery.datedAt)}.

@@ -1,7 +1,6 @@
 import { explorerTxUrl } from './config';
-import { CHAIN_TXS, DISPLAY, IDENTITY, RANGE } from './constants';
+import { CHAIN_TXS, DISPLAY } from './constants';
 import { short, usdcFixed, utcMinute } from './format';
-import type { RangeDays } from './range';
 import {
   integerText,
   list,
@@ -161,26 +160,4 @@ export function txRow(
     ),
     href: explorerTxUrl(tx.signature),
   };
-}
-
-export function txPageHref(
-  days: RangeDays,
-  before: string | null,
-  verified = false,
-) {
-  const params = new URLSearchParams();
-  if (days !== RANGE.defaultDays) params.set(RANGE.param, String(days));
-  if (verified) params.set(IDENTITY.verifiedParam, IDENTITY.verifiedValue);
-  if (before) params.set(CHAIN_TXS.param, before);
-  const query = params.toString();
-  return query ? `/?${query}` : '/';
-}
-
-export function rangeSwitchHref(search: string, days: RangeDays) {
-  const params = new URLSearchParams(search);
-  return txPageHref(
-    days,
-    txCursor(params.get(CHAIN_TXS.param)),
-    params.get(IDENTITY.verifiedParam) === IDENTITY.verifiedValue,
-  );
 }
