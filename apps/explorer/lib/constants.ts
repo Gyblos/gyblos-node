@@ -171,3 +171,8 @@ export const IDENTITY = {
   hashOffset: 2_166_136_261,
   hashPrime: 16_777_619,
 } as const;
+
+export const SELLER_NAME = {
+  hint: 'self-chosen name, not verified',
+  unsafe: /[@✓✔✅☑\p{Cc}\p{Cf}]/u,
+} as const;

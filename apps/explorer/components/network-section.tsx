@@ -9,25 +9,19 @@ import { HOW_TO_VERIFY_URL } from '../lib/config';
 import { DISPLAY, PAGING } from '../lib/constants';
 import type { DiscoverySnapshot, Seller } from '../lib/discovery';
 import { getDiscovery } from '../lib/discovery-render';
-import { count, percent, pricePerMtok, short, usdc, utc } from '../lib/format';
-import {
-  notOnline,
-  type GithubAccount,
-  type NetworkStatus,
-} from '../lib/network-status';
+import { count, percent, pricePerMtok, usdc, utc } from '../lib/format';
+import type { GithubAccount } from '../lib/network-status';
 import { summarizeOffers, uptimeRatio } from '../lib/offers';
 import { queryHref, tablePager, type ExplorerQuery } from '../lib/paging';
 import {
   emptySellersMessage,
   githubByNode,
   namesByNode,
-  notOnlineMeta,
   offersCaption,
   orderSellers,
   sellerHref,
   verifiedOnly,
 } from '../lib/seller-identity';
-import { SELLER_STATUS_LABELS } from '../lib/seller-profile';
 import { Flow } from './board/animated-number';
 import { Chip } from './board/chip';
 import { StatCard } from './board/stat-card';
@@ -188,7 +182,8 @@ function SellersBlock({
         <span>
           The discovery index checked that the named GitHub account published
           the seller&apos;s NodeId. It links the seller to that account; it does
-          not identify a person and says nothing about quality.{' '}
+          not identify a person and says nothing about quality. Names under an
+          account are chosen by sellers and not verified.{' '}
           <a className="text-muted hover:text-brand" href={HOW_TO_VERIFY_URL}>
             How to verify
           </a>

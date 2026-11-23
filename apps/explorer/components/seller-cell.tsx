@@ -3,12 +3,11 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 import { gistUrl } from '../lib/config';
+import { SELLER_NAME } from '../lib/constants';
 import { short } from '../lib/format';
 import type { GithubAccount } from '../lib/network-status';
-import { sellerHref } from '../lib/seller-identity';
+import { sellerHref, sellerNameHint } from '../lib/seller-identity';
 import { Identicon } from './identicon';
-
-const SELLER_NAME_TITLE = 'Self-chosen name, not verified';
 
 export function SellerCell({
   nodeId,
@@ -34,17 +33,7 @@ export function SellerCell({
         <Identicon nodeId={nodeId} />
       )}
       <div className="min-w-0">
-        {name ? (
-          <div
-            className="truncate font-sans text-ink"
-            title={SELLER_NAME_TITLE}
-          >
-            <bdi>{name}</bdi>
-          </div>
-        ) : null}
-        <div
-          className={`flex items-center gap-1 font-mono${name ? ' text-xs' : ''}`}
-        >
+        <div className="flex items-center gap-1 font-mono">
           {href ? (
             <Link className="text-ink hover:text-brand" href={href}>
               {label}
@@ -66,6 +55,15 @@ export function SellerCell({
             </a>
           ) : null}
         </div>
+        {name ? (
+          <div
+            className="max-w-56 truncate font-sans text-xs text-dim"
+            title={sellerNameHint(name)}
+          >
+            <bdi>{name}</bdi>
+            <span className="sr-only">, {SELLER_NAME.hint}</span>
+          </div>
+        ) : null}
         {children ? <div className="text-xs text-dim">{children}</div> : null}
       </div>
     </div>
