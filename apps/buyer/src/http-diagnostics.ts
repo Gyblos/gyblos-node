@@ -12,6 +12,10 @@ import {
 } from '@gyblos/payments-upto/batch-session';
 import { BatchChannelError } from '@gyblos/protocol/batch-channel';
 import {
+  BUYER_KEY_CODES,
+  BuyerApiKeyError,
+} from '@gyblos/protocol/buyer-api-keys';
+import {
   FREE_EXECUTION_CODES,
   PAYMENT_ERROR_CODES,
   PROTOCOL_ERROR_CODES,
@@ -55,6 +59,7 @@ const CODES = [
   ...Object.values(PAYMENT_ERROR_CODES),
   ...Object.values(PAID_EXECUTION_CODES),
   ...Object.values(BUYER_ROUTING_CODES),
+  ...Object.values(BUYER_KEY_CODES),
   ...BATCH_SDK_DIAGNOSTIC_CODES,
 ];
 function failureCode(error: unknown) {
@@ -73,7 +78,8 @@ function failureCode(error: unknown) {
       error instanceof PaidBuyerError ||
       error instanceof BuyerRoutingError ||
       error instanceof UnsentSellerBusyError ||
-      error instanceof UnsentChannelRequestError
+      error instanceof UnsentChannelRequestError ||
+      error instanceof BuyerApiKeyError
     ) {
       const code: unknown = error.code;
       const known = CODES.find((item) => item === code);

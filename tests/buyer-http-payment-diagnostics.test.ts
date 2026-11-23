@@ -12,6 +12,10 @@ import { PaidBuyerError } from '@gyblos/node/buyer-paid-error';
 import { UnsentSellerBusyError } from '@gyblos/node/buyer-routing';
 import { UnsentChannelRequestError } from '@gyblos/node/buyer-session';
 import { BatchChannelError } from '@gyblos/protocol/batch-channel';
+import {
+  BUYER_KEY_CODES,
+  BuyerApiKeyError,
+} from '@gyblos/protocol/buyer-api-keys';
 import { PAYMENT_ERROR_CODES } from '@gyblos/protocol/constants';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import { PaymentError } from '@gyblos/protocol/payment';
@@ -93,4 +97,9 @@ void test('buyer HTTP failures keep routing and unsent channel codes', () => {
     ).code,
     SESSION_CODES.UNAVAILABLE,
   );
+});
+
+void test('buyer HTTP failures keep API key codes', () => {
+  for (const code of Object.values(BUYER_KEY_CODES))
+    assert.equal(failed(new BuyerApiKeyError(code)).code, code);
 });
