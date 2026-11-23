@@ -61,6 +61,7 @@ None of these needs a funded wallet, engine or Docker. `gate:*`, funding, identi
 - Boundaries and lint errors are enforcing; never suppress, baseline or cast around them. Lint warnings must not grow.
 - Source comment budgets are exact per file; a changed file may not gain a comment whose text is not in the base.
 - One canonical definition per owned discrete value (`as const` in the owning `constants.ts`, type derived from it); for example use `INFERENCE_EVIDENCE_CODES.ASSERTION_FAILED`, never a second `'ASSERTION_FAILED'` literal. Details: [docs/code-standards.md](docs/code-standards.md).
+- All code is TypeScript, including scripts, tooling and configuration: never add a `.mjs`, `.cjs` or `.js` file.
 - No `any`, no widening closed types to `string`, no object-literal `as`, no floating promises, one declaration per `const`/`let`. Parse external input as `unknown` and validate at the boundary.
 - Delete code no product path uses: when a replacement is ready, remove the old path with its tests, scripts, docs and workspace entries instead of keeping it "for compatibility". Reachability from product entry points (seller daemon and `gyblos` CLI, buyer commands, desktop, Workers) decides; a test, lab gate or doc that is its only user does not keep it alive. This applies to every app and package.
 - Paid inference uses payment channels (payment sessions) only. Never add a new per-request payment path.

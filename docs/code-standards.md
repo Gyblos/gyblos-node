@@ -47,7 +47,8 @@ or, if the rule is wrong, change the rule in a separate tooling PR with a test.
 
 - Keep functions focused on one named step. Use descriptive names; `i` and `tx`
   are permitted.
-- New code is TypeScript, not MJS.
+- All code is TypeScript, including scripts, tooling and configuration. Do not
+  add `.mjs`, `.cjs` or `.js` files.
 - Use four import groups separated by blank lines: Node builtins, external
   packages, `@gyblos/*` packages, then relative imports. `pnpm format` sorts
   them.
