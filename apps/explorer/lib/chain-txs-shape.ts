@@ -102,14 +102,22 @@ export function parseChainTxs(value: unknown): Omit<ChainTxPage, 'error'> {
   };
 }
 
-export function chainTxsQuery(before: string | null) {
+export function chainTxsQuery(
+  before: string | null,
+  recipient: string | null = null,
+) {
   const params = new URLSearchParams();
   if (before) params.set(CHAIN_TXS.param, before);
+  if (recipient) params.set(CHAIN_TXS.recipientParam, recipient);
   return params.toString();
 }
 
-export function chainTxsUrl(collector: string, before: string | null) {
-  const query = chainTxsQuery(before);
+export function chainTxsUrl(
+  collector: string,
+  before: string | null,
+  recipient: string | null = null,
+) {
+  const query = chainTxsQuery(before, recipient);
   return `${collector}/stats/chain/txs${query ? `?${query}` : ''}`;
 }
 

@@ -24,6 +24,8 @@
     "./offers": "./lib/offers.ts",
     "./range": "./lib/range.ts",
     "./seller-identity": "./lib/seller-identity.ts",
+    "./seller-page": "./lib/seller-page.ts",
+    "./seller-profile": "./lib/seller-profile.ts",
     "./usage": "./lib/usage.ts"
   },
   "scripts": {

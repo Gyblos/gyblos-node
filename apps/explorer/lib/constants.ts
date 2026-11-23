@@ -88,6 +88,7 @@ export const DISPLAY = {
 
 export const CHAIN_TXS = {
   param: 'before',
+  recipientParam: 'recipient',
 } as const;
 
 // The date range control: preset spans of UTC days ending today. The collector answers at most 92 days
@@ -117,4 +118,11 @@ export const IDENTITY = {
   cellPx: 4,
   hashOffset: 2_166_136_261,
   hashPrime: 16_777_619,
+} as const;
+
+export const SELLER_PAGE = {
+  path: '/sellers',
+  modelsParam: 'models',
+  dailyParam: 'daily',
+  rowsPerPage: 25,
 } as const;

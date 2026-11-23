@@ -10,15 +10,12 @@ import {
   Wallet,
 } from 'lucide-react';
 
-import {
-  getCollector,
-  type NetworkDay,
-  type NetworkSide,
-} from '../lib/collector';
+import { getCollector, type NetworkDay } from '../lib/collector';
 import { DISPLAY } from '../lib/constants';
 import { count, usdcDecimal } from '../lib/format';
 import type { RangeDays } from '../lib/range';
 import {
+  buyersText,
   countText,
   dailyRequests,
   latencyText,
@@ -36,12 +33,6 @@ import { delta, type Delta } from './board/delta';
 import { StatCard } from './board/stat-card';
 import { numberCell, SectionTitle, Table, td, Unavailable } from './ui';
 
-const buyersText = (side: NetworkSide | null) =>
-  !side
-    ? '—'
-    : side.withheld
-      ? `< ${DISPLAY.minPublicBuyers}`
-      : count(side.buyers ?? 0);
 // One row's "free · paid" figure cells.
 function FigureCells({
   free,
