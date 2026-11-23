@@ -227,3 +227,47 @@ void test('compact loading and shortcut hints stay accessible', async () => {
     /label="New chat"\s+aria-keyshortcuts=\{previewShortcut\(PREVIEW_SHORTCUT\.NEW_CHAT\)\.aria\}/,
   );
 });
+
+void test('compact pills, buttons, icons, digits and code line numbers', async () => {
+  const [css, kit] = await Promise.all([
+    read('preview.css'),
+    read('views/PreviewKit.tsx.preview'),
+  ]);
+  const compact = (selector: string, declaration: string) =>
+    assert.ok(
+      new RegExp(
+        String.raw`html\[data-density='compact'\][^{]*` +
+          selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') +
+          String.raw`[^{]*\{[^}]*` +
+          declaration.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+      ).test(css),
+      selector + ' ' + declaration,
+    );
+  compact('.pk-tag', 'height: 18px;');
+  compact('.ui-badge', 'font-size: 11px;');
+  compact('.ui-icon-tile', 'width: 28px;');
+  compact('.ui-icon-tile', 'width: 16px;');
+  compact('.preview-metric-icon', 'width: 24px;');
+  compact(
+    '.ui-button:not(.ui-icon-button, .ui-menu-trigger)',
+    '--control-size: 24px;',
+  );
+  assert.match(
+    css,
+    /html\[data-density='compact'\] \.app\.desktop-frame \{[^}]*--shell-control-size: 28px;/,
+  );
+  assert.match(
+    css,
+    /html\[data-font='inter'\] \.app\.desktop-frame \{\s*--preview-ui-type:\s*'Gyblos Digits', InterVariable/,
+  );
+  assert.match(
+    css,
+    /html\[data-font='inter'\] \.desktop-frame \{\s*font-family:\s*'Gyblos Digits', InterVariable/,
+  );
+  assert.match(kit, /className="pk-code-line"/);
+  assert.match(
+    css,
+    /\.pk-code-line::before \{[^}]*counter-increment: pk-code-line;/,
+  );
+  assert.match(css, /user-select: none;/);
+});
