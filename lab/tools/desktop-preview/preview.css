@@ -4096,9 +4096,6 @@ html[data-density='compact']
   ) {
   font-size: var(--ui-font);
 }
-html[data-density='compact'] .app.desktop-frame .preview-metric-card dd > span {
-  font-size: 22px;
-}
 html[data-density='compact']
   .app.desktop-frame
   :is(.pk-tag, .ui-badge):not(.pk-badge-line .pk-tag) {
@@ -4147,7 +4144,7 @@ html[data-density='compact']
   border-radius: var(--radius-panel);
 }
 html[data-density='compact'] .app.desktop-frame .content .preview-metric-grid {
-  gap: 12px;
+  gap: var(--space-3);
 }
 html[data-density='compact'] .app.desktop-frame .content .preview-metric-card {
   padding: 12px 14px;
@@ -4158,11 +4155,10 @@ html[data-density='compact'] .app.desktop-frame .preview-metric-card dt {
 html[data-density='compact'] .app.desktop-frame .preview-metric-card dd > span {
   font-size: 18px;
   line-height: 24px;
-  white-space: nowrap;
 }
 html[data-density='compact'] .app.desktop-frame .preview-tool-guide {
-  gap: 16px;
-  padding: 16px;
+  gap: var(--space-4);
+  padding: var(--space-4);
 }
 html[data-density='compact']
   .app.desktop-frame
@@ -4185,7 +4181,7 @@ html[data-density='compact']
 html[data-density='compact'] .app.desktop-frame .preview-steps li {
   grid-template-columns: 20px minmax(0, 1fr);
   column-gap: 10px;
-  padding-bottom: 16px;
+  padding-bottom: var(--space-4);
 }
 html[data-density='compact'] .app.desktop-frame .preview-steps li:last-child {
   padding-bottom: 0;

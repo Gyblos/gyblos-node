@@ -150,9 +150,9 @@ previous density for comparison.
   24 px.
 - Digits keep the fixed-width `Gyblos Digits` face under Inter as well.
 - Headings: 15 px section titles, 16 px page intros and the tool guide; 18 px
-  metric values on one line. Chat messages stay at 14 px for reading.
-- Cards (metric, settings, payment methods, tables, tool guide, tool and
-  application cards) share `--radius-panel`; metric cards pad 12 / 14 px with
+  metric values. Chat messages stay at 14 px for reading.
+- Cards (metric, settings, payment methods, tables, lists, tool guide,
+  limit, tool and application cards) share `--radius-panel`; metric cards pad 12 / 14 px with
   12 px labels. Help and detail text is 12 px. Tool guide steps use 20 px
   markers with 12 px glyphs and a 28 px tool logo.
 - Settings rows, forms and empty states keep 20 px of inner spacing

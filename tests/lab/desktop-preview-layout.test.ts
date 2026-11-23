@@ -4,6 +4,17 @@ import test from 'node:test';
 
 const preview = new URL('../../lab/tools/desktop-preview/', import.meta.url);
 const read = (name: string) => readFile(new URL(name, preview), 'utf8');
+const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const assertCompact = (css: string, selector: string, declaration: string) =>
+  assert.ok(
+    new RegExp(
+      String.raw`html\[data-density='compact'\][^{]*` +
+        escape(selector) +
+        String.raw`[^{]*\{(?:[^}]*[\s;])?` +
+        escape(declaration),
+    ).test(css.replace(/\s+/g, ' ')),
+    selector + ' ' + declaration,
+  );
 
 void test('the sidebar splits into an icon rail and a conversation panel with pinned and dated groups', async () => {
   const sidebar = await read('views/BuyerSidebar.tsx.preview');
@@ -145,7 +156,7 @@ void test('compact density is the default and ?density=comfortable restores the 
   );
   assert.match(
     css,
-    /html\[data-density='compact'\][^{]*\.preview-metric-card dd > span[^{]*\{[^}]*font-size: 22px;/,
+    /html\[data-density='compact'\][^{]*\.preview-metric-card dd > span[^{]*\{[^}]*font-size: 18px;/,
   );
   assert.match(browser, /dataset\.density = 'compact'/);
   assert.match(browser, /compact && !query\.has\('font'\)/);
@@ -234,15 +245,7 @@ void test('compact pills, buttons, icons, digits and code line numbers', async (
     read('views/PreviewKit.tsx.preview'),
   ]);
   const compact = (selector: string, declaration: string) =>
-    assert.ok(
-      new RegExp(
-        String.raw`html\[data-density='compact'\][^{]*` +
-          selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') +
-          String.raw`[^{]*\{[^}]*` +
-          declaration.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
-      ).test(css.replace(/\s+/g, ' ')),
-      selector + ' ' + declaration,
-    );
+    assertCompact(css, selector, declaration);
   compact(
     ':is(.pk-tag, .ui-badge):not(.pk-badge-line .pk-tag)',
     'height: 18px;',
@@ -284,21 +287,17 @@ void test('compact pills, buttons, icons, digits and code line numbers', async (
 void test('compact cards and connection steps use the compact scale', async () => {
   const css = (await read('preview.css')).replace(/\s+/g, ' ');
   const compact = (selector: string, declaration: string) =>
-    assert.ok(
-      new RegExp(
-        String.raw`html\[data-density='compact'\][^{]*` +
-          selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') +
-          String.raw`[^{]*\{[^}]*` +
-          declaration.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
-      ).test(css),
-      selector + ' ' + declaration,
-    );
+    assertCompact(css, selector, declaration);
   compact('.preview-metric-card', 'padding: 12px 14px;');
   compact('.preview-metric-card', 'border-radius: var(--radius-panel);');
   compact('.preview-metric-card dt', 'font-size: var(--ui-detail);');
   compact('.preview-metric-card dd > span', 'font-size: 18px;');
-  compact('.preview-metric-card dd > span', 'white-space: nowrap;');
-  compact('.preview-tool-guide', 'padding: 16px;');
+  assert.doesNotMatch(
+    css,
+    /html\[data-density='compact'\][^{]*preview-metric-card dd > span \{[^}]*white-space: nowrap/,
+    'long metric values wrap instead of overflowing narrow cards',
+  );
+  compact('.preview-tool-guide', 'padding: var(--space-4);');
   compact('.preview-tool-logo', 'width: 28px;');
   compact('.preview-steps li > span', 'width: 20px;');
   compact('.preview-steps li > span svg', 'width: 12px;');
