@@ -513,9 +513,11 @@ since when. `--cancel` signs a cancel claim, so the index stops linking the
 seller to the account, and removes the progress file. The gist stays on GitHub;
 delete it yourself, or, when other sellers share it, remove only this seller's
 line, since deleting it turns their verified links `lost` at their next check.
-Only `verified` means the index found the proof. The command prints public
-identifiers only (NodeId, account, gist URL and the index origin), never a key
-or the home location.
+Only `verified` means the index found the proof; the explorer
+(https://explorer.gyblos.com) then shows `@<user>` with a ✓ next to the seller,
+and its `Verified only` filter (`?verified=1`) lists only such sellers. The
+command prints public identifiers only (NodeId, account, gist URL and the index
+origin), never a key or the home location.
 
 ### Docker
 

@@ -250,3 +250,14 @@ void test('the newest page URL has no empty query, so it shares the collector ca
     `https://c.test/v1/stats/chain/txs?before=${CURSOR}`,
   );
 });
+
+void test('transaction pages keep the verified seller filter', () => {
+  assert.equal(
+    txPageHref(7, CURSOR, true),
+    `/?range=7&verified=1&before=${CURSOR}`,
+  );
+  assert.equal(
+    rangeSwitchHref(`verified=1&before=${CURSOR}`, 30),
+    `/?verified=1&before=${CURSOR}`,
+  );
+});

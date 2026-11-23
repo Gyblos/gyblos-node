@@ -10,8 +10,10 @@
     "./chain-shape": "./lib/chain-shape.ts",
     "./chain-txs-shape": "./lib/chain-txs-shape.ts",
     "./collector-shape": "./lib/collector-shape.ts",
+    "./config": "./lib/config.ts",
     "./constants": "./lib/constants.ts",
     "./discovery": "./lib/discovery.ts",
+    "./discovery-shape": "./lib/discovery-shape.ts",
     "./discovery-snapshot": "./lib/discovery-snapshot.ts",
     "./fetch-json": "./lib/fetch-json.ts",
     "./format": "./lib/format.ts",
@@ -21,6 +23,7 @@
     "./network-status": "./lib/network-status.ts",
     "./offers": "./lib/offers.ts",
     "./range": "./lib/range.ts",
+    "./seller-identity": "./lib/seller-identity.ts",
     "./usage": "./lib/usage.ts"
   },
   "scripts": {

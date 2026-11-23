@@ -91,10 +91,12 @@ function TxLine({ row, lookup }: { row: Row; lookup: boolean }) {
 
 function Pager({
   days,
+  verified,
   newest,
   older,
 }: {
   days: RangeDays;
+  verified: boolean;
   newest: boolean;
   older: string | null;
 }) {
@@ -102,12 +104,20 @@ function Pager({
   return (
     <nav className="my-3 flex justify-end gap-4 font-mono text-xs text-muted">
       {newest ? (
-        <Link className={link} href={txPageHref(days, null)} scroll={false}>
+        <Link
+          className={link}
+          href={txPageHref(days, null, verified)}
+          scroll={false}
+        >
           Newest
         </Link>
       ) : null}
       {older ? (
-        <Link className={link} href={txPageHref(days, older)} scroll={false}>
+        <Link
+          className={link}
+          href={txPageHref(days, older, verified)}
+          scroll={false}
+        >
           Older
         </Link>
       ) : null}
@@ -118,9 +128,11 @@ function Pager({
 export async function ChannelTxs({
   days,
   before,
+  verified,
 }: {
   days: RangeDays;
   before: string | null;
+  verified: boolean;
 }) {
   const [page, discovery] = await Promise.all([
     getChainTxs(before),
@@ -137,7 +149,12 @@ export async function ChannelTxs({
         for Settle, paid out of the channel for Paid out and Refunded. Do not
         add them up.
       </p>
-      <Pager days={days} newest={before !== null} older={null} />
+      <Pager
+        days={days}
+        verified={verified}
+        newest={before !== null}
+        older={null}
+      />
       <Table minWidth={DISPLAY.wideTable} head={HEAD}>
         {page.transactions.length ? null : (
           <tr>
@@ -153,7 +170,12 @@ export async function ChannelTxs({
           return <TxLine key={row.key} row={row} lookup={lookup} />;
         })}
       </Table>
-      <Pager days={days} newest={before !== null} older={page.next} />
+      <Pager
+        days={days}
+        verified={verified}
+        newest={before !== null}
+        older={page.next}
+      />
     </>
   );
 }

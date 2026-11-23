@@ -22,3 +22,9 @@ export const explorerTxUrl = (signature: string) =>
 
 export const PAYMENT_PROGRAM_SOURCE_URL =
   'https://github.com/solana-foundation/payment-channels/tree/0c07d5751c8972abf6a219570a3f39a72f46f879';
+
+export const HOW_TO_VERIFY_URL =
+  'https://docs.gyblos.com/en/sellers/identity#verify-github';
+
+export const gistUrl = (github: { account: string; gist: string }) =>
+  `https://gist.github.com/${github.account}/${github.gist}`;

@@ -13,7 +13,7 @@ import { RangeControl } from '../components/range-control';
 import { Loading } from '../components/ui';
 import { UsageSection } from '../components/usage-section';
 import { txCursor } from '../lib/chain-txs-shape';
-import { CHAIN_TXS, RANGE } from '../lib/constants';
+import { CHAIN_TXS, IDENTITY, RANGE } from '../lib/constants';
 import { parseRange } from '../lib/range';
 
 // Every request renders. The collector caches its answers at its own edge (5 minutes); the discovery
@@ -28,6 +28,7 @@ export default async function Home({
   const params = await searchParams;
   const days = parseRange(params[RANGE.param]);
   const before = txCursor(params[CHAIN_TXS.param]);
+  const verified = params[IDENTITY.verifiedParam] === IDENTITY.verifiedValue;
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pb-16 sm:px-6">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line py-5">
@@ -42,7 +43,7 @@ export default async function Home({
         </div>
       </header>
       <Suspense fallback={<Loading />}>
-        <NetworkSection />
+        <NetworkSection days={days} verified={verified} />
       </Suspense>
       <Suspense fallback={<Loading />}>
         <ModelsSection days={days} />
@@ -54,7 +55,7 @@ export default async function Home({
         <PaymentsSection days={days} />
       </Suspense>
       <Suspense fallback={<Loading />}>
-        <ChannelTxs days={days} before={before} />
+        <ChannelTxs days={days} before={before} verified={verified} />
       </Suspense>
     </div>
   );

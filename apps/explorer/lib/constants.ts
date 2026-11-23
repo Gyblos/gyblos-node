@@ -108,3 +108,13 @@ export const LIVE = {
   // How often the "updated … ago" label is redrawn.
   labelMs: 5 * 1000,
 } as const;
+
+export const IDENTITY = {
+  verifiedParam: 'verified',
+  verifiedValue: '1',
+  bandsPerUnit: 100,
+  gridSize: 5,
+  cellPx: 4,
+  hashOffset: 2_166_136_261,
+  hashPrime: 16_777_619,
+} as const;

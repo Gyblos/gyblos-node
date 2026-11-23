@@ -15,12 +15,17 @@ import {
 export const NODE_STATES = ['online', 'offline', 'unpublished'] as const;
 export type NodeState = (typeof NODE_STATES)[number];
 
+export interface GithubAccount {
+  account: string;
+  gist: string;
+}
 export interface NetworkNode {
   nodeId: string;
   state: NodeState;
   firstSeenAt: number | null;
   lastSeenAt: number | null;
   models: string[];
+  github: GithubAccount | null;
 }
 export interface NetworkStatus {
   counts: {
@@ -40,6 +45,14 @@ function state(value: unknown): NodeState {
   if (!known) throw new SourceShapeError('node.state');
   return known;
 }
+function github(value: unknown): GithubAccount | null {
+  if (value === undefined || value === null) return null;
+  const source = record(value, 'node.github');
+  return {
+    account: text(source.account, 'node.github.account'),
+    gist: text(source.gist, 'node.github.gist'),
+  };
+}
 const time = (value: unknown, where: string) =>
   nullable(value, (present) => num(present, where));
 
@@ -53,6 +66,7 @@ function node(value: unknown): NetworkNode {
     models: list(source.models, 'node.models').map((model) =>
       text(model, 'node.model'),
     ),
+    github: github(source.github),
   };
 }
 
@@ -76,3 +90,14 @@ export function parseNetworkStatus(value: unknown): NetworkStatus {
 // The sellers not online now, most recently seen first (the index's own order is kept).
 export const notOnline = (status: NetworkStatus) =>
   status.nodes.filter((entry) => entry.state !== 'online');
+
+export const normalizeNetwork = (
+  status: NetworkStatus | null,
+): NetworkStatus | null =>
+  status && {
+    ...status,
+    nodes: status.nodes.map((node) => ({
+      ...node,
+      github: node.github ?? null,
+    })),
+  };
