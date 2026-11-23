@@ -240,7 +240,7 @@ void test('compact pills, buttons, icons, digits and code line numbers', async (
           selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') +
           String.raw`[^{]*\{[^}]*` +
           declaration.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
-      ).test(css),
+      ).test(css.replace(/\s+/g, ' ')),
       selector + ' ' + declaration,
     );
   compact(
@@ -252,7 +252,7 @@ void test('compact pills, buttons, icons, digits and code line numbers', async (
   compact('.ui-icon-tile', 'width: 16px;');
   compact('.preview-metric-icon', 'width: 24px;');
   compact(
-    '.ui-button:not(.ui-icon-button, .ui-menu-trigger, .pk-switch, .pk-update)',
+    '.ui-button:not( .ui-icon-button, .ui-menu-trigger, .pk-switch, .pk-update, .theme-switch, dialog .ui-button )',
     '--control-size: 24px;',
   );
   assert.match(
@@ -273,4 +273,10 @@ void test('compact pills, buttons, icons, digits and code line numbers', async (
     /\.pk-code-line::before \{[^}]*counter-increment: pk-code-line;/,
   );
   assert.match(css, /\.pk-code-line::before \{[^}]*user-select: none;/);
+  assert.match(
+    css,
+    /\.pk-code-line \{[^}]*width: max-content;[^}]*min-width: 100%;/,
+  );
+  assert.match(css, /\.pk-code-line::before \{[^}]*padding-inline: 12px;/);
+  assert.doesNotMatch(css, /\.pk-code-line::before \{[^}]*margin-right/);
 });
