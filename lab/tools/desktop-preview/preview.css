@@ -3521,6 +3521,8 @@ html .app.desktop-frame .pk-code pre {
 }
 .desktop-frame .pk-code-line {
   display: block;
+  width: max-content;
+  min-width: 100%;
 }
 .desktop-frame .pk-code-line::before {
   counter-increment: pk-code-line;
@@ -3529,8 +3531,7 @@ html .app.desktop-frame .pk-code pre {
   left: 0;
   display: inline-block;
   min-width: 2ch;
-  margin-right: 12px;
-  padding-inline: 12px 0;
+  padding-inline: 12px;
   background: var(--raised);
   color: color-mix(in srgb, var(--muted) 70%, transparent);
   text-align: right;
@@ -4109,7 +4110,14 @@ html[data-density='compact'] .app.desktop-frame .preview-metric-icon svg {
 html[data-density='compact']
   .app.desktop-frame
   .content
-  .ui-button:not(.ui-icon-button, .ui-menu-trigger, .pk-switch, .pk-update) {
+  .ui-button:not(
+    .ui-icon-button,
+    .ui-menu-trigger,
+    .pk-switch,
+    .pk-update,
+    .theme-switch,
+    dialog .ui-button
+  ) {
   --control-size: 24px;
   height: var(--control-size);
   min-height: var(--control-size);
