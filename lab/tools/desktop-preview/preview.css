@@ -524,20 +524,6 @@ html .app.desktop-frame .content .preview-simple-table .ui-inline-actions {
   justify-content: flex-end;
   gap: 6px;
 }
-.desktop-frame .preview-model-menu .preview-model-group[data-open='true'] {
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--ink) 3%, transparent);
-}
-.desktop-frame .preview-model-menu .preview-seller-list {
-  display: grid;
-  margin: 0 0 4px 22px;
-  padding-left: 8px;
-  border-left: 1px solid var(--line);
-}
-.desktop-frame .preview-model-menu .preview-seller-list .dropdown-row {
-  min-height: 0;
-  padding-block: 6px;
-}
 .desktop-frame .preview-limit-card {
   display: grid;
   gap: 12px;
@@ -888,10 +874,6 @@ html .app.desktop-frame .preview-pin[aria-pressed='true'] {
   margin-left: auto;
   font-size: 12px;
 }
-.desktop-frame .preview-model-menu,
-.desktop-frame .preview-model-menu [role='menu'] {
-  scrollbar-gutter: stable;
-}
 .desktop-frame .pk-delta {
   color: var(--pk-tone);
   font-size: 12px;
@@ -992,15 +974,6 @@ html .app.desktop-frame .pk-chips button:focus-visible {
     transition: none;
   }
 }
-html .app.desktop-frame .preview-model-menu {
-  max-height: min(520px, calc(100vh - 140px));
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-html .app.desktop-frame .preview-model-menu [role='menu'] {
-  max-height: none;
-  overflow: visible;
-}
 html .app.desktop-frame .preview-check-circle {
   display: inline-grid;
   place-items: center;
@@ -1050,16 +1023,6 @@ html .app.desktop-frame .preview-offer-price {
   white-space: nowrap;
   color: var(--ink);
 }
-html
-  .app.desktop-frame
-  .compact-dropdown.preview-model-menu[data-split]:popover-open,
-html .app.desktop-frame .preview-model-menu[data-split] .dropdown-content {
-  display: flex;
-  flex-direction: column;
-}
-html .app.desktop-frame .preview-model-menu[data-split] .dropdown-content {
-  flex: 1;
-}
 html .app.desktop-frame .preview-check-slot {
   width: 18px;
   flex: none;
@@ -1079,11 +1042,6 @@ html
   .preview-strategy-icon {
   color: var(--pk-success);
 }
-@media (max-width: 560px) {
-  html .app.desktop-frame .preview-model-menu[data-split] .preview-menu-caret {
-    display: none;
-  }
-}
 html .app.desktop-frame .pk-balance-line {
   display: flex;
   align-items: center;
@@ -1100,9 +1058,6 @@ html .app.desktop-frame .pk-balance-line strong {
   font-weight: 500;
   color: var(--ink);
   white-space: nowrap;
-}
-html .app.desktop-frame .compact-dropdown.preview-model-menu {
-  overflow-x: hidden;
 }
 html .app.desktop-frame .pk-ring {
   width: 14px;

@@ -125,26 +125,7 @@ function AgentSetupDialog({
   const unavailable = busy || !!state.error || !preview;
   return (
     <Modal title="Connect a tool" close={close}>
-      <FormField label="Tool" htmlFor="buyer-agent-tool">
-        <select
-          id="buyer-agent-tool"
-          className="ui-input"
-          value={tool}
-          disabled={busy}
-          onChange={(event) => {
-            const chosen = Object.values(AGENT_TOOLS).find(
-              (tool) => tool === event.target.value,
-            );
-            if (chosen) setTool(chosen);
-          }}
-        >
-          {Object.values(AGENT_TOOLS).map((tool) => (
-            <option key={tool} value={tool}>
-              {labels[tool]}
-            </option>
-          ))}
-        </select>
-      </FormField>
+      <ToolSelector tool={tool} setTool={setTool} busy={busy} />
       <p className="ui-help-text">
         Supports OpenAI Chat Completions, Responses and Anthropic Messages
         through your local buyer. Your key's budget applies to every model and
@@ -220,5 +201,38 @@ export function BuyerAgentSetup({
         <AgentSetupDialog api={api} id={id} close={() => setOpen(false)} />
       )}
     </>
+  );
+}
+
+function ToolSelector({
+  tool,
+  setTool,
+  busy,
+}: {
+  tool: AgentTool;
+  setTool(tool: AgentTool): void;
+  busy: boolean;
+}) {
+  return (
+    <FormField label="Tool" htmlFor="buyer-agent-tool">
+      <select
+        id="buyer-agent-tool"
+        className="ui-input"
+        value={tool}
+        disabled={busy}
+        onChange={(event) => {
+          const chosen = Object.values(AGENT_TOOLS).find(
+            (tool) => tool === event.target.value,
+          );
+          if (chosen) setTool(chosen);
+        }}
+      >
+        {Object.values(AGENT_TOOLS).map((tool) => (
+          <option key={tool} value={tool}>
+            {labels[tool]}
+          </option>
+        ))}
+      </select>
+    </FormField>
   );
 }

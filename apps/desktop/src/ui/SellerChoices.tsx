@@ -5,6 +5,28 @@ import { moveMenuFocus } from './menu-keyboard';
 
 const EDGE = 8;
 
+function positionChoices(menu: HTMLDivElement, trigger: HTMLElement) {
+  const anchor = trigger.getBoundingClientRect();
+  const right = window.innerWidth - anchor.right - EDGE;
+  const left = anchor.left - EDGE;
+  const width = Math.min(MENU_GEOMETRY.WIDTH, window.innerWidth - 2 * EDGE);
+  menu.style.width = width + 'px';
+  const fits = right >= width || left >= width;
+  const x = fits
+    ? right >= width
+      ? anchor.right
+      : anchor.left - width
+    : Math.max(EDGE, Math.min(anchor.left, window.innerWidth - width - EDGE));
+  menu.style.left = x + 'px';
+  menu.style.top =
+    Math.max(
+      EDGE,
+      Math.min(
+        fits ? anchor.top : anchor.bottom,
+        window.innerHeight - menu.offsetHeight - EDGE,
+      ),
+    ) + 'px';
+}
 export function SellerChoices({
   name,
   flyout,
@@ -22,31 +44,7 @@ export function SellerChoices({
     const trigger =
       menu?.parentElement?.querySelector<HTMLElement>('[data-model-row]');
     if (!flyout || !menu || !trigger) return;
-    const position = () => {
-      const anchor = trigger.getBoundingClientRect();
-      const right = window.innerWidth - anchor.right - EDGE;
-      const left = anchor.left - EDGE;
-      const width = Math.min(MENU_GEOMETRY.WIDTH, window.innerWidth - 2 * EDGE);
-      menu.style.width = width + 'px';
-      const fits = right >= width || left >= width;
-      const x = fits
-        ? right >= width
-          ? anchor.right
-          : anchor.left - width
-        : Math.max(
-            EDGE,
-            Math.min(anchor.left, window.innerWidth - width - EDGE),
-          );
-      menu.style.left = x + 'px';
-      menu.style.top =
-        Math.max(
-          EDGE,
-          Math.min(
-            fits ? anchor.top : anchor.bottom,
-            window.innerHeight - menu.offsetHeight - EDGE,
-          ),
-        ) + 'px';
-    };
+    const position = () => positionChoices(menu, trigger);
     menu.showPopover();
     position();
     menu

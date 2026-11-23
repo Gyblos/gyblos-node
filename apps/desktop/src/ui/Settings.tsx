@@ -49,6 +49,38 @@ export function Settings({
           </div>
         </div>
       </Section>
+      <PolicySettings />
+      <Section title="About" icon={<Info size={16} />}>
+        <div className="preview-settings-rows">
+          <div>
+            <span>Design system</span>
+            <Button onClick={() => setDesignOpen(true)}>View controls</Button>
+          </div>
+          <div>
+            <span>About Gyblos</span>
+            <Button onClick={() => setAboutOpen(true)}>View details</Button>
+          </div>
+        </div>
+      </Section>
+      {aboutOpen && (
+        <Modal title="About Gyblos" close={() => setAboutOpen(false)}>
+          <div className="ui-section">
+            <p>Gyblos desktop</p>
+            <p className="ui-help-text">Version {version}</p>
+            <p className="ui-help-text">Local desktop application</p>
+          </div>
+        </Modal>
+      )}
+      {designOpen && (
+        <DesignDialog font={font} close={() => setDesignOpen(false)} />
+      )}
+    </PagePanel>
+  );
+}
+
+function PolicySettings() {
+  return (
+    <>
       <Section title="Sellers" icon={<UsersThree size={16} />}>
         <div className="preview-settings-rows">
           <div>
@@ -104,67 +136,51 @@ export function Settings({
           </div>
         </div>
       </Section>
-      <Section title="About" icon={<Info size={16} />}>
-        <div className="preview-settings-rows">
-          <div>
-            <span>Design system</span>
-            <Button onClick={() => setDesignOpen(true)}>View controls</Button>
-          </div>
-          <div>
-            <span>About Gyblos</span>
-            <Button onClick={() => setAboutOpen(true)}>View details</Button>
-          </div>
+    </>
+  );
+}
+
+function DesignDialog({ font, close }: { font: string; close(): void }) {
+  return (
+    <>
+      <Modal title="Design system" close={close}>
+        <div className="ui-section">
+          <Section title="Typography">
+            <p className="ui-help-text">
+              {font} · 13 px interface · 15 px sections
+            </p>
+          </Section>
+          <Section title="Colors">
+            <div className="ui-swatch-list">
+              <span className="ui-swatch ui-swatch--background">
+                Background
+              </span>
+              <span className="ui-swatch ui-swatch--panel">Surface</span>
+              <span className="ui-swatch ui-swatch--accent">#0A28F0</span>
+            </div>
+          </Section>
+          <Section title="Controls">
+            <div className="ui-inline-actions">
+              <Button variant={BUTTON_VARIANT.PRIMARY}>Primary</Button>
+              <Button variant={BUTTON_VARIANT.SECONDARY}>Secondary</Button>
+              <Button>Outline</Button>
+              <Button disabled>Disabled</Button>
+            </div>
+            <FormField label="Example input" htmlFor="review-design-input">
+              <FormInput
+                id="review-design-input"
+                value="28 px shared control"
+                readOnly
+              />
+            </FormField>
+          </Section>
+          <Section title="Spacing">
+            <p className="ui-help-text">
+              4, 8, 12, 16, 24 and 32 px. Controls use a 6 px radius.
+            </p>
+          </Section>
         </div>
-      </Section>
-      {aboutOpen && (
-        <Modal title="About Gyblos" close={() => setAboutOpen(false)}>
-          <div className="ui-section">
-            <p>Gyblos desktop</p>
-            <p className="ui-help-text">Version {version}</p>
-            <p className="ui-help-text">Local desktop application</p>
-          </div>
-        </Modal>
-      )}
-      {designOpen && (
-        <Modal title="Design system" close={() => setDesignOpen(false)}>
-          <div className="ui-section">
-            <Section title="Typography">
-              <p className="ui-help-text">
-                {font} · 13 px interface · 15 px sections
-              </p>
-            </Section>
-            <Section title="Colors">
-              <div className="ui-swatch-list">
-                <span className="ui-swatch ui-swatch--background">
-                  Background
-                </span>
-                <span className="ui-swatch ui-swatch--panel">Surface</span>
-                <span className="ui-swatch ui-swatch--accent">#0A28F0</span>
-              </div>
-            </Section>
-            <Section title="Controls">
-              <div className="ui-inline-actions">
-                <Button variant={BUTTON_VARIANT.PRIMARY}>Primary</Button>
-                <Button variant={BUTTON_VARIANT.SECONDARY}>Secondary</Button>
-                <Button>Outline</Button>
-                <Button disabled>Disabled</Button>
-              </div>
-              <FormField label="Example input" htmlFor="review-design-input">
-                <FormInput
-                  id="review-design-input"
-                  value="28 px shared control"
-                  readOnly
-                />
-              </FormField>
-            </Section>
-            <Section title="Spacing">
-              <p className="ui-help-text">
-                4, 8, 12, 16, 24 and 32 px. Controls use a 6 px radius.
-              </p>
-            </Section>
-          </div>
-        </Modal>
-      )}
-    </PagePanel>
+      </Modal>
+    </>
   );
 }

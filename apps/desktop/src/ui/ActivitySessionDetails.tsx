@@ -45,45 +45,7 @@ export function ActivitySessionDetails({
       title={`Session ${entry.id.slice(0, DESKTOP_ACTIVITY.DISPLAY_ID_CHARACTERS)}`}
       close={close}
     >
-      <DetailSummary
-        status={{
-          label: sessionOutcome(entry),
-          tone: statusTone(sessionOutcome(entry)),
-        }}
-        meta="PayPal Sandbox · test funds"
-        totals={[
-          { label: 'Recorded', value: paypalDollars(entry.recordedCents) },
-          {
-            label: 'Captured',
-            value:
-              entry.capturedCents === null
-                ? 'Not confirmed'
-                : paypalDollars(entry.capturedCents),
-          },
-          { label: 'Limit', value: paypalDollars(entry.limitCents) },
-        ]}
-        rows={[
-          {
-            label: 'Chat',
-            value: paypalDollars(entry.chatCents),
-            note: plural(entry.chatCount, 'reply', 'replies'),
-          },
-          {
-            label: 'API',
-            value: paypalDollars(entry.agentCents),
-            note: plural(entry.agentCount, 'request', 'requests'),
-          },
-          ...(entry.unconfirmedCents > 0
-            ? [
-                {
-                  label: 'Awaiting confirmation',
-                  value: paypalDollars(entry.unconfirmedCents),
-                },
-              ]
-            : []),
-          { label: 'Last activity', value: activityDate(entry.updatedAt) },
-        ]}
-      />
+      <SessionFinancialSummary entry={entry} />
       {reference && (
         <PaymentReferenceDetails reference={reference} copy={onCopyReference} />
       )}
@@ -124,5 +86,51 @@ export function ActivitySessionDetails({
         </Button>
       )}
     </Modal>
+  );
+}
+
+function SessionFinancialSummary({ entry }: Pick<Props, 'entry'>) {
+  return (
+    <>
+      <DetailSummary
+        status={{
+          label: sessionOutcome(entry),
+          tone: statusTone(sessionOutcome(entry)),
+        }}
+        meta="PayPal Sandbox · test funds"
+        totals={[
+          { label: 'Recorded', value: paypalDollars(entry.recordedCents) },
+          {
+            label: 'Captured',
+            value:
+              entry.capturedCents === null
+                ? 'Not confirmed'
+                : paypalDollars(entry.capturedCents),
+          },
+          { label: 'Limit', value: paypalDollars(entry.limitCents) },
+        ]}
+        rows={[
+          {
+            label: 'Chat',
+            value: paypalDollars(entry.chatCents),
+            note: plural(entry.chatCount, 'reply', 'replies'),
+          },
+          {
+            label: 'API',
+            value: paypalDollars(entry.agentCents),
+            note: plural(entry.agentCount, 'request', 'requests'),
+          },
+          ...(entry.unconfirmedCents > 0
+            ? [
+                {
+                  label: 'Awaiting confirmation',
+                  value: paypalDollars(entry.unconfirmedCents),
+                },
+              ]
+            : []),
+          { label: 'Last activity', value: activityDate(entry.updatedAt) },
+        ]}
+      />
+    </>
   );
 }

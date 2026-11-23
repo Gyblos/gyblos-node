@@ -58,75 +58,7 @@ export function SystemStatus({
       onPayments();
     },
   };
-  const checks: StatusCheck[] = [
-    wallet.status === WALLET_STATUS.READY
-      ? { label: 'Wallet', value: 'Ready', tone: TONE.SUCCESS }
-      : wallet.status === WALLET_STATUS.LOCKED
-        ? {
-            label: 'Wallet',
-            value: 'Locked · free chat still works',
-            tone: TONE.NEUTRAL,
-            action: manage,
-          }
-        : wallet.status === WALLET_STATUS.LOADING
-          ? { label: 'Wallet', value: 'Loading', tone: TONE.INFO }
-          : wallet.status === WALLET_STATUS.RECOVERY_REQUIRED
-            ? {
-                label: 'Wallet',
-                value: 'Recovery required',
-                tone: TONE.DANGER,
-                summary: 'Wallet recovery required',
-                action: manage,
-              }
-            : {
-                label: 'Wallet',
-                value: 'Unavailable',
-                tone: TONE.DANGER,
-                summary: 'Wallet unavailable',
-                action: manage,
-              },
-  ];
-  if (wallet.status === WALLET_STATUS.READY)
-    checks.push(
-      wallet.backupVerified
-        ? { label: 'Recovery backup', value: 'Verified', tone: TONE.SUCCESS }
-        : {
-            label: 'Recovery backup',
-            value: 'Not verified yet',
-            tone: TONE.WARNING,
-            summary: 'Backup needed',
-            action: { ...manage, label: 'Back up' },
-          },
-    );
-  checks.push({
-    label: 'Payment network',
-    value: 'Testnet · test funds only',
-    tone: TONE.INFO,
-  });
-  const nodeIssue = nodeTone(state) === TONE.DANGER;
-  const issues = [
-    ...(nodeIssue
-      ? [{ tone: TONE.DANGER, summary: LOCAL_NODE_LABELS[state] }]
-      : []),
-    ...checks.filter((check) => ISSUE.includes(check.tone)),
-  ];
-  const tone = issues.some((issue) => issue.tone === TONE.DANGER)
-    ? TONE.DANGER
-    : issues.length
-      ? TONE.WARNING
-      : state === LOCAL_NODE_STATE.READY &&
-          wallet.status !== WALLET_STATUS.LOADING
-        ? TONE.SUCCESS
-        : TONE.INFO;
-  const summary =
-    issues.length > 1
-      ? issues.length + ' items need attention'
-      : (issues[0]?.summary ??
-        (state !== LOCAL_NODE_STATE.READY
-          ? LOCAL_NODE_LABELS[state]
-          : wallet.status === WALLET_STATUS.LOADING
-            ? 'Loading wallet'
-            : 'All systems ready'));
+  const { checks, tone, summary } = summarizeStatus(wallet, state, manage);
   return (
     <>
       <Button
@@ -179,4 +111,88 @@ export function SystemStatus({
       </MotionPresence>
     </>
   );
+}
+
+function walletChecks(
+  wallet: ReturnType<typeof useDesktopWallet>,
+  manage: NonNullable<StatusCheck['action']>,
+) {
+  const checks: StatusCheck[] = [
+    wallet.status === WALLET_STATUS.READY
+      ? { label: 'Wallet', value: 'Ready', tone: TONE.SUCCESS }
+      : wallet.status === WALLET_STATUS.LOCKED
+        ? {
+            label: 'Wallet',
+            value: 'Locked · free chat still works',
+            tone: TONE.NEUTRAL,
+            action: manage,
+          }
+        : wallet.status === WALLET_STATUS.LOADING
+          ? { label: 'Wallet', value: 'Loading', tone: TONE.INFO }
+          : wallet.status === WALLET_STATUS.RECOVERY_REQUIRED
+            ? {
+                label: 'Wallet',
+                value: 'Recovery required',
+                tone: TONE.DANGER,
+                summary: 'Wallet recovery required',
+                action: manage,
+              }
+            : {
+                label: 'Wallet',
+                value: 'Unavailable',
+                tone: TONE.DANGER,
+                summary: 'Wallet unavailable',
+                action: manage,
+              },
+  ];
+  if (wallet.status === WALLET_STATUS.READY)
+    checks.push(
+      wallet.backupVerified
+        ? { label: 'Recovery backup', value: 'Verified', tone: TONE.SUCCESS }
+        : {
+            label: 'Recovery backup',
+            value: 'Not verified yet',
+            tone: TONE.WARNING,
+            summary: 'Backup needed',
+            action: { ...manage, label: 'Back up' },
+          },
+    );
+  checks.push({
+    label: 'Payment network',
+    value: 'Testnet · test funds only',
+    tone: TONE.INFO,
+  });
+  return checks;
+}
+function summarizeStatus(
+  wallet: ReturnType<typeof useDesktopWallet>,
+  state: LocalNodeState,
+  manage: NonNullable<StatusCheck['action']>,
+) {
+  const checks = walletChecks(wallet, manage);
+  const nodeIssue = nodeTone(state) === TONE.DANGER;
+  const issues = [
+    ...(nodeIssue
+      ? [{ tone: TONE.DANGER, summary: LOCAL_NODE_LABELS[state] }]
+      : []),
+    ...checks.filter((check) => ISSUE.includes(check.tone)),
+  ];
+  const tone = issues.some((issue) => issue.tone === TONE.DANGER)
+    ? TONE.DANGER
+    : issues.length
+      ? TONE.WARNING
+      : state === LOCAL_NODE_STATE.READY &&
+          wallet.status !== WALLET_STATUS.LOADING
+        ? TONE.SUCCESS
+        : TONE.INFO;
+  const summary =
+    issues.length > 1
+      ? issues.length + ' items need attention'
+      : (issues[0]?.summary ??
+        (state !== LOCAL_NODE_STATE.READY
+          ? LOCAL_NODE_LABELS[state]
+          : wallet.status === WALLET_STATUS.LOADING
+            ? 'Loading wallet'
+            : 'All systems ready'));
+  return { checks, tone, summary };
 }

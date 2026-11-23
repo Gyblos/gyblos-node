@@ -23,18 +23,7 @@ function modelDetail(model: ModelOption) {
   return model.free ? 'Preview model' : priceLabel(model);
 }
 
-export function ModelDropdown({
-  model,
-  models,
-  onSelect,
-  onBrowse,
-  toolbar = false,
-  label,
-  showBrowse = true,
-  networkOnly = false,
-  contextLabel,
-  auto,
-}: {
+type PickerProps = {
   model: ModelOption;
   models: readonly ModelOption[];
   onSelect: (id: string) => void;
@@ -49,7 +38,19 @@ export function ModelDropdown({
     paid: boolean;
     choose(name: string): void;
   };
-}) {
+};
+export function ModelDropdown({
+  model,
+  models,
+  onSelect,
+  onBrowse,
+  toolbar = false,
+  label,
+  showBrowse = true,
+  networkOnly = false,
+  contextLabel,
+  auto,
+}: PickerProps) {
   const network =
     networkOnly ||
     models.some((item) => item.source === MODEL_SOURCE.ANNOUNCED);
@@ -58,6 +59,7 @@ export function ModelDropdown({
     : [model, ...models.filter((item) => item.id !== model.id)];
   return (
     <Dropdown
+      panelClassName="preview-model-menu"
       searchLabel="Search models"
       label={label ?? (toolbar ? 'Choose chat model' : 'Choose composer model')}
       className={toolbar ? 'model-picker' : 'ui-model-trigger'}
@@ -81,69 +83,115 @@ export function ModelDropdown({
       }
     >
       {(close, query) => {
-        const filtered = ordered.filter((item) =>
-          `${item.name} ${item.family ?? ''}`
-            .toLowerCase()
-            .includes(query.trim().toLowerCase()),
-        );
-        const options =
-          network || query.trim()
-            ? filtered
-            : filtered.slice(0, MENU_GEOMETRY.QUICK_MODELS);
         return (
-          <>
-            {auto ? (
-              <NetworkSellerMenu
-                models={options}
-                selected={model.id}
-                automatic={!!model.automatic}
-                buyerModels={auto.buyerModels}
-                paid={auto.paid}
-                onAuto={(name) => {
-                  close();
-                  auto.choose(name);
-                }}
-                onSelect={(id) => {
-                  close();
-                  onSelect(id);
-                }}
-              />
-            ) : (
-              options.map((item) => (
-                <MenuItem
-                  key={item.id}
-                  role="menuitemradio"
-                  checked={item.id === model.id}
-                  label={item.name}
-                  detail={contextLabel ?? modelDetail(item)}
-                  badge={item.free ? <Badge>Free</Badge> : undefined}
-                  leading={<ModelImage artwork={item.image} name={item.name} />}
-                  trailing={item.id === model.id && <Check size={16} />}
-                  onClick={() => {
-                    close();
-                    onSelect(item.id);
-                  }}
-                />
-              ))
-            )}
-            {!options.length && (
-              <p className="dropdown-note" role="status">
-                No models found
-              </p>
-            )}
-            {showBrowse && (
-              <MenuItem
-                footer
-                label="View all models"
-                onClick={() => {
-                  close();
-                  onBrowse();
-                }}
-              />
-            )}
-          </>
+          <ModelOptions
+            {...{
+              close,
+              query,
+              ordered,
+              network,
+              model,
+              auto,
+              onSelect,
+              onBrowse,
+              contextLabel,
+              showBrowse,
+            }}
+          />
         );
       }}
     </Dropdown>
   );
+}
+
+function ModelOptions({
+  close,
+  query,
+  ordered,
+  network,
+  model,
+  auto,
+  onSelect,
+  onBrowse,
+  contextLabel,
+  showBrowse,
+}: Pick<
+  PickerProps,
+  'model' | 'auto' | 'onSelect' | 'onBrowse' | 'contextLabel' | 'showBrowse'
+> & {
+  close(): void;
+  query: string;
+  ordered: readonly ModelOption[];
+  network: boolean;
+}) {
+  const options = matchingModels(ordered, query, network);
+  return (
+    <>
+      {auto ? (
+        <NetworkSellerMenu
+          models={options}
+          selected={model.id}
+          automatic={!!model.automatic}
+          buyerModels={auto.buyerModels}
+          paid={auto.paid}
+          onAuto={(name) => {
+            close();
+            auto.choose(name);
+          }}
+          onSelect={(id) => {
+            close();
+            onSelect(id);
+          }}
+        />
+      ) : (
+        options.map((item) => (
+          <MenuItem
+            key={item.id}
+            role="menuitemradio"
+            checked={item.id === model.id}
+            label={item.name}
+            detail={contextLabel ?? modelDetail(item)}
+            badge={item.free ? <Badge>Free</Badge> : undefined}
+            leading={<ModelImage artwork={item.image} name={item.name} />}
+            trailing={item.id === model.id && <Check size={16} />}
+            onClick={() => {
+              close();
+              onSelect(item.id);
+            }}
+          />
+        ))
+      )}
+      {!options.length && (
+        <p className="dropdown-note" role="status">
+          No models found
+        </p>
+      )}
+      {showBrowse && (
+        <MenuItem
+          footer
+          label="View all models"
+          onClick={() => {
+            close();
+            onBrowse();
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+function matchingModels(
+  ordered: readonly ModelOption[],
+  query: string,
+  network: boolean,
+) {
+  const filtered = ordered.filter((item) =>
+    `${item.name} ${item.family ?? ''}`
+      .toLowerCase()
+      .includes(query.trim().toLowerCase()),
+  );
+  return;
+  network || query.trim()
+    ? filtered
+    : filtered.slice(0, MENU_GEOMETRY.QUICK_MODELS);
 }

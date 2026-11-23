@@ -11,6 +11,64 @@ import { ModelImage } from './ModelImage';
 import { MotionPresence } from './Motion';
 import { NetworkSellerMenu } from './NetworkSellerMenu';
 
+function CatalogRows({
+  ordered,
+  selectedId,
+  automatic,
+  open,
+}: {
+  ordered: ReturnType<typeof useCatalogFilters>['ordered'];
+  selectedId: string;
+  automatic: boolean;
+  open(name: string): void;
+}) {
+  return (
+    <>
+      {' '}
+      {ordered.map(([model, rows]) => {
+        const first = rows[0];
+        if (!first) return null;
+        const selected =
+          rows.some((row) => row.id === selectedId) ||
+          (automatic && selectedId === 'auto/' + model);
+        return (
+          <div
+            key={model}
+            className="preview-model-item"
+            data-current={selected}
+          >
+            <button
+              type="button"
+              className="preview-model-head preview-model-summary"
+              aria-haspopup="dialog"
+              onClick={() => open(model)}
+            >
+              <ModelImage name={model} artwork={first.image} />
+              <span className="preview-model-copy">
+                <strong>
+                  {model}
+                  {selected && <Check size={14} aria-label="In use" />}
+                </strong>
+                <small>
+                  {[
+                    ...new Set(rows.map((row) => row.variant).filter(Boolean)),
+                  ].join(', ')}{' '}
+                  · {[...new Set(rows.map((row) => row.context))].join(', ')}{' '}
+                  context
+                </small>
+              </span>
+              <span className="preview-model-stats">
+                {rows.reduce((count, row) => count + row.providers, 0)} offers
+              </span>
+              <span className="ui-price">{groupPrice(rows)}</span>
+              <CaretRight size={14} />
+            </button>
+          </div>
+        );
+      })}
+    </>
+  );
+}
 export function CatalogOffers(
   props: Omit<ComponentProps<typeof NetworkSellerMenu>, 'models'> & {
     models: readonly CatalogModel[];
@@ -52,47 +110,12 @@ export function CatalogOffers(
           No offers match these filters.
         </p>
       )}
-      {options.ordered.map(([model, rows]) => {
-        const first = rows[0];
-        if (!first) return null;
-        const selected =
-          rows.some((row) => row.id === props.selected) ||
-          (props.automatic && props.selected === 'auto/' + model);
-        return (
-          <div
-            key={model}
-            className="preview-model-item"
-            data-current={selected}
-          >
-            <button
-              type="button"
-              className="preview-model-head preview-model-summary"
-              aria-haspopup="dialog"
-              onClick={() => setName(model)}
-            >
-              <ModelImage name={model} artwork={first.image} />
-              <span className="preview-model-copy">
-                <strong>
-                  {model}
-                  {selected && <Check size={14} aria-label="In use" />}
-                </strong>
-                <small>
-                  {[
-                    ...new Set(rows.map((row) => row.variant).filter(Boolean)),
-                  ].join(', ')}{' '}
-                  · {[...new Set(rows.map((row) => row.context))].join(', ')}{' '}
-                  context
-                </small>
-              </span>
-              <span className="preview-model-stats">
-                {rows.reduce((count, row) => count + row.providers, 0)} offers
-              </span>
-              <span className="ui-price">{groupPrice(rows)}</span>
-              <CaretRight size={14} />
-            </button>
-          </div>
-        );
-      })}
+      <CatalogRows
+        ordered={options.ordered}
+        selectedId={props.selected}
+        automatic={props.automatic}
+        open={setName}
+      />
       <MotionPresence>
         {name && offers && (
           <Modal title={name} size="lg" close={() => setName(undefined)}>

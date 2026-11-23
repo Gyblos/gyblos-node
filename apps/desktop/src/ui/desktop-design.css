@@ -1291,6 +1291,20 @@ html .app.desktop-frame .content .ui-table-region td .ui-inline-actions {
 .desktop-frame .modal .preview-metric-card dd {
   font-size: 17px;
 }
+.desktop-frame .preview-model-menu .preview-model-group[data-open='true'] {
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--ink) 3%, transparent);
+}
+.desktop-frame .preview-model-menu .preview-seller-list {
+  display: grid;
+  margin: 0 0 4px 22px;
+  padding-left: 8px;
+  border-left: 1px solid var(--line);
+}
+.desktop-frame .preview-model-menu .preview-seller-list .dropdown-row {
+  min-height: 0;
+  padding-block: 6px;
+}
 .desktop-frame .preview-settings-rows > div > span small {
   display: block;
   margin-top: 2px;
@@ -1688,6 +1702,10 @@ html .app.desktop-frame .content .preview-model-summary {
     display: none;
   }
 }
+.desktop-frame .preview-model-menu,
+.desktop-frame .preview-model-menu [role='menu'] {
+  scrollbar-gutter: stable;
+}
 .desktop-frame {
   --pk-success: var(--connected);
   --pk-warning: var(--warm);
@@ -1788,6 +1806,15 @@ html .app.desktop-frame select.ui-input {
 }
 html .app.desktop-frame .ui-select-trigger {
   font-size: 14px;
+}
+html .app.desktop-frame .preview-model-menu {
+  max-height: min(520px, calc(100vh - 140px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+html .app.desktop-frame .preview-model-menu [role='menu'] {
+  max-height: none;
+  overflow: visible;
 }
 html .app.desktop-frame .composer {
   border: 1px solid var(--line);
@@ -1948,6 +1975,16 @@ html .app.desktop-frame .dropdown-row[data-strategy] .ui-item-title {
 }
 html
   .app.desktop-frame
+  .compact-dropdown.preview-model-menu[data-split]:popover-open,
+html .app.desktop-frame .preview-model-menu[data-split] .dropdown-content {
+  display: flex;
+  flex-direction: column;
+}
+html .app.desktop-frame .preview-model-menu[data-split] .dropdown-content {
+  flex: 1;
+}
+html
+  .app.desktop-frame
   :is(.preview-model-menu[data-split], .preview-seller-flyout)
   .dropdown-footer {
   margin-top: auto;
@@ -2023,6 +2060,14 @@ html[data-font='inter'] .desktop-frame {
   font-family:
     'Gyblos Digits', InterVariable, ui-sans-serif, system-ui, sans-serif;
   font-feature-settings: 'cv11', 'ss01';
+}
+@media (max-width: 560px) {
+  html .app.desktop-frame .preview-model-menu[data-split] .preview-menu-caret {
+    display: none;
+  }
+}
+html .app.desktop-frame .compact-dropdown.preview-model-menu {
+  overflow-x: hidden;
 }
 html .app.desktop-frame .pk-composer-tab {
   display: flex;

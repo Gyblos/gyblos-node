@@ -92,6 +92,28 @@ export function Payments(props: Props) {
           />
         )}
       </div>
+      <PaypalManagement {...props} />
+      {walletOpen && (
+        <Modal title="Wallet details" close={() => setWalletOpen(false)}>
+          <WalletDetails
+            onBackup={() => {
+              setWalletOpen(false);
+              props.onBackup();
+            }}
+            onAddFunds={() => {
+              setWalletOpen(false);
+              props.onAddFunds();
+            }}
+          />
+        </Modal>
+      )}
+    </PagePanel>
+  );
+}
+
+function PaypalManagement(props: Props) {
+  return (
+    <>
       {props.managePaypal && (
         <Modal title="PayPal Sandbox" close={() => props.onManagePaypal(false)}>
           <PaypalSessionPanel
@@ -113,20 +135,6 @@ export function Payments(props: Props) {
           </FormActions>
         </Modal>
       )}
-      {walletOpen && (
-        <Modal title="Wallet details" close={() => setWalletOpen(false)}>
-          <WalletDetails
-            onBackup={() => {
-              setWalletOpen(false);
-              props.onBackup();
-            }}
-            onAddFunds={() => {
-              setWalletOpen(false);
-              props.onAddFunds();
-            }}
-          />
-        </Modal>
-      )}
-    </PagePanel>
+    </>
   );
 }
