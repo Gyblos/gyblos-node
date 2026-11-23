@@ -257,3 +257,30 @@ html .app.desktop-frame .pk-chips button:focus-visible {
 .desktop-frame .preview-connect-copy small {
   font-size: 12px;
 }
+
+.desktop-frame .preview-price-range {
+  display: grid;
+  grid-template-columns: auto minmax(40px, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.desktop-frame .preview-price-track {
+  position: relative;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--connected), var(--warm));
+  opacity: 0.8;
+}
+.desktop-frame .preview-price-track > span {
+  position: absolute;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--panel);
+  border-radius: 50%;
+  background: var(--ink);
+  transform: translate(-50%, -50%);
+}

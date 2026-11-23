@@ -1,11 +1,12 @@
 import { CaretRight, Check } from '@phosphor-icons/react';
 import { useState, type ComponentProps } from 'react';
 
+import { RESPONSE_METRICS } from '../constants';
 import { useCatalogFilters } from './catalog-filters';
 import { CatalogSellerDialog } from './CatalogSellerDialog';
 import { ChoiceMenu } from './Management';
-import { groupPrice } from './model-price';
-import type { CatalogModel } from './model-types';
+import { groupPrice, usdPerMtok } from './model-price';
+import type { CatalogModel, ModelOption } from './model-types';
 import { ModelImage } from './ModelImage';
 import { MotionPresence } from './Motion';
 import type { NetworkSellerMenu } from './NetworkSellerMenu';
@@ -58,7 +59,10 @@ function CatalogRows({
                 </small>
               </span>
               <span className="preview-model-stats">
-                {rows.reduce((count, row) => count + row.providers, 0)} offers
+                <small>
+                  {rows.reduce((count, row) => count + row.providers, 0)} offers
+                </small>
+                <InputPriceRange offers={rows} selected={selectedId} />
               </span>
               <span className="preview-model-mode">
                 {selected ? (automatic ? 'Auto' : 'Selected') : '—'}
@@ -145,5 +149,38 @@ export function CatalogOffers(
         )}
       </MotionPresence>
     </>
+  );
+}
+
+function InputPriceRange({
+  offers,
+  selected,
+}: {
+  offers: readonly ModelOption[];
+  selected: string;
+}) {
+  if (!offers.some((offer) => !offer.free)) return null;
+  const prices = offers.map((offer) => offer.input);
+  const minimum = Math.min(...prices);
+  const maximum = Math.max(...prices);
+  const active = offers.find((offer) => offer.id === selected);
+  const position =
+    active && maximum > minimum
+      ? (RESPONSE_METRICS.PERCENT_SCALE * (active.input - minimum)) /
+        (maximum - minimum)
+      : 0;
+  return (
+    <span
+      className="preview-price-range"
+      aria-label={
+        'Input price from ' + usdPerMtok(minimum) + ' to ' + usdPerMtok(maximum)
+      }
+    >
+      <span>{usdPerMtok(minimum)}</span>
+      <span className="preview-price-track">
+        {active && <span style={{ left: position + '%' }} />}
+      </span>
+      <span>{usdPerMtok(maximum)}</span>
+    </span>
   );
 }
