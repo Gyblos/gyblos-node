@@ -22,16 +22,17 @@ rules. The local receipt receiver for private testing is a different app
 
 ## Endpoints
 
-| Route                           | Purpose                                                                |
-| ------------------------------- | ---------------------------------------------------------------------- |
-| `POST /v1/receipts`             | Upload one signed envelope of 1 to 50 receipts.                        |
-| `POST /v1/observations`         | Upload one signed envelope of 1 to 200 content-free telemetry events.  |
-| `GET /v1/health`                | `{ "ok": true }` once storage and every limiter exist.                 |
-| `GET /v1/stats/network`         | Network totals per UTC day ([public stats](#public-stats-api)).        |
-| `GET /v1/stats/models`          | Totals per model over a day range.                                     |
-| `GET /v1/stats/sellers/:nodeId` | One seller's totals per day and per model.                             |
-| `GET /v1/stats/chain`           | Payment-channels program activity per UTC day ([chain](#chain-stats)). |
-| `GET /v1/admin/rpc-probe`       | Operator check of the chain RPC endpoints ([probe](#chain-index)).     |
+| Route                           | Purpose                                                                  |
+| ------------------------------- | ------------------------------------------------------------------------ |
+| `POST /v1/receipts`             | Upload one signed envelope of 1 to 50 receipts.                          |
+| `POST /v1/observations`         | Upload one signed envelope of 1 to 200 content-free telemetry events.    |
+| `GET /v1/health`                | `{ "ok": true }` once storage and every limiter exist.                   |
+| `GET /v1/stats/network`         | Network totals per UTC day ([public stats](#public-stats-api)).          |
+| `GET /v1/stats/models`          | Totals per model over a day range.                                       |
+| `GET /v1/stats/sellers/:nodeId` | One seller's totals per day and per model.                               |
+| `GET /v1/stats/chain`           | Payment-channels program activity per UTC day ([chain](#chain-stats)).   |
+| `GET /v1/stats/chain/txs`       | Gyblos channel instructions, newest first ([list](#chain-transactions)). |
+| `GET /v1/admin/rpc-probe`       | Operator check of the chain RPC endpoints ([probe](#chain-index)).       |
 
 Every response carries `Cache-Control: no-store`, except a successful stats
 answer, which is `public, max-age=300`. Every response also carries
@@ -378,15 +379,17 @@ proofs) or online sellers from presence, which the
 ## Public stats API
 
 `GET` only, aggregates only: never a receipt, a buyer identity or a raw
-observation. Query parameters `from` and `to` are UTC days (`YYYY-MM-DD`); the
-range is inclusive and at most 92 days long (for example 2026-08-17 to
-2026-11-16). The default is the 30 days up to today. A malformed, impossible,
-reversed or too long range, or a NodeId that is not 64 lowercase hex characters,
-answers `400 INVALID_QUERY`. Without a database the stats routes answer
-`503 COLLECTOR_UNAVAILABLE`. Reads spend their own per-address budget
-(`COLLECTOR_READ_LIMITER`, 120 per minute). A successful answer is
-`Cache-Control: public, max-age=300` and the Worker keeps it in the edge cache,
-keyed by URL, so repeated reads cost no database query; errors are never cached.
+observation. The one list of single rows is
+[chain transactions](#chain-transactions), which is public chain data. Query
+parameters `from` and `to` are UTC days (`YYYY-MM-DD`); the range is inclusive
+and at most 92 days long (for example 2026-08-17 to 2026-11-16). The default is
+the 30 days up to today. A malformed, impossible, reversed or too long range, or
+a NodeId that is not 64 lowercase hex characters, answers `400 INVALID_QUERY`.
+Without a database the stats routes answer `503 COLLECTOR_UNAVAILABLE`. Reads
+spend their own per-address budget (`COLLECTOR_READ_LIMITER`, 120 per minute). A
+successful answer is `Cache-Control: public, max-age=300` and the Worker keeps
+it in the edge cache, keyed by URL, so repeated reads cost no database query;
+errors are never cached.
 
 Every answer has `from`, `to`, `formulaVersion` (the version every row in the
 answer was computed with, or `null` when there is no data or a recompute after a
@@ -427,8 +430,8 @@ with one buyer they describe that one pseudonymous buyer's use of that seller.
 
 Each stats request is one batch of reads over aggregate tables: five statements
 for the network answer, three for the seller answer, two in one batch for
-models, two for chain, whatever the range. Histograms are summed and lists are
-capped in SQL.
+models, two for chain, whatever the range; the chain transaction list is one
+statement per page. Histograms are summed and lists are capped in SQL.
 
 ### Chain stats
 
@@ -452,6 +455,81 @@ This is the only source of settled USDC and fees: a paid receipt's
 `authorizedAtomic` is usage both sides signed for, not payment. `gyblosClaimed`
 is a self-declared label ([chain index](#chain-index)); wallets are public on
 chain, so payer and payee counts are not withheld.
+
+### Chain transactions
+
+`GET /v1/stats/chain/txs` lists the decoded instructions of Gyblos channels
+(`gyblos = 1` in `collector_chain_channels`: the open carries a Gyblos memo, or
+a distribute the index read pays the Gyblos treasury; see
+[Gyblos traffic is a claim](#chain-index)), newest first by slot, then
+signature, then instruction index. It reads the chain index tables only, never
+writes, and takes no day range. It first selects the page's rows, then computes
+amounts for those rows only, reading settle history only for channels with a
+settle on the page and only up to the page's newest slot. Query parameters, each
+at most once and in this order:
+
+- `before`: the `next` cursor of the previous page,
+  `<slot>-<signature>-<instructionIndex>`;
+- `limit`: rows per page, 1 to 50; omit it for the default of 25.
+
+Numbers are canonical (`0` or no leading zero). Any other parameter (an unnamed
+one included), a repeated one, another order, `limit=25` (the default is sent by
+omitting it), a `limit` outside 1 to 50 or a malformed cursor answers
+`400 INVALID_QUERY`, so each page has one cache key. Caching, the read budget
+and `503 COLLECTOR_UNAVAILABLE` are as for the other stats routes. The answer:
+
+```json
+{
+  "network": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
+  "programId": "CHNLxYvVA28MJP9PrFuDXccuoGXAx7jBacfLEkahyGsX",
+  "mint": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+  "treasury": "4Ui1dfvqbFx9CtjXNcKajHdr7aKT1nbYRiYjB1s7umNy",
+  "transactions": [
+    {
+      "signature": "<base58>",
+      "instructionIndex": 1,
+      "slot": 431000000,
+      "blockTime": 1800000000000,
+      "kind": "distribute",
+      "channel": "<address>",
+      "payee": "<address>",
+      "recipients": ["<address>", "<address>"],
+      "amountAtomic": "1500000"
+    }
+  ],
+  "next": "431000000-<signature>-1"
+}
+```
+
+`treasury` is the Gyblos fee treasury. `next` is `null` on the last page.
+`blockTime` is in milliseconds, or `null` when the RPC gave none. `kind` is one
+of `open`, `settle`, `top_up`, `settle_and_seal`, `request_close`, `seal`,
+`distribute`, `reclaim`. `payee` is the channel's payee as opened (the seller's
+fee payer, not a recipient of money) and `recipients` the owners of its split
+recipients as opened, in order (for Gyblos sessions the seller's payout address,
+then the fee treasury); `payee` is `null` and `recipients` empty when the open
+was not read. `amountAtomic` is devnet USDC as a decimal string:
+
+- `open` and `top_up`: the deposit added;
+- `settle` and `settle_and_seal`: the voucher's cumulative amount above the
+  highest one the channel settled before it, both capped at the channel's
+  deposits, in the daily aggregate's order (slot, capped cumulative, signature,
+  instruction index), so the rows of a day add up to its `settledAtomic`; `0`
+  when it adds nothing;
+- `distribute` and `reclaim`: the USDC that left the channel's vault in that
+  transaction, on the first such instruction of the channel in it.
+
+`amountAtomic` is `null` when:
+
+- the channel's mint is not devnet USDC, or is unknown because its open was
+  never read;
+- the kind is `request_close` or `seal`;
+- a settle carries no voucher, or its transaction has no block time;
+- a `distribute` or `reclaim` has no negative USDC change of the channel's vault
+  in its transaction, or is not the channel's first paying instruction in it.
+
+The list is as complete as the chain index: channels it never read, and history
+before its floor, are missing.
 
 ## Chain index
 
@@ -772,11 +850,11 @@ Cloudflare counts it per location, so it is approximate.
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Entry       | `src/worker.ts`: bindings, the scheduled run and the stats edge cache; inert on import.                                                                                         |
 | HTTP        | `src/app.ts`, `src/http.ts`, `src/stats-routes.ts`, `src/rpc-probe.ts`; shared runtime rate-limit key: `@gyblos/runtime/ip-key`.                                                |
-| Use cases   | `src/ingest.ts`, `src/ingest-observations.ts`, `src/stats.ts`, `src/stats-chain.ts`                                                                                             |
+| Use cases   | `src/ingest.ts`, `src/ingest-observations.ts`, `src/stats.ts`, `src/stats-chain.ts`, `src/stats-chain-txs.ts` (with its read port)                                              |
 | Policy      | `@gyblos/core/public-receipts`: receipt verification, classification and merge rules.                                                                                           |
 | Storage     | `src/storage.ts` (port), `src/storage-d1*.ts` and `src/storage-memory.ts` (adapters)                                                                                            |
 | Aggregation | `src/aggregate*.ts`, `src/sql-primitives.ts`                                                                                                                                    |
-| Stats reads | `src/stats-store.ts` (port), `src/stats-read.ts` (D1)                                                                                                                           |
+| Stats reads | `src/stats-store.ts` (port), `src/stats-read.ts` (D1); `src/stats-chain-txs-read.ts` (D1, chain index tables)                                                                   |
 | Chain index | `src/chain/`: the scheduled read (`indexer.ts`, `list.ts`, `follow.ts`), call budgets and fallback (`endpoints.ts`), the RPC client, decoding and writes; `src/schema-chain.ts` |
 | Values      | `src/constants.ts`, `src/errors.ts`                                                                                                                                             |
 

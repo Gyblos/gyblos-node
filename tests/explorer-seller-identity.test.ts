@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
 
+import { rangeSwitchHref } from '@gyblos/explorer/chain-txs-shape';
 import { gistUrl } from '@gyblos/explorer/config';
 import { DISPLAY, IDENTITY } from '@gyblos/explorer/constants';
 import type { Seller } from '@gyblos/explorer/discovery';
@@ -11,7 +12,6 @@ import {
   normalizeNetwork,
   parseNetworkStatus,
 } from '@gyblos/explorer/network-status';
-import { rangeHref } from '@gyblos/explorer/range';
 import {
   emptySellersMessage,
   githubByNode,
@@ -190,9 +190,9 @@ void test('the empty sellers message says what is known', () => {
 });
 
 void test('a date range switch keeps the other query parameters', () => {
-  assert.equal(rangeHref('/', 'verified=1', 7), '/?verified=1&range=7');
-  assert.equal(rangeHref('/', 'verified=1&range=7', 30), '/?verified=1');
-  assert.equal(rangeHref('/', '', 30), '/');
+  assert.equal(rangeSwitchHref('verified=1', 7), '/?range=7&verified=1');
+  assert.equal(rangeSwitchHref('verified=1&range=7', 30), '/?verified=1');
+  assert.equal(rangeSwitchHref('', 30), '/');
 });
 
 void test('llms.txt states the verified filter and the ordering window', () => {
