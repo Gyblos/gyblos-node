@@ -122,3 +122,17 @@ void test('network search shows results only for a submitted model ID', async ()
     /snapshot\.query && query\.trim\(\) === snapshot\.query && !expanded/,
   );
 });
+
+void test('the native Limits view fits the approved narrow window and identifies the limit-used card', async () => {
+  const desktop = await readFile('apps/desktop/src/constants.ts', 'utf8');
+  const minimum = /MIN_WIDTH:\s*(\d+)/.exec(desktop);
+  assert.ok(minimum && Number(minimum[1]) <= 596);
+  const limits = await readFile(
+    'apps/desktop/src/ui/SpendingLimits.tsx',
+    'utf8',
+  );
+  assert.match(
+    limits,
+    /aria-label="Limit used">\s*<h3>Spending limit used<\/h3>/,
+  );
+});

@@ -222,15 +222,22 @@ export function SpendingLimits({
   return (
     <>
       <div className="preview-usage-grid">
-        <section className="preview-panel" aria-label="Spending by source">
-          <h3>Spending by source</h3>
+        <section className="preview-panel" aria-label="Limit used">
+          <h3>Spending limit used</h3>
           <div className="preview-panel-row">
             <span>
               {total === null
-                ? 'Spending unavailable'
+                ? !policy && !buyer.state.error
+                  ? 'Connect a buyer to see spending'
+                  : 'Spending unavailable'
                 : money(total) + ' spent'}
             </span>
-            <span className="ui-help-text">Separate limits</span>
+            <span
+              className="ui-help-text"
+              title="Chat and each API key have their own spending limits."
+            >
+              No shared limit
+            </span>
           </div>
           <SpendingBar segments={segments} total={total} />
         </section>
