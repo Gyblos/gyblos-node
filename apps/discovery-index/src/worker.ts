@@ -21,6 +21,7 @@ import {
 import { createD1GithubClaimStore } from './github-claim-store-d1';
 import { recheckGithubClaims } from './github-claims';
 import type { DiscoveryLimiters, RateLimiter } from './limits';
+import { createD1SellerProfileStore } from './profile-store-d1';
 import { parsePublishAllowlist } from './publishers';
 import { createD1RegistrationStore } from './registration-store-d1';
 import type { RegistryReader } from './registrations';
@@ -114,6 +115,9 @@ function appFor(bindings: unknown, cache: WeakMap<object, DiscoveryIndex>) {
         ? createD1GithubClaimStore(database)
         : undefined,
       gistFetch: edgeFetch(),
+      profiles: isDatabase(database)
+        ? createD1SellerProfileStore(database)
+        : undefined,
       limiters: limitersOf(bindings),
       publishers: parsePublishAllowlist(
         binding(bindings, DISCOVERY_PUBLISH_ALLOWLIST_BINDING),

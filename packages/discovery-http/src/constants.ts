@@ -28,6 +28,7 @@ export const DISCOVERY_ERROR_CODES = {
   CLAIM_REJECTED: 'DISCOVERY_CLAIM_REJECTED',
   STALE_CLAIM: 'DISCOVERY_STALE_CLAIM',
   UNKNOWN_NODE: 'DISCOVERY_UNKNOWN_NODE',
+  PROFILE_HELD: 'DISCOVERY_PROFILE_HELD',
   PAYLOAD_TOO_LARGE: 'DISCOVERY_PAYLOAD_TOO_LARGE',
   RATE_LIMITED: 'DISCOVERY_RATE_LIMITED',
   UNAVAILABLE: 'DISCOVERY_UNAVAILABLE',
@@ -52,6 +53,8 @@ export const INDEX_WIRE_ERRORS = {
   NODE_REVOKED: 'NODE_REVOKED',
   INVALID_CLAIM: 'INVALID_CLAIM',
   UNKNOWN_NODE: 'UNKNOWN_NODE',
+  PROFILE_HELD: 'PROFILE_HELD',
+  NO_PROFILE: 'NO_PROFILE',
 } as const;
 
 export const INDEX_ERROR_MAP: ReadonlyMap<string, DiscoveryErrorCode> = new Map(
@@ -93,6 +96,7 @@ export const CLAIM_ERROR_MAP: ReadonlyMap<string, DiscoveryErrorCode> = new Map(
       DISCOVERY_ERROR_CODES.INVALID_SIGNATURE,
     ],
     [INDEX_WIRE_ERRORS.UNKNOWN_NODE, DISCOVERY_ERROR_CODES.UNKNOWN_NODE],
+    [INDEX_WIRE_ERRORS.PROFILE_HELD, DISCOVERY_ERROR_CODES.PROFILE_HELD],
     [INDEX_WIRE_ERRORS.HTTPS_REQUIRED, DISCOVERY_ERROR_CODES.INSECURE_URL],
   ],
 );
@@ -122,6 +126,7 @@ export const DISCOVERY_PATHS = {
   registrations: '/registrations',
   uptime: '/uptime',
   githubIdentity: '/identity/github',
+  profile: '/profile',
 } as const;
 
 // A beta invite as `gyblos index:invite` prints it, and a NodeId (lowercase hex of its Ed25519 key);
@@ -191,6 +196,7 @@ export const DISCOVERY_LIMITS = {
   maxClaimResponseBytes: 4_096,
   // The longest CHECK_DEFERRED wait the index can ask for (its per-NodeId fetch interval).
   maxRetryAfterSeconds: 3_600,
+  maxTimeMs: 8.64e15,
   // A canonical public v2 record may reach 32 KiB; 2 KiB more covers the envelope (same cap as the index).
   maxPublishBodyBytes: 34_816,
   defaultSellers: 50,

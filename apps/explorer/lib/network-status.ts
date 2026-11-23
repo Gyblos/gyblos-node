@@ -25,6 +25,7 @@ export interface NetworkNode {
   firstSeenAt: number | null;
   lastSeenAt: number | null;
   models: string[];
+  name: string | null;
   github: GithubAccount | null;
 }
 export interface NetworkStatus {
@@ -66,6 +67,7 @@ function node(value: unknown): NetworkNode {
     models: list(source.models, 'node.models').map((model) =>
       text(model, 'node.model'),
     ),
+    name: nullable(source.name, (present) => text(present, 'node.name')),
     github: github(source.github),
   };
 }
@@ -98,6 +100,7 @@ export const normalizeNetwork = (
     ...status,
     nodes: status.nodes.map((node) => ({
       ...node,
+      name: node.name ?? null,
       github: node.github ?? null,
     })),
   };

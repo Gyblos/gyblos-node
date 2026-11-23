@@ -124,7 +124,10 @@ async function check(
 }
 
 // A seller the index already knows: an active registration or a stored catalog.
-async function known(context: GithubClaimContext, nodeId: string) {
+export async function known(
+  context: Pick<GithubClaimContext, 'registrations' | 'storage'>,
+  nodeId: string,
+) {
   if (await context.registrations?.active(nodeId)) return true;
   return !!(await context.storage.state(nodeId))?.catalog;
 }

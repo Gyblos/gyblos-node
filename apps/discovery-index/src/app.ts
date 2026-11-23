@@ -29,6 +29,7 @@ import { githubClaimRoutes } from './github-claim-routes';
 import { allowed } from './limits';
 import { modelsPage, parseModelsQuery } from './models';
 import { networkPage, parseNetworkQuery } from './network';
+import { profileRoutes } from './profile-routes';
 import { acceptRecord, type PublishContext } from './publish';
 import { publishModeOf } from './publishers';
 import type { RegistrationStore } from './registration-store';
@@ -245,7 +246,7 @@ function readRoutes(app: Hono<IndexEnv>, settings: IndexSettings) {
           networkPage(
             context.get('storage'),
             settings.registrations,
-            settings.claims,
+            { claims: settings.claims, profiles: settings.profiles },
             settings.now(),
             settings.maxResponseBytes,
           ),
@@ -299,6 +300,7 @@ export function createDiscoveryIndex(options: DiscoveryIndexOptions = {}) {
     );
   readRoutes(app, settings);
   githubClaimRoutes(app, settings);
+  profileRoutes(app, settings);
   // Reports the publish mode only, never the allowlisted or registered NodeIds.
   app.get(INDEX_ROUTES.HEALTH, async (context) => {
     const records = await settings.records.read(

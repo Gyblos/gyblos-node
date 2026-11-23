@@ -267,6 +267,31 @@ Each error starts with a sentence that says what to do and ends with a code in b
 | `VERIFY_SIGNING_FAILED`                                  | The node key couldn't sign the claim. Run `gyblos doctor`.                                                                                                                      |
 | `VERIFY_STATE_FAILED`                                    | The command couldn't save its progress in the seller home. Check that the seller folder is yours and writable (`gyblos doctor`), then run the command again.                    |
 
+## Choose a public name [#seller-name]
+
+You can give your seller an optional public name. The discovery index shows it next to your NodeId in the
+index's network list (`/v1/network`). You choose it, so the index doesn't verify it and another seller can use the same name. It
+never gets a check mark: only a [verified GitHub account](#verify-github) shows who runs a seller. To set a
+name, the index must already know your seller, as for GitHub verification; clearing it works either way.
+
+```sh
+gyblos seller name "NAME"
+gyblos seller name --status
+gyblos seller name --clear
+```
+
+Replace `NAME` with the name you want. For a Docker seller, run them from `~/gyblos-seller` with `docker compose exec seller` in front, for example
+`docker compose exec seller gyblos seller name "My Seller"`.
+
+A name has 1 to 32 characters: letters and numbers, spaces and `-` `_` `.` `'`, with at least one letter or
+number. Accents and other marks are allowed after a letter, so names in Hindi, Thai, Arabic, Hebrew, Yoruba
+and many other languages work, but all letters must come from one widely used writing system. Latin can be mixed with Chinese characters and Japanese kana, Korean Hangul or Bopomofo. Typographic apostrophes such as ’ become a straight apostrophe; use a straight apostrophe `'`. Joiners (ZWNJ, ZWJ) and the `·` and `・` middle dots are not accepted. Emoji, symbols such as
+check marks, invisible characters and any name that contains `gyblos`, `verified`, `verificado`, `official`
+or `oficial` are refused (`NAME_INVALID` or `NAME_RESERVED`, with a sentence saying which part failed). The
+index may take up to 10 seconds to show a new name. The name is public, so don't put your legal name, email
+or location in it: see [Data and privacy](/en/reference/data-and-privacy#seller-name). Every option is in the
+[CLI reference](/en/reference/cli#seller-name).
+
 ## Privacy [#buyer-data-and-network-privacy]
 
 A local engine processes buyers' messages on your machine; do not store or share them. A remote engine

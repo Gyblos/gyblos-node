@@ -31,6 +31,8 @@ export const INDEX_ERRORS = {
   INVALID_CLAIM: 'INVALID_CLAIM',
   STALE_CLAIM: 'STALE_CLAIM',
   UNKNOWN_NODE: 'UNKNOWN_NODE',
+  PROFILE_HELD: 'PROFILE_HELD',
+  NO_PROFILE: 'NO_PROFILE',
   UNAVAILABLE: 'DISCOVERY_UNAVAILABLE',
 } as const;
 export type IndexErrorCode = (typeof INDEX_ERRORS)[keyof typeof INDEX_ERRORS];
@@ -60,6 +62,7 @@ export const INDEX_ROUTES = {
   NETWORK: '/v1/network',
   // POST a signed GitHub claim here; GET `${GITHUB_IDENTITY}/<nodeId>` reads one.
   GITHUB_IDENTITY: '/v1/identity/github',
+  PROFILE: '/v1/profile',
 } as const;
 // Public reads are CORS-readable on every status, errors included.
 export const PUBLIC_READ_ROUTES: ReadonlySet<string> = new Set([
@@ -73,6 +76,7 @@ export const PUBLIC_READ_ROUTES: ReadonlySet<string> = new Set([
 // Public reads below a prefix (GET /v1/identity/github/<nodeId>), CORS-readable like the routes above.
 export const PUBLIC_READ_PREFIXES: readonly string[] = [
   `${INDEX_ROUTES.GITHUB_IDENTITY}/`,
+  `${INDEX_ROUTES.PROFILE}/`,
 ];
 
 export const INDEX_HEADERS = {
@@ -329,4 +333,12 @@ export const GITHUB_CLAIM = {
   inconclusive: [403, 429, 451],
   serverError: 500,
   msPerSecond: 1000,
+} as const;
+
+export const SELLER_PROFILE = {
+  maxBodyBytes: 1024,
+  maxAgeMs: 60_000,
+  held: 1,
+  open: 0,
+  maxListedRows: 1000,
 } as const;

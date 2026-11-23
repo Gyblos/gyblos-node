@@ -26,6 +26,7 @@ import {
   GITHUB_CLAIM_STATES,
   REGISTRATION,
   REGISTRATION_STATUS,
+  SELLER_PROFILE,
   UPTIME,
 } from './constants';
 import { nullableTextLength, textLength } from './sqlite-expressions';
@@ -250,6 +251,34 @@ export const githubClaims = sqliteTable(
         isNull(table.state),
         inArray(table.state, Object.values(GITHUB_CLAIM_STATES)),
       )}`,
+    ),
+  ],
+);
+export const sellerProfiles = sqliteTable(
+  'discovery_seller_profiles',
+  {
+    nodeId: text('node_id').primaryKey(),
+    name: text('name'),
+    issuedAt: integer('issued_at').notNull(),
+    signature: text('signature'),
+    held: integer('held').notNull().default(SELLER_PROFILE.open),
+  },
+  (table) => [
+    literalCheck(
+      'discovery_seller_profiles_node_id',
+      eq(textLength(table.nodeId), nodeIdCharacters),
+    ),
+    literalCheck(
+      'discovery_seller_profiles_tombstone',
+      sql`(${isNull(table.name)}) = (${isNull(table.signature)})`,
+    ),
+    literalCheck(
+      'discovery_seller_profiles_held',
+      inArray(table.held, [SELLER_PROFILE.open, SELLER_PROFILE.held]),
+    ),
+    literalCheck(
+      'discovery_seller_profiles_held_empty',
+      sql`${or(eq(table.held, SELLER_PROFILE.open), isNull(table.name))}`,
     ),
   ],
 );

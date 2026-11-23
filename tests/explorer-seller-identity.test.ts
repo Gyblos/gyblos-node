@@ -232,9 +232,12 @@ void test('a stored network status from before the GitHub field reads as unverif
   const stored = parseNetworkStatus(network(null));
   const old = {
     ...stored,
-    nodes: stored.nodes.map(({ github: _github, ...rest }) => rest),
+    nodes: stored.nodes.map(
+      ({ github: _github, name: _name, ...rest }) => rest,
+    ),
   } as unknown as typeof stored;
   assert.equal(normalizeNetwork(old)?.nodes[0]?.github, null);
+  assert.equal(normalizeNetwork(old)?.nodes[0]?.name, null);
   assert.equal(normalizeNetwork(null), null);
 });
 

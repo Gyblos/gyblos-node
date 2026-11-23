@@ -32,6 +32,7 @@ Replace `COMMAND` with a command from the table below. The examples on this page
 | `gyblos seller register`                    | None                                                   | 0 registered or already registered; 1 failure             |
 | `gyblos seller rpc`, `rpc set`, `rpc reset` | None                                                   | 0 shown or saved; 1 failure, nothing changed              |
 | `gyblos seller verify github USER`          | `--gist URL`; or `--status`, `--cancel` without `USER` | 0 verified, shown or cancelled; 1 not verified or failure |
+| `gyblos seller name NAME`                   | Or `--clear`, `--status` without `NAME`                | 0 set, cleared or shown; 1 refused or failure             |
 | `gyblos seller init`                        | See [`seller init`](#init-flags-for-a-native-checkout) | 0 written; 1 failure; 130 prompt cancelled                |
 | `gyblos seller service install`             | `--memory SIZE`, `--cpu PERCENT`, `--dry-run`          | 0 success; 1 failure                                      |
 | `gyblos seller service uninstall`           | `--dry-run`                                            | 0 success; 1 failure                                      |
@@ -103,6 +104,7 @@ docker compose exec seller gyblos seller status
 docker compose exec seller gyblos seller status --online
 docker compose exec seller gyblos seller register
 docker compose exec seller gyblos seller verify github USER
+docker compose exec seller gyblos seller name "NAME"
 ```
 
 `seller status` is read-only. `--online` also looks up the seller's NodeId in the discovery index. While
@@ -140,6 +142,29 @@ stop it at any point and run it again. `Verified` exits 0; `pending` or `lost` e
 example that the proof line is missing or that the index could not reach GitHub (run it again later).
 `--status` shows what the index holds; `--cancel` removes the link and leaves the gist for you to delete.
 Only `verified` means the index found the proof.
+
+## seller name [#seller-name]
+
+`seller name "NAME"` sets an optional public name that the discovery index shows beside this seller's
+NodeId. You choose it: the index doesn't verify it, and two sellers can use the same name, so it never shows
+a check mark. Only [`seller verify github`](#verify-github) proves who runs a seller. To set a name, the index must
+already know the seller, as for `seller verify github`; `--clear` works either way.
+
+A name has 1 to 32 characters: letters and numbers, spaces and `-` `_` `.` `'`, with at least one letter
+or number. Accents and other marks are allowed after a letter, so names in Hindi, Thai, Arabic, Hebrew,
+Yoruba and many other languages can be written, but all letters must come from one widely used writing system. Latin can be mixed with Chinese characters and Japanese kana, Korean Hangul or Bopomofo. Typographic apostrophes such as ’ become a straight apostrophe; use a straight apostrophe `'`. Joiners (ZWNJ, ZWJ) and the `·` and `・` middle dots are not accepted. Emoji, symbols such as check marks,
+modifier and small capital letters, and invisible characters are refused, and so is any name that contains
+`gyblos`, `verified`, `verificado`, `official` or `oficial`, even written with digits, spaces or
+punctuation. Extra spaces are removed. A refused name stops with `NAME_INVALID` or `NAME_RESERVED` and says
+which part failed, before anything is sent. For a name that starts with `-`, put `--` before it:
+`gyblos seller name -- "-Lab"`. The node key signs the name and the command sends it to the index, which
+may take up to 10 seconds to show it.
+
+`--clear` removes the name; `--status` shows the name the index holds, or says that an index operator removed it. Refusals from the index end with a
+static code in brackets, such as `DISCOVERY_UNKNOWN_NODE` (register or publish the seller first),
+`DISCOVERY_STALE_CLAIM` (turn on automatic time on the computer; the message shows how far off the clock is
+when the index reports its time) or `DISCOVERY_PROFILE_HELD` (an index operator removed the name). See
+[Data and privacy](/en/reference/data-and-privacy#seller-name) for what becomes public.
 
 ## seller init [#init-flags-for-a-native-checkout]
 

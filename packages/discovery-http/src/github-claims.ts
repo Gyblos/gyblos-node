@@ -121,10 +121,10 @@ function checkAnswer(body: unknown): GithubClaimAnswer {
   return { state, reason, retryAfter };
 }
 
-async function readAnswer(
+export async function readClaimBody(
   response: Response,
   aborted: Promise<never>,
-): Promise<GithubClaimAnswer> {
+): Promise<unknown> {
   const mapped = CLAIM_STATUS_ERROR_MAP.get(response.status);
   if (mapped) failStatus(response, mapped);
   if (response.status !== HTTP_STATUS.OK && !isRefusal(response.status))
@@ -150,8 +150,11 @@ async function readAnswer(
       ),
       response.status,
     );
-  return checkAnswer(body);
+  return body;
 }
+
+const readAnswer = async (response: Response, aborted: Promise<never>) =>
+  checkAnswer(await readClaimBody(response, aborted));
 
 export async function submitGithubClaim(
   input: SubmitGithubClaimInput,
@@ -183,7 +186,7 @@ const OLDER_VIEW_KEYS = [
   'verifiedAt',
 ] as const;
 const VIEW_KEYS = [...OLDER_VIEW_KEYS, 'issuedAt', 'signature'] as const;
-const SIGNATURE_HEX = new RegExp(
+export const SIGNATURE_HEX = new RegExp(
   `^[0-9a-f]{${CONTROL_LIMITS.signatureBytes * 2}}$`,
 );
 const signatureOf = (value: unknown): value is string | null =>
