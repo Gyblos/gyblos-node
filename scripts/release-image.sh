@@ -25,7 +25,7 @@ printf '%s\n' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-
   die "invalid version: '$version' (expected for example 0.1.0-beta.1)"
 # The same rule the publish job uses to order releases (no leading zeros), checked before anything is pushed.
 valid=0
-node "$(dirname "$0")/semver-newer.mjs" "$version" "$version" 2>/dev/null || valid=$?
+node "$(dirname "$0")/semver-newer.ts" "$version" "$version" 2>/dev/null || valid=$?
 [ "$valid" -ne 2 ] || die "invalid version: '$version' (expected for example 0.1.0-beta.1)"
 # Keyless signing binds the release to the workflow's identity; anywhere else it would sign as a person.
 [ "${GITHUB_ACTIONS:-}" = true ] && [ -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ] ||

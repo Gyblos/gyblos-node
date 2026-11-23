@@ -156,6 +156,9 @@ importers:
       eslint:
         specifier: 9.39.1
         version: 9.39.1(jiti@2.7.0)
+      jiti:
+        specifier: 2.7.0
+        version: 2.7.0
       litesvm:
         specifier: 1.6.2
         version: 1.6.2(typescript@5.9.3)

@@ -13,11 +13,11 @@ Related pages:
 
 ## What lint enforces
 
-`pnpm lint` runs ESLint ([eslint.config.js](../eslint.config.js) with the local
+`pnpm lint` runs ESLint ([eslint.config.ts](../eslint.config.ts) with the local
 rules in [tooling/code-standards.ts](../tooling/code-standards.ts)),
-`pnpm comments:check`, `prettier --check`, `pnpm tooling:test`,
-`pnpm skills:check` and `pnpm boundaries`. Errors fail the check; warnings are
-reported and must not grow in a PR.
+`pnpm comments:check`, `pnpm typescript:check`, `prettier --check`,
+`pnpm tooling:test`, `pnpm skills:check` and `pnpm boundaries`. Errors fail the
+check; warnings are reported and must not grow in a PR.
 
 | Rule                                      | Level | Scope and exceptions                                                                                                                           |
 | ----------------------------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -27,6 +27,7 @@ reported and must not grow in a PR.
 | `@typescript-eslint/no-floating-promises` | error | All TypeScript.                                                                                                                                |
 | `gyblos/no-new-comments`                  | error | TypeScript source; comments cannot exceed the exact per-file budget.                                                                           |
 | `pnpm comments:check`                     | error | Every source format, including shell, YAML, TOML, CSS, SQL, JSONC, HTML, SVG, `.tsx.preview` and patches; no new comment text versus the base. |
+| `pnpm typescript:check`                   | error | Every tracked file: no `.js`, `.mjs` or `.cjs` file outside the exceptions recorded in `tooling/typescript-only.ts`.                           |
 | `gyblos/package-boundaries`               | error | `apps`, `packages`, `lab`: a relative import must not leave its package.                                                                       |
 | `gyblos/import-extensions`                | error | All TypeScript: relative code imports have no extension; `.json`/`.css` keep it.                                                               |
 | `gyblos/version-pins`                     | error | `packages/config/src/versions.ts` must match the dependency pins in manifests.                                                                 |
@@ -48,9 +49,11 @@ or, if the rule is wrong, change the rule in a separate tooling PR with a test.
 - Keep functions focused on one named step. Use descriptive names; `i` and `tx`
   are permitted.
 - JavaScript-family code is always TypeScript, including scripts, tooling and
-  configuration. Do not add `.mjs`, `.cjs` or `.js` files. A few tracked files
-  still have those extensions and are to be converted, not copied. Rust sidecars
-  follow [the stack guide](stack.md#when-to-use-rust).
+  configuration. Do not add `.mjs`, `.cjs` or `.js` files.
+  `pnpm typescript:check` fails when a tracked file has one of those extensions.
+  A config a tool cannot load as TypeScript is plain data, such as
+  `postcss.config.json`. Rust sidecars follow
+  [the stack guide](stack.md#when-to-use-rust).
 - Use four import groups separated by blank lines: Node builtins, external
   packages, `@gyblos/*` packages, then relative imports. `pnpm format` sorts
   them.

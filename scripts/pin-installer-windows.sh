@@ -14,7 +14,7 @@ die() {
 version=${1:-}
 sha=${2:-}
 valid=0
-node "$(dirname "$0")/semver-newer.mjs" "$version" "$version" 2>/dev/null || valid=$?
+node "$(dirname "$0")/semver-newer.ts" "$version" "$version" 2>/dev/null || valid=$?
 [ "$valid" -ne 2 ] || die "not a semantic version: '$version'"
 printf '%s\n' "$sha" | grep -Eq '^[0-9a-f]{64}$' || die "not a SHA-256: '$sha'"
 file=${3:-$(git rev-parse --show-toplevel)/install.ps1}

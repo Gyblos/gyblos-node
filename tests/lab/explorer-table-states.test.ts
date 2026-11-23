@@ -181,7 +181,7 @@ before(async () => {
     'package.json',
     'tsconfig.json',
     'next.config.ts',
-    'postcss.config.mjs',
+    'postcss.config.json',
   ]) {
     await cp(new URL(name, APP), join(dir, name), { recursive: true });
   }

@@ -19,7 +19,7 @@ die() {
 
 version=${1:-}
 valid=0
-node "$(dirname "$0")/semver-newer.mjs" "$version" "$version" 2>/dev/null || valid=$?
+node "$(dirname "$0")/semver-newer.ts" "$version" "$version" 2>/dev/null || valid=$?
 [ "$valid" -ne 2 ] || die "not a semantic version: '$version'"
 [ "${GITHUB_ACTIONS:-}" = true ] && [ -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ] ||
   die 'publishes only in the release workflow.'
@@ -28,7 +28,7 @@ tag=latest
 current=$(npm view "$MAIN" dist-tags.latest 2>/dev/null || true)
 if [ -n "$current" ] && [ "$current" != "$version" ]; then
   status=0
-  node "$(dirname "$0")/semver-newer.mjs" "$version" "$current" || status=$?
+  node "$(dirname "$0")/semver-newer.ts" "$version" "$current" || status=$?
   case "$status" in
     0) ;;
     1) tag=previous ;;

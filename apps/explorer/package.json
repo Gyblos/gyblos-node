@@ -31,10 +31,10 @@
     "./usage": "./lib/usage.ts"
   },
   "scripts": {
-    "dev": "node scripts/build-registry.mjs && next dev --port 4190",
-    "build": "node scripts/build-registry.mjs && next build",
-    "registry:build": "node scripts/build-registry.mjs",
-    "build:cloudflare": "opennextjs-cloudflare build && node scripts/write-worker-entry.mjs",
+    "dev": "node scripts/build-registry.ts && next dev --port 4190",
+    "build": "node scripts/build-registry.ts && next build",
+    "registry:build": "node scripts/build-registry.ts",
+    "build:cloudflare": "opennextjs-cloudflare build && node scripts/write-worker-entry.ts",
     "start": "next start --port 4190"
   },
   "dependencies": {

@@ -9,7 +9,7 @@
     "node": ">=24.22.1"
   },
   "scripts": {
-    "lint": "eslint . && pnpm comments:check && prettier . --check && pnpm tooling:test && pnpm skills:check && pnpm boundaries && pnpm db:check",
+    "lint": "eslint . && pnpm comments:check && pnpm typescript:check && prettier . --check && pnpm tooling:test && pnpm skills:check && pnpm boundaries && pnpm db:check",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.tests.json && tsc -p apps/desktop/tsconfig.renderer.json && tsc -p apps/docs/tsconfig.json && tsc -p apps/explorer/tsconfig.json",
@@ -24,6 +24,7 @@
     "build:npm": "node --import tsx tooling/npm-packages-cli.ts",
     "skills:check": "node --import tsx tooling/skills-cli.ts check",
     "comments:check": "node --import tsx tooling/comments-cli.ts check",
+    "typescript:check": "node --import tsx tooling/typescript-only-cli.ts",
     "comments:report": "node --import tsx tooling/comments-cli.ts report",
     "skills:materialize": "node --import tsx tooling/skills-cli.ts materialize",
     "skills:materialize:replace": "node --import tsx tooling/skills-cli.ts materialize --replace",
@@ -112,6 +113,7 @@
     "drizzle-orm": "0.45.4",
     "esbuild": "0.28.2",
     "eslint": "9.39.1",
+    "jiti": "2.7.0",
     "litesvm": "1.6.2",
     "prettier": "3.10.1",
     "tsx": "4.23.15",
