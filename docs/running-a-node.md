@@ -915,8 +915,12 @@ endpoints on `127.0.0.1:4031`:
 | `pnpm buyer`      | Free or paid, chosen from each verified signed quote within the ceilings | `api-token` required | One request at a time (`PAID_BUYER_BUSY`)     |
 | `pnpm buyer:free` | Free quotes only; loads no wallet signer, tokenizer or RPC               | none                 | Up to two at once, each on a different seller |
 
-Both use the same `selection.json`. Client setup, formats, tools, coding agents
-and errors are in
+Both use the same `selection.json`. Every `pnpm buyer*` script runs the one
+buyer executable, `apps/buyer/src/bin.ts`, with a subcommand: `start`, `free`,
+`chat`, `init`, `setup`, `auto`, `agent` or `withdraw`.
+`node --import tsx apps/buyer/src/bin.ts --help` lists them; `pnpm buyer --help`
+does not, because that script already passes `start`. Client setup, formats,
+tools, coding agents and errors are in
 [Connect your coding tools](https://docs.gyblos.com/en/buyers/use-from-code).
 `pnpm buyer:agent <opencode|pi|codex|claude>` prints (or with `--write` updates)
 a coding agent's configuration for every model the buyer serves;

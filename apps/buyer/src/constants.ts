@@ -6,6 +6,16 @@ import { BUYER_PAID_TIMEOUTS } from '@gyblos/node/constants';
 import { BUYER_API, BUYER_SIDECAR } from '@gyblos/protocol/buyer-api';
 import type { ProtocolErrorCode } from '@gyblos/protocol/constants';
 
+export const BUYER_COMMANDS = {
+  START: 'start',
+  FREE: 'free',
+  CHAT: 'chat',
+  INIT: 'init',
+  SETUP: 'setup',
+  AUTO: 'auto',
+  AGENT: 'agent',
+  WITHDRAW: 'withdraw',
+} as const;
 export const CHAT_COMMANDS = {
   NEW: '/new',
   EXIT: '/exit',
@@ -263,6 +273,10 @@ export const BUYER_INIT_FLAGS = {
   ADVANCED: '--advanced',
   HELP: '--help',
 } as const;
+export const BUYER_HELP_FLAGS: readonly string[] = [
+  BUYER_INIT_FLAGS.HELP,
+  '-h',
+];
 
 // Operational HTTP diagnostics, separate from inference observations and receipts.
 export const BUYER_HTTP_DIAGNOSTICS = {

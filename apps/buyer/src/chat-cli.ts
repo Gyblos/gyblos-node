@@ -7,7 +7,6 @@ import { prepareBuyerConversation } from '@gyblos/core/buyer-conversation';
 import { SESSION_VERDICTS } from '@gyblos/node/constants';
 import type { ChatMessage } from '@gyblos/protocol/chat';
 import { FREE_CHAT_ROLES } from '@gyblos/protocol/constants';
-import { isMain } from '@gyblos/runtime';
 
 import { startBuyer } from './buyer-main';
 import {
@@ -280,4 +279,3 @@ export async function main(options?: {
     process.off('SIGINT', cancel);
   }
 }
-if (isMain(import.meta.url)) await main();

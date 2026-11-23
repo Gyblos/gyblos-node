@@ -6,7 +6,6 @@ import {
   WITHDRAW_STEPS,
   type UptoBuyerWithdrawStep,
 } from '@gyblos/node/buyer-withdraw';
-import { isMain } from '@gyblos/runtime';
 
 import { PAID_WITHDRAW_CODES, PAID_WITHDRAW_EXIT } from './constants';
 import { buyerRole, paidChainFailure } from './paid-chain';
@@ -55,5 +54,3 @@ export async function main(
     return undefined;
   }
 }
-
-if (isMain(import.meta.url)) await main();

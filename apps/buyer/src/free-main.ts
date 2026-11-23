@@ -3,7 +3,7 @@ import { FREE_OUTPUT_TOKENS, PORTS } from '@gyblos/config';
 import { BUYER_DEPOSIT_MINIMUM_HINT } from '@gyblos/config/batch-session';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
 import { NodeError } from '@gyblos/node/errors';
-import { isMain, shutdownSignal } from '@gyblos/runtime';
+import { shutdownSignal } from '@gyblos/runtime';
 import type { RelayConfigurationCode } from '@gyblos/transport-iroh/constants';
 import { RelayConfigurationError } from '@gyblos/transport-iroh/relays';
 
@@ -134,4 +134,3 @@ export async function main(start: BuyerStarter = startFreeBuyer) {
     }
   }
 }
-if (isMain(import.meta.url)) await main();
