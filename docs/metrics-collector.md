@@ -538,16 +538,25 @@ was not read. `amountAtomic` is devnet USDC as a decimal string:
 - `distribute`: `split.paidOut`, what the seller side received;
 - `reclaim`: `split.refunded`, what went back to the payer.
 
+Contract change (2026-11-23): before this date a `distribute` or `reclaim`
+`amountAtomic` was all the USDC that left the channel's vault in that
+transaction (seller share, fees and refund together). It is now the part named
+above; the whole outflow is the sum of the `split` parts. A client that summed
+`amountAtomic` as withdrawals must sum the split instead.
+
 The mint of a row is the channel's mint, or the instruction's own mint when the
 channel's open was never read (its mint is not recorded).
 
 `split` is set only on the transaction's first `distribute` or `reclaim`
-instruction in devnet USDC, and `null` on every other row. It classifies the
-transaction's positive devnet USDC changes exactly as the daily aggregate's
-payout totals do (the two share the same SQL): `gyblosFees` (the Gyblos fee
-treasury), `programTreasury` (the program's own treasury: rounding remainders,
-or a recipient's share the program could not deliver; not a Gyblos fee),
-`refunded` (a payer of a channel the transaction names, or the payer a
+instruction in devnet USDC, and `null` on every other row. With `recipient`, it
+is set on the transaction's first such instruction among the channels that match
+the filter, still with the whole transaction's values, so a seller's payout
+keeps its breakdown when another channel's instruction comes first. It
+classifies the transaction's positive devnet USDC changes exactly as the daily
+aggregate's payout totals do (the two share the same SQL): `gyblosFees` (the
+Gyblos fee treasury), `programTreasury` (the program's own treasury: rounding
+remainders, or a recipient's share the program could not deliver; not a Gyblos
+fee), `refunded` (a payer of a channel the transaction names, or the payer a
 `distribute` or `reclaim` names itself) and `paidOut` (that channel's payee or a
 distribute recipient), as decimal strings; `channels`, how many USDC channels
 the transaction pays (with more than one, the split is the transaction's total,
@@ -560,9 +569,10 @@ bundled with the payout), or that also pays a channel that is not Gyblos, gets
 no split.
 
 `batched` is `true` on a devnet USDC `distribute` or `reclaim` that is not its
-transaction's first such instruction: that transaction's split and amount are on
-its first paying row (a total over its channels, which may be another seller's
-channel), so this row has neither. It is `false` on every other row.
+transaction's first such instruction (with `recipient`, the first among the
+matching channels): that transaction's split and amount are on its first paying
+row (a total over its channels, which may be another seller's channel), so this
+row has neither. It is `false` on every other row.
 
 The splits of a day's rows add up to that day's `gyblosFeesAtomic`,
 `programTreasuryAtomic`, `refundedAtomic` and `paidOutAtomic`, except that a

@@ -50,7 +50,7 @@ function batched() {
   return database;
 }
 
-void test('a paying row after the transaction first one is marked batched, never given an amount', async () => {
+void test('a paying row after the transaction first one is marked batched; filtered by recipient, the first matching row carries the whole transaction split', async () => {
   const { app } = collector(batched());
   const rows = (await get(app)).body.transactions;
   assert.deepEqual(
@@ -68,10 +68,18 @@ void test('a paying row after the transaction first one is marked batched, never
   );
   const second = (await get(app, `?recipient=${SECOND}`)).body.transactions;
   assert.deepEqual(
-    second.map((row) => [row.kind, row.batched, row.split]),
+    second.map((row) => [
+      row.kind,
+      row.batched,
+      row.split?.channels ?? null,
+      row.amountAtomic !== null,
+    ]),
     [
-      [K.DISTRIBUTE, true, null],
-      [K.OPEN, false, null],
+      [K.DISTRIBUTE, false, 2, true],
+      [K.OPEN, false, null, true],
     ],
   );
+  const whole = rows.find((row) => row.channel === 'A')!;
+  assert.deepEqual(second[0]!.split, whole.split);
+  assert.equal(second[0]!.amountAtomic, whole.amountAtomic);
 });

@@ -181,10 +181,14 @@ function payoutSplits(
 function payoutFields(
   page: ReturnType<typeof pageKeys>,
   splits: ReturnType<typeof payoutSplits>,
+  recipient: string | null,
 ) {
+  const sameRecipient = recipient
+    ? sql` and json_extract(${col('ec', chainChannels.recipientsJson)}, '$[0].owner') = ${recipient}`
+    : sql``;
   const firstPaying = sql`not exists (select 1 from ${from(ins, 'e')} ${channelJoin('e', 'ec')}
     where ${col('e', ins.signature)} = ${page.signature} and ${usdcMint('e', 'ec')}
-      and ${col('e', ins.kind)} in ${kinds(PAYING)} and ${col('e', ins.instructionIndex)} < ${page.instructionIndex})`;
+      and ${col('e', ins.kind)} in ${kinds(PAYING)} and ${col('e', ins.instructionIndex)} < ${page.instructionIndex}${sameRecipient})`;
   const balanced = payoutParts().balanced({
     g: sql`${splits.gyblosFees}`,
     pt: sql`${splits.programTreasury}`,
@@ -231,7 +235,7 @@ export function chainTxReader(database: D1Database): ChainTxReader {
       const page = pageKeys(orm, query);
       const settles = settleIncrements(orm, page);
       const splits = payoutSplits(orm, page);
-      const payout = payoutFields(page, splits);
+      const payout = payoutFields(page, splits, query.recipient);
       return orm
         .with(page)
         .select({
