@@ -12,12 +12,8 @@ const GEOMETRY_STYLE: SignatureStyle = Object.fromEntries(
 );
 
 type SignalState = (typeof SIGNAL_STATE)[keyof typeof SIGNAL_STATE];
-const SETTLE_MS = 1800;
 const ORBIT_PATH =
   'M 32 7 H 46 Q 50 7 50 11 V 37 Q 50 41 46 41 H 18 Q 14 41 14 37 V 11 Q 14 7 18 7 Z';
-function transient(state: SignalState) {
-  return state === SIGNAL_STATE.COMPLETE || state === SIGNAL_STATE.STOPPED;
-}
 
 export function SignalFace({
   state = SIGNAL_STATE.IDLE,
@@ -26,17 +22,10 @@ export function SignalFace({
 }) {
   const instanceId = useId().replace(/:/g, '');
   const gradientId = `signal-foil-${instanceId}`;
-  const previous = useRef(state);
   const activated = useRef(false);
   const [expression, setExpression] = useState<SignalState>(SIGNAL_STATE.IDLE);
   useEffect(() => {
-    if (previous.current === state && transient(state)) return;
-    previous.current = state;
-    if (
-      !activated.current &&
-      !transient(state) &&
-      state !== SIGNAL_STATE.IDLE
-    ) {
+    if (!activated.current && state !== SIGNAL_STATE.IDLE) {
       let secondFrame = 0;
       const firstFrame = window.requestAnimationFrame(() => {
         secondFrame = window.requestAnimationFrame(() => {
@@ -51,12 +40,6 @@ export function SignalFace({
     }
     activated.current = true;
     setExpression(state);
-    if (!transient(state)) return;
-    const timer = window.setTimeout(
-      () => setExpression(SIGNAL_STATE.IDLE),
-      SETTLE_MS,
-    );
-    return () => window.clearTimeout(timer);
   }, [state]);
   const face = expression !== SIGNAL_STATE.IDLE;
   const working =
