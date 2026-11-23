@@ -2,7 +2,6 @@ import { ROLE_FILES, rolePathIn } from '@gyblos/config';
 import { checkBuyerInit } from '@gyblos/node/buyer-init';
 import { pricePerMtokToAtomicPerMtok } from '@gyblos/node/node-config-price';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
-import { isMain } from '@gyblos/runtime';
 import {
   acquireProcessLock,
   readPrivateFile,
@@ -45,9 +44,9 @@ async function configure(args: string[]) {
     await lock.release();
   }
 }
-if (isMain(import.meta.url)) {
+export async function main(args: string[]) {
   try {
-    await configure(process.argv.slice(2));
+    await configure(args);
   } catch (error) {
     console.error(
       error instanceof AutoSettingsError
