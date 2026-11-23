@@ -663,7 +663,6 @@ export function Chat({
                   {answer && (
                     <ChatAnswer
                       message={answer}
-                      run={run}
                       copied={copied === answer.id}
                       canReuse={
                         answer === session.messages.at(-1) && !!lastUser

@@ -2174,47 +2174,6 @@ html .app.desktop-frame .composer-bottom .ui-composer-action {
     transition: none;
   }
 }
-.desktop-frame .preview-answer-skeleton {
-  display: grid;
-  gap: 8px;
-  max-width: 520px;
-  margin-top: 12px;
-}
-.desktop-frame .preview-answer-skeleton i {
-  display: block;
-  height: 10px;
-  border-radius: 5px;
-  background: linear-gradient(
-    90deg,
-    var(--line) 0%,
-    color-mix(in srgb, var(--ink) 16%, transparent) 50%,
-    var(--line) 100%
-  );
-  background-size: 200% 100%;
-  animation: preview-shimmer 1.4s ease-in-out infinite;
-}
-.desktop-frame .preview-answer-skeleton i:nth-child(1) {
-  width: 92%;
-}
-.desktop-frame .preview-answer-skeleton i:nth-child(2) {
-  width: 76%;
-}
-.desktop-frame .preview-answer-skeleton i:nth-child(3) {
-  width: 48%;
-}
-@keyframes preview-shimmer {
-  from {
-    background-position: 100% 0;
-  }
-  to {
-    background-position: -100% 0;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .desktop-frame .preview-answer-skeleton i {
-    animation: none;
-  }
-}
 @container (max-width: 620px) {
   html .app.desktop-frame .ui-table-region .ui-data-table {
     min-width: 0;

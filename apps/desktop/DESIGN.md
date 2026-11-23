@@ -104,7 +104,11 @@ The navigation rail opens Chat, Models, Connections, Applications, Usage & payme
 Chat has one transcript and draft across payment methods. Only user messages
 have bubbles, with time, copy and edit actions below them. Assistant responses
 use the page background without a model/payment heading. Preserve the Gyblos
-progress signal. The composer owns model, thinking, tools and payment choices;
+progress signal. Each live turn has a keyboard-accessible Activity disclosure. Waiting dots
+appear for longer requests and yield to the first visible text. Durations use the local
+monotonic clock, including the first nonempty streaming delta when available. Stopping
+keeps partial text and open code blocks readable. Activity timings last for the current
+app session. The composer owns model, thinking, tools and payment choices;
 USDC chat displays the observed payer balance and chat limit beside the composer. Editing only
 prefills the draft. Navigation and method selection never send a request.
 

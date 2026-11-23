@@ -210,8 +210,13 @@ void test('desktop zero-authority release refuses paid permissions and mismatche
 
 void test('live activity follows the first nonempty delta and terminal for its own turn', () => {
   let clock = 10;
-  const chat = new ChatController('first', () => clock);
-  const model = { id: 'local', name: 'Local', image: { src: 'local.svg' }, free: true };
+  const chat = new ChatController('first', undefined, () => clock);
+  const model = {
+    id: 'local',
+    name: 'Local',
+    image: { src: 'local.svg' },
+    free: true,
+  };
   const answer = () => chat.getSnapshot().sessions[0]?.messages.at(-1);
   chat.startPaypal('Question', model, 'one', undefined, PAYMENT_METHOD.USDC);
   assert.deepEqual(answer()?.activity, { started: 10 });

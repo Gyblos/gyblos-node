@@ -352,20 +352,9 @@ void test('preview Connections leads with a tool grid and an inline setup guide'
   );
 });
 
-void test('preview chat answers show a skeleton while the reply is pending', async () => {
-  const { transformBrand } =
-    await import('../../lab/tools/desktop-preview/brand-build');
-  const file = 'apps/desktop/src/ui/ChatAnswer.tsx';
-  const source = await readFile(file, 'utf8');
-  const rendered = transformBrand(source, file, 'apps/desktop') ?? source;
-  assert.ok(rendered.includes('className="preview-answer-skeleton"'));
-  const css = await previewStyles();
-  assert.match(css, /\.preview-answer-skeleton/);
-  assert.match(
-    css,
-    /prefers-reduced-motion: reduce\)\s*\{[^}]*preview-answer-skeleton/,
-    'the shimmer stops for reduced motion',
-  );
+void test('the desktop preview uses the approved live turn activity component', async () => {
+  const source = await readFile('apps/desktop/src/ui/ChatAnswer.tsx', 'utf8');
+  assert.match(source, /<TurnActivity/);
 });
 
 void test('Compare sellers opens the detail of that model', async () => {

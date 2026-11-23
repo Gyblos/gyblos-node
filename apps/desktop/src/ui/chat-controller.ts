@@ -47,6 +47,7 @@ export class ChatController {
   constructor(
     firstId: string,
     private readonly now: () => number = Date.now,
+    private readonly activityClock: () => number = () => performance.now(),
   ) {
     this.snapshot = { sessions: [createSession(firstId)], activeId: firstId };
   }
@@ -243,6 +244,7 @@ export class ChatController {
           paymentMethod: method,
           ...(paymentSessionId ? { paymentSessionId } : {}),
           sentAt: null,
+          activity: { started: this.activityClock() },
         },
       ],
     }));
@@ -266,6 +268,7 @@ export class ChatController {
               text,
               model: { ...model },
               state: MESSAGE_STATE.COMPLETE,
+              ...this.endActivity(message),
               ...(metrics ? { metrics } : {}),
             }
           : message,
@@ -273,12 +276,23 @@ export class ChatController {
     }));
   }
   appendBuyer(sessionId: string, id: string, text: string) {
+    if (!text) return;
     this.updatePaypal(sessionId, id, (session) => ({
       ...session,
       messages: session.messages.map((message) =>
         message.id === `${id}-assistant` &&
         message.paymentMethod === PAYMENT_METHOD.USDC
-          ? { ...message, text: message.text + text }
+          ? {
+              ...message,
+              text: message.text + text,
+              ...(message.activity &&
+                message.activity.first === undefined && {
+                  activity: {
+                    ...message.activity,
+                    first: this.activityClock(),
+                  },
+                }),
+            }
           : message,
       ),
     }));
@@ -292,7 +306,11 @@ export class ChatController {
             paypalRun: null,
             messages: session.messages.map((message) =>
               message.id === `${id}-assistant`
-                ? { ...message, state: MESSAGE_STATE.STOPPED }
+                ? {
+                    ...message,
+                    state: MESSAGE_STATE.STOPPED,
+                    ...this.endActivity(message),
+                  }
                 : message,
             ),
           },
@@ -309,10 +327,19 @@ export class ChatController {
       notice,
       messages: session.messages.map((message) =>
         message.id === `${id}-assistant`
-          ? { ...message, state: MESSAGE_STATE.FAILED }
+          ? {
+              ...message,
+              state: MESSAGE_STATE.FAILED,
+              ...this.endActivity(message),
+            }
           : message,
       ),
     }));
+  }
+  private endActivity(message: ChatSession['messages'][number]) {
+    return message.activity
+      ? { activity: { ...message.activity, ended: this.activityClock() } }
+      : {};
   }
   private updatePaypal(
     sessionId: string,

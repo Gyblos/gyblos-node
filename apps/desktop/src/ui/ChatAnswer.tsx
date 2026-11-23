@@ -2,27 +2,13 @@
 // Execution, clipboard state and session transitions remain with the caller.
 import { ArrowClockwise, Check, Copy, Info } from '@phosphor-icons/react';
 
-import { PAYMENT_METHOD } from '../paypal-model';
-import {
-  CHAT_PHASE,
-  MESSAGE_STATE,
-  type ChatMessage,
-  type ChatRun,
-} from './chat-state';
-import { AssistantProgress } from './ChatMessageParts';
+import { MESSAGE_STATE, type ChatMessage } from './chat-state';
 import { MessageText } from './MessageText';
-import { SIGNAL_STATE, SignalMark } from './Signal';
+import { TurnActivity } from './TurnActivity';
 import { IconButton } from './UI';
-
-const PHASE_LABEL = {
-  [CHAT_PHASE.CONNECTING]: 'Thinking…',
-  [CHAT_PHASE.TOOLS]: 'Using tools…',
-  [CHAT_PHASE.RESPONDING]: 'Writing…',
-} as const;
 
 type Props = {
   message: ChatMessage;
-  run: ChatRun | null;
   copied: boolean;
   canReuse: boolean;
   reuseDisabled: boolean;
@@ -81,40 +67,21 @@ function AnswerActions({
 }
 
 export function ChatAnswer(props: Props) {
-  const { message, run } = props;
+  const { message } = props;
   return (
-    <article className="chat-answer" aria-label="Assistant">
-      {message.state === MESSAGE_STATE.PENDING && (
-        <AssistantProgress
-          mark={
-            <SignalMark
-              state={
-                run?.phase === CHAT_PHASE.CONNECTING
-                  ? SIGNAL_STATE.CONNECTING
-                  : run?.phase === CHAT_PHASE.TOOLS
-                    ? SIGNAL_STATE.WORKING
-                    : SIGNAL_STATE.RESPONDING
-              }
-            />
-          }
-        >
-          <span>
-            {message.paymentMethod === PAYMENT_METHOD.PAYPAL
-              ? 'Generating response…'
-              : run
-                ? PHASE_LABEL[run.phase]
-                : message.text
-                  ? 'Writing…'
-                  : 'Preparing response'}
-          </span>
-        </AssistantProgress>
-      )}
-      {message.state === MESSAGE_STATE.PENDING && !message.text && (
-        <span className="preview-answer-skeleton" aria-hidden="true">
-          <i />
-          <i />
-          <i />
-        </span>
+    <article
+      className="chat-answer"
+      aria-label="Assistant"
+      data-streaming={
+        (message.state === MESSAGE_STATE.PENDING && !!message.text) || undefined
+      }
+    >
+      {message.activity && (
+        <TurnActivity
+          timing={message.activity}
+          state={message.state}
+          hasText={!!message.text}
+        />
       )}
       {message.text ? (
         <MessageText text={message.text} />

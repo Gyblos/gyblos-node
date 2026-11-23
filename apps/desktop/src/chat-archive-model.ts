@@ -21,7 +21,7 @@ export {
   CHAT_STORAGE_STATE,
   type ChatArchiveState,
 } from './constants';
-export type ArchivedMessage = Omit<ChatMessage, 'model'> & {
+export type ArchivedMessage = Omit<ChatMessage, 'model' | 'activity'> & {
   model: Omit<ChatModel, 'image'>;
 };
 export type ArchivedConversation = Pick<
@@ -232,7 +232,7 @@ export function projectChatArchive(snapshot: ChatSnapshot): ChatArchive | null {
       title: session.title,
       ...(session.pinned && { pinned: true }),
       draft: session.draft,
-      messages: session.messages.map((message) => ({
+      messages: session.messages.map(({ activity: _activity, ...message }) => ({
         ...message,
         model: {
           id: message.model.id,

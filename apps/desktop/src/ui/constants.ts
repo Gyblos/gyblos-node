@@ -313,3 +313,9 @@ export const USAGE_CALENDAR = {
   dayMs: 86400000,
   percentScale: 100,
 } as const;
+
+export const TURN_ACTIVITY = {
+  TICK_MS: 125,
+  REVEAL_MS: 180,
+  SHOW_CLOCK_MS: 1000,
+} as const;
