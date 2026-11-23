@@ -243,13 +243,16 @@ void test('compact pills, buttons, icons, digits and code line numbers', async (
       ).test(css),
       selector + ' ' + declaration,
     );
-  compact('.pk-tag', 'height: 18px;');
+  compact(
+    ':is(.pk-tag, .ui-badge):not(.pk-badge-line .pk-tag)',
+    'height: 18px;',
+  );
   compact('.ui-badge', 'font-size: 11px;');
   compact('.ui-icon-tile', 'width: 28px;');
   compact('.ui-icon-tile', 'width: 16px;');
   compact('.preview-metric-icon', 'width: 24px;');
   compact(
-    '.ui-button:not(.ui-icon-button, .ui-menu-trigger)',
+    '.ui-button:not(.ui-icon-button, .ui-menu-trigger, .pk-switch, .pk-update)',
     '--control-size: 24px;',
   );
   assert.match(
@@ -269,5 +272,5 @@ void test('compact pills, buttons, icons, digits and code line numbers', async (
     css,
     /\.pk-code-line::before \{[^}]*counter-increment: pk-code-line;/,
   );
-  assert.match(css, /user-select: none;/);
+  assert.match(css, /\.pk-code-line::before \{[^}]*user-select: none;/);
 });
