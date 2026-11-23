@@ -1031,29 +1031,6 @@ html
     transition: rotate var(--pk-menu-motion) ease-out !important;
   }
 }
-html
-  .app.desktop-frame
-  .preview-model-menu:has(.dropdown-search input:focus:not(:placeholder-shown))
-  .preview-model-list
-  > :nth-child(1 of [data-model-row]:not(:disabled)) {
-  background: color-mix(in srgb, var(--ink) 7%, transparent);
-}
-html
-  .app.desktop-frame
-  .preview-model-menu
-  .dropdown-row:is(:hover, :focus-visible, [data-active]),
-html
-  .app.desktop-frame
-  .preview-seller-flyout
-  .dropdown-row:is(:hover, :focus-visible) {
-  background: color-mix(in srgb, var(--ink) 7%, transparent);
-}
-html
-  .app.desktop-frame
-  :is(.preview-model-menu, .preview-seller-flyout)
-  .dropdown-row:focus-visible {
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 28%, transparent);
-}
 html .app.desktop-frame .preview-menu-caret {
   color: var(--muted);
   transition: color var(--motion-overlay) ease;
@@ -1064,15 +1041,6 @@ html .app.desktop-frame .dropdown-row[data-active] .preview-menu-caret {
 html .app.desktop-frame .preview-caret-slot {
   width: 13px;
   flex: none;
-}
-html
-  .app.desktop-frame
-  :is(
-    .preview-model-menu .dropdown-copy strong,
-    .preview-flyout-title strong,
-    .ui-model-trigger
-  ) {
-  font-family: var(--preview-name-type);
 }
 html .app.desktop-frame .preview-offer-price {
   flex: none;
@@ -1092,48 +1060,9 @@ html .app.desktop-frame .preview-model-menu[data-split] .dropdown-content {
 html .app.desktop-frame .preview-model-menu[data-split] .dropdown-content {
   flex: 1;
 }
-html
-  .app.desktop-frame
-  :is(.preview-model-menu[data-split], .preview-seller-flyout)
-  .dropdown-footer {
-  margin-top: auto;
-}
 html .app.desktop-frame .preview-check-slot {
   width: 18px;
   flex: none;
-}
-html .app.desktop-frame .compact-dropdown.preview-seller-flyout:popover-open {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-html .app.desktop-frame .compact-dropdown.preview-seller-flyout {
-  overflow-y: auto;
-  transform-origin: left center;
-  transition:
-    opacity var(--pk-menu-motion) ease-out,
-    scale var(--pk-menu-motion) ease-out,
-    filter var(--pk-menu-motion) ease-out,
-    top var(--motion-overlay) var(--motion-push-ease),
-    display var(--pk-menu-motion) allow-discrete,
-    overlay var(--pk-menu-motion) allow-discrete;
-}
-html .app.desktop-frame .preview-flyout-title {
-  display: grid;
-  gap: 2px;
-  margin: 0 0 2px;
-  padding: 4px 8px 6px;
-  border-bottom: 1px solid var(--subtle-line);
-}
-html .app.desktop-frame .preview-flyout-title strong {
-  font-size: 13px;
-  line-height: 18px;
-  font-weight: 600;
-}
-html .app.desktop-frame .preview-flyout-title small {
-  font-size: 12px;
-  line-height: 16px;
-  color: var(--muted);
 }
 html .app.desktop-frame .preview-strategy-icon {
   display: inline-grid;
@@ -1149,16 +1078,6 @@ html
   .dropdown-row[data-strategy][aria-checked='true']
   .preview-strategy-icon {
   color: var(--pk-success);
-}
-html .app.desktop-frame .preview-seller-flyout .dropdown-footer {
-  flex: none;
-  border-top: 1px solid var(--subtle-line);
-}
-@media (prefers-reduced-motion: reduce) {
-  html .app.desktop-frame .compact-dropdown.preview-seller-flyout,
-  html .app.desktop-frame .preview-strategy-icon {
-    transition: none;
-  }
 }
 @media (max-width: 560px) {
   html .app.desktop-frame .preview-model-menu[data-split] .preview-menu-caret {
@@ -1236,11 +1155,6 @@ html .app.desktop-frame .preview-strategy button:disabled {
   cursor: default;
   opacity: 0.7;
 }
-html .app.desktop-frame .preview-model-list .ui-item-title {
-  flex-wrap: wrap;
-  row-gap: 2px;
-  column-gap: 6px;
-}
 html .app.desktop-frame .pk-badge-line {
   display: flex;
   flex-basis: 100%;
@@ -1258,40 +1172,6 @@ html .app.desktop-frame .pk-balance-line .ui-button.pk-balance-add {
   padding: 0 6px;
   font-size: 12px;
   font-weight: 500;
-}
-html .app.desktop-frame .preview-model-list .dropdown-copy strong {
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 20px;
-}
-html .app.desktop-frame .preview-model-list .dropdown-row {
-  padding-block: 6px;
-}
-html .app.desktop-frame .preview-seller-flyout .dropdown-copy strong {
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 18px;
-}
-html .app.desktop-frame .preview-seller-flyout .dropdown-copy small {
-  overflow: hidden;
-  font-size: 12px;
-  line-height: 16px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-html .app.desktop-frame .preview-seller-flyout .preview-offer-price {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  line-height: 18px;
-}
-html
-  .app.desktop-frame
-  :is(.preview-model-menu, .preview-seller-flyout)
-  .dropdown-row:disabled:hover {
-  background: transparent;
-}
-html .app.desktop-frame :is(.preview-model-menu, .preview-seller-flyout) {
-  scrollbar-width: thin;
 }
 html .app.desktop-frame .preview-chat-pin {
   position: absolute;

@@ -25,7 +25,8 @@ export const priceRange = (model: Pick<ModelOption, 'input' | 'output'>) =>
   `${usdPerMtok(model.input)} / ${usdPerMtok(model.output)}`;
 
 export function groupPrice(offers: readonly ModelOption[]) {
-  if (offers.some((offer) => offer.free)) return 'Free';
+  if (offers.some((offer) => offer.free))
+    return offers.every((offer) => offer.free) ? 'Free' : 'Free and paid';
   const cheapest = offers.reduce<ModelOption | undefined>(
     (best, offer) =>
       !best ||

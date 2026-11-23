@@ -253,7 +253,8 @@
 .desktop-frame .ui-copy-field .ui-input:focus-visible {
   border-color: var(--focus);
 }
-.desktop-frame .ui-copy-field.ui-copy-field--reveal {
+.desktop-frame .ui-copy-field.ui-copy-field--reveal,
+.desktop-frame .ui-connection-page .ui-copy-field.ui-copy-field--reveal {
   grid-template-columns: minmax(0, 1fr) auto auto;
 }
 @media (max-width: 899px) {

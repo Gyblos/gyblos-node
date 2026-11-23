@@ -7,6 +7,7 @@ import { networkModelGroups } from './announced-models';
 import { groupPrice, priceRange } from './model-price';
 import type { ModelOption } from './model-types';
 import { ModelImage } from './ModelImage';
+import { SellerChoices } from './SellerChoices';
 import { MenuItem } from './UI';
 
 export function NetworkSellerMenu({
@@ -40,34 +41,28 @@ export function NetworkSellerMenu({
         }
         data-model-row={name}
         onKeyDown={(event) => {
-          if (event.key !== 'ArrowRight') return;
-          event.preventDefault();
-          const group = event.currentTarget.parentElement;
-          setExpanded(name);
-          requestAnimationFrame(() =>
-            group
-              ?.querySelector<HTMLElement>('[role="menuitemradio"]')
-              ?.focus(),
-          );
+          if (event.key === 'ArrowRight') {
+            event.preventDefault();
+            setExpanded(name);
+          }
         }}
-        aria-expanded={expanded === name}
+        aria-haspopup={offers.length > 1 ? 'menu' : undefined}
+        aria-expanded={offers.length > 1 ? expanded === name : undefined}
         leading={<ModelImage artwork={offers[0]!.image} name={name} />}
         trailing={expanded === name ? <CaretDown /> : <CaretRight />}
-        onClick={() => setExpanded(expanded === name ? undefined : name)}
+        onClick={() => {
+          if (!initiallyExpanded && offers.length === 1) {
+            onSelect(offers[0]!.id);
+            return;
+          }
+          setExpanded(expanded === name ? undefined : name);
+        }}
       />
       {expanded === name && (
-        <div
-          className="seller-menu-choices"
-          onKeyDown={(event) => {
-            if (event.key !== 'ArrowLeft') return;
-            event.preventDefault();
-            event.currentTarget.parentElement
-              ?.querySelector<HTMLElement>('[data-model-row]')
-              ?.focus();
-            setExpanded(undefined);
-          }}
-          role="group"
-          aria-label={'Seller for ' + name}
+        <SellerChoices
+          name={name}
+          flyout={!initiallyExpanded}
+          onDismiss={() => setExpanded(undefined)}
         >
           {buyerModels.includes(name) && (
             <MenuItem
@@ -95,7 +90,7 @@ export function NetworkSellerMenu({
               onClick={() => onSelect(offer.id)}
             />
           ))}
-        </div>
+        </SellerChoices>
       )}
     </div>
   ));
