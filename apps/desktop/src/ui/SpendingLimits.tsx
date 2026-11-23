@@ -148,13 +148,13 @@ function LimitControl({ buyer, policy, open }: LimitControlProps) {
             <small id="chat-limit-help" className="ui-help-text">
               Applies to this chat session. API keys have separate limits.
             </small>
+          </div>
+          <div className="preview-setting-control">
             {!available && (
               <Button disabled={buyer.busy} onClick={() => open('')}>
                 Manage chat budget
               </Button>
             )}
-          </div>
-          <div className="preview-setting-control">
             <AmountField
               compact
               disabled={!available}
