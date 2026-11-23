@@ -70,6 +70,11 @@ function seeded() {
   ]);
   delta(database, sig('E'), 'G', '-1500');
   delta(database, sig('E'), SELLER_OWNER, '1440');
+  database.raw
+    .prepare(
+      'UPDATE collector_chain_instructions SET recipients_json = recipients_json_of_channel.r FROM (SELECT recipients_json AS r FROM collector_chain_channels WHERE channel = ?) AS recipients_json_of_channel WHERE signature = ? AND instruction_index = 1',
+    )
+    .run('G', sig('E'));
   add('N1', 145, [['open', 'N', { amount: '999' }]]);
   add('L1', 146, [['open', 'L', { amount: '77' }]]);
   add('Fa', 150, [['reclaim', 'G']]);
@@ -81,7 +86,7 @@ const EXPECTED = [
   ['Fb', 0, 'request_close', 'G', null],
   ['Fa', 0, 'reclaim', 'G', null],
   ['L1', 0, 'open', 'L', null],
-  ['E', 1, 'distribute', 'G', '1500'],
+  ['E', 1, 'distribute', 'G', '1440'],
   ['E', 0, 'settle_and_seal', 'G', '1200'],
   ['D', 0, 'settle', 'G', '0'],
   ['C', 0, 'settle', 'G', '300'],
@@ -118,6 +123,7 @@ void test('GET /v1/stats/chain/txs lists Gyblos channel instructions newest firs
     payee: FEE_PAYER,
     recipients: [SELLER_OWNER, DEVNET_GYBLOS_TREASURY],
     amountAtomic: '1000',
+    split: null,
   });
   assert.deepEqual(body.transactions[2]!.recipients, []);
   assert.ok(body.transactions.every((row) => row.channel !== 'N'));
@@ -263,8 +269,8 @@ void test('the real devnet lifecycle lists its instructions with the amounts the
     sum(usdc.map((day) => day.settledAtomic)),
   );
   assert.equal(
-    sum([amountOf('distribute'), amountOf('reclaim')]),
-    sum(usdc.map((day) => day.depositedAtomic)),
+    BigInt(amountOf('distribute')!),
+    sum(usdc.map((day) => day.paidOutAtomic)),
   );
 });
 

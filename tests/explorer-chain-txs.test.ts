@@ -44,6 +44,14 @@ function answer() {
         payee: 'FeePayer1111',
         recipients: ['SellerOwner', TREASURY],
         amountAtomic: '1500000',
+        split: {
+          paidOut: '1500000',
+          gyblosFees: '0',
+          programTreasury: '0',
+          refunded: '0',
+          channels: 1,
+          unclassified: '0',
+        },
       },
       {
         signature: SIGNATURE,
@@ -103,6 +111,14 @@ void test('channel transactions are checked at the boundary and amounts stay exa
     channel: 'ChannelAddress1111',
     recipients: ['SellerOwner', TREASURY],
     amount: 1_500_000n,
+    split: {
+      paidOut: 1_500_000n,
+      gyblosFees: 0n,
+      programTreasury: 0n,
+      refunded: 0n,
+      channels: 1,
+      unclassified: 0n,
+    },
   });
   assert.equal(page.transactions[1]!.amount, null);
   const withoutPayee = answer();
@@ -172,6 +188,8 @@ void test('a row is labeled plainly with a fixed six-decimal amount and a Solana
     seller: SELLER,
     amount: '1.500000',
     muted: false,
+    detail: [],
+    shared: false,
     signature: `${SIGNATURE.slice(0, 6)}…${SIGNATURE.slice(-6)}`,
     href: `https://explorer.solana.com/tx/${SIGNATURE}?cluster=devnet`,
   });
@@ -260,4 +278,118 @@ void test('transaction pages keep the verified seller filter', () => {
     rangeSwitchHref(`verified=1&before=${CURSOR}`, 30),
     `/?verified=1&before=${CURSOR}`,
   );
+});
+
+type Body = ReturnType<typeof answer>;
+const SPLIT = {
+  paidOut: '213',
+  gyblosFees: '9',
+  programTreasury: '0',
+  refunded: '999778',
+  channels: 1,
+  unclassified: '0',
+};
+function payout(kind: string, amountAtomic: string, split: object) {
+  const body: Body = answer();
+  Object.assign(body.transactions[0]!, { kind, amountAtomic, split });
+  return parseChainTxs(body).transactions[0]!;
+}
+
+void test('a paid out row shows the seller amount and the rest of the split, one part per line', () => {
+  const tx = payout('distribute', '213', SPLIT);
+  assert.deepEqual(tx.split, {
+    paidOut: 213n,
+    gyblosFees: 9n,
+    programTreasury: 0n,
+    refunded: 999_778n,
+    channels: 1,
+    unclassified: 0n,
+  });
+  const row = txRow(tx, new Map(), TREASURY);
+  assert.deepEqual(
+    [row.amount, row.muted, row.detail, row.shared],
+    ['0.000213', false, ['Gyblos fee 0.000009', 'to buyer 0.999778'], false],
+  );
+  assert.deepEqual(
+    txRow(
+      payout('distribute', '213', { ...SPLIT, programTreasury: '3' }),
+      new Map(),
+      TREASURY,
+    ).detail,
+    ['Gyblos fee 0.000009', 'payments program 0.000003', 'to buyer 0.999778'],
+  );
+});
+
+void test('a refunded row shows just its refund, and a zero payout is muted', () => {
+  const refund = txRow(
+    payout('reclaim', '500', {
+      paidOut: '0',
+      gyblosFees: '0',
+      programTreasury: '0',
+      refunded: '500',
+      channels: 1,
+      unclassified: '0',
+    }),
+    new Map(),
+    TREASURY,
+  );
+  assert.deepEqual(
+    [refund.label, refund.amount, refund.detail],
+    ['Refunded', '0.000500', []],
+  );
+  const nothing = txRow(
+    payout('distribute', '0', { ...SPLIT, paidOut: '0' }),
+    new Map(),
+    TREASURY,
+  );
+  assert.deepEqual([nothing.amount, nothing.muted], ['0.000000', true]);
+});
+
+void test('a split shared by several channels is labeled as a transaction total and credits no seller', () => {
+  const row = txRow(
+    payout('distribute', '213', { ...SPLIT, channels: 2 }),
+    sellerOwners([SELLER]),
+    TREASURY,
+  );
+  assert.deepEqual(
+    [row.shared, row.seller, row.detail[0]],
+    [true, null, 'total of 2 channels'],
+  );
+});
+
+void test('the split is parsed strictly, and an older collector payout amount is not shown as seller proceeds', () => {
+  for (const broken of [
+    { paidOut: '213', gyblosFees: '9', programTreasury: '0', channels: 1 },
+    { ...SPLIT, paidOut: '2.13' },
+    { ...SPLIT, gyblosFee: '9', gyblosFees: undefined },
+    { ...SPLIT, channels: '1' },
+    { ...SPLIT, unclassified: undefined },
+    '213',
+  ]) {
+    const bad: Body = answer();
+    Object.assign(bad.transactions[0]!, { split: broken });
+    assert.throws(() => parseChainTxs(bad), /unexpected source shape/);
+  }
+  const older: Body = answer();
+  Reflect.deleteProperty(older.transactions[0]!, 'split');
+  const legacy = parseChainTxs(older).transactions[0]!;
+  assert.deepEqual([legacy.split, legacy.amount], [null, null]);
+  assert.equal(txRow(legacy, new Map(), TREASURY).amount, '—');
+  const kept = parseChainTxs(answer()).transactions[1]!;
+  assert.equal(kept.kind, 'seal');
+  const settle: Body = answer();
+  Object.assign(settle.transactions[1]!, {
+    kind: 'settle',
+    amountAtomic: '42',
+  });
+  assert.equal(parseChainTxs(settle).transactions[1]!.amount, 42n);
+});
+
+void test('a payout that accounts for less than the vault outflow shows the unclassified remainder', () => {
+  const row = txRow(
+    payout('distribute', '213', { ...SPLIT, unclassified: '40' }),
+    new Map(),
+    TREASURY,
+  );
+  assert.equal(row.detail.at(-1), 'unclassified 0.000040');
 });

@@ -494,7 +494,15 @@ and `503 COLLECTOR_UNAVAILABLE` are as for the other stats routes. The answer:
       "channel": "<address>",
       "payee": "<address>",
       "recipients": ["<address>", "<address>"],
-      "amountAtomic": "1500000"
+      "amountAtomic": "213",
+      "split": {
+        "paidOut": "213",
+        "gyblosFees": "9",
+        "programTreasury": "3",
+        "refunded": "999775",
+        "channels": 1,
+        "unclassified": "0"
+      }
     }
   ],
   "next": "431000000-<signature>-1"
@@ -516,17 +524,47 @@ was not read. `amountAtomic` is devnet USDC as a decimal string:
   deposits, in the daily aggregate's order (slot, capped cumulative, signature,
   instruction index), so the rows of a day add up to its `settledAtomic`; `0`
   when it adds nothing;
-- `distribute` and `reclaim`: the USDC that left the channel's vault in that
-  transaction, on the first such instruction of the channel in it.
+- `distribute`: `split.paidOut`, what the seller side received;
+- `reclaim`: `split.refunded`, what went back to the payer.
+
+The mint of a row is the channel's mint, or the instruction's own mint when the
+channel's open was never read (its mint is not recorded).
+
+`split` is set only on the transaction's first `distribute` or `reclaim`
+instruction in devnet USDC, and `null` on every other row. It classifies the
+transaction's positive devnet USDC changes exactly as the daily aggregate's
+payout totals do (the two share the same SQL): `gyblosFees` (the Gyblos fee
+treasury), `programTreasury` (the program's own treasury: rounding remainders,
+or a recipient's share the program could not deliver; not a Gyblos fee),
+`refunded` (a payer of a channel the transaction names, or the payer a
+`distribute` or `reclaim` names itself) and `paidOut` (that channel's payee or a
+distribute recipient), as decimal strings; `channels`, how many USDC channels
+the transaction pays (with more than one, the split is the transaction's total,
+not one channel's); and `unclassified`, the USDC that left the channels' vaults
+to no party the transaction names. The aggregate accepts such a remainder (it
+only refuses parts that exceed the outflow), so the list shows it instead of
+hiding it; it is `0` when every unit is accounted for. Like the aggregate, a
+transaction whose parts exceed what left its channels' vaults (a transfer
+bundled with the payout), or that also pays a channel that is not Gyblos, gets
+no split.
+
+The splits of a day's rows add up to that day's `gyblosFeesAtomic`,
+`programTreasuryAtomic`, `refundedAtomic` and `paidOutAtomic`, except that a
+transaction without a block time is listed but belongs to no day.
 
 `amountAtomic` is `null` when:
 
-- the channel's mint is not devnet USDC, or is unknown because its open was
-  never read;
+- the row's mint is not devnet USDC, or is unknown because neither the channel's
+  open nor the instruction recorded one;
 - the kind is `request_close` or `seal`;
 - a settle carries no voucher, or its transaction has no block time;
-- a `distribute` or `reclaim` has no negative USDC change of the channel's vault
-  in its transaction, or is not the channel's first paying instruction in it.
+- a `distribute` or `reclaim` has no `split`: it is not the transaction's first
+  USDC paying instruction, the transaction moved no USDC to anyone, its parts
+  exceed the vault outflow, or it also pays a channel that is not Gyblos.
+
+The explorer shows no amount on a `distribute` or `reclaim` row of an answer
+without the `split` field (a collector older than this rule), since that amount
+was the whole vault outflow, refunds included, not what the seller received.
 
 The list is as complete as the chain index: channels it never read, and history
 before its floor, are missing.
@@ -731,9 +769,12 @@ activity that day has no row.
 - **Payouts** are the positive USDC changes in distribute and reclaim
   transactions, by who received them: `gyblosFees` (the Gyblos fee treasury),
   `programTreasury` (the program's own treasury: rounding residual and
-  redirected payouts), `refunded` (the payer of a channel the transaction names)
-  and `paidOut` (a payee or distribute recipient). Owners the channels do not
-  name never count, and a transaction whose payouts exceed what left its
+  redirected payouts), `refunded` (the payer of a channel the transaction names,
+  or the payer a distribute or reclaim names itself, so a refund still counts
+  when the channel's open was never read) and `paidOut` (a payee or distribute
+  recipient). `AGGREGATES.formulaVersion` 4 added the payer a distribute or
+  reclaim names itself, so every day is recomputed once. Owners the channels do
+  not name never count, and a transaction whose payouts exceed what left its
   channels' vaults (a transfer bundled with the payout) counts none, so payouts
   never exceed what the program released. Within that bound a payer can still
   move its own refund to a payee it controls. Payouts are per transaction, so in
