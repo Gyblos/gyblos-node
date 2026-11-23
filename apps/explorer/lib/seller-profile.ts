@@ -1,7 +1,11 @@
 import type { ModelStat, SellerDay, Totals } from './collector-shape';
 import { DISPLAY, SELLER_STATUS } from './constants';
 import type { DiscoverySnapshot, OfferedModel } from './discovery';
-import type { GithubAccount, NodeState } from './network-status';
+import {
+  NODE_STATE,
+  type GithubAccount,
+  type NodeState,
+} from './network-status';
 import { modelKey, uptimeRatio } from './offers';
 import { sideFigures } from './usage';
 
@@ -32,7 +36,8 @@ function sellerStatus(
   listed: boolean,
   networkStale: boolean,
 ): SellerStatus {
-  if (listed && (networkStale || !state)) return 'online';
+  if (listed && (networkStale || !state)) return NODE_STATE.online;
+  if (networkStale && state === NODE_STATE.online) return NODE_STATE.offline;
   return state ?? SELLER_STATUS.unknown;
 }
 
@@ -131,6 +136,8 @@ export function unknownSeller(
 ) {
   if (snapshot.error || stats.error || stats.models.length) return false;
   if (!snapshot.network || snapshot.network.truncated) return false;
+  if (snapshot.datedAt !== null || snapshot.networkDatedAt !== null)
+    return false;
   if (sellerProfile(nodeId, snapshot).status !== SELLER_STATUS.unknown)
     return false;
   return sellerTotals(stats.days).active.length === 0;

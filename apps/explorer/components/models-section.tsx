@@ -59,7 +59,8 @@ export async function ModelsSection({ query }: { query: ExplorerQuery }) {
     getDiscovery(),
     getCollector(days),
   ]);
-  if (discovery.error && collector.error) return <Unavailable title="Models" />;
+  if (discovery.error && collector.error)
+    return <Unavailable title="Models" anchors={[PAGING.anchors.models]} />;
   const offersKnown = !discovery.error;
   const rows = modelRows(
     offersKnown ? summarizeOffers(discovery).models : new Map(),

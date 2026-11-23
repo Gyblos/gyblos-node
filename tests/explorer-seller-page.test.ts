@@ -246,6 +246,12 @@ void test('a seller profile joins the listed offer, the network status and the i
     sellerProfile(NODE, { ...stale, networkDatedAt: 4000 }).status,
     'online',
   );
+  const gone = snapshot([], [{ nodeId: NODE, state: 'online' }]);
+  assert.equal(sellerProfile(NODE, gone).status, 'online');
+  assert.equal(
+    sellerProfile(NODE, { ...gone, networkDatedAt: 4000 }).status,
+    'offline',
+  );
   const listedOnly = sellerProfile(NODE, snapshot([listed(NODE, OWNER)], null));
   assert.deepEqual(
     [listedOnly.status, listedOnly.firstSeenAt, listedOnly.github],
@@ -311,6 +317,11 @@ void test('a valid NodeId unknown to the index and without activity is not a sel
     false,
   );
   assert.equal(unknownSeller(OTHER, snapshot([], null), idle), false);
+  assert.equal(
+    unknownSeller(OTHER, { ...nobody, networkDatedAt: 4000 }, idle),
+    false,
+  );
+  assert.equal(unknownSeller(OTHER, { ...nobody, datedAt: 4000 }, idle), false);
   const partial = snapshot([], []);
   assert.equal(
     unknownSeller(

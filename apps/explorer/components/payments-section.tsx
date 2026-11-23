@@ -67,7 +67,10 @@ export async function PaymentsSection({ query }: { query: ExplorerQuery }) {
     getChainStats(days),
     getChainStats(days, 1),
   ]);
-  if (chain.error) return <Unavailable title="Payments" />;
+  if (chain.error)
+    return (
+      <Unavailable title="Payments" anchors={[PAGING.anchors.chainDaily]} />
+    );
   const summary = summarizeChain(chain);
   const { totals } = summary;
   const change = changes(totals, before);

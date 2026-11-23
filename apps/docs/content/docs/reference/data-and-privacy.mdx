@@ -244,7 +244,8 @@ time, instruction type, USDC amount (for a payout, how it split between the sell
 program treasury and the refund to the buyer), signature, seller and channel, from the metrics
 collector's public `GET /v1/stats/chain/txs`. The seller column shows a listed seller when the channel's
 payout recipient (its first split recipient) equals the owner address that one, and only one, listed
-seller publishes in the discovery index; otherwise it says "Unlisted seller". That owner address is
+seller publishes in the discovery index, and links to that seller's page; a payout shared by several
+channels says "Several channels", and otherwise it says "Unlisted seller". That owner address is
 self-declared, so the column is a display hint, not proof of who was paid. It does link a listed
 seller's owner address to the channels that paid it and to the amounts.
 

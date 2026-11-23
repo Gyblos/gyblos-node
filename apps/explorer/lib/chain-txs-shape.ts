@@ -1,7 +1,8 @@
 import { explorerTxUrl } from './config';
-import { CHAIN_TXS, DISPLAY } from './constants';
+import { CHAIN_TXS, DISPLAY, TX_TEXT } from './constants';
 import { short, usdcFixed, utcMinute } from './format';
 import {
+  flag,
   integerText,
   list,
   nullable,
@@ -45,6 +46,7 @@ export interface ChainTx {
   recipients: string[];
   amount: bigint | null;
   split: PayoutSplit | null;
+  batched: boolean;
 }
 export interface PayoutSplit {
   paidOut: bigint;
@@ -125,6 +127,8 @@ function transaction(value: unknown): ChainTx {
           BigInt(integerText(present, 'tx.amountAtomic')),
         ),
     split: nullable(source.split, payoutSplit),
+    batched:
+      source.batched === undefined ? false : flag(source.batched, 'tx.batched'),
   };
 }
 
@@ -192,8 +196,16 @@ function splitLines(tx: ChainTx): string[] {
     : parts;
 }
 
+const HINTS: Partial<Record<ChainTxKind, string>> = {
+  open: TX_TEXT.deposit,
+  top_up: TX_TEXT.deposit,
+  reclaim: TX_TEXT.refund,
+};
+
 function amountText(tx: ChainTx) {
   if (tx.amount === null) return '—';
+  if ((tx.split?.channels ?? 1) > 1)
+    return `${TX_TEXT.batchTotal} ${usdcFixed(tx.amount)}`;
   if (tx.amount === 0n && SETTLING.includes(tx.kind)) return NO_CHANGE;
   return usdcFixed(tx.amount);
 }
@@ -217,8 +229,9 @@ export function txRow(
         ? (owners.get(payTo) ?? null)
         : null,
     amount: amountText(tx),
-    muted: !tx.amount,
-    detail: splitLines(tx),
+    muted: !tx.amount || tx.kind !== 'distribute' || shared,
+    hint: HINTS[tx.kind] ?? null,
+    detail: tx.batched ? [TX_TEXT.batched] : splitLines(tx),
     shared,
     signature: short(
       tx.signature,

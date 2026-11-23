@@ -94,7 +94,13 @@ export async function UsageSection({ query }: { query: ExplorerQuery }) {
     getCollector(days),
     getCollector(days, 1),
   ]);
-  if (snapshot.error) return <Unavailable title="Usage" />;
+  if (snapshot.error)
+    return (
+      <Unavailable
+        title="Usage"
+        anchors={[PAGING.anchors.daily, PAGING.anchors.demand]}
+      />
+    );
   const usage = summarizeUsage(snapshot);
   const change = changes(usage, before.error ? null : summarizeUsage(before));
   const { free, paid } = usage;

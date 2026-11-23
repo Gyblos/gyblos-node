@@ -1,17 +1,15 @@
-import { ArrowUpRight } from 'lucide-react';
-
 import { getChainTxs } from '../lib/chain-txs';
 import { txRow } from '../lib/chain-txs-shape';
 import { DISPLAY, PAGING } from '../lib/constants';
 import { getDiscovery } from '../lib/discovery-render';
 import { txPager, type ExplorerQuery } from '../lib/paging';
 import { sellerProfile } from '../lib/seller-profile';
-import { TxAmount } from './channel-txs';
+import { TxLine } from './channel-txs';
 import { Pager } from './pager';
-import { Addr, SectionTitle, Table, td, timeCell, Unavailable } from './ui';
+import { SectionTitle, Table, td, Unavailable } from './ui';
 
 const TITLE = 'Channel transactions';
-const link = 'inline-flex items-center gap-1 hover:text-brand';
+const ANCHORS = [PAGING.anchors.transactions];
 const NO_OWNERS = new Map<string, never>();
 const HEAD = [
   { label: 'Time (UTC)' },
@@ -40,7 +38,7 @@ export async function SellerTxs({
   query: ExplorerQuery;
 }) {
   const snapshot = await getDiscovery();
-  if (snapshot.error) return <Unavailable title={TITLE} />;
+  if (snapshot.error) return <Unavailable title={TITLE} anchors={ANCHORS} />;
   const profile = sellerProfile(nodeId, snapshot);
   if (!profile.owner)
     return (
@@ -50,7 +48,7 @@ export async function SellerTxs({
       </Note>
     );
   const page = await getChainTxs(query.before, profile.owner);
-  if (page.error) return <Unavailable title={TITLE} />;
+  if (page.error) return <Unavailable title={TITLE} anchors={ANCHORS} />;
   return (
     <>
       <SectionTitle
@@ -60,10 +58,12 @@ export async function SellerTxs({
       />
       <p className="-mt-2 mb-3 text-xs text-muted">
         Channels whose payout recipient is this seller&apos;s self-declared
-        owner address. Paid out is what that address got; below it, the rest of
-        the split. A row marked &quot;total of N channels&quot; is a transaction
-        that paid several channels, possibly to other sellers. Do not add the
-        amounts up.
+        owner address. Paid out, the only amount in green, is what the seller
+        side (payee and payout recipients) received; below it, the rest of the
+        split. A batch total covers every channel its transaction paid, possibly
+        other sellers&apos; too, and a row marked as part of such a payout has
+        its amount on that transaction&apos;s first row. Do not add the amounts
+        up.
         {profile.ownerShared
           ? ' Another listed seller publishes the same owner address, so these channels may belong to either of them.'
           : null}
@@ -80,24 +80,7 @@ export async function SellerTxs({
         )}
         {page.transactions.map((tx) => {
           const row = txRow(tx, NO_OWNERS, page.treasury);
-          return (
-            <tr key={row.key} className="border-t border-line">
-              <td className={timeCell}>{row.time}</td>
-              <td className={td} title={row.kind}>
-                {row.label}
-              </td>
-              <TxAmount row={row} />
-              <td className={`${td} font-mono`}>
-                <a className={link} href={row.href}>
-                  {row.signature}
-                  <ArrowUpRight aria-hidden className="size-3" />
-                </a>
-              </td>
-              <td className={`${td} font-mono`}>
-                <Addr value={row.channel} />
-              </td>
-            </tr>
-          );
+          return <TxLine key={row.key} row={row} />;
         })}
       </Table>
       <Pager

@@ -121,6 +121,17 @@ export const SELLER_PAGE = {
   path: '/sellers',
 } as const;
 
+export const HASH_SCROLL = {
+  maxWaitMs: 15 * 1000,
+} as const;
+
+export const TX_TEXT = {
+  batched: 'part of a payout of several channels; see the transaction',
+  batchTotal: 'batch total',
+  deposit: 'buyer deposit',
+  refund: 'back to buyer',
+} as const;
+
 export const SELLER_STATUS = {
   unknown: 'unknown',
 } as const;

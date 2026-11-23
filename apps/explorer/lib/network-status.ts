@@ -12,7 +12,16 @@ import {
   text,
 } from './validate';
 
-export const NODE_STATES = ['online', 'offline', 'unpublished'] as const;
+export const NODE_STATE = {
+  online: 'online',
+  offline: 'offline',
+  unpublished: 'unpublished',
+} as const;
+export const NODE_STATES = [
+  NODE_STATE.online,
+  NODE_STATE.offline,
+  NODE_STATE.unpublished,
+] as const;
 export type NodeState = (typeof NODE_STATES)[number];
 
 export interface GithubAccount {

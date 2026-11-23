@@ -40,10 +40,20 @@ export function SectionTitle({
   );
 }
 
-export function Unavailable({ title }: { title: string }) {
+export function Unavailable({
+  title,
+  anchors = [],
+}: {
+  title: string;
+  anchors?: readonly string[];
+}) {
+  const [first, ...rest] = anchors;
   return (
     <>
-      <SectionTitle title={title} />
+      {rest.map((anchor) => (
+        <span key={anchor} id={anchor} className="block scroll-mt-4" />
+      ))}
+      <SectionTitle id={first} title={title} />
       <div className="rounded-2xl border border-line bg-panel p-5 text-sm text-muted">
         Source unavailable.
       </div>

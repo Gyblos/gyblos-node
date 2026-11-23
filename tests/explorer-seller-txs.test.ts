@@ -7,7 +7,7 @@ import {
   parseChainTxs,
   txRow,
 } from '@gyblos/explorer/chain-txs-shape';
-import { CHAIN_TXS } from '@gyblos/explorer/constants';
+import { CHAIN_TXS, TX_TEXT } from '@gyblos/explorer/constants';
 import { CHAIN_TX_PAGE } from '@gyblos/metrics-collector/constants';
 import { parseChainTxQuery } from '@gyblos/metrics-collector/stats-chain-txs';
 
@@ -77,7 +77,55 @@ void test('a seller page payout row reads as what the seller got, with the rest 
     'T',
   );
   assert.equal(shared.detail[0], 'total of 2 channels');
-  assert.equal(shared.shared, true);
+  assert.deepEqual(
+    [shared.shared, shared.amount, shared.muted],
+    [true, 'batch total 0.000096', true],
+  );
+  assert.equal(row.muted, false);
   const legacy = txRow(parseChainTxs(payout({})).transactions[0]!, owners, 'T');
   assert.deepEqual([legacy.amount, legacy.detail], ['—', []]);
+});
+
+void test('a batched paying row says so instead of showing no amount', () => {
+  const row = txRow(
+    parseChainTxs(payout({ amountAtomic: null, split: null, batched: true }))
+      .transactions[0]!,
+    new Map(),
+    'T',
+  );
+  assert.deepEqual(
+    [row.amount, row.muted, row.detail],
+    ['—', true, [TX_TEXT.batched]],
+  );
+  assert.equal(
+    parseChainTxs(payout({ split: split(1) })).transactions[0]!.batched,
+    false,
+  );
+});
+
+void test('only a payout is money; deposits and refunds are muted with their direction', () => {
+  const row = (kind: string, amountAtomic: string) =>
+    txRow(
+      parseChainTxs(
+        payout({
+          kind,
+          amountAtomic,
+          split: kind === 'reclaim' ? { ...split(1), paidOut: '0' } : null,
+        }),
+      ).transactions[0]!,
+      new Map(),
+      'T',
+    );
+  assert.deepEqual(
+    ['open', 'top_up', 'reclaim', 'settle'].map((kind) => {
+      const shown = row(kind, '900');
+      return [kind, shown.muted, shown.hint];
+    }),
+    [
+      ['open', true, TX_TEXT.deposit],
+      ['top_up', true, TX_TEXT.deposit],
+      ['reclaim', true, TX_TEXT.refund],
+      ['settle', true, null],
+    ],
+  );
 });

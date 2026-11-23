@@ -118,6 +118,7 @@ void test('channel transactions are checked at the boundary and amounts stay exa
       channels: 1,
       unclassified: 0n,
     },
+    batched: false,
   });
   assert.equal(page.transactions[1]!.amount, null);
   const withoutPayee = answer();
@@ -187,6 +188,7 @@ void test('a row is labeled plainly with a fixed six-decimal amount and a Solana
     seller: SELLER,
     amount: '1.500000',
     muted: false,
+    hint: null,
     detail: [],
     shared: false,
     signature: `${SIGNATURE.slice(0, 6)}…${SIGNATURE.slice(-6)}`,

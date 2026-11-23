@@ -1,4 +1,11 @@
-import { CircleCheck, Hash, MessagesSquare, Timer, Wallet } from 'lucide-react';
+import {
+  Boxes,
+  CircleCheck,
+  Hash,
+  MessagesSquare,
+  Timer,
+  Wallet,
+} from 'lucide-react';
 
 import type { SellerDay } from '../lib/collector-shape';
 import { DISPLAY, PAGING } from '../lib/constants';
@@ -201,7 +208,13 @@ function DailyTable({
   );
 }
 
-function Figures({ totals }: { totals: ReturnType<typeof sellerTotals> }) {
+function Figures({
+  totals,
+  served,
+}: {
+  totals: ReturnType<typeof sellerTotals>;
+  served: number;
+}) {
   const { free, paid } = totals;
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
@@ -247,6 +260,12 @@ function Figures({ totals }: { totals: ReturnType<typeof sellerTotals> }) {
         caption="Usage both sides signed for, not settled USDC"
         money
       />
+      <StatCard
+        icon={Boxes}
+        label="Models served"
+        value={<Flow value={served} kind="count" />}
+        caption="Models with requests in the range"
+      />
     </div>
   );
 }
@@ -267,14 +286,17 @@ export async function SellerActivity({
   return (
     <>
       {stats.error ? (
-        <Unavailable title={`Activity · ${query.days} days`} />
+        <Unavailable
+          title={`Activity · ${query.days} days`}
+          anchors={[PAGING.anchors.daily]}
+        />
       ) : (
         <>
           <SectionTitle
             title={`Activity · ${query.days} days`}
             meta={usageMeta(query.days, stats.aggregatedAt, false)}
           />
-          <Figures totals={totals} />
+          <Figures totals={totals} served={stats.models.length} />
           <p className="mt-2 text-xs text-dim">
             No earned total is shown: there is no per-seller on-chain total yet.
             Payouts are listed per transaction below.

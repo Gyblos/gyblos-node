@@ -12,22 +12,32 @@ export function SellerCell({
   nodeId,
   github,
   children,
+  href = sellerHref(nodeId),
 }: {
   nodeId: string;
   github: GithubAccount | null;
   children?: ReactNode;
+  href?: string | null;
 }) {
-  const href = sellerHref(nodeId);
+  const label = github ? `@${github.account}` : short(nodeId);
   return (
     <div className="flex items-center gap-2">
-      <Link href={href} aria-hidden="true" tabIndex={-1} className="shrink-0">
+      {href ? (
+        <Link href={href} aria-hidden="true" tabIndex={-1} className="shrink-0">
+          <Identicon nodeId={nodeId} />
+        </Link>
+      ) : (
         <Identicon nodeId={nodeId} />
-      </Link>
+      )}
       <div className="min-w-0">
         <div className="flex items-center gap-1 font-mono">
-          <Link className="text-ink hover:text-brand" href={href}>
-            {github ? `@${github.account}` : short(nodeId)}
-          </Link>
+          {href ? (
+            <Link className="text-ink hover:text-brand" href={href}>
+              {label}
+            </Link>
+          ) : (
+            <span className="text-ink">{label}</span>
+          )}
           {github ? (
             <a
               className="inline-flex hover:text-brand"
