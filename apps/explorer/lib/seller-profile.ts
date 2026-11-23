@@ -1,11 +1,8 @@
 import type { ModelStat, SellerDay, Totals } from './collector-shape';
-import { DISPLAY, SELLER_STATUS } from './constants';
+import { DISPLAY, NODE_STATE, SELLER_STATUS } from './constants';
 import type { DiscoverySnapshot, OfferedModel } from './discovery';
-import {
-  NODE_STATE,
-  type GithubAccount,
-  type NodeState,
-} from './network-status';
+import { count } from './format';
+import type { GithubAccount, NodeState } from './network-status';
 import { modelKey, uptimeRatio } from './offers';
 import { sideFigures } from './usage';
 
@@ -141,4 +138,22 @@ export function unknownSeller(
   if (sellerProfile(nodeId, snapshot).status !== SELLER_STATUS.unknown)
     return false;
   return sellerTotals(stats.days).active.length === 0;
+}
+
+export const modelsServedText = (served: number) =>
+  served >= DISPLAY.maxPublicModels
+    ? `${count(DISPLAY.maxPublicModels)}+`
+    : count(served);
+
+export function modelsNote(served: boolean, offersKnown: boolean) {
+  const prices = offersKnown
+    ? "Context and prices are the seller's current offer"
+    : 'Context and prices: current offers unavailable';
+  const requests = served
+    ? 'requests are over the range'
+    : 'requests unavailable now';
+  const missing = offersKnown
+    ? ' A model without a price is not offered now.'
+    : '';
+  return `${prices}; ${requests}.${missing}`;
 }

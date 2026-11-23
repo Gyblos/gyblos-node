@@ -1,9 +1,9 @@
 import { Activity, Boxes, CalendarClock, Server } from 'lucide-react';
 import type { ReactNode } from 'react';
 
+import { NODE_STATE } from '../lib/constants';
 import { getDiscovery } from '../lib/discovery-render';
 import { count, percent, utc } from '../lib/format';
-import { NODE_STATE } from '../lib/network-status';
 import {
   SELLER_STATUS_LABELS,
   sellerProfile,
@@ -74,7 +74,7 @@ export async function SellerProfileSection({ nodeId }: { nodeId: string }) {
       ? `Sellers and models as of ${utc(snapshot.datedAt)}.`
       : null,
     snapshot.networkDatedAt
-      ? `Online, offline and not published status as of ${utc(snapshot.networkDatedAt)}.`
+      ? `Online, offline and not published status as of ${utc(snapshot.networkDatedAt)}; a seller in the newer seller list shows as online.`
       : null,
   ].filter(Boolean);
   const profile = sellerProfile(nodeId, snapshot);

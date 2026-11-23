@@ -84,6 +84,7 @@ export const DISPLAY = {
   percentDigits: 1,
   // Unique buyer counts below this are withheld by the collector.
   minPublicBuyers: 5,
+  maxPublicModels: 100,
 } as const;
 
 export const CHAIN_TXS = {
@@ -130,6 +131,12 @@ export const TX_TEXT = {
   batchTotal: 'batch total',
   deposit: 'buyer deposit',
   refund: 'back to buyer',
+} as const;
+
+export const NODE_STATE = {
+  online: 'online',
+  offline: 'offline',
+  unpublished: 'unpublished',
 } as const;
 
 export const SELLER_STATUS = {

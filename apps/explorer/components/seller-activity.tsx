@@ -13,6 +13,8 @@ import { getDiscovery } from '../lib/discovery-render';
 import { count, pricePerMtok, usdcDecimal } from '../lib/format';
 import { tablePager, type ExplorerQuery } from '../lib/paging';
 import {
+  modelsNote,
+  modelsServedText,
   sellerModelRows,
   sellerProfile,
   sellerTotals,
@@ -87,10 +89,12 @@ function ModelsTable({
   query,
   rows,
   served,
+  offersKnown,
 }: {
   query: ExplorerQuery;
   rows: ReturnType<typeof sellerModelRows>;
   served: boolean;
+  offersKnown: boolean;
 }) {
   const head = [
     { label: 'Model' },
@@ -108,9 +112,7 @@ function ModelsTable({
     <>
       <SectionTitle id={PAGING.anchors.models} title="Models" />
       <p className="-mt-2 mb-3 text-xs text-muted">
-        Context and prices are the seller&apos;s current offer; requests are
-        over the range{served ? '' : ' (unavailable now)'}. A model without a
-        price is not offered now.
+        {modelsNote(served, offersKnown)}
       </p>
       <Table minWidth={DISPLAY.modelsTable} head={head}>
         {rows.length ? null : (
@@ -263,7 +265,7 @@ function Figures({
       <StatCard
         icon={Boxes}
         label="Models served"
-        value={<Flow value={served} kind="count" />}
+        value={modelsServedText(served)}
         caption="Models with requests in the range"
       />
     </div>
@@ -308,6 +310,7 @@ export async function SellerActivity({
         query={query}
         rows={sellerModelRows(offers, stats.models)}
         served={!stats.error}
+        offersKnown={!snapshot.error}
       />
       {stats.error ? null : <DailyTable query={query} days={totals.active} />}
     </>
