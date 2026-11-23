@@ -111,3 +111,14 @@ void test('desktop detail and confirmation dialogs use the approved widths', asy
     /title="Revoke API key\?"\s+size="sm"/,
   );
 });
+
+void test('network search shows results only for a submitted model ID', async () => {
+  const source = await readFile(
+    'apps/desktop/src/ui/NetworkCatalog.tsx',
+    'utf8',
+  );
+  assert.match(
+    source,
+    /snapshot\.query && query\.trim\(\) === snapshot\.query && !expanded/,
+  );
+});

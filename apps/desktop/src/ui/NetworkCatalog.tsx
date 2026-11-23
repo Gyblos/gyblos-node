@@ -32,7 +32,7 @@ export function useNetworkCatalog() {
     const current = query === undefined ? undefined : ++sequence.current;
     if (query !== undefined)
       setSearchResult(emptyCatalog(CATALOG_STATE.LOADING, query));
-    let next = emptyCatalog(CATALOG_STATE.ERROR);
+    let next = emptyCatalog(CATALOG_STATE.ERROR, query);
     try {
       next = parseNetworkCatalog(
         await (query === undefined
@@ -226,7 +226,7 @@ export function NetworkCatalogPanel({
   return (
     <div className="network-search">
       <CatalogSearch search={search} />
-      {query.trim() === snapshot.query && !expanded && (
+      {snapshot.query && query.trim() === snapshot.query && !expanded && (
         <section aria-live="polite" aria-label="Search results">
           {models.length > 0 && (
             <>
