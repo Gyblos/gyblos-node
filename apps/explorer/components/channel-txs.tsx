@@ -158,7 +158,9 @@ export async function ChannelTxs({
         for Settle, what the seller got for Paid out and the refund for
         Refunded; below a payout, the rest of its split (Gyblos fee, payments
         program, to buyer). Payments program: the payment program&apos;s own
-        treasury (rounding remainder), not a Gyblos fee. Do not add them up.
+        treasury (rounding remainders, or a share it could not deliver), not a
+        Gyblos fee; unclassified: USDC that left the channel to no party it
+        names. Do not add them up.
       </p>
       <Pager
         days={days}

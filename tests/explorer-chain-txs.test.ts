@@ -50,6 +50,7 @@ function answer() {
           programTreasury: '0',
           refunded: '0',
           channels: 1,
+          unclassified: '0',
         },
       },
       {
@@ -116,6 +117,7 @@ void test('channel transactions are checked at the boundary and amounts stay exa
       programTreasury: 0n,
       refunded: 0n,
       channels: 1,
+      unclassified: 0n,
     },
   });
   assert.equal(page.transactions[1]!.amount, null);
@@ -285,6 +287,7 @@ const SPLIT = {
   programTreasury: '0',
   refunded: '999778',
   channels: 1,
+  unclassified: '0',
 };
 function payout(kind: string, amountAtomic: string, split: object) {
   const body: Body = answer();
@@ -300,6 +303,7 @@ void test('a paid out row shows the seller amount and the rest of the split, one
     programTreasury: 0n,
     refunded: 999_778n,
     channels: 1,
+    unclassified: 0n,
   });
   const row = txRow(tx, new Map(), TREASURY);
   assert.deepEqual(
@@ -324,6 +328,7 @@ void test('a refunded row shows just its refund, and a zero payout is muted', ()
       programTreasury: '0',
       refunded: '500',
       channels: 1,
+      unclassified: '0',
     }),
     new Map(),
     TREASURY,
@@ -358,6 +363,7 @@ void test('the split is parsed strictly, and an older collector payout amount is
     { ...SPLIT, paidOut: '2.13' },
     { ...SPLIT, gyblosFee: '9', gyblosFees: undefined },
     { ...SPLIT, channels: '1' },
+    { ...SPLIT, unclassified: undefined },
     '213',
   ]) {
     const bad: Body = answer();
@@ -377,4 +383,13 @@ void test('the split is parsed strictly, and an older collector payout amount is
     amountAtomic: '42',
   });
   assert.equal(parseChainTxs(settle).transactions[1]!.amount, 42n);
+});
+
+void test('a payout that accounts for less than the vault outflow shows the unclassified remainder', () => {
+  const row = txRow(
+    payout('distribute', '213', { ...SPLIT, unclassified: '40' }),
+    new Map(),
+    TREASURY,
+  );
+  assert.equal(row.detail.at(-1), 'unclassified 0.000040');
 });

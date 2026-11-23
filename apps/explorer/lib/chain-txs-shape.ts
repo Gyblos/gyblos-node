@@ -53,19 +53,21 @@ export interface PayoutSplit {
   programTreasury: bigint;
   refunded: bigint;
   channels: number;
+  unclassified: bigint;
 }
-const PAYING: readonly ChainTxKind[] = ['distribute', 'reclaim'];
 type SplitPart = Exclude<keyof PayoutSplit, 'channels'>;
 const SPLIT_LABELS: [SplitPart, string][] = [
   ['paidOut', 'seller'],
   ['gyblosFees', 'Gyblos fee'],
   ['programTreasury', 'payments program'],
   ['refunded', 'to buyer'],
+  ['unclassified', 'unclassified'],
 ];
 const MAIN_PART: Partial<Record<ChainTxKind, SplitPart>> = {
   distribute: 'paidOut',
   reclaim: 'refunded',
 };
+const PAYING = new Set(Object.keys(MAIN_PART));
 export interface ChainTxPage {
   programId: string;
   treasury: string;
@@ -98,13 +100,14 @@ function payoutSplit(value: unknown): PayoutSplit {
     programTreasury: part('programTreasury'),
     refunded: part('refunded'),
     channels: num(source.channels, 'tx.split.channels'),
+    unclassified: part('unclassified'),
   };
 }
 
 function transaction(value: unknown): ChainTx {
   const source = record(value, 'tx');
   const kindRead = kind(source.kind);
-  const legacyPayout = PAYING.includes(kindRead) && !('split' in source);
+  const legacyPayout = PAYING.has(kindRead) && !('split' in source);
   return {
     signature: text(source.signature, 'tx.signature'),
     instructionIndex: num(source.instructionIndex, 'tx.instructionIndex'),
