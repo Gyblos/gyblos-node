@@ -64,33 +64,29 @@ export function Models({
         <Button onClick={() => setNetwork(true)}>Find network models</Button>
         {!canSelect && <Badge>Preview</Badge>}
       </div>
-      <List label="Model catalog">
-        {canSelect && (
-          <CatalogOffers
-            models={offers}
-            selected={selected}
-            automatic={!!auto?.selected}
-            buyerModels={auto?.buyerModels ?? []}
-            paid={!!auto?.paid}
-            onAuto={(name) => auto?.choose(name)}
-            onSelect={(id) => {
-              const offer = offers.find((row) => row.id === id);
-              if (offer) chooseOffer(offer);
-            }}
-          />
-        )}
-        {canSelect && !offers.length && (
-          <p className="ui-list-empty">No network offers match your search.</p>
-        )}
-        {!canSelect && (
+      {canSelect ? (
+        <CatalogOffers
+          models={offers}
+          selected={selected}
+          automatic={!!auto?.selected}
+          buyerModels={auto?.buyerModels ?? []}
+          paid={!!auto?.paid}
+          onAuto={(name) => auto?.choose(name)}
+          onSelect={(id) => {
+            const offer = offers.find((row) => row.id === id);
+            if (offer) chooseOffer(offer);
+          }}
+        />
+      ) : (
+        <List label="Model catalog">
           <PreviewRows
             query={query}
             filter={filter}
             selected={selected}
             onSelect={onSelect}
           />
-        )}
-      </List>
+        </List>
+      )}
       {!canSelect && (
         <p className="ui-help-text">
           PayPal uses its configured local model. This catalog is a USDC

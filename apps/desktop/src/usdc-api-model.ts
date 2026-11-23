@@ -112,7 +112,10 @@ export function parseUsdcApiState(input: unknown): UsdcApiState {
 }
 
 export function usdcApiAmount(atomic: string, scope: BuyerKeyScope) {
-  return `${x402Amount(atomic, scope)} ${scope.mint === DEVNET_USDC ? 'USDC' : 'atomic units'}`;
+  if (scope.mint !== DEVNET_USDC) return atomic + ' atomic units';
+  const [whole, fraction] = x402Amount(atomic, scope).split('.');
+  const decimals = fraction?.replace(/0+$/, '');
+  return (decimals ? whole + '.' + decimals : whole) + ' USDC';
 }
 export function usdcApiKeyBadge(state: UsdcApiState, key: BuyerApiKeySummary) {
   return key.revoked

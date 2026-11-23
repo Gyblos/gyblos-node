@@ -117,7 +117,7 @@ function group(models: readonly ModelOption[]) {
   return [...groups.entries()];
 }
 
-const FLYOUT = { GAP: 6, REPOSITION: 'preview:reposition' } as const;
+const FLYOUT = { GAP: 6, REPOSITION: MENU_GEOMETRY.REPOSITION } as const;
 
 function moveFocus(event: KeyboardEvent<HTMLElement>, selector: string) {
   if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return false;

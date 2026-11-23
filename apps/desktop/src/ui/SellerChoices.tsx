@@ -3,30 +3,6 @@ import { useLayoutEffect, useRef, type ReactNode } from 'react';
 import { MENU_GEOMETRY } from './constants';
 import { moveMenuFocus } from './menu-keyboard';
 
-const EDGE = 8;
-
-function positionChoices(menu: HTMLDivElement, trigger: HTMLElement) {
-  const anchor = trigger.getBoundingClientRect();
-  const right = window.innerWidth - anchor.right - EDGE;
-  const left = anchor.left - EDGE;
-  const width = Math.min(MENU_GEOMETRY.WIDTH, window.innerWidth - 2 * EDGE);
-  menu.style.width = width + 'px';
-  const fits = right >= width || left >= width;
-  const x = fits
-    ? right >= width
-      ? anchor.right
-      : anchor.left - width
-    : Math.max(EDGE, Math.min(anchor.left, window.innerWidth - width - EDGE));
-  menu.style.left = x + 'px';
-  menu.style.top =
-    Math.max(
-      EDGE,
-      Math.min(
-        fits ? anchor.top : anchor.bottom,
-        window.innerHeight - menu.offsetHeight - EDGE,
-      ),
-    ) + 'px';
-}
 export function SellerChoices({
   name,
   flyout,
@@ -44,18 +20,23 @@ export function SellerChoices({
     const trigger =
       menu?.parentElement?.querySelector<HTMLElement>('[data-model-row]');
     if (!flyout || !menu || !trigger) return;
-    const position = () => positionChoices(menu, trigger);
+    const parent = trigger.closest<HTMLElement>('.preview-model-menu');
+    if (!parent) return;
+    parent.dataset.split = 'true';
+    const position = () => positionChoices(menu, parent);
     menu.showPopover();
     position();
     menu
       .querySelector<HTMLElement>(
-        '[aria-checked="true"],[role="menuitemradio"]',
+        '[aria-checked="true"]:not(:disabled),[role="menuitemradio"]:not(:disabled)',
       )
       ?.focus();
     window.addEventListener('resize', position);
     window.addEventListener('scroll', position, true);
     return () => {
       menu.hidePopover();
+      delete parent.dataset.split;
+      parent.dispatchEvent(new Event(MENU_GEOMETRY.REPOSITION));
       window.removeEventListener('resize', position);
       window.removeEventListener('scroll', position, true);
     };
@@ -97,4 +78,14 @@ export function SellerChoices({
       {children}
     </div>
   );
+}
+
+function positionChoices(menu: HTMLElement, parent: HTMLElement) {
+  parent.dispatchEvent(new Event(MENU_GEOMETRY.REPOSITION));
+  const box = parent.getBoundingClientRect();
+  menu.style.width = box.width + 'px';
+  menu.style.left = box.right + MENU_GEOMETRY.FLYOUT_GAP + 'px';
+  menu.style.top = parent.style.top;
+  menu.style.bottom = parent.style.bottom;
+  menu.style.maxHeight = parent.style.maxHeight;
 }

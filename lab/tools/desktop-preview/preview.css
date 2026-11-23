@@ -326,10 +326,6 @@ html .app.desktop-frame .pk-update:hover {
   min-width: 0;
   width: 100%;
 }
-.desktop-frame .preview-tabular {
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
 .desktop-frame .preview-connect-entry {
   display: flex;
   gap: 10px;
@@ -364,125 +360,6 @@ html .app.desktop-frame .pk-update:hover {
   inherits: false;
   initial-value: 0deg;
 }
-.desktop-frame .preview-simple-table-region {
-  container-type: inline-size;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-panel);
-  overflow: hidden;
-}
-.desktop-frame .preview-simple-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-.desktop-frame .preview-simple-table :is(th, td) {
-  height: 44px;
-  padding: 0 14px;
-  text-align: left;
-  vertical-align: middle;
-  white-space: nowrap;
-  font-weight: 400;
-  border-bottom: 1px solid var(--line);
-}
-.desktop-frame .preview-simple-table thead th {
-  height: 36px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--muted);
-  background: var(--panel);
-}
-.desktop-frame .preview-simple-table tbody th {
-  font-weight: 500;
-  color: var(--ink);
-}
-.desktop-frame .preview-simple-table tbody tr:last-child > * {
-  border-bottom: 0;
-}
-.desktop-frame .preview-simple-table tbody tr:hover > * {
-  background: color-mix(in srgb, var(--ink) 4%, var(--bg));
-}
-.desktop-frame .preview-simple-table .preview-limit-scope {
-  color: var(--muted);
-  white-space: normal;
-}
-.desktop-frame .preview-simple-table .preview-num {
-  text-align: right;
-}
-.desktop-frame .preview-simple-table .preview-limit-action {
-  width: 1%;
-}
-.desktop-frame .preview-simple-table .ui-badge {
-  font-size: 11px;
-  line-height: 18px;
-  padding: 0 8px;
-}
-html .app.desktop-frame .content .preview-simple-table .ui-button {
-  min-height: 28px;
-  height: 28px;
-  padding: 0 10px;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  background: transparent;
-  color: var(--ink);
-  font-size: 12px;
-}
-html .app.desktop-frame .content .preview-simple-table .ui-icon-button {
-  width: 28px;
-  min-width: 28px;
-  padding: 0;
-  border-color: transparent;
-  color: var(--muted);
-}
-html
-  .app.desktop-frame
-  .content
-  .preview-simple-table
-  .ui-button:hover:not(:disabled) {
-  background: var(--raised);
-  color: var(--ink);
-}
-@container (max-width: 620px) {
-  .desktop-frame .preview-simple-table thead {
-    display: none;
-  }
-  .desktop-frame .preview-simple-table tbody tr {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    align-items: center;
-    column-gap: 10px;
-    row-gap: 2px;
-    padding: 12px 14px;
-    border-bottom: 1px solid var(--line);
-  }
-  .desktop-frame .preview-simple-table tbody tr:last-child {
-    border-bottom: 0;
-  }
-  .desktop-frame .preview-simple-table tbody tr > * {
-    height: auto;
-    padding: 0;
-    border: 0;
-    text-align: left;
-  }
-  .desktop-frame .preview-simple-table tbody tr > .preview-num {
-    text-align: left;
-  }
-  .desktop-frame .preview-simple-table .preview-limit-scope {
-    grid-column: 1 / 3;
-    grid-row: 2;
-  }
-  .desktop-frame .preview-simple-table .preview-tabular {
-    grid-column: 1 / 3;
-    grid-row: 3;
-  }
-  .desktop-frame .preview-simple-table .preview-tabular ~ .preview-tabular {
-    grid-row: auto;
-  }
-  .desktop-frame .preview-simple-table .preview-limit-action {
-    grid-column: 3;
-    grid-row: 1 / span 3;
-    width: auto;
-  }
-}
 .desktop-frame .preview-detail-progress {
   appearance: none;
   width: 100%;
@@ -516,13 +393,6 @@ html
   .ui-button.preview-destructive-ghost:hover:not(:disabled) {
   background: color-mix(in srgb, #e5484d 14%, transparent);
   color: #e5484d;
-}
-
-html .app.desktop-frame .content .preview-simple-table .ui-inline-actions {
-  display: inline-flex;
-  flex-flow: row nowrap;
-  justify-content: flex-end;
-  gap: 6px;
 }
 .desktop-frame .preview-limit-card {
   display: grid;
@@ -594,102 +464,6 @@ html .app.desktop-frame .content .preview-simple-table .ui-inline-actions {
 .desktop-frame .preview-limit-editor .ui-help-text {
   margin: 0;
   font-size: 12px;
-}
-html .app.desktop-frame .content .ui-table-region .ui-data-table thead th,
-html .app.desktop-frame .content .preview-simple-table thead th {
-  background: var(--panel);
-  border-bottom: 1px solid var(--line);
-}
-html
-  .app.desktop-frame
-  .content
-  :is(.ui-table-region .ui-data-table, .preview-simple-table)
-  :is(td, tbody th) {
-  border-bottom-color: color-mix(in srgb, var(--line) 70%, transparent);
-}
-html
-  .app.desktop-frame
-  .content
-  :is(.ui-table-region .ui-data-table, .preview-simple-table)
-  tbody
-  tr:hover
-  > * {
-  background: color-mix(in srgb, var(--ink) 4%, var(--panel));
-}
-.desktop-frame .preview-usage-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 16px;
-}
-.desktop-frame .preview-panel {
-  display: grid;
-  align-content: start;
-  gap: 10px;
-  padding: 16px 18px;
-}
-.desktop-frame .preview-panel h3 {
-  margin: 0 0 4px;
-  font-size: 15px;
-  font-weight: 600;
-}
-.desktop-frame .preview-panel-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 12px;
-  font-size: 13px;
-}
-.desktop-frame .preview-panel-row strong {
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-.desktop-frame .preview-panel .preview-detail-progress {
-  height: 8px;
-  border-radius: 4px;
-}
-.desktop-frame .preview-setting-copy {
-  flex: 1 1 260px;
-  min-width: 0;
-}
-.desktop-frame .preview-setting-control {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-left: auto;
-}
-.desktop-frame .preview-compact-amount {
-  display: grid;
-  grid-template-columns: 96px auto auto;
-  align-items: center;
-  gap: 6px;
-  height: 36px;
-  padding: 0 4px 0 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-control);
-  background: var(--bg);
-}
-.desktop-frame .preview-compact-amount:focus-within {
-  border-color: var(--focus);
-}
-.desktop-frame .preview-compact-amount[data-invalid='true'] {
-  border-color: #e5484d;
-}
-html .app.desktop-frame .content .preview-compact-amount input {
-  min-width: 0;
-  height: 100%;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  font-size: 14px;
-  font-variant-numeric: tabular-nums;
-  text-align: left;
-}
-.desktop-frame .preview-dirty-actions {
-  display: flex;
-  gap: 6px;
-  animation: preview-fade-in var(--motion-overlay) var(--motion-push-ease) both;
 }
 @keyframes preview-fade-in {
   from {
@@ -812,12 +586,6 @@ html .app.desktop-frame .preview-strategy button[aria-checked='true'] {
   background: var(--raised);
   color: var(--ink);
 }
-.desktop-frame .preview-simple-table tr[data-active='true'] > * {
-  background: var(--soft);
-}
-.desktop-frame .preview-simple-table th .preview-model-mode {
-  margin-left: 8px;
-}
 .desktop-frame .preview-route {
   display: flex;
   align-items: center;
@@ -857,22 +625,11 @@ html .app.desktop-frame .preview-strategy button[aria-checked='true'] {
   align-items: center;
   gap: 6px;
 }
-.desktop-frame .preview-simple-table tr[data-pinned='true'] > th {
-  box-shadow: inset 2px 0 0 var(--accent);
-}
 html .app.desktop-frame .preview-pin {
   color: var(--muted);
 }
 html .app.desktop-frame .preview-pin[aria-pressed='true'] {
   color: var(--accent);
-}
-.desktop-frame .preview-catalog-filters {
-  flex-wrap: wrap;
-  margin-bottom: 8px;
-}
-.desktop-frame .preview-catalog-filters .ui-help-text {
-  margin-left: auto;
-  font-size: 12px;
 }
 .desktop-frame .pk-delta {
   color: var(--pk-tone);
@@ -884,43 +641,6 @@ html .app.desktop-frame .preview-pin[aria-pressed='true'] {
 .desktop-frame .pk-delta-suffix {
   color: var(--muted);
   font-weight: 400;
-}
-.desktop-frame .pk-segmented {
-  display: grid;
-  gap: 10px;
-}
-.desktop-frame .pk-segmented-track {
-  display: flex;
-  gap: 2px;
-  height: 8px;
-  overflow: hidden;
-  border-radius: 4px;
-  background: var(--raised);
-}
-.desktop-frame .pk-segmented-track > span {
-  min-width: 3px;
-  background: var(--pk-tone);
-  transition: width var(--motion-enter) var(--motion-push-ease);
-}
-.desktop-frame .pk-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 16px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  color: var(--muted);
-  font-size: 12px;
-}
-.desktop-frame .pk-legend li {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.desktop-frame .pk-legend strong {
-  color: var(--ink);
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
 }
 .desktop-frame .pk-chips {
   display: inline-flex;
@@ -969,104 +689,11 @@ html .app.desktop-frame .pk-chips button:focus-visible {
   align-items: center;
   gap: 10px;
 }
-@media (prefers-reduced-motion: reduce) {
-  .desktop-frame .pk-segmented-track > span {
-    transition: none;
-  }
-}
-html .app.desktop-frame .preview-check-circle {
-  display: inline-grid;
-  place-items: center;
-  width: 18px;
-  height: 18px;
-  flex: none;
-  border-radius: 50%;
-  background: var(--pk-success);
-  color: var(--bg);
-}
-html .app.desktop-frame .preview-menu-trail {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-html
-  .app.desktop-frame
-  [aria-expanded='true']
-  > :is(.preview-trigger-caret, svg:last-child:not(:only-child)) {
-  rotate: 180deg;
-}
-@media (prefers-reduced-motion: no-preference) {
-  html
-    body
-    .app.desktop-frame
-    [aria-expanded]
-    > :is(.preview-trigger-caret, svg:last-child:not(:only-child)) {
-    transition: rotate var(--pk-menu-motion) ease-out !important;
-  }
-}
-html .app.desktop-frame .preview-menu-caret {
-  color: var(--muted);
-  transition: color var(--motion-overlay) ease;
-}
-html .app.desktop-frame .dropdown-row[data-active] .preview-menu-caret {
-  color: var(--ink);
-}
-html .app.desktop-frame .preview-caret-slot {
-  width: 13px;
-  flex: none;
-}
-html .app.desktop-frame .preview-offer-price {
-  flex: none;
-  font-size: 12px;
-  font-weight: 400;
-  line-height: 20px;
-  white-space: nowrap;
-  color: var(--ink);
-}
-html .app.desktop-frame .preview-check-slot {
-  width: 18px;
-  flex: none;
-}
-html .app.desktop-frame .preview-strategy-icon {
-  display: inline-grid;
-  place-items: center;
-  width: 16px;
-  height: 16px;
-  flex: none;
-  color: var(--muted);
-  transition: color var(--motion-overlay) ease;
-}
-html
-  .app.desktop-frame
-  .dropdown-row[data-strategy][aria-checked='true']
-  .preview-strategy-icon {
-  color: var(--pk-success);
-}
-html .app.desktop-frame .pk-balance-line {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0 0 4px;
-  padding: 2px 4px 8px 8px;
-  border-bottom: 1px solid var(--subtle-line);
-  font-size: 13px;
-  line-height: 18px;
-  color: var(--muted);
-}
-html .app.desktop-frame .pk-balance-line strong {
-  font-family: var(--font-mono);
-  font-weight: 500;
-  color: var(--ink);
-  white-space: nowrap;
-}
 html .app.desktop-frame .pk-ring {
   width: 14px;
   height: 14px;
   border-radius: 50%;
   mask: radial-gradient(circle, transparent 4px, #000 4.5px);
-}
-html .app.desktop-frame .preview-trigger-caret {
-  color: var(--muted);
 }
 @keyframes preview-shimmer {
   from {
@@ -1109,24 +736,6 @@ html .app.desktop-frame .preview-strategy button {
 html .app.desktop-frame .preview-strategy button:disabled {
   cursor: default;
   opacity: 0.7;
-}
-html .app.desktop-frame .pk-badge-line {
-  display: flex;
-  flex-basis: 100%;
-  gap: 4px;
-}
-html .app.desktop-frame .pk-balance-line > svg {
-  flex: none;
-  color: var(--muted);
-}
-html .app.desktop-frame .pk-balance-line .ui-button.pk-balance-add {
-  gap: 4px;
-  min-height: 26px;
-  height: 26px;
-  margin-left: auto;
-  padding: 0 6px;
-  font-size: 12px;
-  font-weight: 500;
 }
 html .app.desktop-frame .preview-chat-pin {
   position: absolute;

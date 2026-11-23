@@ -36,7 +36,12 @@ export function Settings({
             onLightChange={onLightChange}
           />
           <div>
-            <span>Interface font</span>
+            <span>
+              Interface font
+              <small className="ui-help-text">
+                Choose the typeface for the desktop interface.
+              </small>
+            </span>
             <ChoiceMenu
               label="Interface font"
               value={font}

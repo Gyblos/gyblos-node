@@ -2995,3 +2995,12 @@ html .app.desktop-frame .pk-empty-line svg {
     transition-duration: 0ms;
   }
 }
+
+.desktop-frame .preview-catalog-filters {
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.desktop-frame .preview-catalog-filters .ui-help-text {
+  margin-left: auto;
+  font-size: 12px;
+}

@@ -10,6 +10,7 @@ import type { CatalogModel } from './model-types';
 import { ModelImage } from './ModelImage';
 import { MotionPresence } from './Motion';
 import { NetworkSellerMenu } from './NetworkSellerMenu';
+import { List } from './UI';
 
 function CatalogRows({
   ordered,
@@ -84,7 +85,7 @@ export function CatalogOffers(
   };
   return (
     <>
-      <div className="ui-toolbar">
+      <div className="ui-toolbar preview-catalog-filters">
         <ChoiceMenu
           label="Variant"
           value={options.variant}
@@ -103,19 +104,21 @@ export function CatalogOffers(
           options={options.sorts}
           onChange={options.setSort}
         />
-        <small>{groups.size} models</small>
+        <small className="ui-help-text">{groups.size} models</small>
       </div>
-      {!groups.size && (
-        <p className="ui-help-text" role="status">
-          No offers match these filters.
-        </p>
-      )}
-      <CatalogRows
-        ordered={options.ordered}
-        selectedId={props.selected}
-        automatic={props.automatic}
-        open={setName}
-      />
+      <List label="Model catalog">
+        {!groups.size && (
+          <p className="ui-help-text" role="status">
+            No offers match these filters.
+          </p>
+        )}
+        <CatalogRows
+          ordered={options.ordered}
+          selectedId={props.selected}
+          automatic={props.automatic}
+          open={setName}
+        />
+      </List>
       <MotionPresence>
         {name && offers && (
           <Modal title={name} size="lg" close={() => setName(undefined)}>

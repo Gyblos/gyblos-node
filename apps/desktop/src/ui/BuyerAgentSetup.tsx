@@ -14,6 +14,7 @@ import { USDC_AGENT_SETUP } from '../x402/constants';
 import { agentCodeLanguage, CodeBlock } from './CodeBlock';
 import { BUTTON_VARIANT } from './constants';
 import { FormActions, FormField } from './Form';
+import { ChoiceMenu } from './Management';
 import { Modal } from './Modal';
 import { Button } from './UI';
 import type { useUsdcApiKeys } from './useUsdcApiKeys';
@@ -215,24 +216,15 @@ function ToolSelector({
 }) {
   return (
     <FormField label="Tool" htmlFor="buyer-agent-tool">
-      <select
+      <ChoiceMenu
         id="buyer-agent-tool"
-        className="ui-input"
+        label="Tool"
         value={tool}
         disabled={busy}
-        onChange={(event) => {
-          const chosen = Object.values(AGENT_TOOLS).find(
-            (tool) => tool === event.target.value,
-          );
-          if (chosen) setTool(chosen);
-        }}
-      >
-        {Object.values(AGENT_TOOLS).map((tool) => (
-          <option key={tool} value={tool}>
-            {labels[tool]}
-          </option>
-        ))}
-      </select>
+        options={Object.values(AGENT_TOOLS)}
+        display={(value) => labels[value]}
+        onChange={setTool}
+      />
     </FormField>
   );
 }

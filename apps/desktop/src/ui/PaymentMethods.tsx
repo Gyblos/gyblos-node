@@ -18,8 +18,9 @@ import { BUTTON_VARIANT } from './constants';
 import { FormActions } from './Form';
 import { displayDollars } from './history-presentation';
 import { Modal } from './Modal';
+import { TONE } from './status-tone';
 import { Tag } from './Tag';
-import { Badge, Button } from './UI';
+import { Button } from './UI';
 import { useBuyerFunding } from './useBuyerFunding';
 import type { PaypalSessionView } from './usePaypalSession';
 import type { X402View } from './useX402';
@@ -54,7 +55,10 @@ export function WalletOverview({
       <div className="preview-method-copy">
         <span className="preview-method-name">
           <h3>USDC wallet</h3>
-          <Tag> {funding?.network === DEVNET ? 'Devnet' : 'Buyer wallet'} </Tag>
+          <Tag dot>
+            {' '}
+            {funding?.network === DEVNET ? 'Devnet' : 'Buyer wallet'}{' '}
+          </Tag>
         </span>
         <span className="ui-help-text">
           {loading
@@ -121,19 +125,10 @@ export function PaypalSummary({
       <div className="preview-method-copy">
         <div className="preview-method-name">
           <h3>PayPal</h3>
-          <Badge>Sandbox</Badge>
+          <Tag tone={TONE.WARNING}>Sandbox</Tag>
         </div>
-        <strong
-          className="ui-status-line"
-          data-ready={paypalSessionCanConnectAgent(
-            session.state.status,
-            session.state.statusFresh,
-            session.state.busy,
-          )}
-        >
-          {summary.label}
-        </strong>
         <p className="ui-help-text">
+          {summary.label} ·{' '}
           {summary.limitCents === null
             ? 'One approval for multiple replies and tool requests.'
             : (summary.usedCents === null

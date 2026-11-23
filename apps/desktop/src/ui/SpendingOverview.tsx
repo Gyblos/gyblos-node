@@ -26,22 +26,31 @@ export function SpendingOverview({
   return (
     <Section
       title="Spending"
-      action={<Button onClick={onLimits}>Spending limits</Button>}
+      className="preview-spending"
+      action={
+        <Button onClick={onLimits}>
+          <Gauge size={16} />
+          Spending limits
+        </Button>
+      }
     >
       <StatGrid>
         <StatCard
           label="Chat spending"
+          help="USDC spent by the current chat session."
           value={known ? format(summary.spentAtomic) : null}
           detail="Current USDC chat session"
         />
         <StatCard
           label="Chat spending limit"
+          help="Maximum spending authorized for this chat session."
           icon={Gauge}
           value={known && summary.active ? format(summary.limitAtomic) : null}
           detail="API keys have separate limits"
         />
         <StatCard
           label="Remaining"
+          help="The portion of the chat spending limit still available."
           icon={Wallet}
           value={
             remaining !== null && remaining >= 0n

@@ -66,16 +66,18 @@ export function Facts({
 export function Section({
   title,
   icon,
+  className,
   action,
   children,
 }: {
   title: string;
   icon?: ReactNode;
+  className?: string;
   action?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <section className="ui-section">
+    <section className={className ? `ui-section ${className}` : 'ui-section'}>
       <div className="ui-section-title">
         <h2>
           {icon}
@@ -90,11 +92,17 @@ export function Section({
 export function ChoiceMenu<T extends string>({
   label,
   value,
+  id,
+  disabled,
+  display = (option) => option,
   options,
   onChange,
 }: {
   label: string;
   value: T;
+  id?: string;
+  disabled?: boolean;
+  display?: (option: T) => string;
   options: readonly T[];
   onChange: (value: T) => void;
 }) {
@@ -102,12 +110,14 @@ export function ChoiceMenu<T extends string>({
     <Dropdown
       label={label}
       className="ui-select-trigger"
-      trigger={value}
+      trigger={display(value)}
+      triggerId={id}
+      disabled={disabled}
       searchLabel={'Search ' + label.toLowerCase()}
     >
       {(close, query) => {
         const matches = options.filter((option) =>
-          option.toLowerCase().includes(query.toLowerCase()),
+          display(option).toLowerCase().includes(query.toLowerCase()),
         );
         return (
           <>
@@ -116,7 +126,7 @@ export function ChoiceMenu<T extends string>({
                 key={option}
                 role="menuitemradio"
                 checked={option === value}
-                label={option}
+                label={display(option)}
                 trailing={option === value ? <Check size={16} /> : undefined}
                 onClick={() => {
                   onChange(option);

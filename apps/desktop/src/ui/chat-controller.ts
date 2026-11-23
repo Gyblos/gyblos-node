@@ -12,6 +12,7 @@ import {
   startRun,
   stopRun,
   type ChatSession,
+  type ChatSnapshot,
 } from './chat-state';
 import {
   CHAT_PHASE,
@@ -30,14 +31,10 @@ import type { ToolId } from './tools';
 export type ChatScheduler = {
   schedule: (callback: () => void, delay: number) => () => void;
 };
-type Snapshot = { sessions: ChatSession[]; activeId: string };
-type ScheduledRun = {
-  run: NonNullable<ChatSession['run']>;
-  cancel: () => void;
-};
+type ScheduledRun = { run: NonNullable<ChatSession['run']>; cancel(): void };
 
 export class ChatController {
-  private snapshot: Snapshot;
+  private snapshot: ChatSnapshot;
   private online = true;
   private restoring = false;
   private scheduler: ChatScheduler | null = null;
@@ -336,10 +333,9 @@ export class ChatController {
       ),
     }));
   }
-  private endActivity(message: ChatSession['messages'][number]) {
-    return message.activity
-      ? { activity: { ...message.activity, ended: this.activityClock() } }
-      : {};
+  private endActivity({ activity }: ChatSession['messages'][number]) {
+    if (!activity) return {};
+    return { activity: { ...activity, ended: this.activityClock() } };
   }
   private updatePaypal(
     sessionId: string,
@@ -363,7 +359,7 @@ export class ChatController {
       ),
     });
   }
-  private publish(snapshot: Snapshot) {
+  private publish(snapshot: ChatSnapshot) {
     this.snapshot = snapshot;
     this.syncTimers();
     for (const listener of this.listeners) listener();

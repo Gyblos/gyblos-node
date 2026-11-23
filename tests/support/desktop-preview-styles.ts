@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 
 export async function previewStyles() {
   const paths = [
+    'apps/desktop/src/ui/buyer-controls.css',
     'apps/desktop/src/ui/desktop-design.css',
     'lab/tools/desktop-preview/preview.css',
   ];

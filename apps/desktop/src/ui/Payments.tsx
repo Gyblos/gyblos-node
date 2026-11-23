@@ -12,13 +12,14 @@ import { PaypalSummary, WalletOverview } from './PaymentMethods';
 import { TabBar, type Tab } from './PaymentTabs';
 import { PaypalSessionPanel } from './PaypalSessionPanel';
 import { SpendingHistory } from './SpendingHistory';
+import { SpendingLimits } from './SpendingLimits';
 import { SpendingOverview } from './SpendingOverview';
 import { Button, PagePanel } from './UI';
 import type { ActivityView } from './useActivity';
 import type { PaypalSessionView } from './usePaypalSession';
 import type { X402View } from './useX402';
 import { WalletDetails } from './WalletDetails';
-import { X402History, X402Payments } from './X402Payments';
+import { X402History } from './X402Payments';
 
 type Props = {
   initialTab?: Tab;
@@ -49,7 +50,8 @@ export function Payments(props: Props) {
       >
         {tab === 'activity' && props.usage}
         {tab === 'limits' && props.x402 && (
-          <X402Payments
+          <SpendingLimits
+            manage={props.onConnections}
             buyer={props.x402}
             onChat={() => {
               if (props.onPaymentMethod(PAYMENT_METHOD.USDC)) props.onChat();

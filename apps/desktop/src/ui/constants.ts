@@ -119,6 +119,8 @@ export const MENU_GEOMETRY = {
   WIDTH: 280,
   MIN_TOP: 80,
   QUICK_MODELS: 3,
+  FLYOUT_GAP: 6,
+  REPOSITION: 'gyblos-menu-position',
 } as const;
 export const MOTION_CLEANUP_MS = 450;
 export const CONNECTION_BUDGET = { MAX_DAILY: 10000, CENTS: 100 } as const;

@@ -2,7 +2,10 @@ import type { KeyboardEvent } from 'react';
 
 export function moveMenuFocus(event: KeyboardEvent<HTMLElement>) {
   const typing = event.target instanceof HTMLInputElement;
-  if (typing && event.key === 'Enter') {
+  if (typing && event.key === 'Enter' && !event.nativeEvent.isComposing) {
+    event.currentTarget
+      .querySelector<HTMLElement>('[data-model-row]:not(:disabled)')
+      ?.click();
     event.preventDefault();
     return;
   }

@@ -1,19 +1,18 @@
 import { Wallet } from '@phosphor-icons/react';
 
+import type { BuyerFunding } from '../funding/model';
 import { x402Amount } from '../x402-model';
 import { fundingAmount } from './BuyerFunding';
-import { useBuyerFunding } from './useBuyerFunding';
 import type { X402View } from './useX402';
 
 export function ComposerFunding({
   buyer,
-  offerId,
+  funding,
 }: {
   buyer: X402View;
-  offerId?: string;
+  funding: BuyerFunding | null;
 }) {
   const { policy, summary, error } = buyer.state;
-  const { funding } = useBuyerFunding(policy?.payer, offerId);
   return (
     <div className="pk-composer-tab">
       <span className="pk-tab-item" data-network="testnet">

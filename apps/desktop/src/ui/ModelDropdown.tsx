@@ -1,13 +1,18 @@
 // Quick model selection for chat; the full catalog remains a separate screen.
-import { Check } from '@phosphor-icons/react';
+import { CaretDown, Check, Plus, Wallet } from '@phosphor-icons/react';
+import { useState } from 'react';
 
+import type { BuyerFunding } from '../funding/model';
+import { AddBuyerFunds, fundingAmount } from './BuyerFunding';
 import { MENU_GEOMETRY, MODEL_SOURCE } from './constants';
 import { Dropdown } from './Dropdown';
+import { Modal } from './Modal';
 import { priceRange, usdPerMtok } from './model-price';
 import type { ModelOption } from './model-types';
 import { ModelImage } from './ModelImage';
 import { NetworkSellerMenu } from './NetworkSellerMenu';
-import { Badge, MenuItem } from './UI';
+import { OfferComparison } from './SellerStrategies';
+import { Badge, Button, MenuItem } from './UI';
 
 export type { ModelOption } from './model-types';
 
@@ -33,81 +38,103 @@ type PickerProps = {
   showBrowse?: boolean;
   networkOnly?: boolean;
   contextLabel?: string;
+  funding?: BuyerFunding | null;
   auto?: {
     buyerModels: readonly string[];
     paid: boolean;
     choose(name: string): void;
   };
 };
-export function ModelDropdown({
-  model,
-  models,
-  onSelect,
-  onBrowse,
-  toolbar = false,
-  label,
-  showBrowse = true,
-  networkOnly = false,
-  contextLabel,
-  auto,
-}: PickerProps) {
+export function ModelDropdown(props: PickerProps) {
+  const { model, models, funding } = props;
+  const [comparison, setComparison] = useState<string>();
+  const [addingFunds, setAddingFunds] = useState(false);
   const network =
-    networkOnly ||
+    props.networkOnly ||
     models.some((item) => item.source === MODEL_SOURCE.ANNOUNCED);
   const ordered = network
     ? models
     : [model, ...models.filter((item) => item.id !== model.id)];
   return (
-    <Dropdown
-      panelClassName="preview-model-menu"
-      searchLabel="Search models"
-      label={label ?? (toolbar ? 'Choose chat model' : 'Choose composer model')}
-      className={toolbar ? 'model-picker' : 'ui-model-trigger'}
-      trigger={
-        <>
-          <ModelImage artwork={model.image} name={model.name} />
-          {model.name}
-          {model.automatic ? (
-            <Badge>Auto</Badge>
-          ) : contextLabel ? (
-            <Badge>Local</Badge>
-          ) : network &&
-            !models.some((item) => item.id === model.id) ? null : model.free ? (
-            <Badge>Free</Badge>
-          ) : (
-            <span className="model-trigger-price" title={priceLabel(model)}>
-              {priceRange(model)} /M
-            </span>
-          )}
-        </>
-      }
-    >
-      {(close, query) => {
-        return (
-          <ModelOptions
-            {...{
-              close,
-              query,
-              ordered,
-              network,
-              model,
-              auto,
-              onSelect,
-              onBrowse,
-              contextLabel,
-              showBrowse,
-            }}
+    <>
+      {comparison && (
+        <OfferComparison
+          name={comparison}
+          offers={models.filter((item) => item.name === comparison)}
+          selected={model.id}
+          close={() => setComparison(undefined)}
+          choose={(id) => {
+            setComparison(undefined);
+            props.onSelect(id);
+          }}
+        />
+      )}
+      {addingFunds && (
+        <Modal title="Add funds" close={() => setAddingFunds(false)}>
+          <AddBuyerFunds payer={funding?.payer} />
+        </Modal>
+      )}
+      <Dropdown
+        panelClassName="preview-model-menu"
+        searchLabel="Search models"
+        label={
+          props.label ??
+          (props.toolbar ? 'Choose chat model' : 'Choose composer model') +
+            ': ' +
+            model.name
+        }
+        className={props.toolbar ? 'model-picker' : 'ui-model-trigger'}
+        trigger={
+          <PickerTrigger
+            model={model}
+            models={models}
+            network={network}
+            contextLabel={props.contextLabel}
           />
-        );
-      }}
-    </Dropdown>
+        }
+      >
+        {(close, query) => (
+          <>
+            {props.networkOnly && (
+              <MenuBalance
+                funding={funding}
+                onAdd={() => {
+                  close();
+                  setAddingFunds(true);
+                }}
+              />
+            )}
+            <ModelOptions
+              onCompare={setComparison}
+              {...props}
+              showBrowse={props.showBrowse ?? true}
+              close={close}
+              query={query}
+              ordered={ordered}
+              network={network}
+            />
+          </>
+        )}
+      </Dropdown>
+    </>
   );
 }
 
+type ModelOptionsProps = Pick<
+  PickerProps,
+  'model' | 'auto' | 'onSelect' | 'onBrowse' | 'contextLabel' | 'showBrowse'
+> & {
+  close(): void;
+  onCompare(name: string): void;
+  query: string;
+  ordered: readonly ModelOption[];
+  network: boolean;
+};
 function ModelOptions({
   close,
   query,
   ordered,
+  onCompare,
   network,
   model,
   auto,
@@ -115,28 +142,24 @@ function ModelOptions({
   onBrowse,
   contextLabel,
   showBrowse,
-}: Pick<
-  PickerProps,
-  'model' | 'auto' | 'onSelect' | 'onBrowse' | 'contextLabel' | 'showBrowse'
-> & {
-  close(): void;
-  query: string;
-  ordered: readonly ModelOption[];
-  network: boolean;
-}) {
+}: ModelOptionsProps) {
   const options = matchingModels(ordered, query, network);
   return (
     <>
-      {auto ? (
+      {network && !contextLabel ? (
         <NetworkSellerMenu
           models={options}
+          onCompare={(name) => {
+            close();
+            onCompare(name);
+          }}
           selected={model.id}
           automatic={!!model.automatic}
-          buyerModels={auto.buyerModels}
-          paid={auto.paid}
+          buyerModels={auto?.buyerModels ?? []}
+          paid={!!auto?.paid}
           onAuto={(name) => {
             close();
-            auto.choose(name);
+            auto?.choose(name);
           }}
           onSelect={(id) => {
             close();
@@ -193,4 +216,62 @@ function matchingModels(
   return network || query.trim()
     ? filtered
     : filtered.slice(0, MENU_GEOMETRY.QUICK_MODELS);
+}
+
+function PickerTrigger({
+  model,
+  models,
+  network,
+  contextLabel,
+}: Pick<PickerProps, 'model' | 'models' | 'contextLabel'> & {
+  network: boolean;
+}) {
+  return (
+    <>
+      <ModelImage artwork={model.image} name={model.name} />
+      {model.name}
+      {model.automatic ? (
+        <Badge>Auto</Badge>
+      ) : contextLabel ? (
+        <Badge>Local</Badge>
+      ) : network &&
+        !models.some((item) => item.id === model.id) ? null : model.free ? (
+        <Badge>Free</Badge>
+      ) : (
+        <span className="model-trigger-price" title={priceLabel(model)}>
+          {priceRange(model)} /M
+        </span>
+      )}
+      <CaretDown
+        size={12}
+        weight="bold"
+        className="preview-trigger-caret"
+        aria-hidden="true"
+      />
+    </>
+  );
+}
+
+function MenuBalance({
+  funding,
+  onAdd,
+}: {
+  funding?: BuyerFunding | null;
+  onAdd(): void;
+}) {
+  return (
+    <p className="pk-balance-line">
+      <Wallet size={14} />
+      <span>Balance</span>
+      <strong>
+        {funding?.balanceAtomic == null
+          ? 'Unavailable'
+          : fundingAmount(funding.balanceAtomic)}
+      </strong>
+      <Button className="pk-balance-add" onClick={onAdd}>
+        <Plus size={12} />
+        Add funds
+      </Button>
+    </p>
+  );
 }

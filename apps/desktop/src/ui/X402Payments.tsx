@@ -15,6 +15,7 @@ import {
   x402Explorer,
 } from '../x402-model';
 import { AutoSellerSettings } from './AutoSellerSettings';
+import { BudgetReview } from './BudgetReview';
 import { BUTTON_VARIANT } from './constants';
 import { DataCell, DataTable } from './DataTable';
 import { CopyField, FormActions, FormField, FormInput } from './Form';
@@ -40,9 +41,11 @@ function useCopyPolicy(buyer: X402View, policyId?: string) {
 export function X402Payments({
   buyer,
   onChat,
+  initialAmount,
 }: {
   buyer: X402View;
   onChat(): void;
+  initialAmount?: string;
 }) {
   const { summary, policy } = buyer.state;
   const activePolicy = effectiveX402Policy(summary, policy);
@@ -85,7 +88,14 @@ export function X402Payments({
       {summary.active && activePolicy ? (
         <X402ActiveBudget buyer={buyer} policy={activePolicy} onChat={onChat} />
       ) : (
-        policy && <X402Authorize buyer={buyer} policy={policy} />
+        policy && (
+          <X402Authorize
+            key={policy.policyId}
+            buyer={buyer}
+            policy={policy}
+            initialAmount={initialAmount}
+          />
+        )
       )}
       {summary.active &&
         policy &&
@@ -95,22 +105,7 @@ export function X402Payments({
             authorizing a new one.
           </p>
         )}
-      {(buyer.state.error || copyError || summary.blocked) && (
-        <p role="status">
-          {copyError ||
-            buyer.state.error ||
-            'An unfinished payment needs review. New messages are blocked.'}
-        </p>
-      )}
-      {(summary.blocked || buyer.state.canCheckChannels) &&
-        summary.available && (
-          <Button
-            disabled={buyer.busy}
-            onClick={() => void buyer.run({ action: X402_ACTION.REVIEW })}
-          >
-            {summary.blocked ? 'Check payment status' : 'Check channel status'}
-          </Button>
-        )}
+      <BudgetReview buyer={buyer} copyError={copyError} />
       <X402History buyer={buyer} />
     </section>
   );
@@ -195,11 +190,13 @@ function X402ExternalConnection({ buyer }: { buyer: X402View }) {
 function X402Authorize({
   buyer,
   policy,
+  initialAmount,
 }: {
   buyer: X402View;
   policy: BuyerApiPolicy;
+  initialAmount?: string;
 }) {
-  const [amount, setAmount] = useState('');
+  const [amount, setAmount] = useState(initialAmount ?? '');
   const [error, setError] = useState('');
   return (
     <form

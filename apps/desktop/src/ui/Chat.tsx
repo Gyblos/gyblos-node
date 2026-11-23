@@ -72,6 +72,7 @@ import {
   SearchField,
 } from './UI';
 import type { ActivityView } from './useActivity';
+import { useBuyerFunding } from './useBuyerFunding';
 import { chatArchiveLabel } from './useChatArchive';
 import type { PaypalSessionView } from './usePaypalSession';
 
@@ -183,6 +184,11 @@ export function Chat({
   const [reasoning, setReasoning] = useState<ReasoningSelection | null>(null);
   const usingPaypal = paymentMethod === PAYMENT_METHOD.PAYPAL;
   const usingX402 = !usingPaypal && !!x402;
+  const { funding } = useBuyerFunding(
+    x402?.state.policy?.payer,
+    model.offerId,
+    active && usingX402,
+  );
   const freeOnly =
     model.source === MODEL_SOURCE.ANNOUNCED &&
     model.free &&
@@ -713,7 +719,7 @@ export function Chat({
             </p>
           )}
           {active && usingX402 && x402 && (
-            <ComposerFunding buyer={x402} offerId={model.offerId} />
+            <ComposerFunding buyer={x402} funding={funding} />
           )}
           <ChatComposer
             disabled={loadingHistory}
@@ -758,6 +764,7 @@ export function Chat({
                     : undefined
                 }
                 networkOnly={usingX402}
+                funding={funding}
                 showBrowse={!usingPaypal}
                 contextLabel={
                   usingPaypal ? 'Local model · PayPal Sandbox' : undefined

@@ -1,6 +1,7 @@
 import { CaretRight } from '@phosphor-icons/react';
 import { useEffect, useState } from 'react';
 
+import { RESPONSE_METRICS } from '../constants';
 import {
   MESSAGE_STATE,
   type MessageState,
@@ -28,7 +29,8 @@ export function TurnActivity({
     );
     return () => window.clearInterval(timer);
   }, [waiting, timing]);
-  const seconds = (ms: number) => (ms / 1000).toFixed(1) + ' s';
+  const seconds = (ms: number) =>
+    (ms / RESPONSE_METRICS.MS_PER_SECOND).toFixed(1) + ' s';
   const outcome =
     state === MESSAGE_STATE.COMPLETE
       ? 'Response complete'

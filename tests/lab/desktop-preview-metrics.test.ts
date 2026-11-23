@@ -261,7 +261,7 @@ void test('preview menus that open upward stay glued to their trigger when their
     transformBrand(dropdownSource, dropdown, 'apps/desktop') ?? dropdownSource;
   assert.match(
     dropdownView,
-    /menu\.style\.bottom = up \?/,
+    /menu\.style\.bottom = up\s*\?/,
     'an upward menu is anchored by its bottom edge, not a top computed from a stale height',
   );
   const picker = await readFile(

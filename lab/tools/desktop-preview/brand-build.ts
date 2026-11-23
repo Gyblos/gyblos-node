@@ -166,8 +166,6 @@ export function transformBrand(source: string, id: string, desktop: string) {
     ]);
   const codeSample = transformCodeSamples(source, target, base);
   if (codeSample !== undefined) return codeSample;
-  if (target === `${base}/src/ui/Dropdown.tsx`)
-    return replaceEach(source, [...funds.MENU_REWRITES]);
   if (target === `${base}/src/ui/BuyerFunding.tsx`)
     return source.replaceAll(
       'Could not open the devnet faucet.',
