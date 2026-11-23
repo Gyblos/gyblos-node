@@ -26,9 +26,10 @@ use the same operations, on either role.
 
 ## Non-goals
 
-- No change to protocol, core, inference or the adapters, with two stated
-  exceptions: the local operator API is defined in protocol (step 7), and the
-  router leaves core for its own package behind a `Router` port in protocol
+- No change to protocol, core, inference or the adapters, with three stated
+  exceptions: v1 signed offers, which no product path uses, are removed from
+  protocol (step 4); the local operator API is defined in protocol (step 7); and
+  the router leaves core for its own package behind a `Router` port in protocol
   (step 9). Every other boundary stays as [architecture.md](architecture.md)
   describes it.
 - No new payment path. Paid inference uses USDC payment channels on Solana
@@ -46,7 +47,7 @@ use the same operations, on either role.
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | Seller logic            | In `packages/node`; `apps/node` is a thin CLI and daemon                                                                                      | In a seller package; unchanged shape                                         |
 | Buyer logic             | Mostly in `apps/buyer`: selection, discovery, routing, the HTTP endpoint and buyer API keys                                                   | In a buyer package; `apps/buyer` is a thin executable                        |
-| Buyer commands          | Eight `pnpm buyer*` scripts, from a checkout only; `pnpm buyer` is the one automatic buyer                                                    | `gyblos buyer <command>` in the released executable                          |
+| Buyer commands          | Eight `pnpm buyer*` scripts, from a checkout only; `pnpm buyer` runs the buyer endpoint                                                       | `gyblos buyer <command>` in the released executable                          |
 | `packages/node`         | Both roles, PayPal, `config.toml`, receipts and agent setup in one package                                                                    | A shared node kit with nothing specific to one role                          |
 | Desktop app             | Bundles `apps/buyer` as a utility process and keeps its own Chat budget and permission state                                                  | A client of the buyer's local API; holds no financial state                  |
 | Local control           | Local buyer routes named in `@gyblos/protocol` (`buyer-api`), served only to the desktop app; the operator token lives in the desktop process | One versioned local operator API per role, usable without the desktop app    |
@@ -143,7 +144,8 @@ An operation is the unit every surface shares.
   journal or releases a lock to succeed. Uncertain payments still block further
   calls until reconciled ([recovery.md](recovery.md)).
 
-Initial operation set, from the commands that exist today:
+An initial subset, to show the shape. The full set is every seller and buyer
+command that exists when the step lands, under the names decided there:
 
 | Role   | Operations                                                                                                            |
 | ------ | --------------------------------------------------------------------------------------------------------------------- |
