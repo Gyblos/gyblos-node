@@ -252,6 +252,16 @@ de descubrimiento; si no, dice "Unlisted seller". Esa dirección del dueño es a
 columna es una ayuda visual, no una prueba de a quién se pagó. Sí vincula la dirección del dueño de un
 vendedor listado con los canales que le pagaron y con los montos.
 
+Cada vendedor tiene además una página en el explorador, `explorer.gyblos.com/sellers/<NodeId>`, que reúne lo
+que ya es público sobre él: su nombre elegido por él mismo y su cuenta de GitHub verificada cuando los
+definió, su NodeId y la dirección del dueño, su estado en línea y su disponibilidad desde el índice de
+descubrimiento, sus totales por día y por modelo desde la ruta pública `GET /v1/stats/sellers/<NodeId>` del
+recolector de métricas (con los conteos de compradores menores que 5 ocultos, como arriba) y las
+transacciones de canales de Gyblos cuyo destinatario del pago es la dirección del dueño, desde
+`GET /v1/stats/chain/txs?recipient=<dirección del dueño>`. La dirección del dueño se muestra solo mientras
+el vendedor está en línea, y otros vendedores pueden publicar la misma, así que las transacciones listadas
+son del dueño.
+
 ## Búsqueda de actualizaciones [#búsqueda-de-actualizaciones]
 
 - **App de escritorio:** al iniciar y cada cinco minutos, pregunta a la API de GitHub por la última

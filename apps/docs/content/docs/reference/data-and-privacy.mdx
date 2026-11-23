@@ -247,6 +247,14 @@ the discovery index; otherwise it says "Unlisted seller". That owner address is 
 column is a display hint, not proof of who was paid. It does link a listed seller's owner address to the
 channels that paid it and to the amounts.
 
+Each seller also has a page in the explorer, `explorer.gyblos.com/sellers/<NodeId>`, that gathers what is
+already public about it: its self-chosen name and verified GitHub account when it set them, its NodeId and
+owner address, its online state and uptime from the discovery index, its daily and per-model totals from
+the metrics collector's public `GET /v1/stats/sellers/<NodeId>` (buyer counts below 5 withheld, as above),
+and the Gyblos channel transactions whose payout recipient is its owner address, from
+`GET /v1/stats/chain/txs?recipient=<owner address>`. The owner address is shown only while the seller is
+online, and other sellers may publish the same one, so the listed transactions are the owner's.
+
 ## Update checks [#update-checks]
 
 - **Desktop app:** at startup and every five minutes, it asks the GitHub API for the latest desktop
