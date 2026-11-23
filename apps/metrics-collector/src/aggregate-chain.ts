@@ -115,12 +115,6 @@ function settledTotal(bounds: DayBounds, scope: ChainAggregateScope) {
     }) as st`;
 }
 
-// What the day's distribute and reclaim transactions paid in USDC, by who received it. Only owners the
-// transaction's channels name count: the Gyblos and program treasuries, a channel's payer or payee, a
-// distribute recipient. A transaction whose payouts exceed what left its channels' vaults (a transfer
-// bundled with the payout) counts none, so payouts never exceed money the program released. Payouts
-// are per transaction, so in the gyblos scope a transaction counts only when every paying instruction
-// in it is for a Gyblos channel.
 export function payoutParts() {
   const owner = col('d', chainTokenDeltas.owner);
   const signature = col('d', chainTokenDeltas.signature);
@@ -140,6 +134,16 @@ export function payoutParts() {
     where ${col('v', chainTokenDeltas.signature)} = ${signature} and ${col('v', chainTokenDeltas.mint)} = ${DEVNET_USDC}
       and ${asInteger(col('v', chainTokenDeltas.deltaAtomic))} < 0
       and ${col('v', chainTokenDeltas.owner)} in (select ${col('vi', chainInstructions.channel)} from ${from(chainInstructions, 'vi')} where ${col('vi', chainInstructions.signature)} = ${signature}))`;
+  const part = (condition: SQL) =>
+    sql`total(case when ${condition} then ${amount} end)`;
+  const otherChannelPaid = sql`(
+        select 1 from ${from(chainInstructions, 'y')} ${channelJoin('y', 'yc')}
+        where ${col('y', chainInstructions.signature)} = ${signature}
+          and ${col('y', chainInstructions.kind)} in ${kinds(PAYING)}
+          and coalesce(${col('yc', chainChannels.gyblos)}, 0) <> 1
+      )`;
+  const balanced = (parts: { g: SQL; pt: SQL; r: SQL; o: SQL; outflow: SQL }) =>
+    sql`${parts.g} + ${parts.pt} + ${parts.r} + ${parts.o} <= ${parts.outflow}`;
   return {
     signature,
     amount,
@@ -148,14 +152,31 @@ export function payoutParts() {
     toPayer,
     toOthers,
     vault,
+    part,
+    otherChannelPaid,
+    balanced,
   };
 }
 
+// What the day's distribute and reclaim transactions paid in USDC, by who received it. Only owners the
+// transaction's channels name count: the Gyblos and program treasuries, a channel's payer or payee, a
+// distribute recipient. A transaction whose payouts exceed what left its channels' vaults (a transfer
+// bundled with the payout) counts none, so payouts never exceed money the program released. Payouts
+// are per transaction, so in the gyblos scope a transaction counts only when every paying instruction
+// in it is for a Gyblos channel.
 function payoutTotals(bounds: DayBounds, scope: ChainAggregateScope) {
-  const { signature, amount, toGyblos, toProgram, toPayer, toOthers, vault } =
-    payoutParts();
-  const part = (condition: SQL) =>
-    sql`total(case when ${condition} then ${amount} end)`;
+  const {
+    signature,
+    amount,
+    toGyblos,
+    toProgram,
+    toPayer,
+    toOthers,
+    vault,
+    part,
+    otherChannelPaid,
+    balanced,
+  } = payoutParts();
   const perTx = sql`(select
       ${part(toGyblos)} as g, ${part(toProgram)} as pt, ${part(toPayer)} as r, ${part(toOthers)} as o,
       ${vault} as vault
@@ -171,24 +192,19 @@ function payoutTotals(bounds: DayBounds, scope: ChainAggregateScope) {
       )${
         scope === CHAIN_AGGREGATE_SCOPES.GYBLOS
           ? sql`
-      and not exists (
-        select 1 from ${from(chainInstructions, 'y')} ${channelJoin('y', 'yc')}
-        where ${col('y', chainInstructions.signature)} = ${signature}
-          and ${col('y', chainInstructions.kind)} in ${kinds(PAYING)}
-          and coalesce(${col('yc', chainChannels.gyblos)}, 0) <> 1
-      )`
+      and not exists ${otherChannelPaid}`
           : sql``
       }
     group by ${signature})`;
-  const balanced = (name: string) =>
+  const shown = (name: string) =>
     atomicTotal(
-      sql`case when g + pt + r + o <= vault then ${sql.identifier(name)} end`,
+      sql`case when ${balanced({ g: sql.raw('g'), pt: sql.raw('pt'), r: sql.raw('r'), o: sql.raw('o'), outflow: sql.raw('vault') })} then ${sql.identifier(name)} end`,
     );
   return sql`(select
-      ${balanced('g')} as gyblos_fees,
-      ${balanced('pt')} as program_treasury,
-      ${balanced('r')} as refunded,
-      ${balanced('o')} as paid_out
+      ${shown('g')} as gyblos_fees,
+      ${shown('pt')} as program_treasury,
+      ${shown('r')} as refunded,
+      ${shown('o')} as paid_out
     from ${perTx}) as dl`;
 }
 

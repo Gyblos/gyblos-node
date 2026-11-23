@@ -20,17 +20,23 @@ export interface ChainTxRow extends ChainTxCursor {
   recipientsJson: string | null;
   amountAtomic: string | null;
   splitPaidOut: string | null;
-  splitGyblosFee: string | null;
-  splitProgramFee: string | null;
+  splitGyblosFees: string | null;
+  splitProgramTreasury: string | null;
   splitRefunded: string | null;
+  splitChannels: number | null;
 }
 type SplitColumns =
-  'splitPaidOut' | 'splitGyblosFee' | 'splitProgramFee' | 'splitRefunded';
+  | 'splitPaidOut'
+  | 'splitGyblosFees'
+  | 'splitProgramTreasury'
+  | 'splitRefunded'
+  | 'splitChannels';
 export interface PayoutSplit {
   paidOut: string;
-  gyblosFee: string;
-  programFee: string;
+  gyblosFees: string;
+  programTreasury: string;
   refunded: string;
+  channels: number;
 }
 export interface ChainTxReader {
   transactions(page: {
@@ -116,20 +122,36 @@ function recipientOwners(json: string | null): string[] {
   }
 }
 
-function payoutSplit(row: Pick<ChainTxRow, SplitColumns>): PayoutSplit | null {
-  const { splitPaidOut, splitGyblosFee, splitProgramFee, splitRefunded } = row;
+function payoutSplit(row: ChainTxRow): PayoutSplit | null {
   if (
-    splitPaidOut === null ||
-    splitGyblosFee === null ||
-    splitProgramFee === null ||
-    splitRefunded === null
+    row.splitPaidOut === null ||
+    row.splitGyblosFees === null ||
+    row.splitProgramTreasury === null ||
+    row.splitRefunded === null ||
+    row.splitChannels === null
   )
     return null;
   return {
-    paidOut: splitPaidOut,
-    gyblosFee: splitGyblosFee,
-    programFee: splitProgramFee,
-    refunded: splitRefunded,
+    paidOut: row.splitPaidOut,
+    gyblosFees: row.splitGyblosFees,
+    programTreasury: row.splitProgramTreasury,
+    refunded: row.splitRefunded,
+    channels: row.splitChannels,
+  };
+}
+
+function chainTx(row: ChainTxRow): ChainTx {
+  return {
+    signature: row.signature,
+    instructionIndex: row.instructionIndex,
+    slot: row.slot,
+    blockTime: row.blockTime,
+    kind: row.kind,
+    channel: row.channel,
+    payee: row.payee,
+    recipients: recipientOwners(row.recipientsJson),
+    amountAtomic: row.amountAtomic,
+    split: payoutSplit(row),
   };
 }
 
@@ -148,25 +170,7 @@ export async function chainTransactions(
     programId: CHANNEL_PROGRAM,
     mint: DEVNET_USDC,
     treasury: DEVNET_GYBLOS_TREASURY,
-    transactions: page.map(
-      ({
-        recipientsJson,
-        splitPaidOut,
-        splitGyblosFee,
-        splitProgramFee,
-        splitRefunded,
-        ...row
-      }) => ({
-        ...row,
-        recipients: recipientOwners(recipientsJson),
-        split: payoutSplit({
-          splitPaidOut,
-          splitGyblosFee,
-          splitProgramFee,
-          splitRefunded,
-        }),
-      }),
-    ),
+    transactions: page.map(chainTx),
     next: rows.length > query.limit && last ? cursorOf(last) : null,
   };
 }

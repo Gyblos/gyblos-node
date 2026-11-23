@@ -61,7 +61,9 @@ function pageKeys(
         channel: ins.channel,
         payee: chainChannels.payee,
         recipientsJson: chainChannels.recipientsJson,
-        mint: chainChannels.mint,
+        mint: sql<
+          string | null
+        >`coalesce(${chainChannels.mint}, ${ins.mint})`.as('mint'),
         depositAtomic: ins.amountAtomic,
         cumulativeAtomic: ins.cumulativeAtomic,
       })
@@ -133,29 +135,30 @@ function settleIncrements(
     .as('settles');
 }
 
+const usdcMint = (instruction: string, channel: string) =>
+  sql`coalesce(${col(channel, chainChannels.mint)}, ${col(instruction, ins.mint)}) = ${DEVNET_USDC}`;
+
 function payoutSplits(
   orm: CollectorDatabase,
   page: ReturnType<typeof pageKeys>,
 ) {
   const deltas = alias(chainTokenDeltas, 'd');
   const parts = payoutParts();
-  const part = (condition: SQL) =>
-    sql<number>`total(case when ${condition} then ${parts.amount} end)`;
   const paying = orm
     .select({ signature: page.signature })
     .from(page)
     .where(inArray(page.kind, PAYING));
-  const otherChannel = sql`exists (select 1 from ${from(ins, 'y')} ${channelJoin('y', 'yc')}
-    where ${col('y', ins.signature)} = ${parts.signature} and ${col('y', ins.kind)} in ${kinds(PAYING)}
-      and coalesce(${col('yc', chainChannels.gyblos)}, 0) <> 1)`;
+  const channels = sql`(select count(distinct ${col('n', ins.channel)}) from ${from(ins, 'n')} ${channelJoin('n', 'nc')}
+    where ${col('n', ins.signature)} = ${parts.signature} and ${col('n', ins.kind)} in ${kinds(PAYING)} and ${usdcMint('n', 'nc')})`;
   return orm
     .select({
       signature: sql<string>`${parts.signature}`.as('split_signature'),
-      gyblosFee: part(parts.toGyblos).as('gyblos_fee'),
-      programFee: part(parts.toProgram).as('program_fee'),
-      refunded: part(parts.toPayer).as('refunded'),
-      paidOut: part(parts.toOthers).as('paid_out'),
+      gyblosFees: parts.part(parts.toGyblos).as('gyblos_fees'),
+      programTreasury: parts.part(parts.toProgram).as('program_treasury'),
+      refunded: parts.part(parts.toPayer).as('refunded'),
+      paidOut: parts.part(parts.toOthers).as('paid_out'),
       vault: sql<number>`max(${parts.vault})`.as('vault'),
+      channels: sql<number>`max(${channels})`.as('channels'),
     })
     .from(deltas)
     .where(
@@ -163,7 +166,7 @@ function payoutSplits(
         inArray(deltas.signature, paying),
         eq(deltas.mint, DEVNET_USDC),
         gt(parts.amount, 0),
-        sql`not ${otherChannel}`,
+        sql`not exists ${parts.otherChannelPaid}`,
       ),
     )
     .groupBy(deltas.signature)
@@ -174,20 +177,27 @@ function payoutFields(
   page: ReturnType<typeof pageKeys>,
   splits: ReturnType<typeof payoutSplits>,
 ) {
-  const firstPaying = sql`not exists (select 1 from ${from(ins, 'e')}
-    where ${col('e', ins.signature)} = ${page.signature}
+  const firstPaying = sql`not exists (select 1 from ${from(ins, 'e')} ${channelJoin('e', 'ec')}
+    where ${col('e', ins.signature)} = ${page.signature} and ${usdcMint('e', 'ec')}
       and ${col('e', ins.kind)} in ${kinds(PAYING)} and ${col('e', ins.instructionIndex)} < ${page.instructionIndex})`;
-  const balanced = sql`${splits.gyblosFee} + ${splits.programFee} + ${splits.refunded} + ${splits.paidOut} <= ${splits.vault}`;
+  const balanced = payoutParts().balanced({
+    g: sql`${splits.gyblosFees}`,
+    pt: sql`${splits.programTreasury}`,
+    r: sql`${splits.refunded}`,
+    o: sql`${splits.paidOut}`,
+    outflow: sql`${splits.vault}`,
+  });
+  const when = sql`${page.mint} is ${DEVNET_USDC} and ${page.kind} in ${kinds(PAYING)} and ${firstPaying} and ${balanced}`;
   const shown = (value: SQL | SQL.Aliased) =>
     sql<
       string | null
-    >`case when ${page.mint} is ${DEVNET_USDC} and ${page.kind} in ${kinds(PAYING)} and ${firstPaying} and ${balanced}
-      then cast(cast(${value} as integer) as text) end`;
+    >`case when ${when} then cast(cast(${value} as integer) as text) end`;
   return {
     paidOut: shown(splits.paidOut),
-    gyblosFee: shown(splits.gyblosFee),
-    programFee: shown(splits.programFee),
+    gyblosFees: shown(splits.gyblosFees),
+    programTreasury: shown(splits.programTreasury),
     refunded: shown(splits.refunded),
+    channels: sql<number | null>`case when ${when} then ${splits.channels} end`,
   };
 }
 
@@ -226,9 +236,12 @@ export function chainTxReader(database: D1Database): ChainTxReader {
           recipientsJson: page.recipientsJson,
           amountAtomic: amountOf(page, settles, payout),
           splitPaidOut: payout.paidOut.as('split_paid_out'),
-          splitGyblosFee: payout.gyblosFee.as('split_gyblos_fee'),
-          splitProgramFee: payout.programFee.as('split_program_fee'),
+          splitGyblosFees: payout.gyblosFees.as('split_gyblos_fees'),
+          splitProgramTreasury: payout.programTreasury.as(
+            'split_program_treasury',
+          ),
           splitRefunded: payout.refunded.as('split_refunded'),
+          splitChannels: payout.channels.as('split_channels'),
         })
         .from(page)
         .leftJoin(

@@ -497,9 +497,10 @@ and `503 COLLECTOR_UNAVAILABLE` are as for the other stats routes. The answer:
       "amountAtomic": "213",
       "split": {
         "paidOut": "213",
-        "gyblosFee": "9",
-        "programFee": "3",
-        "refunded": "999775"
+        "gyblosFees": "9",
+        "programTreasury": "3",
+        "refunded": "999775",
+        "channels": 1
       }
     }
   ],
@@ -525,25 +526,34 @@ was not read. `amountAtomic` is devnet USDC as a decimal string:
 - `distribute`: `split.paidOut`, what the seller side received;
 - `reclaim`: `split.refunded`, what went back to the payer.
 
-`split` is set only on the first `distribute` or `reclaim` instruction of a
-transaction, and `null` on every other row. It classifies the transaction's
-positive devnet USDC changes exactly as the daily aggregate's payout totals do:
-`gyblosFee` (the Gyblos fee treasury), `programFee` (the program's own
-treasury), `refunded` (a payer of a channel the transaction names) and `paidOut`
-(that channel's payee or a distribute recipient), as decimal strings. The rows'
-splits add up to the days' `gyblosFeesAtomic`, `programTreasuryAtomic`,
-`refundedAtomic` and `paidOutAtomic`. Like the aggregate, a transaction whose
-parts exceed what left its channels' vaults (a transfer bundled with the
-payout), or that also pays a channel that is not Gyblos, gets no split.
+The mint of a row is the channel's mint, or the instruction's own mint when the
+channel's open was never read (its mint is not recorded).
+
+`split` is set only on the transaction's first `distribute` or `reclaim`
+instruction in devnet USDC, and `null` on every other row. It classifies the
+transaction's positive devnet USDC changes exactly as the daily aggregate's
+payout totals do (the two share the same SQL): `gyblosFees` (the Gyblos fee
+treasury), `programTreasury` (the program's own treasury: rounding remainder,
+not a Gyblos fee), `refunded` (a payer of a channel the transaction names) and
+`paidOut` (that channel's payee or a distribute recipient), as decimal strings;
+and `channels`, how many USDC channels the transaction pays. With more than one,
+the split is the transaction's total, not one channel's. Like the aggregate, a
+transaction whose parts exceed what left its channels' vaults (a transfer
+bundled with the payout), or that also pays a channel that is not Gyblos, gets
+no split.
+
+The splits of a day's rows add up to that day's `gyblosFeesAtomic`,
+`programTreasuryAtomic`, `refundedAtomic` and `paidOutAtomic`, except that a
+transaction without a block time is listed but belongs to no day.
 
 `amountAtomic` is `null` when:
 
-- the channel's mint is not devnet USDC, or is unknown because its open was
-  never read;
+- the row's mint is not devnet USDC, or is unknown because neither the channel's
+  open nor the instruction recorded one;
 - the kind is `request_close` or `seal`;
 - a settle carries no voucher, or its transaction has no block time;
 - a `distribute` or `reclaim` has no `split`: it is not the transaction's first
-  paying instruction, the transaction moved no USDC to anyone, or its parts
+  USDC paying instruction, the transaction moved no USDC to anyone, its parts
   exceed the vault outflow, or it also pays a channel that is not Gyblos.
 
 The list is as complete as the chain index: channels it never read, and history
