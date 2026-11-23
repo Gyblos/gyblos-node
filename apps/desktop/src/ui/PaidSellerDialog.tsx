@@ -10,12 +10,15 @@ import { atomicToUsdc, usdcToAtomic } from '@gyblos/node/node-config-price';
 
 import { depositShortfall, sellerResponseLimit } from '../funding/model';
 import { paidSellerLimitNotice, X402_ACTION } from '../x402-model';
+import { AmountField } from './AmountField';
 import { fundingAmount } from './BuyerFunding';
 import { BUTTON_VARIANT } from './constants';
-import { FormField, FormInput } from './Form';
+import { FormActions } from './Form';
+import { Facts, Pair } from './Management';
 import { Modal } from './Modal';
 import { usdPerMtok } from './model-price';
 import type { CatalogModel } from './model-types';
+import { ModelImage } from './ModelImage';
 import { Button } from './UI';
 import { useBuyerFunding } from './useBuyerFunding';
 import type { X402View } from './useX402';
@@ -35,14 +38,12 @@ function useSellerConfirmation(
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   async function select() {
-    let maxAtomic: string;
-    try {
-      maxAtomic = String(usdcToAtomic(maximum));
-      if (maxAtomic === '0') throw new Error();
-    } catch {
+    const amount = parseMaximum(maximum);
+    if (amount === null || amount === 0n) {
       setError('Enter a positive USDC maximum with up to six decimal places.');
       return;
     }
+    const maxAtomic = String(amount);
     if (
       availableMaximum !== undefined &&
       BigInt(maxAtomic) > BigInt(availableMaximum)
@@ -173,6 +174,12 @@ export function PaidSellerDialog(
     />
   );
 }
+type TermsProps = SellerDialogProps & {
+  remaining?: string;
+  switching?: string;
+  replacement?: string;
+  availableMaximum?: string;
+};
 function SellerTerms({
   model,
   buyer,
@@ -182,12 +189,7 @@ function SellerTerms({
   switching,
   availableMaximum,
   replacement,
-}: SellerDialogProps & {
-  remaining?: string;
-  switching?: string;
-  replacement?: string;
-  availableMaximum?: string;
-}) {
+}: TermsProps) {
   const { maximum, setMaximum, error, setError, saving, select } =
     useSellerConfirmation(model, buyer, confirm, availableMaximum);
   const { policy } = buyer.state;
@@ -212,25 +214,22 @@ function SellerTerms({
           if (!buyer.busy && !saving) void select();
         }}
       >
-        <div>
-          <strong>{model.name}</strong>
-          <p>{model.family}</p>
+        <div className="paid-model-summary">
+          <ModelImage name={model.name} artwork={model.image} />
+          <div>
+            <strong>{model.name}</strong>
+            <p className="ui-help-text">{model.family}</p>
+          </div>
         </div>
-        <FormField
-          htmlFor="paid-response-maximum"
-          label="Maximum per response (USDC)"
-        >
-          <FormInput
-            id="paid-response-maximum"
-            inputMode="decimal"
-            placeholder="0.00"
-            value={maximum}
-            onChange={(event) => {
-              setMaximum(event.target.value);
-              setError('');
-            }}
-          />
-        </FormField>
+        <SellerMaximum
+          value={maximum}
+          invalid={!!error}
+          disabled={saving || buyer.busy}
+          onChange={(value) => {
+            setMaximum(value);
+            setError('');
+          }}
+        />
         <ChannelTerms
           switching={switching}
           remaining={remaining}
@@ -238,19 +237,71 @@ function SellerTerms({
           minutes={minutes}
         />
         <SellerRates model={model} />
-        {error && <p role="alert">{error}</p>}
-        <Button
-          type="submit"
-          variant={BUTTON_VARIANT.PRIMARY}
-          disabled={!maximum || saving || buyer.busy}
-        >
-          {saving ? 'Saving…' : 'Confirm seller'}
-        </Button>
+        {error && (
+          <p
+            id="seller-confirmation-error"
+            className="preview-field-error"
+            role="alert"
+          >
+            {error}
+          </p>
+        )}
+        <FormActions>
+          <Button disabled={saving} onClick={close}>
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            variant={BUTTON_VARIANT.PRIMARY}
+            disabled={!maximum || saving || buyer.busy}
+          >
+            {saving ? 'Saving…' : 'Confirm seller'}
+          </Button>
+        </FormActions>
       </form>
     </Modal>
   );
 }
 
+function SellerMaximum({
+  value,
+  invalid,
+  disabled,
+  onChange,
+}: {
+  value: string;
+  invalid: boolean;
+  disabled: boolean;
+  onChange(value: string): void;
+}) {
+  return (
+    <div className="preview-amount-editor">
+      <label className="preview-limit-label" htmlFor="paid-response-maximum">
+        Maximum per response
+      </label>
+      <AmountField
+        id="paid-response-maximum"
+        unit="USDC"
+        value={value}
+        parse={parseMaximum}
+        format={atomicToUsdc}
+        step={usdcToAtomic('0.01')}
+        placeholder="0.00"
+        invalid={invalid}
+        disabled={disabled}
+        describedBy={invalid ? 'seller-confirmation-error' : undefined}
+        onChange={onChange}
+      />
+    </div>
+  );
+}
+function parseMaximum(value: string) {
+  try {
+    return usdcToAtomic(value);
+  } catch {
+    return null;
+  }
+}
 function ChannelTerms({
   switching,
   remaining,
@@ -263,18 +314,18 @@ function ChannelTerms({
   minutes: number;
 }) {
   return switching ? (
-    <p>
+    <p className="ui-help-text">
       Sending your first message will close the previous seller’s channel and
       open this one with up to {fundingAmount(switching)} from the refund.
     </p>
   ) : remaining ? (
-    <p>
+    <p className="ui-help-text">
       Your existing channel has {fundingAmount(remaining)} available. If it
       needs replacing before your message, the new deposit can be up to{' '}
       {fundingAmount(deposit)} for {minutes} minutes.{' '}
     </p>
   ) : (
-    <p>
+    <p className="ui-help-text">
       Sending your first message settles any previous single-seller channel
       before opening this one with a {atomicToUsdc(BigInt(deposit))} USDC
       deposit for {minutes} minutes.
@@ -286,10 +337,10 @@ function SellerRates({ model }: { model: CatalogModel }) {
   return (
     <details>
       <summary>Seller rates</summary>
-      <p>
-        {usdPerMtok(model.input)} input · {usdPerMtok(model.output)} output per
-        1M tokens
-      </p>
+      <Facts compact>
+        <Pair label="Input · 1M tokens" value={usdPerMtok(model.input)} />
+        <Pair label="Output · 1M tokens" value={usdPerMtok(model.output)} />
+      </Facts>
     </details>
   );
 }
