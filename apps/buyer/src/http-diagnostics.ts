@@ -1,12 +1,20 @@
 // Content-free observations of the compatibility boundary. Logging never decides retry or admission.
 import type { ServerResponse } from 'node:http';
 
+import { BuyerRoutingError } from '@gyblos/core/buyer-routing';
+import { BUYER_ROUTING_CODES } from '@gyblos/core/constants';
 import { PaidBuyerError } from '@gyblos/node/buyer-paid-error';
+import { UnsentSellerBusyError } from '@gyblos/node/buyer-routing';
+import { UnsentChannelRequestError } from '@gyblos/node/buyer-session';
 import {
   BATCH_SDK_DIAGNOSTIC_CODES,
   batchSdkDiagnosticCode,
 } from '@gyblos/payments-upto/batch-session';
 import { BatchChannelError } from '@gyblos/protocol/batch-channel';
+import {
+  BUYER_KEY_CODES,
+  BuyerApiKeyError,
+} from '@gyblos/protocol/buyer-api-keys';
 import {
   FREE_EXECUTION_CODES,
   PAYMENT_ERROR_CODES,
@@ -50,6 +58,8 @@ const CODES = [
   ...Object.values(SESSION_CODES),
   ...Object.values(PAYMENT_ERROR_CODES),
   ...Object.values(PAID_EXECUTION_CODES),
+  ...Object.values(BUYER_ROUTING_CODES),
+  ...Object.values(BUYER_KEY_CODES),
   ...BATCH_SDK_DIAGNOSTIC_CODES,
 ];
 function failureCode(error: unknown) {
@@ -65,7 +75,11 @@ function failureCode(error: unknown) {
       error instanceof PaymentSessionError ||
       error instanceof PaymentError ||
       error instanceof BatchChannelError ||
-      error instanceof PaidBuyerError
+      error instanceof PaidBuyerError ||
+      error instanceof BuyerRoutingError ||
+      error instanceof UnsentSellerBusyError ||
+      error instanceof UnsentChannelRequestError ||
+      error instanceof BuyerApiKeyError
     ) {
       const code: unknown = error.code;
       const known = CODES.find((item) => item === code);
