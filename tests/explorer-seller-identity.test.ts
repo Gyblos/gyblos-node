@@ -3,7 +3,6 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
 
-import { rangeSwitchHref } from '@gyblos/explorer/chain-txs-shape';
 import { gistUrl } from '@gyblos/explorer/config';
 import { DISPLAY, IDENTITY } from '@gyblos/explorer/constants';
 import type { Seller } from '@gyblos/explorer/discovery';
@@ -12,6 +11,7 @@ import {
   normalizeNetwork,
   parseNetworkStatus,
 } from '@gyblos/explorer/network-status';
+import { rangeSwitchHref } from '@gyblos/explorer/paging';
 import {
   emptySellersMessage,
   githubByNode,

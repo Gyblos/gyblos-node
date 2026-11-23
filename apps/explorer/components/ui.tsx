@@ -23,12 +23,17 @@ export function Loading() {
 export function SectionTitle({
   title,
   meta,
+  id,
 }: {
   title: string;
   meta?: ReactNode;
+  id?: string;
 }) {
   return (
-    <div className="mt-10 mb-4 flex flex-wrap items-baseline justify-between gap-2">
+    <div
+      id={id}
+      className="mt-10 mb-4 flex scroll-mt-4 flex-wrap items-baseline justify-between gap-2"
+    >
       <h2 className="text-xl font-medium">{title}</h2>
       {meta ? <span className="font-mono text-xs text-dim">{meta}</span> : null}
     </div>

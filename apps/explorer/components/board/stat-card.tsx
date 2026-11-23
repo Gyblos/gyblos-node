@@ -27,7 +27,10 @@ export function StatCard({
 }) {
   return (
     <section
-      className={cx('flex min-w-0 flex-col gap-5 p-4 sm:p-5', SURFACE.card)}
+      className={cx(
+        '@container flex min-w-0 flex-col gap-5 p-4 sm:p-5',
+        SURFACE.card,
+      )}
     >
       <span
         className={cx(
@@ -42,7 +45,7 @@ export function StatCard({
         <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
           <span
             className={cx(
-              'font-mono text-2xl whitespace-nowrap text-ink',
+              'max-w-full min-w-0 font-mono text-[clamp(1rem,9.5cqi,1.5rem)] leading-tight text-ink',
               money && 'text-money',
             )}
           >

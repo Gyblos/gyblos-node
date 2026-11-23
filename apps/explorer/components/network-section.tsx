@@ -5,7 +5,7 @@ import { Activity, BadgeCheck, Boxes, Server, Tag } from 'lucide-react';
 import Link from 'next/link';
 
 import { HOW_TO_VERIFY_URL } from '../lib/config';
-import { DISPLAY, IDENTITY, RANGE } from '../lib/constants';
+import { DISPLAY, PAGING } from '../lib/constants';
 import type { DiscoverySnapshot, Seller } from '../lib/discovery';
 import { getDiscovery } from '../lib/discovery-render';
 import { count, percent, pricePerMtok, short, usdc, utc } from '../lib/format';
@@ -16,11 +16,12 @@ import {
   type NetworkStatus,
 } from '../lib/network-status';
 import { summarizeOffers, uptimeRatio } from '../lib/offers';
-import type { RangeDays } from '../lib/range';
+import { queryHref, tablePager, type ExplorerQuery } from '../lib/paging';
 import {
   emptySellersMessage,
   githubByNode,
   notOnlineMeta,
+  offersCaption,
   orderSellers,
   verifiedOnly,
 } from '../lib/seller-identity';
@@ -28,6 +29,7 @@ import { Flow } from './board/animated-number';
 import { Chip } from './board/chip';
 import { StatCard } from './board/stat-card';
 import { StatusDot } from './board/status-dot';
+import { pagedRows, Pager } from './pager';
 import { SellerCell } from './seller-cell';
 import {
   Addr,
@@ -46,13 +48,8 @@ const ratioText = (ratio: number | undefined | null) =>
 const priceText = (value: bigint | null) =>
   value === null ? '—' : usdc(value);
 
-export async function NetworkSection({
-  days,
-  verified,
-}: {
-  days: RangeDays;
-  verified: boolean;
-}) {
+export async function NetworkSection({ query }: { query: ExplorerQuery }) {
+  const { verified } = query;
   const snapshot = await getDiscovery();
   if (snapshot.error) return <Unavailable title="Network" />;
   const summary = summarizeOffers(snapshot);
@@ -72,7 +69,7 @@ export async function NetworkSection({
             : null}
         </p>
       ) : null}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <SellersOnline snapshot={snapshot} />
         <StatCard
           icon={Boxes}
@@ -104,13 +101,13 @@ export async function NetworkSection({
       </div>
 
       <SellersBlock
-        days={days}
-        verified={verified}
+        query={query}
         sellers={shown}
         accounts={accounts}
         accountsKnown={!!snapshot.network && !snapshot.network.truncated}
       />
       <NotOnline
+        query={query}
         network={snapshot.network}
         accounts={verified ? accounts : null}
       />
@@ -145,14 +142,12 @@ function SellersOnline({ snapshot }: { snapshot: DiscoverySnapshot }) {
 }
 
 function SellersBlock({
-  days,
-  verified,
+  query,
   sellers,
   accounts,
   accountsKnown,
 }: {
-  days: RangeDays;
-  verified: boolean;
+  query: ExplorerQuery;
   sellers: Seller[];
   accounts: Map<string, GithubAccount>;
   accountsKnown: boolean;
@@ -160,13 +155,14 @@ function SellersBlock({
   return (
     <>
       <SectionTitle
+        id={PAGING.anchors.sellers}
         title="Sellers"
-        meta={<VerifiedFilter days={days} verified={verified} />}
+        meta={<VerifiedFilter query={query} />}
       />
       <SellersTable
+        query={query}
         sellers={sellers}
         accounts={accounts}
-        verified={verified}
         accountsKnown={accountsKnown}
       />
       <p className="mt-2 flex items-center gap-1 text-xs text-dim">
@@ -187,21 +183,9 @@ function SellersBlock({
   );
 }
 
-function filterHref(days: RangeDays, verified: boolean) {
-  const query = new URLSearchParams();
-  if (days !== RANGE.defaultDays) query.set(RANGE.param, String(days));
-  if (verified) query.set(IDENTITY.verifiedParam, IDENTITY.verifiedValue);
-  const search = query.toString();
-  return search ? `/?${search}` : '/';
-}
-
-function VerifiedFilter({
-  days,
-  verified,
-}: {
-  days: RangeDays;
-  verified: boolean;
-}) {
+function VerifiedFilter({ query }: { query: ExplorerQuery }) {
+  const filterHref = (verified: boolean) =>
+    queryHref(query, { verified, pages: { sellers: 1, offline: 1 } });
   const option = (label: string, href: string, current: boolean) => (
     <Link
       href={href}
@@ -218,45 +202,54 @@ function VerifiedFilter({
   );
   return (
     <span className="flex items-center gap-1">
-      {option('All', filterHref(days, false), !verified)}
-      {option('Verified only', filterHref(days, true), verified)}
+      {option('All', filterHref(false), !query.verified)}
+      {option('Verified only', filterHref(true), query.verified)}
     </span>
   );
 }
 
+const SELLERS_HEAD = [
+  { label: 'Seller' },
+  { label: 'Status' },
+  { label: 'Model' },
+  { label: 'Context', right: true },
+  { label: 'Input / 1M', right: true },
+  { label: 'Output / 1M', right: true },
+  { label: 'Uptime 24 h · 7 d', right: true },
+  { label: 'Online since' },
+];
+
+const sellerOffers = (sellers: Seller[]) =>
+  sellers.flatMap((seller) =>
+    seller.models.map((model) => ({ seller, model })),
+  );
+
 function SellersTable({
+  query,
   sellers,
   accounts,
-  verified,
   accountsKnown,
 }: {
+  query: ExplorerQuery;
   sellers: Seller[];
   accounts: Map<string, GithubAccount>;
-  verified: boolean;
   accountsKnown: boolean;
 }) {
-  const head = [
-    { label: 'Seller' },
-    { label: 'Status' },
-    { label: 'Model' },
-    { label: 'Context', right: true },
-    { label: 'Input / 1M', right: true },
-    { label: 'Output / 1M', right: true },
-    { label: 'Uptime 24 h · 7 d', right: true },
-    { label: 'Online since' },
-  ];
-  const empty = emptySellersMessage(sellers, verified, accountsKnown);
+  const empty = emptySellersMessage(sellers, query.verified, accountsKnown);
+  const offers = sellerOffers(sellers);
+  const complete = !query.verified || accountsKnown;
+  const page = pagedRows(query, 'sellers', offers, complete);
   return (
-    <Table minWidth={DISPLAY.wideTable} head={head}>
-      {empty ? (
-        <tr>
-          <td className={`${td} text-muted`} colSpan={head.length}>
-            {empty}
-          </td>
-        </tr>
-      ) : null}
-      {sellers.flatMap((seller) =>
-        seller.models.map((model) => (
+    <>
+      <Table minWidth={DISPLAY.wideTable} head={SELLERS_HEAD}>
+        {empty ? (
+          <tr>
+            <td className={`${td} text-muted`} colSpan={SELLERS_HEAD.length}>
+              {empty}
+            </td>
+          </tr>
+        ) : null}
+        {page.rows.map(({ seller, model }) => (
           <tr
             key={`${seller.nodeId}:${model.modelId}:${model.variant}:${model.quantization}`}
             className="border-t border-line"
@@ -297,16 +290,24 @@ function SellersTable({
               {utc(seller.uptime?.firstSeenAt ?? null)}
             </td>
           </tr>
-        )),
-      )}
-    </Table>
+        ))}
+      </Table>
+      <Pager label="Sellers" view={tablePager(query, 'sellers', page)} />
+      {offers.length ? (
+        <p className="mt-2 text-xs text-dim">
+          {offersCaption(offers.length, sellers.length)}
+        </p>
+      ) : null}
+    </>
   );
 }
 
 function NotOnline({
+  query,
   network,
   accounts,
 }: {
+  query: ExplorerQuery;
   network: NetworkStatus | null;
   accounts: Map<string, GithubAccount> | null;
 }) {
@@ -314,7 +315,7 @@ function NotOnline({
     <>
       {network ? (
         <>
-          <NotOnlineTable network={network} accounts={accounts} />
+          <NotOnlineTable query={query} network={network} accounts={accounts} />
           {network.truncated ? (
             <p className="mt-2 text-xs text-dim">
               The index reached one of its limits: these lists and their counts
@@ -340,19 +341,23 @@ const STATE_LABELS: Record<Exclude<NetworkNode['state'], 'online'>, string> = {
 // Registered or recently seen sellers without a live presence now. Offline ones were seen before;
 // unpublished ones were never seen or withdrew their catalog.
 function NotOnlineTable({
+  query,
   network,
   accounts,
 }: {
+  query: ExplorerQuery;
   network: NetworkStatus;
   accounts: Map<string, GithubAccount> | null;
 }) {
   const nodes = notOnline(network).filter(
     (node) => !accounts || accounts.has(node.nodeId),
   );
+  const page = pagedRows(query, 'offline', nodes, !network.truncated);
   if (!nodes.length) return null;
   return (
     <>
       <SectionTitle
+        id={PAGING.anchors.offline}
         title="Not online"
         meta={notOnlineMeta(network, accounts ? nodes.length : null)}
       />
@@ -365,11 +370,11 @@ function NotOnlineTable({
           { label: 'First seen' },
         ]}
       >
-        {nodes.map((node) => (
+        {page.rows.map((node) => (
           <tr key={node.nodeId} className="border-t border-line">
             <td className={`${td} font-mono`} title={`Node ${node.nodeId}`}>
               <SellerCell nodeId={node.nodeId} github={node.github}>
-                {short(node.nodeId)}
+                {node.github ? short(node.nodeId) : null}
               </SellerCell>
             </td>
             <td className={td}>
@@ -382,6 +387,7 @@ function NotOnlineTable({
           </tr>
         ))}
       </Table>
+      <Pager label="Not online" view={tablePager(query, 'offline', page)} />
     </>
   );
 }
