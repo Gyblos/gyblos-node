@@ -1136,8 +1136,9 @@ export function PreviewConversationMenu({ chat }: { chat: ChatController }) {
                 leading={<Plus {...previewIcon(14)} aria-hidden="true" />}
                 trailing={<Kbd>{previewShortcut(PREVIEW_SHORTCUT.NEW_CHAT).label}</Kbd>}
                 onClick={() => {
-                  chat.newChat(crypto.randomUUID());
                   close();
+                  chat.newChat(crypto.randomUUID());
+                  document.querySelector<HTMLTextAreaElement>('.composer textarea')?.focus();
                 }}
               />
             )}

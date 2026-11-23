@@ -237,6 +237,10 @@ void test('compact loading and shortcut hints stay accessible', async () => {
     kit,
     /label="New chat"\s+aria-keyshortcuts=\{previewShortcut\(PREVIEW_SHORTCUT\.NEW_CHAT\)\.aria\}/,
   );
+  assert.match(
+    kit,
+    /close\(\);\s+chat\.newChat\(crypto\.randomUUID\(\)\);\s+document\s*\.querySelector<HTMLTextAreaElement>\('\.composer textarea'\)\s*\?\.focus\(\);/,
+  );
 });
 
 void test('compact pills, buttons, icons, digits and code line numbers', async () => {
