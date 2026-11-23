@@ -24,19 +24,22 @@ export interface ChainTxRow extends ChainTxCursor {
   splitProgramTreasury: string | null;
   splitRefunded: string | null;
   splitChannels: number | null;
+  splitUnclassified: string | null;
 }
 type SplitColumns =
   | 'splitPaidOut'
   | 'splitGyblosFees'
   | 'splitProgramTreasury'
   | 'splitRefunded'
-  | 'splitChannels';
+  | 'splitChannels'
+  | 'splitUnclassified';
 export interface PayoutSplit {
   paidOut: string;
   gyblosFees: string;
   programTreasury: string;
   refunded: string;
   channels: number;
+  unclassified: string;
 }
 export interface ChainTxReader {
   transactions(page: {
@@ -128,7 +131,8 @@ function payoutSplit(row: ChainTxRow): PayoutSplit | null {
     row.splitGyblosFees === null ||
     row.splitProgramTreasury === null ||
     row.splitRefunded === null ||
-    row.splitChannels === null
+    row.splitChannels === null ||
+    row.splitUnclassified === null
   )
     return null;
   return {
@@ -137,6 +141,7 @@ function payoutSplit(row: ChainTxRow): PayoutSplit | null {
     programTreasury: row.splitProgramTreasury,
     refunded: row.splitRefunded,
     channels: row.splitChannels,
+    unclassified: row.splitUnclassified,
   };
 }
 

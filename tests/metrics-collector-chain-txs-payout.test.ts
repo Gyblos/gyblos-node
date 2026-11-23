@@ -81,6 +81,7 @@ void test('a payout row shows what the seller got, with the fee and refund split
         programTreasury: '3',
         refunded: '999775',
         channels: 1,
+        unclassified: '0',
       },
     ],
   );
@@ -118,6 +119,7 @@ void test('a reclaim row shows the refund; an unbalanced payout shows nothing', 
         programTreasury: '0',
         refunded: '500',
         channels: 1,
+        unclassified: '0',
       },
     ],
   );
@@ -260,4 +262,55 @@ void test('a payout of two channels in one transaction says its split is a trans
     ['A', '96', 2],
   );
   assert.equal(second!.split, null);
+});
+
+void test('a refund to the payer named on the payout itself counts when the open was never read', async () => {
+  const database = createCollectorD1();
+  channel(database, 'U', {});
+  tx(database, sig('Pay'), AT, 1, { slot: 10 });
+  instruction(database, sig('Pay'), 0, K.DISTRIBUTE, 'U');
+  recipients(database, sig('Pay'), 0);
+  database.raw
+    .prepare(
+      'UPDATE collector_chain_instructions SET payer = ? WHERE signature = ?',
+    )
+    .run(BUYER, sig('Pay'));
+  delta(database, sig('Pay'), 'U', '-1000000');
+  delta(database, sig('Pay'), SELLER, '960');
+  delta(database, sig('Pay'), DEVNET_GYBLOS_TREASURY, '40');
+  delta(database, sig('Pay'), BUYER, '999000');
+  await runAggregation(database, AT + 10 * 86_400_000);
+  const { app } = collector(database);
+  const stats = (await (
+    await app.request(`${ORIGIN}/v1/stats/chain?from=2026-11-10&to=2026-11-10`)
+  ).json()) as ChainStats;
+  const usdc = stats.days[0]!.gyblosClaimed!.usdc;
+  assert.deepEqual(
+    [usdc.paidOutAtomic, usdc.gyblosFeesAtomic, usdc.refundedAtomic],
+    ['960', '40', '999000'],
+  );
+  const [row] = (await get(app)).body.transactions;
+  assert.deepEqual(row!.split, {
+    paidOut: '960',
+    gyblosFees: '40',
+    programTreasury: '0',
+    refunded: '999000',
+    channels: 1,
+    unclassified: '0',
+  });
+});
+
+void test('a payout that accounts for less than the vault outflow shows the unclassified remainder', async () => {
+  const database = production();
+  tx(database, sig('Short'), AT + 2000, 1, { slot: 30 });
+  instruction(database, sig('Short'), 0, K.DISTRIBUTE, 'G');
+  recipients(database, sig('Short'), 0);
+  delta(database, sig('Short'), 'G', '-100');
+  delta(database, sig('Short'), SELLER, '60');
+  const { app } = collector(database);
+  const [row] = (await get(app)).body.transactions;
+  assert.deepEqual(
+    [row!.amountAtomic, row!.split?.paidOut, row!.split?.unclassified],
+    ['60', '60', '40'],
+  );
 });

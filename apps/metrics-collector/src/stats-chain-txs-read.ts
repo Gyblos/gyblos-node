@@ -192,7 +192,9 @@ function payoutFields(
     sql<
       string | null
     >`case when ${when} then cast(cast(${value} as integer) as text) end`;
+  const unclassified = sql`${splits.vault} - (${splits.gyblosFees} + ${splits.programTreasury} + ${splits.refunded} + ${splits.paidOut})`;
   return {
+    unclassified: shown(unclassified),
     paidOut: shown(splits.paidOut),
     gyblosFees: shown(splits.gyblosFees),
     programTreasury: shown(splits.programTreasury),
@@ -242,6 +244,7 @@ export function chainTxReader(database: D1Database): ChainTxReader {
           ),
           splitRefunded: payout.refunded.as('split_refunded'),
           splitChannels: payout.channels.as('split_channels'),
+          splitUnclassified: payout.unclassified.as('split_unclassified'),
         })
         .from(page)
         .leftJoin(

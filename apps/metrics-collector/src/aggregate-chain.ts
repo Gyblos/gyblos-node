@@ -128,8 +128,11 @@ export function payoutParts() {
   const toGyblos = sql`${owner} = ${DEVNET_GYBLOS_TREASURY}`;
   const toProgram = sql`${owner} = ${DEVNET_TREASURY_OWNER}`;
   const treasury = sql`(${toGyblos} or ${toProgram})`;
-  const toPayer = sql`not ${treasury} and ${named(chainChannels.payer)}`;
-  const toOthers = sql`not ${treasury} and not ${named(chainChannels.payer)} and (${named(chainChannels.payee)} or ${recipient})`;
+  const payer = sql`(${named(chainChannels.payer)} or ${owner} in (select ${col('ip', chainInstructions.payer)} from ${from(chainInstructions, 'ip')}
+    where ${col('ip', chainInstructions.signature)} = ${signature} and ${col('ip', chainInstructions.kind)} in ${kinds(PAYING)}
+      and ${col('ip', chainInstructions.payer)} is not null))`;
+  const toPayer = sql`not ${treasury} and ${payer}`;
+  const toOthers = sql`not ${treasury} and not ${payer} and (${named(chainChannels.payee)} or ${recipient})`;
   const vault = sql`(select total(-${asInteger(col('v', chainTokenDeltas.deltaAtomic))}) from ${from(chainTokenDeltas, 'v')}
     where ${col('v', chainTokenDeltas.signature)} = ${signature} and ${col('v', chainTokenDeltas.mint)} = ${DEVNET_USDC}
       and ${asInteger(col('v', chainTokenDeltas.deltaAtomic))} < 0
