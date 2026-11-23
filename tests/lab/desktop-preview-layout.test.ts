@@ -325,3 +325,23 @@ void test('the conversation panel slides under the rail like a stacked sheet', a
   );
   assert.match(css, /\.desktop-frame \.preview-rail \{[^}]*z-index: 1;/);
 });
+
+void test('connection tool cards stretch with the sheet instead of snapping to empty tracks', async () => {
+  const css = (await read('preview.css')).replace(/\s+/g, ' ');
+  assert.match(
+    css,
+    /\.desktop-frame \.preview-tool-grid \{[^}]*grid-template-columns: repeat\(auto-fit, minmax\(min\(100%, 150px\), 1fr\)\);/,
+  );
+  assert.doesNotMatch(css, /auto-fill/);
+  assertCompact(
+    css,
+    '.preview-tool-grid',
+    'grid-template-columns: repeat(auto-fit, minmax(min(100%, 112px), 1fr));',
+  );
+  assertCompact(
+    css,
+    '.preview-tool-card',
+    'grid-template-columns: minmax(0, 1fr);',
+  );
+  assertCompact(css, '.preview-tool-card) .preview-tool-logo', 'width: 28px;');
+});

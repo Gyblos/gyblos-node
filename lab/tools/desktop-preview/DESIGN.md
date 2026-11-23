@@ -154,7 +154,8 @@ previous density for comparison.
 - Cards (metric, settings, payment methods, tables, lists, tool guide,
   limit, tool and application cards) share `--radius-panel`; metric cards pad 12 / 14 px with
   12 px labels. Help and detail text is 12 px. Tool guide steps use 20 px
-  markers with 12 px glyphs and a 28 px tool logo.
+  markers with 12 px glyphs and a 28 px tool logo. Tool cards stack the
+  logo above the name, so the five tools stay in one row while the sheet resizes.
 - Settings rows, forms and empty states keep 20 px of inner spacing
   (`--pk-comfort-padding`).
 - Radii by level: 6 px buttons and inputs (`--radius-control`), 8 px menus

@@ -1149,7 +1149,7 @@ html body .desktop-frame dialog.modal[data-origin='right'] {
 }
 .desktop-frame .preview-tool-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
   gap: 8px;
 }
 .desktop-frame .preview-tool-card {
@@ -4162,8 +4162,7 @@ html[data-density='compact'] .app.desktop-frame .preview-tool-guide {
 }
 html[data-density='compact']
   .app.desktop-frame
-  .preview-tool-guide
-  > header
+  :is(.preview-tool-guide > header, .preview-tool-card)
   .preview-tool-logo {
   width: 28px;
   height: 28px;
@@ -4171,12 +4170,27 @@ html[data-density='compact']
 }
 html[data-density='compact']
   .app.desktop-frame
-  .preview-tool-guide
-  > header
+  :is(.preview-tool-guide > header, .preview-tool-card)
   .preview-tool-logo
   img {
   width: 16px;
   height: 16px;
+}
+html[data-density='compact'] .app.desktop-frame .preview-tool-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 112px), 1fr));
+}
+html[data-density='compact'] .app.desktop-frame .preview-tool-card {
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  row-gap: var(--space-1);
+  padding: var(--space-3);
+}
+html[data-density='compact']
+  .app.desktop-frame
+  .preview-tool-card
+  .preview-tool-logo {
+  grid-row: auto;
+  margin-bottom: var(--space-1);
 }
 html[data-density='compact'] .app.desktop-frame .preview-steps li {
   grid-template-columns: 20px minmax(0, 1fr);
