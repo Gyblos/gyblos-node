@@ -18,9 +18,7 @@ import { Facts, Pair } from './Management';
 import { Modal } from './Modal';
 import { usdPerMtok } from './model-price';
 import type { CatalogModel } from './model-types';
-import { ModelImage } from './ModelImage';
-import { TONE } from './status-tone';
-import { Tag } from './Tag';
+import { SellerIdentity } from './SellerIdentity';
 import { Button } from './UI';
 import { useBuyerFunding } from './useBuyerFunding';
 import type { X402View } from './useX402';
@@ -209,6 +207,7 @@ function SellerTerms(props: TermsProps) {
         }}
       >
         <SellerIdentity
+          verified={!!policy}
           model={model}
           remaining={props.remaining}
           switching={props.switching}
@@ -255,37 +254,6 @@ function SellerTerms(props: TermsProps) {
   );
 }
 
-function SellerIdentity({
-  model,
-  remaining,
-  switching,
-}: Pick<TermsProps, 'model' | 'remaining' | 'switching'>) {
-  return (
-    <>
-      <div className="preview-detail-head">
-        <Tag tone={TONE.INFO} dot>
-          Awaiting confirmation
-        </Tag>
-        {remaining ? (
-          <Tag tone={TONE.SUCCESS} dot>
-            Active channel
-          </Tag>
-        ) : (
-          <Tag tone={TONE.WARNING} dot>
-            {switching ? 'Channel change' : 'Deposit required'}
-          </Tag>
-        )}
-      </div>
-      <div className="paid-model-summary">
-        <ModelImage name={model.name} artwork={model.image} />
-        <div>
-          <strong>{model.name}</strong>
-          <p className="ui-help-text">{model.family}</p>
-        </div>
-      </div>
-    </>
-  );
-}
 function SellerMaximum({
   value,
   invalid,
