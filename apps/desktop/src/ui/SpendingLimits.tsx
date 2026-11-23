@@ -230,7 +230,7 @@ export function SpendingLimits({
                 ? !policy && !buyer.state.error
                   ? 'Connect a buyer to see spending'
                   : 'Spending unavailable'
-                : money(total) + ' spent'}
+                : money(total) + ' spent by source'}
             </span>
             <span
               className="ui-help-text"
