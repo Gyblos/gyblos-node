@@ -261,7 +261,10 @@ recolector de métricas (con los conteos de compradores menores que 5 ocultos, c
 transacciones de canales de Gyblos cuyo destinatario del pago es la dirección del dueño, desde
 `GET /v1/stats/chain/txs?recipient=<dirección del dueño>`. La dirección del dueño se muestra solo mientras
 el vendedor está en línea, y otros vendedores pueden publicar la misma, así que las transacciones listadas
-son del dueño.
+pueden ser de cualquiera de ellos. Desconectarse solo oculta las transacciones de esa página: cualquiera
+puede pedir al recolector los canales de cualquier dirección destinataria, y las transacciones siguen
+siendo públicas en la cadena. Los canales de un comprador con un vendedor, con sus depósitos, pagos y
+reembolsos, aparecen en la página de ese vendedor.
 
 ## Búsqueda de actualizaciones [#búsqueda-de-actualizaciones]
 

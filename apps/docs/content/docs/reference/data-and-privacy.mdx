@@ -254,7 +254,10 @@ owner address, its online state and uptime from the discovery index, its daily a
 the metrics collector's public `GET /v1/stats/sellers/<NodeId>` (buyer counts below 5 withheld, as above),
 and the Gyblos channel transactions whose payout recipient is its owner address, from
 `GET /v1/stats/chain/txs?recipient=<owner address>`. The owner address is shown only while the seller is
-online, and other sellers may publish the same one, so the listed transactions are the owner's.
+online, and other sellers may publish the same one, so the listed transactions may belong to any of them.
+Going offline only hides the transactions from that page: anyone can ask the collector for the channels
+of any recipient address, and the transactions stay public on chain. A buyer's channels with a seller,
+with their deposits, payouts and refunds, are listed on that seller's page.
 
 ## Update checks [#update-checks]
 

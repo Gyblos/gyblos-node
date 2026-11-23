@@ -2,7 +2,7 @@ import { Activity, Boxes, CalendarClock, Server } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { getDiscovery } from '../lib/discovery-render';
-import { count, percent, short, utc } from '../lib/format';
+import { count, percent, utc } from '../lib/format';
 import {
   SELLER_STATUS_LABELS,
   sellerProfile,
@@ -31,11 +31,11 @@ function Identity({ profile }: { profile: SellerProfile }) {
       {profile.name ? (
         <span className="flex flex-wrap items-baseline gap-x-2 break-all">
           <bdi className="text-base text-ink">{profile.name}</bdi>
-          <span className="text-xs text-dim">self-chosen name</span>
+          <span className="text-xs text-dim">
+            self-chosen name, not verified
+          </span>
         </span>
-      ) : (
-        <span className="font-mono">{short(profile.nodeId)}</span>
-      )}
+      ) : null}
     </SellerCell>
   );
 }
@@ -45,6 +45,9 @@ function statusCaption(profile: SellerProfile) {
     return profile.firstSeenAt ? `First seen ${utc(profile.firstSeenAt)}` : '';
   return profile.lastSeenAt ? `Last seen ${utc(profile.lastSeenAt)}` : '';
 }
+
+const uptimeCaption = (profile: SellerProfile) =>
+  profile.owner ? undefined : 'Not listed now';
 
 function OwnerField({ profile }: { profile: SellerProfile }) {
   if (!profile.owner)
@@ -73,7 +76,7 @@ export async function SellerProfileSection({ nodeId }: { nodeId: string }) {
           <Field label="NodeId">
             <span className="font-mono text-xs break-all">{nodeId}</span>
           </Field>
-          <Field label="Owner address">
+          <Field label="Owner address (self-declared)">
             <OwnerField profile={profile} />
           </Field>
         </dl>
@@ -83,7 +86,7 @@ export async function SellerProfileSection({ nodeId }: { nodeId: string }) {
           icon={Server}
           label="Status"
           value={
-            <span className="inline-flex items-center gap-2 text-xl">
+            <span className="inline-flex flex-wrap items-center gap-2">
               {profile.status === 'online' ? <StatusDot /> : null}
               {SELLER_STATUS_LABELS[profile.status]}
             </span>
@@ -94,11 +97,13 @@ export async function SellerProfileSection({ nodeId }: { nodeId: string }) {
           icon={Activity}
           label="Uptime 24 h"
           value={ratioText(profile.dayUptime)}
+          caption={uptimeCaption(profile)}
         />
         <StatCard
           icon={CalendarClock}
           label="Uptime 7 d"
           value={ratioText(profile.weekUptime)}
+          caption={uptimeCaption(profile)}
         />
         <StatCard
           icon={Boxes}

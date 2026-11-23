@@ -1,25 +1,30 @@
-import { CircleCheck, Hash, MessagesSquare } from 'lucide-react';
+import { CircleCheck, Hash, MessagesSquare, Timer, Wallet } from 'lucide-react';
 
 import type { SellerDay } from '../lib/collector-shape';
-import { DISPLAY } from '../lib/constants';
+import { DISPLAY, PAGING } from '../lib/constants';
 import { getDiscovery } from '../lib/discovery-render';
-import { count, pricePerMtok } from '../lib/format';
-import { pageOf, sellerHref, type SellerPageState } from '../lib/seller-page';
-import { sellerModelRows, sellerProfile } from '../lib/seller-profile';
+import { count, pricePerMtok, usdcDecimal } from '../lib/format';
+import { tablePager, type ExplorerQuery } from '../lib/paging';
+import {
+  sellerModelRows,
+  sellerProfile,
+  sellerTotals,
+} from '../lib/seller-profile';
 import { getSellerStats } from '../lib/seller-stats';
 import {
   buyersText,
   countText,
   dailyRequests,
+  latencyText,
   pair,
   rateText,
   sideFigures,
   usageMeta,
 } from '../lib/usage';
-import { FlowPair } from './board/animated-number';
+import { Flow, FlowPair } from './board/animated-number';
 import { BarChartCard } from './board/bar-chart-card';
 import { StatCard } from './board/stat-card';
-import { PageLinks } from './page-links';
+import { pagedRows, Pager } from './pager';
 import {
   ModelName,
   moneyCell,
@@ -31,15 +36,17 @@ import {
 } from './ui';
 
 type Section = Parameters<typeof sideFigures>[0][number];
+type Figure = 'requests' | 'successRate' | 'outputTokens' | 'firstToken';
 const muted = `${td} text-muted`;
-const requestsText = (free: Section, paid: Section) =>
-  pair(sideFigures([free]).requests, sideFigures([paid]).requests, countText);
-const successText = (free: Section, paid: Section) =>
-  pair(
-    sideFigures([free]).successRate,
-    sideFigures([paid]).successRate,
-    rateText,
-  );
+function pairText(free: Section, paid: Section, figure: Figure) {
+  const left = sideFigures([free]);
+  const right = sideFigures([paid]);
+  if (figure === 'successRate')
+    return pair(left.successRate, right.successRate, rateText);
+  if (figure === 'firstToken')
+    return pair(left.firstToken, right.firstToken, latencyText);
+  return pair(left[figure], right[figure], countText);
+}
 
 function RequestCharts({ days }: { days: SellerDay[] }) {
   const series = dailyRequests(days);
@@ -70,15 +77,13 @@ function RequestCharts({ days }: { days: SellerDay[] }) {
 }
 
 function ModelsTable({
-  nodeId,
-  state,
+  query,
   rows,
-  offersKnown,
+  served,
 }: {
-  nodeId: string;
-  state: SellerPageState;
+  query: ExplorerQuery;
   rows: ReturnType<typeof sellerModelRows>;
-  offersKnown: boolean;
+  served: boolean;
 }) {
   const head = [
     { label: 'Model' },
@@ -87,20 +92,20 @@ function ModelsTable({
     { label: 'Output / 1M', right: true },
     { label: 'Requests free · paid', right: true },
     { label: 'Success free · paid', right: true },
+    { label: 'Seller first token p50 free · paid', right: true },
   ];
-  const shown = pageOf(rows, state.models);
-  const href = (page: number) => sellerHref(nodeId, { ...state, models: page });
+  const shown = pagedRows(query, 'models', rows);
+  const figure = (row: (typeof rows)[number], name: Figure) =>
+    served ? pairText(row.free, row.paid, name) : '—';
   return (
     <>
-      <SectionTitle
-        title="Models"
-        meta={offersKnown ? undefined : 'current offers unavailable'}
-      />
+      <SectionTitle id={PAGING.anchors.models} title="Models" />
       <p className="-mt-2 mb-3 text-xs text-muted">
         Context and prices are the seller&apos;s current offer; requests are
-        over the range. A model without a price is not offered now.
+        over the range{served ? '' : ' (unavailable now)'}. A model without a
+        price is not offered now.
       </p>
-      <Table minWidth={DISPLAY.wideTable} head={head}>
+      <Table minWidth={DISPLAY.modelsTable} head={head}>
         {rows.length ? null : (
           <tr>
             <td className={muted} colSpan={head.length}>
@@ -130,23 +135,22 @@ function ModelsTable({
                 ? pricePerMtok(row.offer.pricing.outputAtomicPerMtok)
                 : '—'}
             </td>
-            <td className={numberCell}>{requestsText(row.free, row.paid)}</td>
-            <td className={numberCell}>{successText(row.free, row.paid)}</td>
+            <td className={numberCell}>{figure(row, 'requests')}</td>
+            <td className={numberCell}>{figure(row, 'successRate')}</td>
+            <td className={numberCell}>{figure(row, 'firstToken')}</td>
           </tr>
         ))}
       </Table>
-      <PageLinks page={shown.page} pages={shown.pages} href={href} />
+      <Pager label="Models" view={tablePager(query, 'models', shown)} />
     </>
   );
 }
 
 function DailyTable({
-  nodeId,
-  state,
+  query,
   days,
 }: {
-  nodeId: string;
-  state: SellerPageState;
+  query: ExplorerQuery;
   days: SellerDay[];
 }) {
   const head = [
@@ -156,12 +160,11 @@ function DailyTable({
     { label: 'Output tokens free · paid', right: true },
     { label: 'Buyers free · paid', right: true },
   ];
-  const active = days.filter((day) => day.free || day.paid).reverse();
-  const shown = pageOf(active, state.daily);
-  const href = (page: number) => sellerHref(nodeId, { ...state, daily: page });
+  const active = [...days].reverse();
+  const shown = pagedRows(query, 'daily', active);
   return (
     <>
-      <SectionTitle title="Daily" />
+      <SectionTitle id={PAGING.anchors.daily} title="Daily" />
       <Table minWidth={DISPLAY.dailyTable} head={head}>
         {active.length ? null : (
           <tr>
@@ -173,14 +176,14 @@ function DailyTable({
         {shown.rows.map((day) => (
           <tr key={day.day} className="border-t border-line">
             <td className={`${td} font-mono`}>{day.day}</td>
-            <td className={numberCell}>{requestsText(day.free, day.paid)}</td>
-            <td className={numberCell}>{successText(day.free, day.paid)}</td>
             <td className={numberCell}>
-              {pair(
-                sideFigures([day.free]).outputTokens,
-                sideFigures([day.paid]).outputTokens,
-                countText,
-              )}
+              {pairText(day.free, day.paid, 'requests')}
+            </td>
+            <td className={numberCell}>
+              {pairText(day.free, day.paid, 'successRate')}
+            </td>
+            <td className={numberCell}>
+              {pairText(day.free, day.paid, 'outputTokens')}
             </td>
             <td className={numberCell}>
               {buyersText(day.free)} · {buyersText(day.paid)}
@@ -188,7 +191,7 @@ function DailyTable({
           </tr>
         ))}
       </Table>
-      <PageLinks page={shown.page} pages={shown.pages} href={href} />
+      <Pager label="Daily" view={tablePager(query, 'daily', shown)} />
       <p className="mt-2 text-xs text-dim">
         Buyers are distinct per day and side, never added up; counts below{' '}
         {DISPLAY.minPublicBuyers} are withheld and shown as &lt;{' '}
@@ -198,68 +201,93 @@ function DailyTable({
   );
 }
 
+function Figures({ totals }: { totals: ReturnType<typeof sellerTotals> }) {
+  const { free, paid } = totals;
+  return (
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+      <StatCard
+        icon={MessagesSquare}
+        label="Requests free · paid"
+        value={
+          <FlowPair free={free.requests} paid={paid.requests} kind="count" />
+        }
+      />
+      <StatCard
+        icon={CircleCheck}
+        label="Success free · paid"
+        value={
+          <FlowPair
+            free={free.successRate}
+            paid={paid.successRate}
+            kind="percent"
+          />
+        }
+        caption="Cancellations are not counted as failures"
+      />
+      <StatCard
+        icon={Hash}
+        label="Output tokens free · paid"
+        value={
+          <FlowPair
+            free={free.outputTokens}
+            paid={paid.outputTokens}
+            kind="count"
+          />
+        }
+      />
+      <StatCard
+        icon={Timer}
+        label="Seller first token p50 free · paid"
+        value={pair(free.firstToken, paid.firstToken, latencyText)}
+      />
+      <StatCard
+        icon={Wallet}
+        label="Authorized (paid)"
+        value={<Flow value={usdcDecimal(totals.authorized)} kind="usdc" />}
+        caption="Usage both sides signed for, not settled USDC"
+        money
+      />
+    </div>
+  );
+}
+
 export async function SellerActivity({
   nodeId,
-  state,
+  query,
 }: {
   nodeId: string;
-  state: SellerPageState;
+  query: ExplorerQuery;
 }) {
   const [stats, snapshot] = await Promise.all([
-    getSellerStats(nodeId, state.days),
+    getSellerStats(nodeId, query.days),
     getDiscovery(),
   ]);
-  if (stats.error) return <Unavailable title="Activity" />;
-  const active = stats.days.filter((day) => day.free || day.paid);
-  const free = sideFigures(active.map((day) => day.free));
-  const paid = sideFigures(active.map((day) => day.paid));
   const offers = snapshot.error ? [] : sellerProfile(nodeId, snapshot).offers;
+  const totals = sellerTotals(stats.days);
   return (
     <>
-      <SectionTitle
-        title={`Activity · ${state.days} days`}
-        meta={usageMeta(state.days, stats.aggregatedAt, false)}
-      />
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-        <StatCard
-          icon={MessagesSquare}
-          label="Requests free · paid"
-          value={
-            <FlowPair free={free.requests} paid={paid.requests} kind="count" />
-          }
-        />
-        <StatCard
-          icon={CircleCheck}
-          label="Success free · paid"
-          value={
-            <FlowPair
-              free={free.successRate}
-              paid={paid.successRate}
-              kind="percent"
-            />
-          }
-          caption="Cancellations are not counted as failures"
-        />
-        <StatCard
-          icon={Hash}
-          label="Output tokens free · paid"
-          value={
-            <FlowPair
-              free={free.outputTokens}
-              paid={paid.outputTokens}
-              kind="count"
-            />
-          }
-        />
-      </div>
-      <RequestCharts days={stats.days} />
+      {stats.error ? (
+        <Unavailable title={`Activity · ${query.days} days`} />
+      ) : (
+        <>
+          <SectionTitle
+            title={`Activity · ${query.days} days`}
+            meta={usageMeta(query.days, stats.aggregatedAt, false)}
+          />
+          <Figures totals={totals} />
+          <p className="mt-2 text-xs text-dim">
+            No earned total is shown: there is no per-seller on-chain total yet.
+            Payouts are listed per transaction below.
+          </p>
+          <RequestCharts days={stats.days} />
+        </>
+      )}
       <ModelsTable
-        nodeId={nodeId}
-        state={state}
+        query={query}
         rows={sellerModelRows(offers, stats.models)}
-        offersKnown={!snapshot.error}
+        served={!stats.error}
       />
-      <DailyTable nodeId={nodeId} state={state} days={stats.days} />
+      {stats.error ? null : <DailyTable query={query} days={totals.active} />}
     </>
   );
 }

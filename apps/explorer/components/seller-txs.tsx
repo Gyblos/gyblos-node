@@ -1,22 +1,14 @@
 import { ArrowUpRight } from 'lucide-react';
-import Link from 'next/link';
 
 import { getChainTxs } from '../lib/chain-txs';
 import { txRow } from '../lib/chain-txs-shape';
-import { DISPLAY } from '../lib/constants';
+import { DISPLAY, PAGING } from '../lib/constants';
 import { getDiscovery } from '../lib/discovery-render';
-import { sellerHref, type SellerPageState } from '../lib/seller-page';
+import { txPager, type ExplorerQuery } from '../lib/paging';
 import { sellerProfile } from '../lib/seller-profile';
-import {
-  Addr,
-  moneyCell,
-  numberCell,
-  SectionTitle,
-  Table,
-  td,
-  timeCell,
-  Unavailable,
-} from './ui';
+import { TxAmount } from './channel-txs';
+import { Pager } from './pager';
+import { Addr, SectionTitle, Table, td, timeCell, Unavailable } from './ui';
 
 const TITLE = 'Channel transactions';
 const link = 'inline-flex items-center gap-1 hover:text-brand';
@@ -32,7 +24,7 @@ const HEAD = [
 function Note({ children }: { children: string }) {
   return (
     <>
-      <SectionTitle title={TITLE} />
+      <SectionTitle id={PAGING.anchors.transactions} title={TITLE} />
       <div className="rounded-2xl border border-line bg-panel p-5 text-sm text-muted">
         {children}
       </div>
@@ -40,38 +32,12 @@ function Note({ children }: { children: string }) {
   );
 }
 
-function Pager({
-  href,
-  newest,
-  older,
-}: {
-  href: (before: string | null) => string;
-  newest: boolean;
-  older: string | null;
-}) {
-  if (!newest && !older) return null;
-  return (
-    <nav className="my-3 flex justify-end gap-4 font-mono text-xs text-muted">
-      {newest ? (
-        <Link className={link} href={href(null)} scroll={false}>
-          Newest
-        </Link>
-      ) : null}
-      {older ? (
-        <Link className={link} href={href(older)} scroll={false}>
-          Older
-        </Link>
-      ) : null}
-    </nav>
-  );
-}
-
 export async function SellerTxs({
   nodeId,
-  state,
+  query,
 }: {
   nodeId: string;
-  state: SellerPageState;
+  query: ExplorerQuery;
 }) {
   const snapshot = await getDiscovery();
   if (snapshot.error) return <Unavailable title={TITLE} />;
@@ -83,30 +49,30 @@ export async function SellerTxs({
         the discovery index publishes only while the seller is online.
       </Note>
     );
-  const page = await getChainTxs(state.before, profile.owner);
+  const page = await getChainTxs(query.before, profile.owner);
   if (page.error) return <Unavailable title={TITLE} />;
-  const href = (before: string | null) =>
-    sellerHref(nodeId, { ...state, before });
   return (
     <>
       <SectionTitle
+        id={PAGING.anchors.transactions}
         title={TITLE}
         meta="Latest, all time · not filtered by range"
       />
       <p className="-mt-2 mb-3 text-xs text-muted">
         Channels whose payout recipient is this seller&apos;s self-declared
-        owner address. Amounts are per row, as in the explorer&apos;s main list:
-        do not add them up.
+        owner address. Paid out is what that address got; below it, the rest of
+        the split. A row marked &quot;total of N channels&quot; is a transaction
+        that paid several channels, possibly to other sellers. Do not add the
+        amounts up.
         {profile.ownerShared
-          ? ' Other listed sellers publish the same owner address, so these channels are the owner’s, not only this seller’s.'
+          ? ' Another listed seller publishes the same owner address, so these channels may belong to either of them.'
           : null}
       </p>
-      <Pager href={href} newest={state.before !== null} older={null} />
       <Table minWidth={DISPLAY.defaultTable} head={HEAD}>
         {page.transactions.length ? null : (
           <tr>
             <td className={`${td} text-muted`} colSpan={HEAD.length}>
-              {state.before
+              {query.before
                 ? 'No older transactions.'
                 : 'No Gyblos channel transactions pay this owner address.'}
             </td>
@@ -120,11 +86,7 @@ export async function SellerTxs({
               <td className={td} title={row.kind}>
                 {row.label}
               </td>
-              <td
-                className={row.muted ? `${numberCell} text-muted` : moneyCell}
-              >
-                {row.amount}
-              </td>
+              <TxAmount row={row} />
               <td className={`${td} font-mono`}>
                 <a className={link} href={row.href}>
                   {row.signature}
@@ -138,7 +100,10 @@ export async function SellerTxs({
           );
         })}
       </Table>
-      <Pager href={href} newest={state.before !== null} older={page.next} />
+      <Pager
+        label={TITLE}
+        view={txPager(query, page.transactions.length, page.next)}
+      />
     </>
   );
 }

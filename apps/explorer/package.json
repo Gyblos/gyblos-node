@@ -22,6 +22,7 @@
     "./model-table": "./lib/model-table.ts",
     "./network-status": "./lib/network-status.ts",
     "./offers": "./lib/offers.ts",
+    "./paging": "./lib/paging.ts",
     "./range": "./lib/range.ts",
     "./seller-identity": "./lib/seller-identity.ts",
     "./seller-page": "./lib/seller-page.ts",

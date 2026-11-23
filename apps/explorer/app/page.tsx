@@ -12,9 +12,7 @@ import { PaymentsSection } from '../components/payments-section';
 import { RangeControl } from '../components/range-control';
 import { Loading } from '../components/ui';
 import { UsageSection } from '../components/usage-section';
-import { txCursor } from '../lib/chain-txs-shape';
-import { CHAIN_TXS, IDENTITY, RANGE } from '../lib/constants';
-import { parseRange } from '../lib/range';
+import { readQuery } from '../lib/paging';
 
 // Every request renders. The collector caches its answers at its own edge (5 minutes); the discovery
 // index is read into KV by the Worker's scheduled run, and renders read KV (lib/discovery-render.ts).
@@ -26,9 +24,8 @@ export default async function Home({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
-  const days = parseRange(params[RANGE.param]);
-  const before = txCursor(params[CHAIN_TXS.param]);
-  const verified = params[IDENTITY.verifiedParam] === IDENTITY.verifiedValue;
+  const query = readQuery(params);
+  const { days } = query;
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pb-16 sm:px-6">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line py-5">
@@ -43,19 +40,19 @@ export default async function Home({
         </div>
       </header>
       <Suspense fallback={<Loading />}>
-        <NetworkSection days={days} verified={verified} />
+        <NetworkSection query={query} />
       </Suspense>
       <Suspense fallback={<Loading />}>
-        <ModelsSection days={days} />
+        <ModelsSection query={query} />
       </Suspense>
       <Suspense fallback={<Loading />}>
-        <UsageSection days={days} />
+        <UsageSection query={query} />
       </Suspense>
       <Suspense fallback={<Loading />}>
-        <PaymentsSection days={days} />
+        <PaymentsSection query={query} />
       </Suspense>
       <Suspense fallback={<Loading />}>
-        <ChannelTxs days={days} before={before} verified={verified} />
+        <ChannelTxs query={query} />
       </Suspense>
     </div>
   );

@@ -1,8 +1,9 @@
-import type { ModelStat, Totals } from './collector-shape';
+import type { ModelStat, SellerDay, Totals } from './collector-shape';
 import { DISPLAY } from './constants';
 import type { DiscoverySnapshot, OfferedModel } from './discovery';
 import type { GithubAccount, NodeState } from './network-status';
 import { modelKey, uptimeRatio } from './offers';
+import { sideFigures } from './usage';
 
 export type SellerStatus = NodeState | 'unknown';
 export const SELLER_STATUS_LABELS: Record<SellerStatus, string> = {
@@ -91,4 +92,32 @@ export function sellerModelRows(
       paid: model.paid,
     }));
   return [...offered, ...servedOnly];
+}
+
+export function sellerTotals(days: readonly SellerDay[]) {
+  const active = days.filter((day) => day.free || day.paid);
+  return {
+    active,
+    free: sideFigures(active.map((day) => day.free)),
+    paid: sideFigures(active.map((day) => day.paid)),
+    authorized: active.reduce(
+      (sum, day) => sum + BigInt(day.paid?.authorizedAtomic ?? '0'),
+      0n,
+    ),
+  };
+}
+
+export function unknownSeller(
+  nodeId: string,
+  snapshot: DiscoverySnapshot,
+  stats: {
+    days: readonly SellerDay[];
+    models: readonly ModelStat[];
+    error: string | null;
+  },
+) {
+  if (snapshot.error || stats.error || stats.models.length) return false;
+  if (!snapshot.network || snapshot.network.truncated) return false;
+  if (sellerProfile(nodeId, snapshot).status !== 'unknown') return false;
+  return sellerTotals(stats.days).active.length === 0;
 }

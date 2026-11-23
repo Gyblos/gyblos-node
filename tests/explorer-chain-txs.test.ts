@@ -7,14 +7,13 @@ import {
   chainTxsQuery,
   chainTxsUrl,
   parseChainTxs,
-  rangeSwitchHref,
   sellerOwners,
   txCursor,
-  txPageHref,
   txRow,
   type ChainTx,
 } from '@gyblos/explorer/chain-txs-shape';
 import { CHAIN_TXS, RANGE } from '@gyblos/explorer/constants';
+import { queryHref, rangeSwitchHref, readQuery } from '@gyblos/explorer/paging';
 import {
   CHAIN_INSTRUCTIONS,
   CHAIN_TX_PAGE,
@@ -237,6 +236,9 @@ void test('the seller is only the listed, unique owner of the channel payout rec
   assert.equal(credited(distribute(), sellerOwners([])), null);
 });
 
+const txPageHref = (days: number, before: string | null, verified = '') =>
+  queryHref(readQuery({ range: String(days), verified }), { before });
+
 void test('pager links keep the range and carry the cursor', () => {
   assert.equal(txPageHref(RANGE.defaultDays, null), '/');
   assert.equal(txPageHref(RANGE.defaultDays, CURSOR), `/?before=${CURSOR}`);
@@ -271,7 +273,7 @@ void test('the newest page URL has no empty query, so it shares the collector ca
 
 void test('transaction pages keep the verified seller filter', () => {
   assert.equal(
-    txPageHref(7, CURSOR, true),
+    txPageHref(7, CURSOR, '1'),
     `/?range=7&verified=1&before=${CURSOR}`,
   );
   assert.equal(

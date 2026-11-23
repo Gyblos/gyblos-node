@@ -7,8 +7,9 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useTransition } from 'react';
 
 import { RANGE } from '../lib/constants';
+import { rangeSwitchHref } from '../lib/paging';
 import type { RangeDays } from '../lib/range';
-import { rangeHref } from '../lib/seller-page';
+import { pagePath } from '../lib/seller-page';
 import { SegmentedControl } from './board/segmented-control';
 
 const OPTIONS = RANGE.presets.map((days) => ({
@@ -29,9 +30,16 @@ export function RangeControl({ days }: { days: RangeDays }) {
         selected={days}
         onChange={(next) =>
           startTransition(() =>
-            router.push(rangeHref(pathname, searchParams.toString(), next), {
-              scroll: false,
-            }),
+            router.push(
+              rangeSwitchHref(
+                searchParams.toString(),
+                next,
+                pagePath(pathname),
+              ),
+              {
+                scroll: false,
+              },
+            ),
           )
         }
       />

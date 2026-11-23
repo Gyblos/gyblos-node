@@ -475,7 +475,10 @@ at most once and in this order:
   channels whose first split recipient as opened (`recipients[0]`, the seller's
   payout address for Gyblos sessions) is that owner. Channels whose open was not
   read never match. The filter goes into the page's row selection, so the page
-  stays one bounded read-only statement.
+  stays one bounded read-only statement. It has no index of its own: it reads
+  Gyblos instructions newest first until the page is full, so a rare recipient
+  costs a scan of the history, which grows with it as the unfiltered page's
+  does.
 
 Numbers are canonical (`0` or no leading zero). Any other parameter (an unnamed
 one included), a repeated one, another order, `limit=25` (the default is sent by

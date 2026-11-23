@@ -5,28 +5,24 @@ import {
   chainTxsQuery,
   chainTxsUrl,
   parseChainTxs,
+  txRow,
 } from '@gyblos/explorer/chain-txs-shape';
 import { parseSellerStats } from '@gyblos/explorer/collector-shape';
-import {
-  CHAIN_TXS,
-  DISPLAY,
-  RANGE,
-  SELLER_PAGE,
-} from '@gyblos/explorer/constants';
+import { CHAIN_TXS, DISPLAY, RANGE } from '@gyblos/explorer/constants';
 import type { DiscoverySnapshot, Seller } from '@gyblos/explorer/discovery';
 import {
-  pageNumber,
-  pageOf,
-  rangeHref,
-  sellerHref,
-  sellerNodeId,
-  sellerPageState,
-  type SellerPageState,
-} from '@gyblos/explorer/seller-page';
+  queryHref,
+  rangeSwitchHref,
+  readQuery,
+  txPager,
+} from '@gyblos/explorer/paging';
+import { pagePath, sellerNodeId } from '@gyblos/explorer/seller-page';
 import {
   SELLER_STATUS_LABELS,
   sellerModelRows,
   sellerProfile,
+  sellerTotals,
+  unknownSeller,
 } from '@gyblos/explorer/seller-profile';
 import { buyersText, dailyRequests } from '@gyblos/explorer/usage';
 import { CHAIN_TX_PAGE } from '@gyblos/metrics-collector/constants';
@@ -36,12 +32,7 @@ const NODE = 'a'.repeat(64);
 const OTHER = 'b'.repeat(64);
 const OWNER = 'CQ3znZDWsSH6unNaov2aizowCueQPFozRUyRrMuyuJde';
 const CURSOR = `140-${'5'.repeat(87)}-1`;
-const STATE: SellerPageState = {
-  days: RANGE.defaultDays,
-  models: 1,
-  daily: 1,
-  before: null,
-};
+const PATH = `/sellers/${NODE}`;
 
 void test('a seller page needs a NodeId of 64 lowercase hex characters', () => {
   assert.equal(sellerNodeId(NODE), NODE);
@@ -56,46 +47,43 @@ void test('a seller page needs a NodeId of 64 lowercase hex characters', () => {
     assert.equal(sellerNodeId(bad), null, bad);
 });
 
-void test('page numbers are canonical positive integers and pages hold 25 rows', () => {
-  assert.equal(SELLER_PAGE.rowsPerPage, CHAIN_TX_PAGE.defaultLimit);
-  assert.equal(pageNumber('3'), 3);
-  for (const bad of [undefined, '', '0', '01', '-1', '1.5', 'x', ['2', '3']])
-    assert.equal(pageNumber(bad), 1, String(bad));
-  const items = Array.from({ length: 60 }, (_, index) => index);
-  assert.deepEqual(
-    [pageOf(items, 1).rows.length, pageOf(items, 1).pages],
-    [25, 3],
-  );
-  assert.deepEqual(pageOf(items, 3).rows, items.slice(50));
-  assert.equal(pageOf(items, 9).page, 3);
-  assert.deepEqual(pageOf([], 4), { rows: [], page: 1, pages: 1 });
+void test('only the explorer and seller pages are page paths', () => {
+  assert.equal(pagePath(PATH), PATH);
+  for (const other of [
+    '/',
+    '/sellers',
+    `/sellers/${NODE}/x`,
+    '/sellers/ABC',
+    '/x',
+  ])
+    assert.equal(pagePath(other), '/', other);
 });
 
-void test('seller page links keep every other parameter and omit defaults', () => {
-  assert.equal(sellerHref(NODE, STATE), `/sellers/${NODE}`);
-  const full = { days: 7, models: 2, daily: 3, before: CURSOR } as const;
-  assert.equal(
-    sellerHref(NODE, full),
-    `/sellers/${NODE}?range=7&models=2&daily=3&before=${CURSOR}`,
+void test('seller page links stay on the seller page and keep every other parameter', () => {
+  const query = readQuery(
+    { range: '7', verified: '1', before: CURSOR, txPage: '2', modelsPage: '2' },
+    PATH,
   );
-  const state = sellerPageState({
-    range: '90',
-    models: '2',
-    daily: '0',
-    before: CURSOR,
-    verified: '1',
-  });
-  assert.deepEqual(state, { days: 90, models: 2, daily: 1, before: CURSOR });
-  assert.deepEqual(sellerPageState({ before: 'nope' }), STATE);
+  assert.equal(query.path, PATH);
   assert.equal(
-    rangeHref(`/sellers/${NODE}`, `models=2&before=${CURSOR}`, 7),
-    `/sellers/${NODE}?range=7&models=2&before=${CURSOR}`,
+    queryHref(query, { pages: { daily: 3 } }),
+    `${PATH}?range=7&verified=1&before=${CURSOR}&modelsPage=2&dailyPage=3&txPage=2`,
+  );
+  assert.equal(queryHref(readQuery({}, PATH)), PATH);
+  assert.equal(
+    rangeSwitchHref('modelsPage=2&dailyPage=2&verified=1', 90, PATH),
+    `${PATH}?range=90&verified=1`,
+  );
+  assert.equal(rangeSwitchHref('verified=1', 7), '/?range=7&verified=1');
+  const pager = txPager(query, 25, CURSOR);
+  assert.ok(
+    pager?.links.every((link) => link.href.startsWith(`${PATH}?`)),
+    JSON.stringify(pager),
   );
   assert.equal(
-    rangeHref(`/sellers/${NODE}`, 'range=7&daily=2', RANGE.defaultDays),
-    `/sellers/${NODE}?daily=2`,
+    queryHref({ ...query, path: '/' }, { pages: {}, before: null }),
+    '/?range=7&verified=1&modelsPage=2',
   );
-  assert.equal(rangeHref('/', 'verified=1', 7), '/?range=7&verified=1');
 });
 
 void test('the explorer asks the collector for one seller owner with the canonical query', () => {
@@ -116,28 +104,54 @@ void test('the explorer asks the collector for one seller owner with the canonic
   );
 });
 
-void test('channel rows read the same with or without a payout split', () => {
-  const row = {
-    signature: '5'.repeat(87),
-    instructionIndex: 1,
-    slot: 140,
-    blockTime: null,
-    kind: 'distribute',
-    channel: 'Channel1111',
-    payee: null,
-    recipients: [OWNER],
-    amountAtomic: '100',
-  };
-  const page = (extra: object) => ({
-    programId: 'P',
-    treasury: 'T',
-    transactions: [{ ...row, ...extra }],
-    next: null,
-  });
-  assert.deepEqual(
-    parseChainTxs(page({ split: [{ owner: OWNER, amountAtomic: '96' }] })),
-    parseChainTxs(page({})),
+const payout = (extra: object) => ({
+  programId: 'P',
+  treasury: 'T',
+  next: null,
+  transactions: [
+    {
+      signature: '5'.repeat(87),
+      instructionIndex: 1,
+      slot: 140,
+      blockTime: null,
+      kind: 'distribute',
+      channel: 'Channel1111',
+      payee: null,
+      recipients: [OWNER],
+      amountAtomic: '96',
+      ...extra,
+    },
+  ],
+});
+const split = (channels: number) => ({
+  paidOut: '96',
+  gyblosFees: '4',
+  programTreasury: '0',
+  refunded: '900',
+  channels,
+  unclassified: '0',
+});
+
+void test('a seller page payout row reads as what the seller got, with the rest of its split', () => {
+  const owners = new Map();
+  const row = txRow(
+    parseChainTxs(payout({ split: split(1) })).transactions[0]!,
+    owners,
+    'T',
   );
+  assert.deepEqual(
+    [row.amount, row.detail, row.shared],
+    ['0.000096', ['Gyblos fee 0.000004', 'to buyer 0.000900'], false],
+  );
+  const shared = txRow(
+    parseChainTxs(payout({ split: split(2) })).transactions[0]!,
+    owners,
+    'T',
+  );
+  assert.equal(shared.detail[0], 'total of 2 channels');
+  assert.equal(shared.shared, true);
+  const legacy = txRow(parseChainTxs(payout({})).transactions[0]!, owners, 'T');
+  assert.deepEqual([legacy.amount, legacy.detail], ['—', []]);
 });
 
 const side = (requests: number, buyers: number | null) => ({
@@ -334,4 +348,49 @@ void test('the model table lists current offers first, then models served in the
       ['served-only', null, null, 3, 0],
     ],
   );
+});
+
+void test('seller totals sum each side and the paid authorized amount over the range', () => {
+  const totals = sellerTotals(parseSellerStats(statsAnswer()).days);
+  assert.deepEqual(
+    [totals.active.length, totals.free.requests, totals.paid.requests],
+    [2, 3, 6],
+  );
+  assert.equal(totals.authorized, 12n);
+  assert.equal(totals.free.firstToken, null);
+  assert.equal(sellerTotals([]).authorized, 0n);
+});
+
+void test('a valid NodeId unknown to the index and without activity is not a seller page', () => {
+  const stats = { ...parseSellerStats(statsAnswer()), error: null };
+  const idle = { aggregatedAt: null, days: [], models: [], error: null };
+  const nobody = snapshot([], []);
+  assert.equal(unknownSeller(OTHER, nobody, idle), true);
+  assert.equal(unknownSeller(OTHER, nobody, stats), false);
+  assert.equal(unknownSeller(OTHER, nobody, { ...idle, error: 'down' }), false);
+  assert.equal(unknownSeller(OTHER, { ...nobody, error: 'down' }, idle), false);
+  assert.equal(
+    unknownSeller(
+      NODE,
+      snapshot([], [{ nodeId: NODE, state: 'offline' }]),
+      idle,
+    ),
+    false,
+  );
+  assert.equal(unknownSeller(OTHER, snapshot([], null), idle), false);
+  const partial = snapshot([], []);
+  assert.equal(
+    unknownSeller(
+      OTHER,
+      { ...partial, network: { ...partial.network!, truncated: true } },
+      idle,
+    ),
+    false,
+  );
+  const quiet = parseSellerStats({
+    ...statsAnswer(),
+    days: [{ day: '2026-11-21', free: null, paid: null }],
+    models: [],
+  });
+  assert.equal(unknownSeller(OTHER, nobody, { ...quiet, error: null }), true);
 });
