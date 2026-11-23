@@ -57,18 +57,6 @@
 .signal-face[data-face='true'] .signal-mouth {
   d: var(--signal-mouth);
 }
-.signal-foil-stop {
-  stop-color: var(--accent);
-}
-.signal-foil-stop:nth-child(2) {
-  stop-color: var(--blue);
-}
-.signal-foil-stop:nth-child(3) {
-  stop-color: var(--accent);
-}
-.signal-foil-stop:nth-child(4) {
-  stop-color: var(--blue);
-}
 .signal-face[data-working='true'] .signal-foil-stop {
   animation: signal-foil-color 3600ms ease-in-out infinite alternate;
 }
@@ -80,18 +68,6 @@
 }
 .signal-face[data-working='true'] .signal-foil-stop:nth-child(4) {
   animation-delay: -2700ms;
-}
-.signal-trail-stop--left {
-  stop-color: var(--accent);
-}
-.signal-trail-stop--left:nth-child(2) {
-  stop-color: var(--blue);
-}
-.signal-trail-stop--right {
-  stop-color: var(--blue);
-}
-.signal-trail-stop--right:nth-child(2) {
-  stop-color: var(--accent);
 }
 .signal-face[data-working='true'] .signal-trail-stop {
   animation: signal-foil-sheen 3600ms ease-in-out infinite alternate;

@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type CSSProperties } from 'react';
 
-import { SIGNAL_STATE } from './constants';
+import { SIGNAL_STATE, type SignalState } from './constants';
 import { SIGNATURE_GEOMETRY } from './signal-geometry';
 
 type SignatureStyle = CSSProperties & { [key: `--signal-${string}`]: string };
@@ -11,7 +11,6 @@ const GEOMETRY_STYLE: SignatureStyle = Object.fromEntries(
   ]),
 );
 
-type SignalState = (typeof SIGNAL_STATE)[keyof typeof SIGNAL_STATE];
 const ORBIT_PATH =
   'M 32 7 H 46 Q 50 7 50 11 V 37 Q 50 41 46 41 H 18 Q 14 41 14 37 V 11 Q 14 7 18 7 Z';
 
@@ -77,18 +76,9 @@ export function SignalFace({
             x2="50"
             y2="41"
           >
-            <stop
-              className={`signal-trail-stop signal-trail-stop--${strand}`}
-              offset="0%"
-            />
-            <stop
-              className={`signal-trail-stop signal-trail-stop--${strand}`}
-              offset="45%"
-            />
-            <stop
-              className={`signal-trail-stop signal-trail-stop--${strand}`}
-              offset="100%"
-            />
+            <stop className="signal-trail-stop" offset="0%" />
+            <stop className="signal-trail-stop" offset="45%" />
+            <stop className="signal-trail-stop" offset="100%" />
           </linearGradient>
         ))}
       </defs>
