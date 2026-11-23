@@ -275,7 +275,7 @@ void test('compact pills, buttons, icons, digits and code line numbers', async (
   assert.match(css, /\.pk-code-line::before \{[^}]*user-select: none;/);
   assert.match(
     css,
-    /\.pk-code-line \{[^}]*width: max-content;[^}]*min-width: 100%;/,
+    /\.pk-code pre code \{[^}]*display: grid;[^}]*width: max-content;[^}]*min-width: 100%;/,
   );
   assert.match(css, /\.pk-code-line::before \{[^}]*padding-inline: 12px;/);
   assert.doesNotMatch(css, /\.pk-code-line::before \{[^}]*margin-right/);
