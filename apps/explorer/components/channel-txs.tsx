@@ -50,6 +50,7 @@ function Meta({ programId }: { programId: string }) {
 function Seller({ row, lookup }: { row: Row; lookup: boolean }) {
   if (!lookup)
     return <span className="text-muted">Seller lookup unavailable</span>;
+  if (row.shared) return <span className="text-muted">Several channels</span>;
   if (row.seller)
     return (
       <span className="font-mono" title={`Node ${row.seller.nodeId}`}>
@@ -72,9 +73,14 @@ function TxLine({ row, lookup }: { row: Row; lookup: boolean }) {
       </td>
       <td className={row.muted ? `${numberCell} text-muted` : moneyCell}>
         {row.amount}
-        {row.detail ? (
-          <div className="font-mono text-xs text-muted">{row.detail}</div>
-        ) : null}
+        {row.detail.map((line) => (
+          <div
+            key={line}
+            className="ml-auto max-w-40 font-mono text-xs whitespace-normal text-muted"
+          >
+            {line}
+          </div>
+        ))}
       </td>
       <td className={`${td} font-mono`}>
         <a className={link} href={row.href}>
@@ -150,8 +156,9 @@ export async function ChannelTxs({
       <p className="-mt-2 mb-3 text-xs text-muted">
         Amounts are per row: deposit in for Deposit and Top-up, newly settled
         for Settle, what the seller got for Paid out and the refund for
-        Refunded; a payout shows its split (seller, Gyblos fee, program
-        treasury, refund to the buyer) below. Do not add them up.
+        Refunded; below a payout, the rest of its split (Gyblos fee, payments
+        program, to buyer). Payments program: the payment program&apos;s own
+        treasury (rounding remainder), not a Gyblos fee. Do not add them up.
       </p>
       <Pager
         days={days}
