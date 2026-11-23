@@ -14,3 +14,9 @@ export const NETWORKS = [
 
 export const explorerAddressUrl = (address: string) =>
   `https://explorer.solana.com/address/${address}?cluster=devnet`;
+
+export const HOW_TO_VERIFY_URL =
+  'https://docs.gyblos.com/en/sellers/identity#verify-github';
+
+export const gistUrl = (github: { account: string; gist: string }) =>
+  `https://gist.github.com/${github.account}/${github.gist}`;

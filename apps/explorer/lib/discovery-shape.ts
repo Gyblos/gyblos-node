@@ -11,6 +11,8 @@ export interface OfferedModel {
 }
 export interface Uptime {
   firstSeenAt: number;
+  generatedAt?: number;
+  readAt?: number;
   windows: { days: number; ratio: number }[];
 }
 export interface Seller {
@@ -42,6 +44,9 @@ export function uptime(value: unknown): Uptime {
   const source = record(value, 'uptime');
   return {
     firstSeenAt: num(source.firstSeenAt, 'uptime.firstSeenAt'),
+    ...(source.generatedAt === undefined
+      ? {}
+      : { generatedAt: num(source.generatedAt, 'uptime.generatedAt') }),
     windows: list(source.windows, 'uptime.windows').map((entry) => {
       const window = record(entry, 'uptime.window');
       return {
