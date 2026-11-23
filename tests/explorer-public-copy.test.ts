@@ -121,6 +121,7 @@ void test('llms.txt states the range presets, the buyer threshold, the longest r
     `${collector}${COLLECTOR_ROUTES.STATS_NETWORK})`,
     `\`${COLLECTOR_ROUTES.STATS_MODELS}\``,
     `\`${COLLECTOR_ROUTES.STATS_CHAIN}\``,
+    `\`${COLLECTOR_ROUTES.STATS_CHAIN_TXS}\``,
   ])
     assert.ok(llms.includes(route), route);
 });

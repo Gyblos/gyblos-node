@@ -86,6 +86,10 @@ export const DISPLAY = {
   minPublicBuyers: 5,
 } as const;
 
+export const CHAIN_TXS = {
+  param: 'before',
+} as const;
+
 // The date range control: preset spans of UTC days ending today. The collector answers at most 92 days
 // (AGGREGATES.maxRangeDays) and 30 by default.
 export const RANGE = {
@@ -103,4 +107,14 @@ export const LIVE = {
   refreshMs: 60 * 1000,
   // How often the "updated … ago" label is redrawn.
   labelMs: 5 * 1000,
+} as const;
+
+export const IDENTITY = {
+  verifiedParam: 'verified',
+  verifiedValue: '1',
+  bandsPerUnit: 100,
+  gridSize: 5,
+  cellPx: 4,
+  hashOffset: 2_166_136_261,
+  hashPrime: 16_777_619,
 } as const;

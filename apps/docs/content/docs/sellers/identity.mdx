@@ -191,11 +191,11 @@ and skips what is done.
 
 ### What each state means [#github-states]
 
-| State      | What it means                                                                                                                                                                                                                                               |
-| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `verified` | The last check GitHub answered found the proof line in your gist. Buyers see the account and the gist in the index's network list.                                                                                                                          |
-| `pending`  | The index has your claim but hasn't found the proof yet. It isn't shown in the network list, but anyone can read it at `GET /v1/identity/github/<NodeId>`. The index checks again about every 6 hours, for up to 7 days; after that, run the command again. |
-| `lost`     | The account was verified, but the last check didn't find the proof: the gist, the file or the line is gone, or the account was renamed. Buyers no longer see it.                                                                                            |
+| State      | What it means                                                                                                                                                                                                                                                                                |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `verified` | The last check GitHub answered found the proof line in your gist. Buyers see the account and the gist in the index's network list, and the [explorer](https://explorer.gyblos.com) shows the account with a ✓ next to your seller; its **Verified only** filter lists only verified sellers. |
+| `pending`  | The index has your claim but hasn't found the proof yet. It isn't shown in the network list, but anyone can read it at `GET /v1/identity/github/<NodeId>`. The index checks again about every 6 hours, for up to 7 days; after that, run the command again.                                  |
+| `lost`     | The account was verified, but the last check didn't find the proof: the gist, the file or the line is gone, or the account was renamed. Buyers no longer see it.                                                                                                                             |
 
 Only `verified` means the proof was found. When GitHub doesn't answer, the claim keeps its current state:
 `pending` stays `pending` and `verified` stays `verified`. The check time shows the last attempt, even one

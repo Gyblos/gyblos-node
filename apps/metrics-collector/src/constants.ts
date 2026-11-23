@@ -50,6 +50,7 @@ export const COLLECTOR_ROUTES = {
   STATS_MODELS: '/v1/stats/models',
   STATS_SELLER: '/v1/stats/sellers/:nodeId',
   STATS_CHAIN: '/v1/stats/chain',
+  STATS_CHAIN_TXS: '/v1/stats/chain/txs',
   // The operator's RPC probe (rpc-probe.ts): 404 unless its admin token is set and sent.
   RPC_PROBE: '/v1/admin/rpc-probe',
 } as const;
@@ -255,6 +256,11 @@ export const CHAIN_CHANNEL_STATUSES = [
   'distributed',
 ] as const;
 export const CHAIN_CHANNEL_CLOSED = 'closed';
+export const CHAIN_TX_PAGE = {
+  defaultLimit: 25,
+  maxLimit: 50,
+  params: { BEFORE: 'before', LIMIT: 'limit' },
+} as const;
 // The address holds no channel of this program (another owner, or another size).
 export const CHAIN_CHANNEL_UNKNOWN = 'unknown';
 export const CHAIN_PROGRAMS = {
