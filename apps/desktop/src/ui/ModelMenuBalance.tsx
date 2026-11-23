@@ -12,7 +12,7 @@ export function ModelMenuBalance({
   return (
     <p className="pk-balance-line">
       <Wallet size={14} aria-hidden="true" />
-      <span>Balance</span>
+      <span>{amount == null ? 'Balance' : 'Last balance'}</span>
       <strong
         title={amount && 'Last checked balance: ' + amount}
         data-unavailable={amount == null || undefined}

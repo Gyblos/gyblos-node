@@ -26,7 +26,7 @@ export function ModelMenuBadges({
           <Tag>
             {offers.length > 1 ? 'from ' : ''}
             {usdPerMtok(Math.min(...offers.map((offer) => offer.input)))}/M
-            <span className="sr-only"> input tokens</span>
+            input
           </Tag>
         )}
         <Tag>

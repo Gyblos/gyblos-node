@@ -280,7 +280,7 @@ void test('preview menus, number fields and model rows follow the shared compone
     'apps/desktop/src/ui/ModelMenuBalance.tsx',
     'utf8',
   );
-  assert.match(balance, /<span>Balance<\/span>/);
+  assert.match(balance, /amount == null \? 'Balance' : 'Last balance'/);
   assert.match(balance, /className="pk-balance-add"/);
 });
 
