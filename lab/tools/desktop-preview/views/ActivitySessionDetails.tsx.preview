@@ -12,7 +12,7 @@ import { BUTTON_VARIANT } from './constants';
 import { Modal } from './Modal';
 import { PaymentReferenceDetails } from './PaymentReference';
 import { Badge, Button, Note } from './UI';
-import { DetailSummary, statusTone } from './PreviewKit';
+import { DetailSummary, previewConversationRemoved, statusTone } from './PreviewKit';
 
 type Props = {
   entry: ActivityEntry;
@@ -37,7 +37,7 @@ export function ActivitySessionDetails({
   canReview,
 }: Props) {
   const linked = conversations.filter((item) =>
-    conversationSummary(item).paymentSessionIds.includes(entry.id),
+    !previewConversationRemoved(item.id) && conversationSummary(item).paymentSessionIds.includes(entry.id),
   );
   return (
     <Modal

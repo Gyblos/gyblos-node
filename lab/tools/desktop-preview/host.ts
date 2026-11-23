@@ -38,6 +38,7 @@ import { BUYER_API, type BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 import { BUYER_API_KEYS } from '@gyblos/protocol/buyer-api-keys';
 
 import { accountBudgetSnapshot, accountLimitError } from './account-budget';
+import { previewChatSeed } from './chat-seed';
 import { PREVIEW } from './constants';
 import { exampleKeys } from './example-keys';
 import { previewFunding } from './funding';
@@ -114,8 +115,10 @@ export function createPreviewHost(
       'Explore search ranking',
       'Outline a release checklist',
     );
+  const seeded: string[] = [];
   function exampleChat(title: string, receiptId: string) {
     const conversationId = conversations.getSnapshot().activeId;
+    seeded.push(conversationId);
     conversations.startPaypal(
       title,
       chatModel,
@@ -148,6 +151,7 @@ export function createPreviewHost(
     exampleChat(title, crypto.randomUUID());
     conversations.newChat(crypto.randomUUID());
   }
+  Object.assign(window, { previewChatSeed: previewChatSeed(seeded) });
   exampleChat('How can I use Gyblos in my coding tools?', 'preview-free-reply');
   let archive = projectChatArchive(conversations.getSnapshot());
 

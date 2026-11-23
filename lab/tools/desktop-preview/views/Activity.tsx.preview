@@ -8,6 +8,7 @@ import type { ChatController } from './chat-controller';
 import { Button, List, ListRow, PagePanel } from './UI';
 import type { ActivityView } from './useActivity';
 import type { X402View } from './useX402';
+import { previewConversationRemoved } from './PreviewKit';
 
 type Props = {
   x402?: X402View;
@@ -32,7 +33,7 @@ export function Activity({
   );
   const entries = activity.state?.available ? activity.state.sessions : [];
   const selected = entries.find(entry => entry.id === selectedSession);
-  const linked = selected ? conversations.filter(chat =>
+  const linked = selected ? conversations.filter(chat => !previewConversationRemoved(chat.id) &&
     conversationSummary(chat).paymentSessionIds.includes(selected.id)) : [];
   return (
     <PagePanel>

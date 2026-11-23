@@ -1,37 +1,41 @@
+const RAIL = [
+  { view: UI_VIEW.CHAT, label: 'Chat', icon: <SidebarActionIcon kind={SIDEBAR_ACTION.CHAT} /> },
+  { view: UI_VIEW.MODELS, label: 'Models', icon: <SidebarIcon name={UI_VIEW.MODELS} />, shortcut: PREVIEW_SHORTCUT.MODELS },
+  { view: UI_VIEW.CONNECT, label: 'Connections', icon: <SidebarActionIcon kind={SIDEBAR_ACTION.LINK} /> },
+  { view: UI_VIEW.PAYMENTS, label: 'Usage & payments', icon: <SidebarActionIcon kind={SIDEBAR_ACTION.WALLET} /> },
+] as const;
+
 export function BuyerSidebar(props: Props) {
-  const nav = (name: View) => MAIN_NAV.find((item) => item.name === name);
-  const usage = nav(UI_VIEW.PAYMENTS);
-  const footerView = props.view === UI_VIEW.ACTIVITY ? UI_VIEW.PAYMENTS : props.view;
+  const current = props.view === UI_VIEW.ACTIVITY ? UI_VIEW.PAYMENTS : props.view;
+  const rail = (view: View, label: string, icon: ReactNode, shortcut?: (typeof PREVIEW_SHORTCUT)[keyof typeof PREVIEW_SHORTCUT]) => (
+    <IconButton
+      key={view}
+      className="preview-rail-item"
+      label={label}
+      title={shortcut && previewCompact() ? label + ' ' + previewShortcut(shortcut).label : undefined}
+      aria-keyshortcuts={shortcut && previewCompact() ? previewShortcut(shortcut).aria : undefined}
+      aria-current={current === view ? 'page' : undefined}
+      onClick={() => props.navigate(view)}
+    >
+      {icon}
+    </IconButton>
+  );
   return (
     <aside id="app-sidebar" className="sidebar buyer-sidebar">
-      <nav aria-label="Main navigation" className="ui-sidebar-primary">
-        <Button
-          className="ui-nav-row ui-sidebar-motion-control preview-new-chat"
-          aria-label="New chat"
-          disabled={props.storageState === CHAT_STORAGE_STATE.LOADING}
-          onClick={props.onNewChat}
-        >
-          <SidebarActionIcon kind={SIDEBAR_ACTION.CREATE} />
-          <span>New chat</span>
-        </Button>
-        {[UI_VIEW.MODELS, UI_VIEW.CONNECT].map((name) => {
-          const item = nav(name);
-          return item ? <NavigationItem key={item.name} item={item} view={props.view} navigate={props.navigate} /> : null;
-        })}
+      <nav aria-label="Main navigation" className="preview-rail">
+        {RAIL.map((item) => rail(item.view, item.label, item.icon, 'shortcut' in item ? item.shortcut : undefined))}
+        <span className="preview-rail-spacer" />
+        {rail(UI_VIEW.SETTINGS, 'Settings', <SidebarActionIcon kind={SIDEBAR_ACTION.SETTINGS} />)}
       </nav>
-      <ConversationList {...props} />
-      <nav className="ui-sidebar-footer" aria-label="Account and activity">
-        {usage && <NavigationItem item={usage} view={footerView} navigate={props.navigate} />}
-        <Button
-          className="ui-nav-row ui-sidebar-motion-control"
-          aria-label="Settings"
-          aria-current={props.view === UI_VIEW.SETTINGS ? 'page' : undefined}
-          onClick={() => props.navigate(UI_VIEW.SETTINGS)}
-        >
-          <SidebarActionIcon kind={SIDEBAR_ACTION.SETTINGS} />
-          <span>Settings</span>
-        </Button>
-      </nav>
+      <PreviewConversationPanel
+        chat={props.chat}
+        view={props.view}
+        collapsed={props.collapsed}
+        loading={props.storageState === CHAT_STORAGE_STATE.LOADING}
+        onNewChat={props.onNewChat}
+        onOpenChat={props.onOpenChat}
+        onConnect={() => props.navigate(UI_VIEW.CONNECT)}
+      />
     </aside>
   );
 }

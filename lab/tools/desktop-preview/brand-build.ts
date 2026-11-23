@@ -10,7 +10,9 @@ import { transformCodeSamples } from './brand-code';
 import { replaceEach, replaceOnce } from './brand-replace';
 import brand from './brand.json' with { type: 'json' };
 import * as funds from './funds-build';
+import * as layout from './layout-build';
 import { previewModels } from './models-build';
+import { withSectionIcon } from './section-build';
 
 export { brand };
 const moduleId = (value: string) => value.replaceAll('\\', '/');
@@ -38,6 +40,8 @@ export function transformBrand(source: string, id: string, desktop: string) {
         'utf8',
       );
   }
+  if (target === `${base}/src/ui/Management.tsx`)
+    return withSectionIcon(source);
   if (target === `${base}/src/ui/ServiceLogo.tsx`)
     return replaceOnce(
       replaceOnce(
@@ -198,9 +202,10 @@ export function transformBrand(source: string, id: string, desktop: string) {
     const statusBar = replaceEach(routed, [
       [
         "import { PageBody } from './ui/PageBody';\n",
-        "import { PageBody } from './ui/PageBody';\nimport { PreviewStatusBar } from './ui/PreviewKit';\n",
+        "import { PageBody } from './ui/PageBody';\nimport { PreviewChatDetails, PreviewStatusBar } from './ui/PreviewKit';\n",
       ],
       ['<UpdateNotice />', ''],
+      ...layout.APP_LAYOUT_REWRITES,
       [
         '        systemStatus={\n          <SystemStatus\n            state={network.state}\n            onRetry={network.retry}\n            onPayments={() => navigate(UI_VIEW.PAYMENTS)}\n          />\n        }\n',
         '',
@@ -238,6 +243,7 @@ export function transformBrand(source: string, id: string, desktop: string) {
     const start = source.indexOf('export function BuyerSidebar(');
     if (start < 0) throw new Error('Missing sidebar review hook');
     return (
+      "import { PREVIEW_SHORTCUT, PreviewConversationPanel, previewCompact, previewShortcut } from './PreviewKit';\nimport { IconButton } from './UI';\n" +
       source.slice(0, start) +
       readFileSync(
         new URL('./views/BuyerSidebar.tsx.preview', import.meta.url),
@@ -246,9 +252,9 @@ export function transformBrand(source: string, id: string, desktop: string) {
     );
   }
   if (target === `${base}/src/ui/WindowTitlebar.tsx`)
-    return replaceOnce(
+    return replaceEach(
       replaceOnce(
-        "import { PREVIEW_EVENT, PREVIEW_NETWORKS, usePreviewNetwork, usePreviewSetting } from './PreviewKit';\n" +
+        "import { PREVIEW_EVENT, PREVIEW_NETWORKS, PreviewConversationMenu, usePreviewConversationTitle, usePreviewNetwork, usePreviewSetting } from './PreviewKit';\n" +
           source +
           readFileSync(
             new URL('./views/NetworkSwitch.tsx.preview', import.meta.url),
@@ -257,8 +263,7 @@ export function transformBrand(source: string, id: string, desktop: string) {
         '{props.children}',
         '<PreviewNetwork />{props.children}',
       ),
-      'data-platform={platform}',
-      "data-platform={platform}\n      data-fullscreen={new URLSearchParams(location.search).get('fullscreen') === '1' || undefined}",
+      layout.TITLEBAR_REWRITES,
     );
   if (target === `${base}/src/ui/BuyerAgentSetup.tsx`)
     return (
