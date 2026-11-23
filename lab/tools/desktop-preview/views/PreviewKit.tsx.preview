@@ -1,11 +1,13 @@
 // Preview-only shared components: every mockup view composes these instead of route-local markup.
-import { CaretRight, Check, Copy, CreditCard, Info, Minus, PaypalLogo, Plus, Wallet, Warning } from '@phosphor-icons/react';
-import { useEffect, useMemo, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react';
+import { ArrowCircleUp, CaretRight, Check, Copy, CreditCard, Info, Minus, PaypalLogo, Plus, Wallet, Warning } from '@phosphor-icons/react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react';
 
 import { AGENT_TOOLS, type AgentTool } from '@gyblos/node/agent-setup-constants';
 
+import { DESKTOP_UPDATE } from '../constants';
+import { observeDesktopUpdates } from '../update-session';
 import { AddBuyerFunds } from './BuyerFunding';
-import { CopyField } from './Form';
+import { CopyField, FormActions } from './Form';
 import { useDesktopWallet } from './WalletState';
 import { CODE_LANGUAGE, codeLanguageLabel, highlightCode, type CodeLanguage } from './code-highlight';
 import { BUTTON_VARIANT, UI_VIEW } from './constants';
@@ -298,6 +300,11 @@ export function PreviewKitShowcase() {
           ]}
         />
       </Panel>
+      <Panel title="Status bar">
+        <div className="pk-row">
+          <PreviewUpdateButton version="0.2.0" onClick={() => {}} />
+        </div>
+      </Panel>
       <Panel title="Filter chips">
         <FilterChips
           label="Usage source"
@@ -410,8 +417,127 @@ export function previewSetting<K extends keyof PreviewSettings>(key: K) {
   return settingsState()[key];
 }
 
-export const PREVIEW_EVENT = { NETWORK: 'preview:network' } as const;
+export const PREVIEW_EVENT = { NETWORK: 'preview:network', UPDATE: 'preview:update' } as const;
 export const PREVIEW_NETWORKS = ['Testnet', 'Mainnet'] as const;
+
+let availableUpdate: string | null = null;
+let stopUpdates: (() => void) | undefined;
+const updateListeners = new Set<() => void>();
+function subscribeUpdate(listener: () => void) {
+  updateListeners.add(listener);
+  const bridge = window.desktopUpdate;
+  if (!stopUpdates && bridge)
+    stopUpdates = observeDesktopUpdates(() => bridge.run(DESKTOP_UPDATE.STATUS), (update) => {
+      availableUpdate = update.available;
+      updateListeners.forEach((notify) => notify());
+    });
+  return () => {
+    updateListeners.delete(listener);
+    if (updateListeners.size) return;
+    stopUpdates?.();
+    stopUpdates = undefined;
+    availableUpdate = null;
+  };
+}
+const readUpdate = () => availableUpdate;
+function usePreviewUpdate(): string | null {
+  return useSyncExternalStore(subscribeUpdate, readUpdate);
+}
+const NewerVersion = createContext<string | null>(null);
+export function usePreviewNewerVersion(): string | null {
+  return useContext(NewerVersion);
+}
+export function openPreviewUpdate() {
+  window.dispatchEvent(new Event(PREVIEW_EVENT.UPDATE));
+}
+export function PreviewUpdateButton({ version, onClick }: { version: string; onClick(): void }) {
+  return (
+    <Button className="pk-update" onClick={onClick}>
+      <ArrowCircleUp size={14} weight="fill" aria-hidden="true" />
+      Update to {version}
+    </Button>
+  );
+}
+function PreviewUpdateDialog({
+  current,
+  available,
+  close,
+  restoreFocus,
+}: {
+  current: string;
+  available: string;
+  close(): void;
+  restoreFocus?: () => void;
+}) {
+  const restore = useRef(restoreFocus);
+  useEffect(() => () => {
+    const focus = restore.current;
+    if (focus) requestAnimationFrame(focus);
+  }, []);
+  return (
+    <Modal title={'Gyblos ' + available} description="A new desktop version is available." size="sm" close={close}>
+      <p className="ui-help-text">
+        You have {current}. Your chats, API keys and wallet stay on this computer when you update.
+      </p>
+      <FormActions>
+        <Button onClick={close}>Later</Button>
+        <Button
+          variant={BUTTON_VARIANT.PRIMARY}
+          onClick={() => {
+            close();
+            void window.desktopUpdate?.run(DESKTOP_UPDATE.OPEN).catch(() => {});
+          }}
+        >
+          Open download page
+        </Button>
+      </FormActions>
+    </Modal>
+  );
+}
+export function PreviewStatusBar({ status, version }: { status: ReactNode; version: string }) {
+  const available = usePreviewUpdate();
+  const footer = useRef<HTMLElement>(null);
+  const [open, setOpen] = useState(false);
+  const [chained, setChained] = useState(false);
+  useEffect(() => {
+    const show = () => {
+      setChained(true);
+      setOpen(true);
+    };
+    window.addEventListener(PREVIEW_EVENT.UPDATE, show);
+    return () => window.removeEventListener(PREVIEW_EVENT.UPDATE, show);
+  }, []);
+  const newer = available && available !== version ? available : null;
+  return (
+    <>
+      <footer ref={footer} className="preview-status-bar" aria-label="App status">
+        <NewerVersion.Provider value={newer}>{status}</NewerVersion.Provider>
+        <span className="preview-status-end">
+          {newer && (
+            <PreviewUpdateButton
+              version={newer}
+              onClick={() => {
+                setChained(false);
+                setOpen(true);
+              }}
+            />
+          )}
+          <span className="preview-version">Gyblos {version}</span>
+        </span>
+      </footer>
+      <MotionPresence>
+        {open && newer && (
+          <PreviewUpdateDialog
+            current={version}
+            available={newer}
+            close={() => setOpen(false)}
+            restoreFocus={chained ? () => footer.current?.querySelector<HTMLElement>('.preview-status-trigger')?.focus() : undefined}
+          />
+        )}
+      </MotionPresence>
+    </>
+  );
+}
 export type PreviewNetworkName = (typeof PREVIEW_NETWORKS)[number];
 
 function subscribeNetwork(listener: () => void) {

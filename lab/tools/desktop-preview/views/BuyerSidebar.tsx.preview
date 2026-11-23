@@ -31,7 +31,6 @@ export function BuyerSidebar(props: Props) {
           <SidebarActionIcon kind={SIDEBAR_ACTION.SETTINGS} />
           <span>Settings</span>
         </Button>
-        {props.systemStatus}
       </nav>
     </aside>
   );

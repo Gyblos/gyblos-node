@@ -30,6 +30,7 @@ export function transformBrand(source: string, id: string, desktop: string) {
     'ActivitySessionDetails',
     'ModelDropdown',
     'Settings',
+    'SystemStatus',
   ]) {
     if (target === `${base}/src/ui/${component}.tsx`)
       return readFileSync(
@@ -146,12 +147,6 @@ export function transformBrand(source: string, id: string, desktop: string) {
       ])
     );
   }
-  if (target === `${base}/src/ui/SystemStatus.tsx`)
-    return replaceOnce(
-      source,
-      'useState(false)',
-      "useState(() => new URLSearchParams(location.search).get('review') === 'system-status')",
-    );
   if (target === `${base}/src/ui/NetworkStatus.tsx`)
     return replaceEach(source, [
       [
@@ -200,7 +195,22 @@ export function transformBrand(source: string, id: string, desktop: string) {
       '{view === UI_VIEW.ACTIVITY && (\n            <Activity',
       '{false && (\n            <Activity',
     );
-    const funded = replaceEach(routed, [...funds.APP_FUNDS_REWRITES]);
+    const statusBar = replaceEach(routed, [
+      [
+        "import { PageBody } from './ui/PageBody';\n",
+        "import { PageBody } from './ui/PageBody';\nimport { PreviewStatusBar } from './ui/PreviewKit';\n",
+      ],
+      ['<UpdateNotice />', ''],
+      [
+        '        systemStatus={\n          <SystemStatus\n            state={network.state}\n            onRetry={network.retry}\n            onPayments={() => navigate(UI_VIEW.PAYMENTS)}\n          />\n        }\n',
+        '',
+      ],
+      [
+        '        </PageBody>\n      </div>\n',
+        '        </PageBody>\n      </div>\n      <PreviewStatusBar version={manifest.version} status={<SystemStatus state={network.state} onRetry={network.retry} onPayments={() => navigate(UI_VIEW.PAYMENTS)} />} />\n',
+      ],
+    ]);
+    const funded = replaceEach(statusBar, [...funds.APP_FUNDS_REWRITES]);
     return replaceOnce(
       replaceOnce(
         funded,
@@ -349,8 +359,10 @@ export function reviewBrand(desktop: string): Plugin {
       const from = moduleId(importer);
       const kit = `${moduleId(desktop)}/src/ui/PreviewKit.tsx`;
       if (
-        source === './PreviewKit' &&
-        from.startsWith(`${moduleId(desktop)}/src/ui/`)
+        (source === './PreviewKit' &&
+          from.startsWith(`${moduleId(desktop)}/src/ui/`)) ||
+        (source === './ui/PreviewKit' &&
+          from === `${moduleId(desktop)}/src/desktop-app.tsx`)
       )
         return `${desktop}/src/ui/PreviewKit.tsx`;
       const helper = PREVIEW_KIT_HELPERS.find((name) => source === `./${name}`);
