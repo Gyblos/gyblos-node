@@ -25,7 +25,6 @@ import {
 import { atomicToUsdc } from '@gyblos/node/node-config';
 import { setupRole } from '@gyblos/node/roles';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
-import { isMain } from '@gyblos/runtime';
 
 import { BUYER_INIT_FLAGS, BUYER_INIT_INPUT } from './constants';
 
@@ -221,8 +220,7 @@ export function buyerInitMessage(error: unknown) {
     : INITIALIZATION_HINTS[error.code];
   return `${error.code}: ${hint}`;
 }
-export async function main() {
-  const args = process.argv.slice(2);
+export async function main(args: string[]) {
   if (
     args.some(
       (argument) =>
@@ -284,4 +282,3 @@ export async function main() {
     input.close();
   }
 }
-if (isMain(import.meta.url)) await main();

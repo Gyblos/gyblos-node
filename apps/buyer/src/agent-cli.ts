@@ -14,7 +14,6 @@ import {
   type AgentTool,
 } from '@gyblos/node/agent-setup';
 import { agentText, writeAgentFile } from '@gyblos/node/agent-setup-host';
-import { isMain } from '@gyblos/runtime';
 
 import { endpointRoutes } from './model-routes';
 import { loadBuyerSelectionConfig } from './selection-config';
@@ -116,5 +115,3 @@ function failure(error: unknown) {
     ? `Could not write ${path ?? 'the configuration'} (${code}).`
     : 'Could not prepare the configuration.';
 }
-
-if (isMain(import.meta.url)) await main();

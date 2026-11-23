@@ -74,14 +74,14 @@ void test('wizard confirms an explicit USDC ceiling and passes validated answers
 
 void test('the actual executable offers offline help and refuses unattended initialization without files', async () => {
   const fixture = await home();
-  const executable = new URL('../apps/buyer/src/init.ts', import.meta.url)
+  const executable = new URL('../apps/buyer/src/bin.ts', import.meta.url)
     .pathname;
   const options = {
     cwd: fixture.directory,
     env: { ...process.env, ...fixture.environment },
     timeout: 10000,
   };
-  const args = ['--import', import.meta.resolve('tsx'), executable];
+  const args = ['--import', import.meta.resolve('tsx'), executable, 'init'];
   try {
     const help = await promisify(execFile)(
       process.execPath,

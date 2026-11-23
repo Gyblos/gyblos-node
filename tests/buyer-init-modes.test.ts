@@ -196,9 +196,9 @@ for (const invalid of [false, true]) {
   void test(`executable ${invalid ? 'rejects unknown options' : 'explains --advanced offline'} before creating local state`, async () => {
     const fixture = await home();
     try {
-      const executable = new URL('../apps/buyer/src/init.ts', import.meta.url)
+      const executable = new URL('../apps/buyer/src/bin.ts', import.meta.url)
         .pathname;
-      const args = ['--import', import.meta.resolve('tsx'), executable];
+      const args = ['--import', import.meta.resolve('tsx'), executable, 'init'];
       const options = {
         cwd: fixture.directory,
         env: { ...process.env, ...fixture.environment },

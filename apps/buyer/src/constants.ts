@@ -6,6 +6,16 @@ import { BUYER_PAID_TIMEOUTS } from '@gyblos/node/constants';
 import { BUYER_API, BUYER_SIDECAR } from '@gyblos/protocol/buyer-api';
 import type { ProtocolErrorCode } from '@gyblos/protocol/constants';
 
+export const BUYER_COMMANDS = {
+  START: 'start',
+  FREE: 'free',
+  CHAT: 'chat',
+  INIT: 'init',
+  SETUP: 'setup',
+  AUTO: 'auto',
+  AGENT: 'agent',
+  WITHDRAW: 'withdraw',
+} as const;
 export const CHAT_COMMANDS = {
   NEW: '/new',
   EXIT: '/exit',
