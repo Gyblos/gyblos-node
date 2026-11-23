@@ -24,7 +24,7 @@ export function ComposerFunding({
         <Wallet size={14} />
         {funding?.balanceAtomic == null
           ? 'Balance unavailable'
-          : fundingAmount(funding.balanceAtomic)}
+          : 'Last checked · ' + fundingAmount(funding.balanceAtomic)}
       </span>
       <span className="pk-tab-item pk-tab-limit">
         {policy && !error && summary.active && !summary.blocked

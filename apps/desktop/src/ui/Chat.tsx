@@ -327,6 +327,12 @@ export function Chat({
         : '0';
     composerOrigin.current = composer.current?.getBoundingClientRect() ?? null;
   }
+  useEffect(() => {
+    setSelectedTools([]);
+    setAllowedTools([]);
+    setPendingSend(null);
+    setDetails(null);
+  }, [activeId]);
   function reset(text = '') {
     if (loadingHistory) return;
     captureComposer();

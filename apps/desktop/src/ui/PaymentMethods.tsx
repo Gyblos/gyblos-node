@@ -1,0 +1,177 @@
+import { PaypalLogo, Wallet } from '@phosphor-icons/react';
+import { useState } from 'react';
+
+import { BUYER_SESSION_DEFAULT_POLICY } from '@gyblos/config/batch-session';
+import { DEVNET } from '@gyblos/config/network';
+import {
+  PAYPAL_SESSION_PHASE,
+  PAYPAL_SESSION_STATUS,
+} from '@gyblos/node/constants';
+
+import { depositShortfall } from '../funding/model';
+import {
+  paypalPaymentSummary,
+  paypalSessionCanConnectAgent,
+} from '../paypal-model';
+import { BuyerFundingAddress, fundingAmount } from './BuyerFunding';
+import { BUTTON_VARIANT } from './constants';
+import { FormActions } from './Form';
+import { displayDollars } from './history-presentation';
+import { Modal } from './Modal';
+import { Tag } from './Tag';
+import { Badge, Button } from './UI';
+import { useBuyerFunding } from './useBuyerFunding';
+import type { PaypalSessionView } from './usePaypalSession';
+import type { X402View } from './useX402';
+
+export function WalletOverview({
+  buyer,
+  onAddFunds,
+  onDetails,
+}: {
+  buyer?: X402View;
+  onAddFunds(): void;
+  onDetails(): void;
+}) {
+  const [open, setOpen] = useState(false);
+  const { funding, loading, refresh } = useBuyerFunding(
+    buyer?.state.policy?.payer,
+  );
+  const balance = funding?.balanceAtomic;
+  const needed =
+    balance != null
+      ? depositShortfall(
+          balance,
+          buyer?.state.policy?.depositAtomic ??
+            BUYER_SESSION_DEFAULT_POLICY.depositAtomic,
+        )
+      : null;
+  return (
+    <li className="preview-method-row" aria-label="USDC buyer wallet">
+      <span className="ui-icon-tile" aria-hidden="true">
+        <Wallet size={18} />
+      </span>
+      <div className="preview-method-copy">
+        <span className="preview-method-name">
+          <h3>USDC wallet</h3>
+          <Tag> {funding?.network === DEVNET ? 'Devnet' : 'Buyer wallet'} </Tag>
+        </span>
+        <span className="ui-help-text">
+          {loading
+            ? 'Checking balance…'
+            : balance != null
+              ? fundingAmount(balance)
+              : 'Balance unavailable'}
+        </span>
+      </div>
+      <div className="preview-method-actions">
+        <Button
+          variant={BUTTON_VARIANT.PRIMARY}
+          disabled={!funding}
+          onClick={onAddFunds}
+        >
+          Add funds
+        </Button>
+        <Button onClick={() => setOpen(true)}>Details</Button>
+      </div>
+      {open && (
+        <Modal title="USDC buyer wallet" close={() => setOpen(false)}>
+          <p>
+            {balance == null ? 'Balance unavailable' : fundingAmount(balance)}
+          </p>
+          {needed && needed !== '0' && (
+            <p>Add {fundingAmount(needed)} to open a new channel.</p>
+          )}
+          {funding && <BuyerFundingAddress funding={funding} />}
+          <FormActions align="start">
+            <Button disabled={loading} onClick={refresh}>
+              Refresh balance
+            </Button>
+            <Button
+              onClick={() => {
+                setOpen(false);
+                onDetails();
+              }}
+            >
+              Desktop wallet details
+            </Button>
+          </FormActions>
+        </Modal>
+      )}
+    </li>
+  );
+}
+export function PaypalSummary({
+  session,
+  onManage,
+}: {
+  session: PaypalSessionView;
+  onManage(): void;
+}) {
+  const summary = paypalPaymentSummary(
+    session.state.status,
+    session.state.statusFresh,
+    session.state.busy,
+  );
+  return (
+    <li className="preview-method-row" aria-label="PayPal payment method">
+      <span className="ui-icon-tile" aria-hidden="true">
+        <PaypalLogo size={18} />
+      </span>
+      <div className="preview-method-copy">
+        <div className="preview-method-name">
+          <h3>PayPal</h3>
+          <Badge>Sandbox</Badge>
+        </div>
+        <strong
+          className="ui-status-line"
+          data-ready={paypalSessionCanConnectAgent(
+            session.state.status,
+            session.state.statusFresh,
+            session.state.busy,
+          )}
+        >
+          {summary.label}
+        </strong>
+        <p className="ui-help-text">
+          {summary.limitCents === null
+            ? 'One approval for multiple replies and tool requests.'
+            : (summary.usedCents === null
+                ? 'Unconfirmed usage'
+                : displayDollars(summary.usedCents)) +
+              ' recorded · ' +
+              displayDollars(summary.limitCents) +
+              ' limit'}
+        </p>
+      </div>
+      <Button
+        variant={BUTTON_VARIANT.SECONDARY}
+        disabled={session.state.busy}
+        onClick={onManage}
+      >
+        {paypalManageLabel(session)}
+      </Button>
+    </li>
+  );
+}
+
+function paypalManageLabel(session: PaypalSessionView) {
+  const phase = session.state.statusFresh
+    ? session.state.status?.phase
+    : undefined;
+  if (
+    phase === PAYPAL_SESSION_STATUS.READY ||
+    phase === PAYPAL_SESSION_PHASE.COMPLETED ||
+    phase === PAYPAL_SESSION_PHASE.VOIDED ||
+    phase === PAYPAL_SESSION_PHASE.CANCELLED
+  )
+    return 'Authorize';
+  if (phase === PAYPAL_SESSION_PHASE.CREATED) return 'Finish approval';
+  return paypalSessionCanConnectAgent(
+    session.state.status,
+    session.state.statusFresh,
+    session.state.busy,
+  )
+    ? 'Manage session'
+    : 'Review session';
+}

@@ -99,7 +99,10 @@ export function ModelDropdown({
                 automatic={!!model.automatic}
                 buyerModels={auto.buyerModels}
                 paid={auto.paid}
-                onAuto={auto.choose}
+                onAuto={(name) => {
+                  close();
+                  auto.choose(name);
+                }}
                 onSelect={(id) => {
                   close();
                   onSelect(id);

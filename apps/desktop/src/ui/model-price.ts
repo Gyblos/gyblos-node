@@ -23,3 +23,18 @@ export function usdPerMtok(value: number) {
 // "$in / $out", as rows and badges show a paid model's price.
 export const priceRange = (model: Pick<ModelOption, 'input' | 'output'>) =>
   `${usdPerMtok(model.input)} / ${usdPerMtok(model.output)}`;
+
+export function groupPrice(offers: readonly ModelOption[]) {
+  if (offers.some((offer) => offer.free)) return 'Free';
+  const cheapest = offers.reduce<ModelOption | undefined>(
+    (best, offer) =>
+      !best ||
+      offer.input < best.input ||
+      (offer.input === best.input && offer.output < best.output)
+        ? offer
+        : best,
+    undefined,
+  );
+  if (!cheapest) return 'Unavailable';
+  return (offers.length > 1 ? 'From ' : '') + priceRange(cheapest);
+}

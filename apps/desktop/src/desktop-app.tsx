@@ -401,6 +401,7 @@ export function DesktopApp() {
       <WindowTitlebar
         notify={setToast}
         route={route}
+        onNewChat={() => chatRef.current?.newChat()}
         chat={chatController}
         collapsed={sidebarCollapsed}
         contextOpen={contextOpen}
@@ -560,7 +561,7 @@ export function DesktopApp() {
                     reviewPaypalPayments();
                   }}
                   onOpenChat={(id) => {
-                    chatController.openChat(id);
+                    chatRef.current?.openChat(id);
                     navigate(UI_VIEW.CHAT);
                   }}
                 />

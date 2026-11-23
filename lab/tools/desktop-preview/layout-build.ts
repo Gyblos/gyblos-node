@@ -9,7 +9,7 @@ export const TITLEBAR_REWRITES: [string, string][] = [
     "data-platform={platform}\n      data-fullscreen={new URLSearchParams(location.search).get('fullscreen') === '1' || undefined}",
   ],
   [
-    '<ConversationMenu chat={props.chat} notify={props.notify} />',
+    '<ConversationMenu\n            onNewChat={props.onNewChat}\n            chat={props.chat}\n            notify={props.notify}\n          />',
     '<PreviewConversationMenu chat={props.chat} />',
   ],
 ];

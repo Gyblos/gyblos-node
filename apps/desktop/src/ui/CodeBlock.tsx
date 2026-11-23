@@ -14,6 +14,8 @@ import {
   type CodeToken,
 } from './code-highlight';
 
+const MAX_HIGHLIGHT_CHARACTERS = 4096;
+const MAX_HIGHLIGHT_LINES = 128;
 const COPY_FEEDBACK_MS = 1000;
 
 function codeLines(tokens: CodeToken[]) {
@@ -45,7 +47,11 @@ export function CodeBlock({
 }) {
   const [copied, setCopied] = useState(false);
   const lines = useMemo(
-    () => codeLines(highlightCode(code, language)),
+    () =>
+      code.length <= MAX_HIGHLIGHT_CHARACTERS &&
+      code.split('\n').length <= MAX_HIGHLIGHT_LINES
+        ? codeLines(highlightCode(code, language))
+        : null,
     [code, language],
   );
   useEffect(() => {
@@ -85,47 +91,27 @@ export function CodeBlock({
       </figcaption>
       <pre tabIndex={0}>
         <code>
-          {lines.map((line, row) => (
-            <span key={row} className="pk-code-line">
-              {line.map((token, index) =>
-                token.kind ? (
-                  <span key={index} data-token={token.kind}>
-                    {token.text}
-                  </span>
-                ) : (
-                  token.text
-                ),
-              )}
-              {row < lines.length - 1 && '\n'}
-            </span>
-          ))}
+          {lines === null
+            ? code
+            : lines.map((line, row) => (
+                <span key={row} className="pk-code-line">
+                  {line.map((token, index) =>
+                    token.kind ? (
+                      <span key={index} data-token={token.kind}>
+                        {token.text}
+                      </span>
+                    ) : (
+                      token.text
+                    ),
+                  )}
+                  {row < lines.length - 1 && '\n'}
+                </span>
+              ))}
         </code>
       </pre>
     </figure>
   );
 }
-const FENCE_LANGUAGE: Record<string, CodeLanguage> = {
-  sh: CODE_LANGUAGE.SHELL,
-  bash: CODE_LANGUAGE.SHELL,
-  zsh: CODE_LANGUAGE.SHELL,
-  shell: CODE_LANGUAGE.SHELL,
-  console: CODE_LANGUAGE.SHELL,
-  json: CODE_LANGUAGE.JSON,
-  toml: CODE_LANGUAGE.TOML,
-  ts: CODE_LANGUAGE.TS,
-  tsx: CODE_LANGUAGE.TS,
-  typescript: CODE_LANGUAGE.TS,
-  js: CODE_LANGUAGE.TS,
-  javascript: CODE_LANGUAGE.TS,
-};
-
-export function fenceLanguage(fence: string): CodeLanguage {
-  return (
-    FENCE_LANGUAGE[/^```\s*([\w-]*)/.exec(fence)?.[1]?.toLowerCase() ?? ''] ??
-    CODE_LANGUAGE.TEXT
-  );
-}
-
 export function agentCodeLanguage(tool: AgentTool): CodeLanguage {
   if (tool === AGENT_TOOLS.CODEX) return CODE_LANGUAGE.TOML;
   if (tool === AGENT_TOOLS.CLAUDE_CODE) return CODE_LANGUAGE.SHELL;

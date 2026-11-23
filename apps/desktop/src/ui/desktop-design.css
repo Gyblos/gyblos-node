@@ -1159,6 +1159,11 @@ html
 html .app.desktop-frame .content .ui-table-region td .ui-inline-actions {
   gap: 2px;
 }
+.desktop-frame .preview-method {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 .desktop-frame .pk-detail {
   display: grid;
   gap: 16px;
@@ -1290,6 +1295,57 @@ html .app.desktop-frame .content .ui-table-region td .ui-inline-actions {
   display: block;
   margin-top: 2px;
   font-size: 12px;
+}
+.desktop-frame .preview-method-list {
+  container-type: inline-size;
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+}
+.desktop-frame .preview-method-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+}
+.desktop-frame .preview-method-row + .preview-method-row {
+  border-top: 1px solid var(--line);
+}
+.desktop-frame .preview-method-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.desktop-frame .preview-method-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.desktop-frame .preview-method-name h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.desktop-frame .preview-method-copy .ui-help-text {
+  font-size: 12px;
+}
+.desktop-frame .preview-method-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+@container (max-width: 520px) {
+  .desktop-frame .preview-method-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .desktop-frame .preview-method-actions {
+    grid-column: 2;
+    justify-content: flex-start;
+  }
 }
 .desktop-frame .preview-spending .preview-metric-change {
   display: none;
@@ -1990,6 +2046,47 @@ html .app.desktop-frame .composer-bottom .ui-composer-action {
 @media (prefers-reduced-motion: reduce) {
   html .app.desktop-frame .pk-composer-tab {
     transition: none;
+  }
+}
+.desktop-frame .preview-answer-skeleton {
+  display: grid;
+  gap: 8px;
+  max-width: 520px;
+  margin-top: 12px;
+}
+.desktop-frame .preview-answer-skeleton i {
+  display: block;
+  height: 10px;
+  border-radius: 5px;
+  background: linear-gradient(
+    90deg,
+    var(--line) 0%,
+    color-mix(in srgb, var(--ink) 16%, transparent) 50%,
+    var(--line) 100%
+  );
+  background-size: 200% 100%;
+  animation: preview-shimmer 1.4s ease-in-out infinite;
+}
+.desktop-frame .preview-answer-skeleton i:nth-child(1) {
+  width: 92%;
+}
+.desktop-frame .preview-answer-skeleton i:nth-child(2) {
+  width: 76%;
+}
+.desktop-frame .preview-answer-skeleton i:nth-child(3) {
+  width: 48%;
+}
+@keyframes preview-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .desktop-frame .preview-answer-skeleton i {
+    animation: none;
   }
 }
 @container (max-width: 620px) {

@@ -358,7 +358,7 @@ void test('preview chat answers show a skeleton while the reply is pending', asy
   const file = 'apps/desktop/src/ui/ChatAnswer.tsx';
   const source = await readFile(file, 'utf8');
   const rendered = transformBrand(source, file, 'apps/desktop') ?? source;
-  assert.ok(rendered.includes('<PreviewAnswerSkeleton'));
+  assert.ok(rendered.includes('className="preview-answer-skeleton"'));
   const css = await previewStyles();
   assert.match(css, /\.preview-answer-skeleton/);
   assert.match(

@@ -109,6 +109,13 @@ export function ChatAnswer(props: Props) {
           </span>
         </AssistantProgress>
       )}
+      {message.state === MESSAGE_STATE.PENDING && !message.text && (
+        <span className="preview-answer-skeleton" aria-hidden="true">
+          <i />
+          <i />
+          <i />
+        </span>
+      )}
       {message.text ? (
         <MessageText text={message.text} />
       ) : message.state === MESSAGE_STATE.FAILED ? (

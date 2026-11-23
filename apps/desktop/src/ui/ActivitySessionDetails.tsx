@@ -9,11 +9,11 @@ import { activityDate, sessionOutcome } from './activity-presentation';
 import { conversationSummary } from './chat-history';
 import type { ChatSession } from './chat-state';
 import { BUTTON_VARIANT } from './constants';
+import { DetailSummary } from './DetailSummary';
 import { Modal } from './Modal';
 import { PaymentReferenceDetails } from './PaymentReference';
+import { statusTone } from './status-tone';
 import { Badge, Button, Note } from './UI';
-import {DetailSummary} from './DetailSummary';
-import {statusTone} from './status-tone';
 
 type Props = {
   entry: ActivityEntry;
@@ -46,21 +46,40 @@ export function ActivitySessionDetails({
       close={close}
     >
       <DetailSummary
-        status={{ label: sessionOutcome(entry), tone: statusTone(sessionOutcome(entry)) }}
+        status={{
+          label: sessionOutcome(entry),
+          tone: statusTone(sessionOutcome(entry)),
+        }}
         meta="PayPal Sandbox · test funds"
         totals={[
           { label: 'Recorded', value: paypalDollars(entry.recordedCents) },
           {
             label: 'Captured',
-            value: entry.capturedCents === null ? 'Not confirmed' : paypalDollars(entry.capturedCents),
+            value:
+              entry.capturedCents === null
+                ? 'Not confirmed'
+                : paypalDollars(entry.capturedCents),
           },
           { label: 'Limit', value: paypalDollars(entry.limitCents) },
         ]}
         rows={[
-          { label: 'Chat', value: paypalDollars(entry.chatCents), note: plural(entry.chatCount, 'reply', 'replies') },
-          { label: 'API', value: paypalDollars(entry.agentCents), note: plural(entry.agentCount, 'request', 'requests') },
+          {
+            label: 'Chat',
+            value: paypalDollars(entry.chatCents),
+            note: plural(entry.chatCount, 'reply', 'replies'),
+          },
+          {
+            label: 'API',
+            value: paypalDollars(entry.agentCents),
+            note: plural(entry.agentCount, 'request', 'requests'),
+          },
           ...(entry.unconfirmedCents > 0
-            ? [{ label: 'Awaiting confirmation', value: paypalDollars(entry.unconfirmedCents) }]
+            ? [
+                {
+                  label: 'Awaiting confirmation',
+                  value: paypalDollars(entry.unconfirmedCents),
+                },
+              ]
             : []),
           { label: 'Last activity', value: activityDate(entry.updatedAt) },
         ]}

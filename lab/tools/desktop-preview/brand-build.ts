@@ -173,15 +173,6 @@ export function transformBrand(source: string, id: string, desktop: string) {
       'Could not open the devnet faucet.',
       'Could not open the testnet faucet.',
     );
-  if (target === `${base}/src/ui/ChatAnswer.tsx`)
-    return (
-      "import { PreviewAnswerSkeleton } from './PreviewKit';\n" +
-      replaceOnce(
-        source,
-        '        </AssistantProgress>\n      )}\n',
-        '        </AssistantProgress>\n      )}\n      {message.state === MESSAGE_STATE.PENDING && !message.text && <PreviewAnswerSkeleton />}\n',
-      )
-    );
   if (target === `${base}/src/ui/Chat.tsx`)
     return (
       "import { PreviewConnectEntry } from './PreviewKit';\n" +

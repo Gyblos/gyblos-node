@@ -98,3 +98,25 @@ export function codeLanguageLabel(language: CodeLanguage) {
   if (language === CODE_LANGUAGE.TEXT) return 'Text';
   return language.toUpperCase();
 }
+
+const FENCE_LANGUAGE: Record<string, CodeLanguage> = {
+  sh: CODE_LANGUAGE.SHELL,
+  bash: CODE_LANGUAGE.SHELL,
+  zsh: CODE_LANGUAGE.SHELL,
+  shell: CODE_LANGUAGE.SHELL,
+  console: CODE_LANGUAGE.SHELL,
+  json: CODE_LANGUAGE.JSON,
+  toml: CODE_LANGUAGE.TOML,
+  ts: CODE_LANGUAGE.TS,
+  tsx: CODE_LANGUAGE.TS,
+  typescript: CODE_LANGUAGE.TS,
+  js: CODE_LANGUAGE.TS,
+  javascript: CODE_LANGUAGE.TS,
+};
+
+export function fenceLanguage(fence: string): CodeLanguage {
+  const name = /^```\s*([\w-]*)/.exec(fence)?.[1]?.toLowerCase() ?? '';
+  return Object.prototype.hasOwnProperty.call(FENCE_LANGUAGE, name)
+    ? (FENCE_LANGUAGE[name] ?? CODE_LANGUAGE.TEXT)
+    : CODE_LANGUAGE.TEXT;
+}

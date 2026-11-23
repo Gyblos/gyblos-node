@@ -24,6 +24,7 @@ import { IconButton } from './UI';
 type Props = {
   route: Navigation;
   chat: ChatController;
+  onNewChat(): void;
   collapsed: boolean;
   contextOpen: boolean;
   onSidebar: () => void;
@@ -153,7 +154,11 @@ export function WindowTitlebar(props: Props) {
       <div className="top-actions">
         <PaymentNetworkLabel />
         {props.route.current === UI_VIEW.CHAT && (
-          <ConversationMenu chat={props.chat} notify={props.notify} />
+          <ConversationMenu
+            onNewChat={props.onNewChat}
+            chat={props.chat}
+            notify={props.notify}
+          />
         )}
         {props.children}
         {(props.route.current === UI_VIEW.CONNECT ||

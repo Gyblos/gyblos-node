@@ -3,7 +3,6 @@ import { useState } from 'react';
 
 import { DESKTOP_ACTIVITY } from '../constants';
 import { PAYMENT_METHOD } from '../paypal-model';
-import { X402_ACTION } from '../x402-model';
 import type { ChatSession } from './chat-state';
 import { CHAT_ROLE } from './constants';
 import { DataCell, TableRow } from './DataTable';
@@ -91,7 +90,7 @@ export function ActivitySessions({
       ...(match && { open: () => onOpenChat(match.chat.id) }),
     });
   }
-  for (const session of activity.state?.available
+  for (const session of period === USAGE_PERIOD.ALL && activity.state?.available
     ? activity.state.sessions
     : []) {
     const append = (source: UsageSource, count: number) => {
@@ -114,9 +113,12 @@ export function ActivitySessions({
   const now = Date.now();
   const { rows, start, totals } = usageReport(events, period, now);
   const previous = previousUsageTotals(events, period, now);
-  const apiAvailable = activity.state?.available === true;
+  const apiAvailable =
+    period === USAGE_PERIOD.ALL && activity.state?.available === true;
   const chatAvailable =
-    apiAvailable && x402?.state.summary.available === true && !x402.state.error;
+    (period !== USAGE_PERIOD.ALL || apiAvailable) &&
+    x402?.state.summary.available === true &&
+    !x402.state.error;
   const count = totals.Chat + totals.API;
   const needle = query.trim().toLowerCase();
   const filtered = rows.filter(
@@ -171,7 +173,7 @@ export function ActivitySessions({
           />
           <StatCard
             label="Chat requests"
-            help="Chat requests in the selected records. PayPal sessions are grouped by their last activity."
+            help="Dated USDC records in this period. All time also includes PayPal session totals."
             icon={ChatCircle}
             {...measuredMetric(
               chatAvailable,
@@ -181,7 +183,7 @@ export function ActivitySessions({
           />
           <StatCard
             label="Recorded API requests"
-            help="API requests recorded in PayPal sessions, grouped by their last activity."
+            help="PayPal reports lifetime session counts. Select All time to see recorded API requests."
             icon={Code}
             {...measuredMetric(apiAvailable, totals.API, previous?.API ?? null)}
           />
@@ -198,8 +200,8 @@ export function ActivitySessions({
           label="Search activity"
           placeholder="Search chats or sessions"
           value={query}
-          onValueChange={(v) => {
-            setQuery(v);
+          onValueChange={(value) => {
+            setQuery(value);
             setPage(1);
           }}
         />
@@ -216,7 +218,6 @@ export function ActivitySessions({
         <Button
           onClick={() => {
             void activity.refresh();
-            void x402?.run({ action: X402_ACTION.STATUS });
           }}
         >
           Refresh
@@ -285,8 +286,8 @@ export function ActivitySessions({
           pageSize={size}
           total={filtered.length}
           onPage={setPage}
-          onPageSize={(v) => {
-            setSize(v);
+          onPageSize={(value) => {
+            setSize(value);
             setPage(1);
           }}
         />

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { MODEL_IDS } from '@gyblos/protocol/constants';
 
 import { networkModelGroups } from './announced-models';
-import { priceRange } from './model-price';
+import { groupPrice, priceRange } from './model-price';
 import type { ModelOption } from './model-types';
 import { ModelImage } from './ModelImage';
 import { MenuItem } from './UI';
@@ -30,24 +30,26 @@ export function NetworkSellerMenu({
 }) {
   const [expanded, setExpanded] = useState(initiallyExpanded);
   return [...networkModelGroups(models)].map(([name, offers]) => (
-    <div className="seller-menu-model" key={name}>
+    <div className="seller-menu-model preview-model-list" key={name}>
       <MenuItem
         label={name}
         detail={
           (offers.length === 1 ? '1 offer' : offers.length + ' offers') +
           ' · ' +
-          (offers.some((offer) => offer.free)
-            ? 'Free'
-            : 'From ' +
-              priceRange(
-                offers.reduce((best, next) =>
-                  next.input + next.output < best.input + best.output
-                    ? next
-                    : best,
-                ),
-              ) +
-              ' /M')
+          groupPrice(offers)
         }
+        data-model-row={name}
+        onKeyDown={(event) => {
+          if (event.key !== 'ArrowRight') return;
+          event.preventDefault();
+          const group = event.currentTarget.parentElement;
+          setExpanded(name);
+          requestAnimationFrame(() =>
+            group
+              ?.querySelector<HTMLElement>('[role="menuitemradio"]')
+              ?.focus(),
+          );
+        }}
         aria-expanded={expanded === name}
         leading={<ModelImage artwork={offers[0]!.image} name={name} />}
         trailing={expanded === name ? <CaretDown /> : <CaretRight />}
@@ -56,6 +58,14 @@ export function NetworkSellerMenu({
       {expanded === name && (
         <div
           className="seller-menu-choices"
+          onKeyDown={(event) => {
+            if (event.key !== 'ArrowLeft') return;
+            event.preventDefault();
+            event.currentTarget.parentElement
+              ?.querySelector<HTMLElement>('[data-model-row]')
+              ?.focus();
+            setExpanded(undefined);
+          }}
           role="group"
           aria-label={'Seller for ' + name}
         >

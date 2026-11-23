@@ -2,7 +2,8 @@
 // React escapes content; no HTML or remote markup is injected.
 import { Fragment } from 'react';
 
-import { CodeBlock, fenceLanguage } from './CodeBlock';
+import { fenceLanguage } from './code-highlight';
+import { CodeBlock } from './CodeBlock';
 
 export function MessageText({ text }: { text: string }) {
   const sections = text.split(/(```[\s\S]*?(?:```|$))/g);

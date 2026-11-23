@@ -22,9 +22,11 @@ type ConversationDialog =
 
 export function ConversationMenu({
   chat,
+  onNewChat,
   notify,
 }: {
   chat: ChatController;
+  onNewChat(): void;
   notify(message: string): void;
 }) {
   const { sessions, activeId } = useSyncExternalStore(
@@ -45,7 +47,9 @@ export function ConversationMenu({
   const remove = () => {
     chat.deleteChat(session.id, crypto.randomUUID());
     setDialog(null);
-    notify('Conversation deleted');
+    notify(
+      'Conversation removed from the current view. Check the history save status for this device.',
+    );
   };
   return (
     <>
@@ -62,7 +66,7 @@ export function ConversationMenu({
               leading={<Plus size={16} aria-hidden="true" />}
               onClick={() => {
                 close();
-                chat.newChat(crypto.randomUUID());
+                onNewChat();
                 document
                   .querySelector<HTMLTextAreaElement>('.composer textarea')
                   ?.focus();
@@ -164,7 +168,11 @@ export function ConversationMenu({
         {dialog === CONVERSATION_DIALOG.DELETE && (
           <Modal
             title="Delete conversation?"
-            description={'"' + title + '" will be removed from this device.'}
+            description={
+              '"' +
+              title +
+              '" will be removed from your conversation history when it is saved.'
+            }
             size="sm"
             close={() => setDialog(null)}
           >

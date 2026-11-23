@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Appearance } from './Appearance';
 import { BUTTON_VARIANT } from './constants';
 import { FormField, FormInput } from './Form';
+import { setInterfaceFont } from './interface-font';
 import { ChoiceMenu, Section } from './Management';
 import { Modal } from './Modal';
 import { Button, PagePanel } from './UI';
@@ -41,8 +42,7 @@ export function Settings({
               value={font}
               options={['Inter', 'Instrument Sans']}
               onChange={(value) => {
-                document.documentElement.dataset.font =
-                  value === 'Inter' ? 'inter' : 'instrument';
+                setInterfaceFont(value);
                 setFont(value);
               }}
             />

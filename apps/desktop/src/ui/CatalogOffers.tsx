@@ -3,9 +3,10 @@ import { useState, type ComponentProps } from 'react';
 
 import { useCatalogFilters } from './catalog-filters';
 import { ChoiceMenu } from './Management';
+import { moveMenuFocus } from './menu-keyboard';
 import { Modal } from './Modal';
-import { priceRange } from './model-price';
-import type { CatalogModel, ModelOption } from './model-types';
+import { groupPrice } from './model-price';
+import type { CatalogModel } from './model-types';
 import { ModelImage } from './ModelImage';
 import { MotionPresence } from './Motion';
 import { NetworkSellerMenu } from './NetworkSellerMenu';
@@ -23,8 +24,6 @@ export function CatalogOffers(
     setName(undefined);
     props.onSelect(id);
   };
-  const price = (offer: ModelOption) =>
-    offer.free ? 'Free' : priceRange(offer);
   return (
     <>
       <div className="ui-toolbar">
@@ -48,6 +47,11 @@ export function CatalogOffers(
         />
         <small>{groups.size} models</small>
       </div>
+      {!groups.size && (
+        <p className="ui-help-text" role="status">
+          No offers match these filters.
+        </p>
+      )}
       {options.ordered.map(([model, rows]) => {
         const first = rows[0];
         if (!first) return null;
@@ -73,15 +77,17 @@ export function CatalogOffers(
                   {selected && <Check size={14} aria-label="In use" />}
                 </strong>
                 <small>
-                  {first.variant} · {first.context} context
+                  {[
+                    ...new Set(rows.map((row) => row.variant).filter(Boolean)),
+                  ].join(', ')}{' '}
+                  · {[...new Set(rows.map((row) => row.context))].join(', ')}{' '}
+                  context
                 </small>
               </span>
               <span className="preview-model-stats">
                 {rows.reduce((count, row) => count + row.providers, 0)} offers
               </span>
-              <span className="ui-price">
-                {rows.some((row) => row.free) ? 'Free' : price(first)}
-              </span>
+              <span className="ui-price">{groupPrice(rows)}</span>
               <CaretRight size={14} />
             </button>
           </div>
@@ -92,16 +98,22 @@ export function CatalogOffers(
           <Modal title={name} size="lg" close={() => setName(undefined)}>
             <div className="preview-seller-drawer">
               <h3>Choose a seller</h3>
-              <NetworkSellerMenu
-                {...props}
-                models={offers}
-                initiallyExpanded={name}
-                onSelect={pick}
-                onAuto={(model) => {
-                  setName(undefined);
-                  props.onAuto(model);
-                }}
-              />
+              <div
+                role="menu"
+                aria-label="Seller options"
+                onKeyDown={moveMenuFocus}
+              >
+                <NetworkSellerMenu
+                  {...props}
+                  models={offers}
+                  initiallyExpanded={name}
+                  onSelect={pick}
+                  onAuto={(model) => {
+                    setName(undefined);
+                    props.onAuto(model);
+                  }}
+                />
+              </div>
             </div>
           </Modal>
         )}
