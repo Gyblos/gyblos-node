@@ -1,9 +1,23 @@
-import { and, desc, eq, inArray, isNotNull, lte, max, sql } from 'drizzle-orm';
+import {
+  and,
+  desc,
+  eq,
+  gt,
+  inArray,
+  isNotNull,
+  lte,
+  max,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
+import { alias } from 'drizzle-orm/sqlite-core';
 
 import { DEVNET_USDC } from '@gyblos/config/network';
 
+import { payoutParts } from './aggregate-chain';
 import {
   asInteger,
+  channelJoin,
   col,
   from,
   K,
@@ -22,6 +36,7 @@ import {
   chainTokenDeltas,
   chainTxs,
 } from './schema';
+import { literal } from './sql-primitives';
 import type { ChainTxCursor, ChainTxReader } from './stats-chain-txs';
 
 const ins = chainInstructions;
@@ -118,22 +133,75 @@ function settleIncrements(
     .as('settles');
 }
 
+function payoutSplits(
+  orm: CollectorDatabase,
+  page: ReturnType<typeof pageKeys>,
+) {
+  const deltas = alias(chainTokenDeltas, 'd');
+  const parts = payoutParts();
+  const part = (condition: SQL) =>
+    sql<number>`total(case when ${condition} then ${parts.amount} end)`;
+  const paying = orm
+    .select({ signature: page.signature })
+    .from(page)
+    .where(inArray(page.kind, PAYING));
+  const otherChannel = sql`exists (select 1 from ${from(ins, 'y')} ${channelJoin('y', 'yc')}
+    where ${col('y', ins.signature)} = ${parts.signature} and ${col('y', ins.kind)} in ${kinds(PAYING)}
+      and coalesce(${col('yc', chainChannels.gyblos)}, 0) <> 1)`;
+  return orm
+    .select({
+      signature: sql<string>`${parts.signature}`.as('split_signature'),
+      gyblosFee: part(parts.toGyblos).as('gyblos_fee'),
+      programFee: part(parts.toProgram).as('program_fee'),
+      refunded: part(parts.toPayer).as('refunded'),
+      paidOut: part(parts.toOthers).as('paid_out'),
+      vault: sql<number>`max(${parts.vault})`.as('vault'),
+    })
+    .from(deltas)
+    .where(
+      and(
+        inArray(deltas.signature, paying),
+        eq(deltas.mint, DEVNET_USDC),
+        gt(parts.amount, 0),
+        sql`not ${otherChannel}`,
+      ),
+    )
+    .groupBy(deltas.signature)
+    .as('splits');
+}
+
+function payoutFields(
+  page: ReturnType<typeof pageKeys>,
+  splits: ReturnType<typeof payoutSplits>,
+) {
+  const firstPaying = sql`not exists (select 1 from ${from(ins, 'e')}
+    where ${col('e', ins.signature)} = ${page.signature}
+      and ${col('e', ins.kind)} in ${kinds(PAYING)} and ${col('e', ins.instructionIndex)} < ${page.instructionIndex})`;
+  const balanced = sql`${splits.gyblosFee} + ${splits.programFee} + ${splits.refunded} + ${splits.paidOut} <= ${splits.vault}`;
+  const shown = (value: SQL | SQL.Aliased) =>
+    sql<
+      string | null
+    >`case when ${page.mint} is ${DEVNET_USDC} and ${page.kind} in ${kinds(PAYING)} and ${firstPaying} and ${balanced}
+      then cast(cast(${value} as integer) as text) end`;
+  return {
+    paidOut: shown(splits.paidOut),
+    gyblosFee: shown(splits.gyblosFee),
+    programFee: shown(splits.programFee),
+    refunded: shown(splits.refunded),
+  };
+}
+
 function amountOf(
   page: ReturnType<typeof pageKeys>,
   settles: ReturnType<typeof settleIncrements>,
+  payout: ReturnType<typeof payoutFields>,
 ) {
-  const firstPaying = sql`not exists (select 1 from ${from(ins, 'e')}
-    where ${col('e', ins.signature)} = ${page.signature} and ${col('e', ins.channel)} = ${page.channel}
-      and ${col('e', ins.kind)} in ${kinds(PAYING)} and ${col('e', ins.instructionIndex)} < ${page.instructionIndex})`;
-  const delta = asInteger(col('d', chainTokenDeltas.deltaAtomic));
-  const vaultOut = sql`(select -${delta} from ${from(chainTokenDeltas, 'd')}
-    where ${col('d', chainTokenDeltas.signature)} = ${page.signature} and ${col('d', chainTokenDeltas.owner)} = ${page.channel}
-      and ${col('d', chainTokenDeltas.mint)} = ${DEVNET_USDC} and ${delta} < 0)`;
   return sql<string | null>`case
     when ${page.mint} is not ${DEVNET_USDC} then null
     when ${page.kind} in ${kinds(DEPOSITING)} then ${page.depositAtomic}
     when ${page.kind} in ${kinds(SETTLING)} then cast(cast(${settles.increment} as integer) as text)
-    when ${page.kind} in ${kinds(PAYING)} and ${firstPaying} then cast(${vaultOut} as text)
+    when ${page.kind} = ${literal(K.DISTRIBUTE)} then ${payout.paidOut}
+    when ${page.kind} = ${literal(K.RECLAIM)} then ${payout.refunded}
   end`;
 }
 
@@ -143,6 +211,8 @@ export function chainTxReader(database: D1Database): ChainTxReader {
     transactions: ({ before, rows }) => {
       const page = pageKeys(orm, before, rows);
       const settles = settleIncrements(orm, page);
+      const splits = payoutSplits(orm, page);
+      const payout = payoutFields(page, splits);
       return orm
         .with(page)
         .select({
@@ -154,7 +224,11 @@ export function chainTxReader(database: D1Database): ChainTxReader {
           channel: page.channel,
           payee: page.payee,
           recipientsJson: page.recipientsJson,
-          amountAtomic: amountOf(page, settles),
+          amountAtomic: amountOf(page, settles, payout),
+          splitPaidOut: payout.paidOut.as('split_paid_out'),
+          splitGyblosFee: payout.gyblosFee.as('split_gyblos_fee'),
+          splitProgramFee: payout.programFee.as('split_program_fee'),
+          splitRefunded: payout.refunded.as('split_refunded'),
         })
         .from(page)
         .leftJoin(
@@ -164,6 +238,7 @@ export function chainTxReader(database: D1Database): ChainTxReader {
             eq(settles.position, page.instructionIndex),
           ),
         )
+        .leftJoin(splits, eq(splits.signature, page.signature))
         .orderBy(
           desc(page.slot),
           desc(page.signature),

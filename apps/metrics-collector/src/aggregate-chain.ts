@@ -121,7 +121,7 @@ function settledTotal(bounds: DayBounds, scope: ChainAggregateScope) {
 // bundled with the payout) counts none, so payouts never exceed money the program released. Payouts
 // are per transaction, so in the gyblos scope a transaction counts only when every paying instruction
 // in it is for a Gyblos channel.
-function payoutTotals(bounds: DayBounds, scope: ChainAggregateScope) {
+export function payoutParts() {
   const owner = col('d', chainTokenDeltas.owner);
   const signature = col('d', chainTokenDeltas.signature);
   const amount = asInteger(col('d', chainTokenDeltas.deltaAtomic));
@@ -140,6 +140,20 @@ function payoutTotals(bounds: DayBounds, scope: ChainAggregateScope) {
     where ${col('v', chainTokenDeltas.signature)} = ${signature} and ${col('v', chainTokenDeltas.mint)} = ${DEVNET_USDC}
       and ${asInteger(col('v', chainTokenDeltas.deltaAtomic))} < 0
       and ${col('v', chainTokenDeltas.owner)} in (select ${col('vi', chainInstructions.channel)} from ${from(chainInstructions, 'vi')} where ${col('vi', chainInstructions.signature)} = ${signature}))`;
+  return {
+    signature,
+    amount,
+    toGyblos,
+    toProgram,
+    toPayer,
+    toOthers,
+    vault,
+  };
+}
+
+function payoutTotals(bounds: DayBounds, scope: ChainAggregateScope) {
+  const { signature, amount, toGyblos, toProgram, toPayer, toOthers, vault } =
+    payoutParts();
   const part = (condition: SQL) =>
     sql`total(case when ${condition} then ${amount} end)`;
   const perTx = sql`(select

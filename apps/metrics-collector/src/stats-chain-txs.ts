@@ -19,6 +19,18 @@ export interface ChainTxRow extends ChainTxCursor {
   payee: string | null;
   recipientsJson: string | null;
   amountAtomic: string | null;
+  splitPaidOut: string | null;
+  splitGyblosFee: string | null;
+  splitProgramFee: string | null;
+  splitRefunded: string | null;
+}
+type SplitColumns =
+  'splitPaidOut' | 'splitGyblosFee' | 'splitProgramFee' | 'splitRefunded';
+export interface PayoutSplit {
+  paidOut: string;
+  gyblosFee: string;
+  programFee: string;
+  refunded: string;
 }
 export interface ChainTxReader {
   transactions(page: {
@@ -26,8 +38,9 @@ export interface ChainTxReader {
     rows: number;
   }): Promise<ChainTxRow[]>;
 }
-export type ChainTx = Omit<ChainTxRow, 'recipientsJson'> & {
+export type ChainTx = Omit<ChainTxRow, 'recipientsJson' | SplitColumns> & {
   recipients: string[];
+  split: PayoutSplit | null;
 };
 export interface ChainTxPage {
   network: string;
@@ -103,6 +116,23 @@ function recipientOwners(json: string | null): string[] {
   }
 }
 
+function payoutSplit(row: Pick<ChainTxRow, SplitColumns>): PayoutSplit | null {
+  const { splitPaidOut, splitGyblosFee, splitProgramFee, splitRefunded } = row;
+  if (
+    splitPaidOut === null ||
+    splitGyblosFee === null ||
+    splitProgramFee === null ||
+    splitRefunded === null
+  )
+    return null;
+  return {
+    paidOut: splitPaidOut,
+    gyblosFee: splitGyblosFee,
+    programFee: splitProgramFee,
+    refunded: splitRefunded,
+  };
+}
+
 export async function chainTransactions(
   reader: ChainTxReader,
   query: ChainTxQuery,
@@ -118,10 +148,25 @@ export async function chainTransactions(
     programId: CHANNEL_PROGRAM,
     mint: DEVNET_USDC,
     treasury: DEVNET_GYBLOS_TREASURY,
-    transactions: page.map(({ recipientsJson, ...row }) => ({
-      ...row,
-      recipients: recipientOwners(recipientsJson),
-    })),
+    transactions: page.map(
+      ({
+        recipientsJson,
+        splitPaidOut,
+        splitGyblosFee,
+        splitProgramFee,
+        splitRefunded,
+        ...row
+      }) => ({
+        ...row,
+        recipients: recipientOwners(recipientsJson),
+        split: payoutSplit({
+          splitPaidOut,
+          splitGyblosFee,
+          splitProgramFee,
+          splitRefunded,
+        }),
+      }),
+    ),
     next: rows.length > query.limit && last ? cursorOf(last) : null,
   };
 }
