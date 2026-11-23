@@ -14,6 +14,8 @@ import { catalogDigestV2 } from '@gyblos/protocol/public-v2';
 import { PUBLIC_TEST_NOW } from './support/public-records';
 import { offerControlFixture } from './support/seller-offer-control';
 
+const TRIGGER_MICROTASK_HOPS = 8;
+
 const code = (response: ControlResponse) =>
   'error' in response ? response.error?.code : undefined;
 
@@ -93,13 +95,19 @@ void test('a renewing offer is never signed into a catalog bounded by the other 
 void test('while one offer renews the other keeps serving a current catalog without waiting for a tick', async () => {
   const run = await offerControlFixture();
   let resigned: Promise<unknown> | undefined;
-  run.set.start(() => (resigned = run.records.refresh()));
+  let calls = 0;
+  run.set.start(() => {
+    calls++;
+    return (resigned = run.records.refresh());
+  });
   run.a.set({ busy: true, validUntil: 0 });
   assert.throws(() => run.records.current(), { code: CONTROL_CODES.STALE });
   // Nothing else refreshes here: the change itself scheduled the re-sign.
-  await Promise.resolve();
+  for (let hop = 0; hop < TRIGGER_MICROTASK_HOPS && !resigned; hop++)
+    await Promise.resolve();
   assert.ok(resigned);
   await resigned;
+  assert.equal(calls, 1);
   assert.deepEqual(run.listedModels(), [run.b.live.offer.modelId]);
   const quoted = await run.quote(run.b.live);
   assert.equal(code(quoted), undefined, JSON.stringify(quoted));
