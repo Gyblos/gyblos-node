@@ -3172,11 +3172,13 @@ html .app.desktop-frame .preview-seller-flyout .dropdown-footer {
   src: url('./assets/InterVariable.woff2') format('woff2');
 }
 html[data-font='inter'] .app.desktop-frame {
-  --preview-ui-type: InterVariable, ui-sans-serif, system-ui, sans-serif;
+  --preview-ui-type:
+    'Gyblos Digits', InterVariable, ui-sans-serif, system-ui, sans-serif;
 }
 html[data-font='inter'] body,
 html[data-font='inter'] .desktop-frame {
-  font-family: InterVariable, ui-sans-serif, system-ui, sans-serif;
+  font-family:
+    'Gyblos Digits', InterVariable, ui-sans-serif, system-ui, sans-serif;
   font-feature-settings: 'cv11', 'ss01';
 }
 @media (max-width: 560px) {
@@ -3504,8 +3506,9 @@ html .app.desktop-frame .pk-code-copy:disabled {
   cursor: default;
 }
 html .app.desktop-frame .pk-code pre {
+  counter-reset: pk-code-line;
   margin: 0;
-  padding: 12px 14px;
+  padding: 12px 14px 12px 0;
   overflow-x: auto;
   border: 0;
   border-radius: 0;
@@ -3515,6 +3518,23 @@ html .app.desktop-frame .pk-code pre {
   font:
     12px/1.7 GeistMono,
     monospace;
+}
+.desktop-frame .pk-code-line {
+  display: block;
+}
+.desktop-frame .pk-code-line::before {
+  counter-increment: pk-code-line;
+  content: counter(pk-code-line);
+  position: sticky;
+  left: 0;
+  display: inline-block;
+  min-width: 2ch;
+  margin-right: 12px;
+  padding-inline: 12px 0;
+  background: var(--raised);
+  color: color-mix(in srgb, var(--muted) 70%, transparent);
+  text-align: right;
+  user-select: none;
 }
 html .app.desktop-frame .pk-code pre:focus-visible {
   outline: 2px solid var(--focus);
@@ -3972,6 +3992,7 @@ html[data-density='compact'] .app.desktop-frame {
   --radius-panel: 10px;
   --pk-radius-sheet: 16px;
   --control-size: 28px;
+  --shell-control-size: 28px;
   --pk-row-height: 30px;
   --pk-comfort-padding: 20px;
   --navigation-row-height: var(--pk-row-height);
@@ -4055,6 +4076,43 @@ html[data-density='compact']
 }
 html[data-density='compact'] .app.desktop-frame .preview-metric-card dd > span {
   font-size: 22px;
+}
+html[data-density='compact'] .app.desktop-frame :is(.pk-tag, .ui-badge) {
+  gap: 4px;
+  height: 18px;
+  padding: 0 6px;
+  font-size: 11px;
+}
+html[data-density='compact'] .app.desktop-frame .ui-icon-tile {
+  width: 28px;
+  height: 28px;
+  flex-basis: 28px;
+}
+html[data-density='compact']
+  .app.desktop-frame
+  .ui-icon-tile
+  :is(.model-artwork, svg) {
+  width: 16px;
+  height: 16px;
+}
+html[data-density='compact'] .app.desktop-frame .preview-metric-icon {
+  width: 24px;
+  height: 24px;
+  margin-bottom: 10px;
+}
+html[data-density='compact'] .app.desktop-frame .preview-metric-icon svg {
+  width: 16px;
+  height: 16px;
+}
+html[data-density='compact']
+  .app.desktop-frame
+  .content
+  .ui-button:not(.ui-icon-button, .ui-menu-trigger) {
+  --control-size: 24px;
+  height: var(--control-size);
+  min-height: var(--control-size);
+  padding-inline: 10px;
+  font-size: var(--ui-detail);
 }
 html[data-density='compact'] .app.desktop-frame .pk-section-icon {
   flex: none;

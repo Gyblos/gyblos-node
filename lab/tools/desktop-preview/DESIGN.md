@@ -113,7 +113,7 @@ follows [`apps/desktop/DESIGN.md`](../../../apps/desktop/DESIGN.md).
   to the composer and carries its actions inline.
 - `Switch`: `role="switch"` button for account-wide settings (the buyer
   `config.toml`); the row beside it carries the label and help.
-- `CodeBlock`: language label (Shell, JSON, TOML, TypeScript, Text), optional file
+- `CodeBlock`: language label (Shell, JSON, TOML, TypeScript, Text), line numbers, optional file
   title, highlighted tokens and a Copy button that shows "Copied" only after a
   confirmed copy. Chat fences map through `fenceLanguage`, tools through
   `agentCodeLanguage`.
@@ -142,6 +142,11 @@ previous density for comparison.
 - Sidebar, menus, tables and lists: rows of 28–32 px (`--pk-row-height`, 30 px),
   controls of 28 px (`--control-size`) and 13 / 12 px text, including select
   triggers, list and card titles, Settings labels and tooltips.
+- Pills (`Tag`, `Badge`) are 18 px with 11 px text. Text buttons in the content
+  area are 24 px with 12 px text; title-bar buttons are 28 px
+  (`--shell-control-size`). Icon tiles are 28 px with 16 px glyphs, metric icons
+  24 px.
+- Digits keep the fixed-width `Gyblos Digits` face under Inter as well.
 - Headings: 15 px section titles, 16 px page intros and the tool guide; 22 px
   metric values. Chat messages stay at 14 px for reading.
 - Settings rows, forms and empty states keep 20 px of inner spacing

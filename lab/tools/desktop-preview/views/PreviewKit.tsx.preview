@@ -12,7 +12,7 @@ import { Dropdown } from './Dropdown';
 import { CopyField, FormActions, FormField, FormInput } from './Form';
 import { Facts, Pair } from './Management';
 import { useDesktopWallet } from './WalletState';
-import { CODE_LANGUAGE, codeLanguageLabel, highlightCode, type CodeLanguage } from './code-highlight';
+import { CODE_LANGUAGE, codeLanguageLabel, highlightCode, type CodeLanguage, type CodeToken } from './code-highlight';
 import { BUTTON_VARIANT, UI_VIEW } from './constants';
 import { similarFreeModel } from './market';
 import { Modal } from './Modal';
@@ -147,6 +147,19 @@ export function FilterChips<T extends string>({ label, options, value, onChange 
   );
 }
 
+function codeLines(tokens: CodeToken[]) {
+  let line: CodeToken[] = [];
+  const lines = [line];
+  for (const token of tokens)
+    token.text.split('\n').forEach((text, index) => {
+      if (index > 0) {
+        line = [];
+        lines.push(line);
+      }
+      if (text) line.push({ ...token, text });
+    });
+  return lines;
+}
 /** The one code sample: language label, colored tokens and a copy action. `onCopy` returning false keeps "Copy". */
 export function CodeBlock({ code, language, title, onCopy, copyDisabled = false }: {
   code: string;
@@ -156,7 +169,7 @@ export function CodeBlock({ code, language, title, onCopy, copyDisabled = false 
   copyDisabled?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
-  const tokens = useMemo(() => highlightCode(code, language), [code, language]);
+  const lines = useMemo(() => codeLines(highlightCode(code, language)), [code, language]);
   useEffect(() => {
     if (!copied) return;
     const timer = setTimeout(() => setCopied(false), previewCompact() ? 1000 : 1600);
@@ -185,9 +198,14 @@ export function CodeBlock({ code, language, title, onCopy, copyDisabled = false 
       </figcaption>
       <pre tabIndex={0}>
         <code>
-          {tokens.map((token, index) =>
-            token.kind ? <span key={index} data-token={token.kind}>{token.text}</span> : token.text,
-          )}
+          {lines.map((line, row) => (
+            <span key={row} className="pk-code-line">
+              {line.map((token, index) =>
+                token.kind ? <span key={index} data-token={token.kind}>{token.text}</span> : token.text,
+              )}
+              {row < lines.length - 1 && '\n'}
+            </span>
+          ))}
         </code>
       </pre>
     </figure>
