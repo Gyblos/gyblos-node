@@ -72,6 +72,9 @@ function TxLine({ row, lookup }: { row: Row; lookup: boolean }) {
       </td>
       <td className={row.muted ? `${numberCell} text-muted` : moneyCell}>
         {row.amount}
+        {row.detail ? (
+          <div className="font-mono text-xs text-muted">{row.detail}</div>
+        ) : null}
       </td>
       <td className={`${td} font-mono`}>
         <a className={link} href={row.href}>
@@ -146,8 +149,9 @@ export async function ChannelTxs({
       <SectionTitle title={TITLE} meta={<Meta programId={page.programId} />} />
       <p className="-mt-2 mb-3 text-xs text-muted">
         Amounts are per row: deposit in for Deposit and Top-up, newly settled
-        for Settle, paid out of the channel for Paid out and Refunded. Do not
-        add them up.
+        for Settle, what the seller got for Paid out and the refund for
+        Refunded; a payout shows its split (seller, Gyblos fee, program
+        treasury, refund to the buyer) below. Do not add them up.
       </p>
       <Pager
         days={days}

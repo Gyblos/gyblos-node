@@ -103,6 +103,7 @@ void test('channel transactions are checked at the boundary and amounts stay exa
     channel: 'ChannelAddress1111',
     recipients: ['SellerOwner', TREASURY],
     amount: 1_500_000n,
+    split: null,
   });
   assert.equal(page.transactions[1]!.amount, null);
   const withoutPayee = answer();
@@ -172,6 +173,7 @@ void test('a row is labeled plainly with a fixed six-decimal amount and a Solana
     seller: SELLER,
     amount: '1.500000',
     muted: false,
+    detail: null,
     signature: `${SIGNATURE.slice(0, 6)}…${SIGNATURE.slice(-6)}`,
     href: `https://explorer.solana.com/tx/${SIGNATURE}?cluster=devnet`,
   });
@@ -260,4 +262,51 @@ void test('transaction pages keep the verified seller filter', () => {
     rangeSwitchHref(`verified=1&before=${CURSOR}`, 30),
     `/?verified=1&before=${CURSOR}`,
   );
+});
+
+void test('a payout row shows what the seller got and the split in plain words', () => {
+  const body = answer();
+  Object.assign(body.transactions[0]!, {
+    amountAtomic: '213',
+    split: {
+      paidOut: '213',
+      gyblosFee: '9',
+      programFee: '0',
+      refunded: '999778',
+    },
+  });
+  const tx = parseChainTxs(body).transactions[0]!;
+  assert.deepEqual(tx.split, {
+    paidOut: 213n,
+    gyblosFee: 9n,
+    programFee: 0n,
+    refunded: 999_778n,
+  });
+  const row = txRow(tx, new Map(), TREASURY);
+  assert.deepEqual(
+    [row.amount, row.detail],
+    ['0.000213', 'seller 0.000213 · fee 0.000009 · refunded 0.999778'],
+  );
+  const withProgram = txRow(
+    { ...tx, split: { ...tx.split!, programFee: 3n } },
+    new Map(),
+    TREASURY,
+  );
+  assert.equal(
+    withProgram.detail,
+    'seller 0.000213 · fee 0.000009 · program 0.000003 · refunded 0.999778',
+  );
+  type Body = ReturnType<typeof answer>;
+  for (const broken of [
+    { paidOut: '213', gyblosFee: '9', programFee: '0' },
+    { paidOut: '2.13', gyblosFee: '9', programFee: '0', refunded: '1' },
+    '213',
+  ]) {
+    const bad: Body = answer();
+    Object.assign(bad.transactions[0]!, { split: broken });
+    assert.throws(() => parseChainTxs(bad), /unexpected source shape/);
+  }
+  const older = answer();
+  assert.ok(!('split' in older.transactions[0]!));
+  assert.equal(parseChainTxs(older).transactions[0]!.split, null);
 });

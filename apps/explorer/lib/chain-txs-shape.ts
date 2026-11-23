@@ -45,6 +45,13 @@ export interface ChainTx {
   channel: string;
   recipients: string[];
   amount: bigint | null;
+  split: PayoutSplit | null;
+}
+export interface PayoutSplit {
+  paidOut: bigint;
+  gyblosFee: bigint;
+  programFee: bigint;
+  refunded: bigint;
 }
 export interface ChainTxPage {
   programId: string;
@@ -68,6 +75,18 @@ function kind(value: unknown): ChainTxKind {
   return known;
 }
 
+function payoutSplit(value: unknown): PayoutSplit {
+  const source = record(value, 'tx.split');
+  const part = (key: keyof PayoutSplit) =>
+    BigInt(integerText(source[key], `tx.split.${key}`));
+  return {
+    paidOut: part('paidOut'),
+    gyblosFee: part('gyblosFee'),
+    programFee: part('programFee'),
+    refunded: part('refunded'),
+  };
+}
+
 function transaction(value: unknown): ChainTx {
   const source = record(value, 'tx');
   return {
@@ -85,6 +104,7 @@ function transaction(value: unknown): ChainTx {
     amount: nullable(source.amountAtomic, (present) =>
       BigInt(integerText(present, 'tx.amountAtomic')),
     ),
+    split: nullable(source.split, payoutSplit),
   };
 }
 
@@ -132,6 +152,21 @@ export function sellerOwners(sellers: ListedOwner[]) {
   );
 }
 
+function splitText(split: PayoutSplit | null) {
+  if (!split) return null;
+  const parts: [string, bigint][] = [
+    ['fee', split.gyblosFee],
+    ['program', split.programFee],
+    ['refunded', split.refunded],
+  ];
+  return [
+    `seller ${usdcFixed(split.paidOut)}`,
+    ...parts.flatMap(([label, value]) =>
+      value ? [`${label} ${usdcFixed(value)}`] : [],
+    ),
+  ].join(' · ');
+}
+
 function amountText(tx: ChainTx) {
   if (tx.amount === null) return '—';
   if (tx.amount === 0n && SETTLING.includes(tx.kind)) return NO_CHANGE;
@@ -154,6 +189,7 @@ export function txRow(
     seller: payTo && payTo !== treasury ? (owners.get(payTo) ?? null) : null,
     amount: amountText(tx),
     muted: tx.amount === null || amountText(tx) === NO_CHANGE,
+    detail: splitText(tx.split),
     signature: short(
       tx.signature,
       DISPLAY.signatureEdge,

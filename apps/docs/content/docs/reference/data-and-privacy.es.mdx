@@ -244,7 +244,8 @@ identidad de cada vendedor. El proveedor del RPC ve esas consultas y tu direcci�
 
 El explorador de Gyblos (`explorer.gyblos.com`) lista las transacciones en cadena más recientes de los
 canales de Gyblos (aquellos cuya apertura lleva un memo de Gyblos, o cuyo reparto paga a la tesorería de
-Gyblos), de la más reciente a la más antigua: hora, tipo de instrucción, monto en USDC, firma, vendedor y
+Gyblos), de la más reciente a la más antigua: hora, tipo de instrucción, monto en USDC (en un pago, cómo se repartió entre el vendedor, la comisión de
+Gyblos, la tesorería del programa y la devolución al comprador), firma, vendedor y
 canal, desde la ruta pública `GET /v1/stats/chain/txs` del recolector de métricas. La columna de vendedor
 muestra un vendedor listado cuando el destinatario del pago del canal (su primer destinatario del reparto)
 coincide con la dirección del dueño que uno, y solo uno, de los vendedores listados publica en el índice
