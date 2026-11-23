@@ -136,3 +136,14 @@ void test('the native Limits view fits the approved narrow window and identifies
     /aria-label="Limit used">\s*<h3>Spending limit used<\/h3>/,
   );
 });
+
+void test('the chat picker refreshes its balance on open and distinguishes a missing payer from a pending read', async () => {
+  const chat = await readFile('apps/desktop/src/ui/Chat.tsx', 'utf8');
+  const picker = await readFile(
+    'apps/desktop/src/ui/ModelDropdown.tsx',
+    'utf8',
+  );
+  assert.match(chat, /fundingLoading\s*\? 'Checking…'/);
+  assert.match(chat, /payer\s*\? 'No reading'\s*: 'No payer'/);
+  assert.match(picker, /onOpen=\{props.refreshFunding\}/);
+});

@@ -187,11 +187,18 @@ export function Chat({
   const [reasoning, setReasoning] = useState<ReasoningSelection | null>(null);
   const usingPaypal = paymentMethod === PAYMENT_METHOD.PAYPAL;
   const usingX402 = !usingPaypal && !!x402;
-  const { funding } = useBuyerFunding(
-    x402?.state.policy?.payer,
+  const payer = x402?.state.policy?.payer;
+  const { funding, loading, refresh } = useBuyerFunding(
+    payer,
     model.offerId,
-    active && usingX402,
+    active && usingX402 && !!payer,
   );
+  const fundingLoading = payer ? loading : x402?.busy;
+  const balanceStatus = fundingLoading
+    ? 'Checking…'
+    : payer
+      ? 'No reading'
+      : 'No payer';
   const freeOnly =
     model.source === MODEL_SOURCE.ANNOUNCED &&
     model.free &&
@@ -724,7 +731,11 @@ export function Chat({
             </p>
           )}
           {active && usingX402 && x402 && (
-            <ComposerFunding buyer={x402} funding={funding} />
+            <ComposerFunding
+              buyer={x402}
+              funding={funding}
+              balanceStatus={balanceStatus}
+            />
           )}
           <ChatComposer
             disabled={loadingHistory}
@@ -770,6 +781,8 @@ export function Chat({
                 }
                 networkOnly={usingX402}
                 funding={funding}
+                balanceStatus={balanceStatus}
+                refreshFunding={usingX402 && payer ? refresh : undefined}
                 showBrowse={!usingPaypal}
                 contextLabel={
                   usingPaypal ? 'Local model · PayPal Sandbox' : undefined

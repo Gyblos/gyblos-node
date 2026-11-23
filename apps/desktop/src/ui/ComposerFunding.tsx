@@ -7,9 +7,11 @@ import type { X402View } from './useX402';
 
 export function ComposerFunding({
   buyer,
+  balanceStatus,
   funding,
 }: {
   buyer: X402View;
+  balanceStatus: string;
   funding: BuyerFunding | null;
 }) {
   const { policy, summary, error } = buyer.state;
@@ -24,7 +26,7 @@ export function ComposerFunding({
       <span className="pk-tab-item">
         <Wallet size={14} />
         {funding?.balanceAtomic == null
-          ? 'Balance unavailable'
+          ? 'Balance · ' + balanceStatus
           : 'Last checked · ' + fundingAmount(funding.balanceAtomic)}
       </span>
       <span className="pk-tab-item pk-tab-limit">

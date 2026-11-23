@@ -16,6 +16,7 @@ export function Dropdown({
   label,
   trigger,
   triggerId,
+  onOpen,
   disabled,
   className = '',
   iconOnly = false,
@@ -27,6 +28,7 @@ export function Dropdown({
   label: string;
   trigger: ReactNode;
   triggerId?: string;
+  onOpen?(): void;
   disabled?: boolean;
   className?: string;
   iconOnly?: boolean;
@@ -42,6 +44,7 @@ export function Dropdown({
   const [query, setQuery] = useState('');
   const content = useRef<HTMLDivElement>(null);
   function show() {
+    if (!open) onOpen?.();
     setQuery('');
     setOpen(true);
   }

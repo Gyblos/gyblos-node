@@ -40,6 +40,8 @@ type PickerProps = {
   networkOnly?: boolean;
   contextLabel?: string;
   funding?: BuyerFunding | null;
+  balanceStatus?: string;
+  refreshFunding?(): void;
   auto?: {
     buyerModels: readonly string[];
     paid: boolean;
@@ -81,6 +83,7 @@ export function ModelDropdown(props: PickerProps) {
       )}
       <Dropdown
         panelClassName="preview-model-menu"
+        onOpen={props.refreshFunding}
         searchLabel="Search models"
         label={
           props.label ??
@@ -102,6 +105,7 @@ export function ModelDropdown(props: PickerProps) {
           <>
             {props.networkOnly && (
               <ModelMenuBalance
+                status={props.balanceStatus}
                 amount={
                   funding?.balanceAtomic == null
                     ? undefined
