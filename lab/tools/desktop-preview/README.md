@@ -22,7 +22,7 @@ changes last only until the page reloads. A copied API key is deliberately
 invalid. Connection examples can be copied from the setup guide on the
 Connections screen.
 
-## Brand proposal awaiting desktop approval
+## Approved brand assets
 
 The browser build applies the approved brand kit 3.0.0 terminal symbol and the
 published website's palette with darker layered surfaces proposed in this
@@ -33,13 +33,12 @@ one blue, `#0a28f0`; reading text stays neutral. Semantic status colors and
 third-party artwork retain their existing meaning.
 
 The two terminal SVGs are supplied brand-kit artwork with unchanged geometry.
-The color tool marks are third-party artwork used unchanged:
-`tool-codex-color.svg` is Lobe Icons `codex-color.svg` at commit `7d7d0379`
-(MIT), and `tool-opencode-color.svg` is the opencode.ai favicon geometry
-(OpenCode, MIT; see `apps/desktop/public/assets/tools/opencode-LICENSE.txt`).
-The preview build swaps them in for the monochrome marks; the desktop app keeps
-its own assets. Typography licenses and attribution already live in
-`apps/docs/public/brand/`. The brand source is
+The color tool marks are third-party artwork used unchanged: `codex-color.svg`
+is Lobe Icons `codex-color.svg` at commit `7d7d0379` (MIT), and
+`opencode-color.svg` is the opencode.ai favicon geometry (OpenCode, MIT; see
+`apps/desktop/public/assets/tools/opencode-LICENSE.txt`). Both builds use the
+artwork under `apps/desktop/public/assets/tools/`. Typography licenses and
+attribution already live in `apps/docs/public/brand/`. The brand source is
 [web-gyblos](https://github.com/Gyblos/web-gyblos): `web/src/brand.css`,
 `web/src/components/focus-landing.css` and the versioned
 `web/public/brand-assets/` distribution. No private vault content is required to

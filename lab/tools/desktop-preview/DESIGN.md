@@ -1,7 +1,6 @@
 # Desktop mockup design system
 
-Rules for the isolated web mockup in `lab/tools/desktop-preview`. They apply only to
-this preview until the founder approves porting a proposal to `apps/desktop`
+Rules for the isolated web mockup in `lab/tools/desktop-preview`. Approved styles and assets are shared with `apps/desktop`
 (see `apps/desktop/DESIGN.md` for the shipped renderer rules and approval gates).
 
 ## Sources
@@ -180,7 +179,7 @@ previous density for comparison.
 Instrument Sans for the interface and JetBrains Mono (bundled as `GeistMono`) for
 technical values. The preview loads no remote fonts (its CSP blocks network access).
 Interface / supporting text 14 / 12 px; tables 13 px with 12 px headers.
-`?font=inter` (Settings → Interface font) switches to Inter 4.1, bundled in `fonts/` under the OFL, for comparison only.
+`?font=inter` (Settings → Interface font) switches to Inter 4.1, bundled in `apps/desktop/public/assets/` under the OFL, for comparison only.
 
 ## Interaction
 

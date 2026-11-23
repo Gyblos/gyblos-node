@@ -11,6 +11,7 @@ import {
 import type { AgentSetupPreview } from '../agent-setup-model';
 import { USDC_API_ACTION } from '../usdc-api-model';
 import { USDC_AGENT_SETUP } from '../x402/constants';
+import { agentCodeLanguage, CodeBlock } from './CodeBlock';
 import { BUTTON_VARIANT } from './constants';
 import { FormActions, FormField } from './Form';
 import { Modal } from './Modal';
@@ -70,14 +71,26 @@ function AgentSetupActions({
   );
 }
 
-function AgentPreview({ preview }: { preview: AgentSetupPreview | undefined }) {
+function AgentPreview({
+  preview,
+  disabled,
+  copy,
+}: {
+  preview: AgentSetupPreview | undefined;
+  disabled: boolean;
+  copy(): Promise<boolean>;
+}) {
   if (!preview) return null;
   return (
     <>
       <p>Models: {preview.models.join(', ')}</p>
-      <pre className="ui-code-block" aria-label="Generated agent configuration">
-        {preview.text}
-      </pre>
+      <CodeBlock
+        language={agentCodeLanguage(preview.tool)}
+        title="Generated agent configuration"
+        copyDisabled={disabled}
+        onCopy={copy}
+        code={preview.text}
+      />
       {preview.path && (
         <p className="ui-help-text">
           Configuration file: {preview.path}. Existing settings are kept; the
@@ -111,8 +124,8 @@ function AgentSetupDialog({
   }, [id, tool, run]);
   const unavailable = busy || !!state.error || !preview;
   return (
-    <Modal title="Connect an agent" close={close}>
-      <FormField label="Agent" htmlFor="buyer-agent-tool">
+    <Modal title="Connect a tool" close={close}>
+      <FormField label="Tool" htmlFor="buyer-agent-tool">
         <select
           id="buyer-agent-tool"
           className="ui-input"
@@ -133,8 +146,9 @@ function AgentSetupDialog({
         </select>
       </FormField>
       <p className="ui-help-text">
-        Uses the models served by your local buyer. Your key's budget applies to
-        every model and tool.
+        Supports OpenAI Chat Completions, Responses and Anthropic Messages
+        through your local buyer. Your key's budget applies to every model and
+        tool.
       </p>
       <p className="ui-help-text">
         The app-managed buyer keeps port {PORTS.desktopBuyer} after restart.
@@ -149,7 +163,18 @@ function AgentSetupDialog({
           {state.error}
         </p>
       )}
-      <AgentPreview preview={preview} />
+      <AgentPreview
+        preview={preview}
+        disabled={unavailable}
+        copy={async () => {
+          const result = await run({
+            action: USDC_API_ACTION.COPY_AGENT,
+            id,
+            tool,
+          });
+          return !!result && !result.error && result.setup?.tool === tool;
+        }}
+      />
       {tool === AGENT_TOOLS.CODEX && (
         <p className="ui-help-text">
           Codex uses config.toml plus a separate profile file per model. Write
@@ -184,8 +209,12 @@ export function BuyerAgentSetup({
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Button disabled={disabled} onClick={() => setOpen(true)}>
-        Connect agent
+      <Button
+        variant={BUTTON_VARIANT.PRIMARY}
+        disabled={disabled}
+        onClick={() => setOpen(true)}
+      >
+        Connect a tool
       </Button>
       {open && (
         <AgentSetupDialog api={api} id={id} close={() => setOpen(false)} />

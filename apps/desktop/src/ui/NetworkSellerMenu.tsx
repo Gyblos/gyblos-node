@@ -17,7 +17,9 @@ export function NetworkSellerMenu({
   paid,
   onAuto,
   onSelect,
+  initiallyExpanded,
 }: {
+  initiallyExpanded?: string;
   models: readonly ModelOption[];
   selected: string;
   automatic: boolean;
@@ -26,7 +28,7 @@ export function NetworkSellerMenu({
   onAuto(name: string): void;
   onSelect(id: string): void;
 }) {
-  const [expanded, setExpanded] = useState<string>();
+  const [expanded, setExpanded] = useState(initiallyExpanded);
   return [...networkModelGroups(models)].map(([name, offers]) => (
     <div className="seller-menu-model" key={name}>
       <MenuItem

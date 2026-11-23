@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
+import { previewStyles } from '../support/desktop-preview-styles';
+
 const preview = new URL('../../lab/tools/desktop-preview/', import.meta.url);
 const views = new URL('views/', preview);
 const view = (name: string) => readFile(new URL(name, views), 'utf8');
@@ -148,7 +150,8 @@ void test('preview paid-model confirmation formats the same listed prices as the
     await import('../../lab/tools/desktop-preview/brand-build');
   const file = 'apps/desktop/src/desktop-app.tsx';
   const app =
-    transformBrand(await readFile(file, 'utf8'), file, 'apps/desktop') ?? '';
+    transformBrand(await readFile(file, 'utf8'), file, 'apps/desktop') ??
+    (await readFile(file, 'utf8'));
   assert.match(app, /import \{ usdPerMtok \} from '\.\/ui\/model-price';/);
 });
 
@@ -157,7 +160,8 @@ void test('preview Models screen keeps one selectable row per model', async () =
     await import('../../lab/tools/desktop-preview/brand-build');
   const file = 'apps/desktop/src/ui/Models.tsx';
   const models =
-    transformBrand(await readFile(file, 'utf8'), file, 'apps/desktop') ?? '';
+    transformBrand(await readFile(file, 'utf8'), file, 'apps/desktop') ??
+    (await readFile(file, 'utf8'));
   assert.doesNotMatch(models, /<NetworkSellerMenu/);
   assert.match(models, /<PreviewCatalog[^>]*canSelect=\{canSelect\}/);
   assert.doesNotMatch(models, /canSelect=\{false\}/);
@@ -217,11 +221,15 @@ void test('preview shows the color marks of OpenCode and Codex', async () => {
     await import('../../lab/tools/desktop-preview/brand-build');
   const file = 'apps/desktop/src/ui/ServiceLogo.tsx';
   const logo =
-    transformBrand(await readFile(file, 'utf8'), file, 'apps/desktop') ?? '';
+    transformBrand(await readFile(file, 'utf8'), file, 'apps/desktop') ??
+    (await readFile(file, 'utf8'));
   assert.match(logo, /\{ file: 'codex-color' \}/);
   assert.match(logo, /\{ file: 'opencode-color' \}/);
-  for (const name of ['tool-codex-color.svg', 'tool-opencode-color.svg'])
-    assert.match(await readFile(new URL(name, preview), 'utf8'), /<svg/);
+  for (const name of ['codex-color.svg', 'opencode-color.svg'])
+    assert.match(
+      await readFile('apps/desktop/public/assets/tools/' + name, 'utf8'),
+      /<svg/,
+    );
 });
 
 void test('preview free fallback never bypasses unfinished payments, expired listings or the wrong free listing', async () => {
@@ -239,7 +247,7 @@ void test('preview free fallback never bypasses unfinished payments, expired lis
 });
 
 void test('preview switch geometry uses the shared radius tokens', async () => {
-  const css = await readFile(new URL('preview.css', preview), 'utf8');
+  const css = await previewStyles();
   const rules = css.slice(css.indexOf('/* Switch: global on/off setting. */'));
   assert.doesNotMatch(
     rules.slice(0, rules.indexOf('/* Seller modes')),
@@ -248,7 +256,7 @@ void test('preview switch geometry uses the shared radius tokens', async () => {
 });
 
 void test('preview menus, number fields and model rows follow the shared component recipe', async () => {
-  const css = await readFile(new URL('preview.css', preview), 'utf8');
+  const css = await previewStyles();
   assert.match(css, /--pk-menu-motion: 150ms/);
   assert.match(css, /scale: 0\.95;\n\s*filter: blur\(2px\);/);
   assert.match(
@@ -270,7 +278,7 @@ void test('model picker lets Paid speak for itself and sizes the seller flyout t
   const dropdown = await view('ModelDropdown.tsx.preview');
   assert.doesNotMatch(dropdown, /pk-needs-funds/);
   assert.doesNotMatch(dropdown, /panel\.style\.height = box\.height/);
-  const css = await readFile(new URL('preview.css', preview), 'utf8');
+  const css = await previewStyles();
   assert.match(
     css,
     /\.preview-model-list \.dropdown-copy strong \{\n\s*font-size: 14px;/,
@@ -288,7 +296,7 @@ void test('model picker announces Needs funds only on rows that are actually dis
 });
 
 void test('preview stylesheet declares each picker and flyout rule once, on shared tokens', async () => {
-  const css = await readFile(new URL('preview.css', preview), 'utf8');
+  const css = await previewStyles();
   for (const selector of [
     'html .app.desktop-frame .compact-dropdown .dropdown-row {',
     'html .app.desktop-frame .compact-dropdown .dropdown-row[data-strategy] {',
@@ -338,7 +346,7 @@ void test('preview median counts only online offers at the same quantization (op
 });
 
 void test('closed seller flyout takes no room, so a short model menu needs no scrollbar', async () => {
-  const css = await readFile(new URL('preview.css', preview), 'utf8');
+  const css = await previewStyles();
   const rule =
     /html \.app\.desktop-frame \.compact-dropdown\.preview-seller-flyout(:popover-open)? \{\n  display: flex;/.exec(
       css,
@@ -348,7 +356,7 @@ void test('closed seller flyout takes no room, so a short model menu needs no sc
 });
 
 void test('preview overlays follow the BoardUI recipe: turning carets, popover tooltips, combobox Enter', async () => {
-  const css = await readFile(new URL('preview.css', preview), 'utf8');
+  const css = await previewStyles();
   assert.match(
     css,
     /@media \(prefers-reduced-motion: no-preference\) \{\n\s*html\n\s*body\n\s*\.app\.desktop-frame\n\s*\[aria-expanded\]\n\s*> :is\(\.preview-trigger-caret, svg:last-child:not\(:only-child\)\) \{\n\s*transition: rotate var\(--pk-menu-motion\) ease-out !important;/,

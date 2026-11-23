@@ -3,6 +3,7 @@
 import type { ReasoningLevel } from '@gyblos/protocol/constants';
 
 import { restoreChatArchive, type ChatArchive } from '../chat-archive-model';
+import { CHAT_STORAGE } from '../constants';
 import { PAYMENT_METHOD, type PaymentMethod } from '../paypal-model';
 import { parseResponseMetrics } from '../response-metrics';
 import {
@@ -87,6 +88,40 @@ export class ChatController {
     this.publish({
       activeId: id,
       sessions: [...this.snapshot.sessions, { ...createSession(id), draft }],
+    });
+  }
+  renameChat(id: string, title: string) {
+    const name = title.trim();
+    if (
+      !this.restoring &&
+      id === this.snapshot.activeId &&
+      name &&
+      name.length <= CHAT_STORAGE.MAX_TITLE_CHARACTERS
+    )
+      this.updateActive((session) => ({ ...session, title: name }));
+  }
+  pinChat(id: string, pinned: boolean) {
+    if (this.restoring || id !== this.snapshot.activeId) return;
+    this.updateActive((session) => {
+      const next = { ...session };
+      if (pinned) next.pinned = true;
+      else delete next.pinned;
+      return next;
+    });
+  }
+  deleteChat(id: string, replacement: string) {
+    const current = this.snapshot.sessions.find((session) => session.id === id);
+    if (this.restoring || !current || current.run || current.paypalRun) return;
+    const sessions = this.snapshot.sessions.filter(
+      (session) => session.id !== id,
+    );
+    if (!sessions.length) sessions.push(createSession(replacement));
+    this.publish({
+      sessions,
+      activeId:
+        this.snapshot.activeId === id
+          ? sessions[sessions.length - 1]!.id
+          : this.snapshot.activeId,
     });
   }
   openChat(id: string) {

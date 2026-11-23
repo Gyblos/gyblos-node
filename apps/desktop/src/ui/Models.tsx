@@ -2,6 +2,7 @@
 import { useState } from 'react';
 
 import { matchesCatalog, type ModelFilter } from './catalog-state';
+import { CatalogOffers } from './CatalogOffers';
 import { MODEL_FILTER, MODELS } from './constants';
 import { ChoiceMenu } from './Management';
 import { Modal } from './Modal';
@@ -9,7 +10,6 @@ import { priceRange } from './model-price';
 import type { CatalogModel } from './model-types';
 import { ModelImage } from './ModelImage';
 import { NetworkCatalogPanel, useNetworkCatalog } from './NetworkCatalog';
-import { NetworkSellerMenu } from './NetworkSellerMenu';
 import {
   Badge,
   Button,
@@ -66,7 +66,7 @@ export function Models({
       </div>
       <List label="Model catalog">
         {canSelect && (
-          <NetworkSellerMenu
+          <CatalogOffers
             models={offers}
             selected={selected}
             automatic={!!auto?.selected}

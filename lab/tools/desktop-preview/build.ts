@@ -2,7 +2,7 @@
 // Never bundles Electron main/preload, starts native services, or reads operational configuration.
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { copyFile, cp, readFile, writeFile } from 'node:fs/promises';
+import { copyFile, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -88,28 +88,8 @@ export async function buildPreview(output = resolve(directory, 'dist')) {
       },
     },
   });
-  for (const name of [
-    'preview.css',
-    'buttons.html',
-    'gyblos-mark-solid-dark.svg',
-    'gyblos-mark-solid-light.svg',
-  ])
+  for (const name of ['preview.css', 'buttons.html'])
     await copyFile(resolve(directory, name), resolve(output, name));
-  for (const name of ['InterVariable.woff2', 'Inter-LICENSE.txt'])
-    await copyFile(
-      resolve(directory, 'fonts', name),
-      resolve(output, 'assets', name),
-    );
-  await cp(
-    resolve(desktop, 'public/assets/tools'),
-    resolve(output, 'assets/tools'),
-    { recursive: true },
-  );
-  for (const tool of ['codex', 'opencode'])
-    await copyFile(
-      resolve(directory, `tool-${tool}-color.svg`),
-      resolve(output, 'assets/tools', `${tool}-color.svg`),
-    );
   const html = await readFile(resolve(output, 'index.html'), 'utf8');
   await writeFile(
     resolve(output, 'index.html'),

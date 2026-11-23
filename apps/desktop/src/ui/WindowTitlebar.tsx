@@ -16,6 +16,7 @@ import { WINDOW_PLATFORM } from '../constants';
 import { windowPlatform } from '../window-chrome';
 import type { ChatController } from './chat-controller';
 import { MAIN_NAV, UI_VIEW } from './constants';
+import { ConversationMenu } from './ConversationMenu';
 import type { View } from './model-types';
 import type { Navigation } from './navigation-state';
 import { IconButton } from './UI';
@@ -29,6 +30,7 @@ type Props = {
   onBack: () => void;
   onForward: () => void;
   onContext: () => void;
+  notify(message: string): void;
   children?: ReactNode;
 };
 function screenLabel(view: View | undefined) {
@@ -57,6 +59,28 @@ function useTitleBounds() {
     return () => observer.disconnect();
   }, []);
   return header;
+}
+function PaymentNetworkLabel() {
+  return (
+    <div
+      className="preview-network"
+      role="group"
+      aria-label="USDC payment network"
+    >
+      <span className="preview-network-single" data-network="testnet">
+        <span className="preview-network-dot" aria-hidden="true" />
+        Testnet
+      </span>
+      <button
+        type="button"
+        disabled
+        data-network="mainnet"
+        title="Mainnet is unavailable"
+      >
+        Mainnet
+      </button>
+    </div>
+  );
 }
 function WindowNavigation(props: Props) {
   const previous = props.route.history.at(-1);
@@ -127,13 +151,27 @@ export function WindowTitlebar(props: Props) {
         {title}
       </h1>
       <div className="top-actions">
+        <PaymentNetworkLabel />
+        {props.route.current === UI_VIEW.CHAT && (
+          <ConversationMenu chat={props.chat} notify={props.notify} />
+        )}
         {props.children}
-        {props.route.current === UI_VIEW.CONNECT && (
+        {(props.route.current === UI_VIEW.CONNECT ||
+          props.route.current === UI_VIEW.CHAT) && (
           <IconButton
             label={
-              props.contextOpen
-                ? 'Hide connection context'
-                : 'Show connection context'
+              props.route.current === UI_VIEW.CHAT
+                ? props.contextOpen
+                  ? 'Hide conversation details'
+                  : 'Show conversation details'
+                : props.contextOpen
+                  ? 'Hide connection context'
+                  : 'Show connection context'
+            }
+            id={
+              props.route.current === UI_VIEW.CHAT
+                ? 'chat-details-toggle'
+                : undefined
             }
             aria-pressed={props.contextOpen}
             onClick={props.onContext}

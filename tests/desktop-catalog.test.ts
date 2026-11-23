@@ -55,8 +55,8 @@ void test('desktop buyer navigation has one stable destination per task', () => 
       [UI_VIEW.CONNECT, 'Connections'],
       [UI_VIEW.MODELS, 'Models'],
       [UI_VIEW.TOOLS, 'Applications'],
-      [UI_VIEW.ACTIVITY, 'Activity'],
-      [UI_VIEW.PAYMENTS, 'Payments'],
+      [UI_VIEW.ACTIVITY, 'Usage & payments'],
+      [UI_VIEW.PAYMENTS, 'Usage & payments'],
     ],
   );
 });

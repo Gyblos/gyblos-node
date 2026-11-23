@@ -26,7 +26,7 @@ export type ArchivedMessage = Omit<ChatMessage, 'model'> & {
 };
 export type ArchivedConversation = Pick<
   ChatSession,
-  'id' | 'title' | 'draft'
+  'id' | 'title' | 'draft' | 'pinned'
 > & { messages: ArchivedMessage[] };
 export type ChatArchive = {
   version: typeof CHAT_STORAGE.VERSION;
@@ -151,10 +151,13 @@ function parseMessage(value: unknown): ArchivedMessage | null {
   };
 }
 function parseConversation(value: unknown): ArchivedConversation | null {
-  const item = object(value, 'draft,id,messages,title');
+  const item =
+    object(value, 'draft,id,messages,title') ??
+    object(value, 'draft,id,messages,pinned,title');
   if (
     !item ||
     !id(item.id) ||
+    (Object.hasOwn(item, 'pinned') && item.pinned !== true) ||
     !text(item.title, CHAT_STORAGE.MAX_TITLE_CHARACTERS) ||
     !text(item.draft) ||
     !Array.isArray(item.messages) ||
@@ -168,7 +171,13 @@ function parseConversation(value: unknown): ArchivedConversation | null {
       return null;
     messages.push(message);
   }
-  return { id: item.id, title: item.title, draft: item.draft, messages };
+  return {
+    id: item.id,
+    title: item.title,
+    draft: item.draft,
+    messages,
+    ...(item.pinned === true && { pinned: true }),
+  };
 }
 export function parseChatArchive(value: unknown): ChatArchive | null {
   const item = object(value, 'activeId,sessions,version');
@@ -221,6 +230,7 @@ export function projectChatArchive(snapshot: ChatSnapshot): ChatArchive | null {
     sessions: snapshot.sessions.map((session) => ({
       id: session.id,
       title: session.title,
+      ...(session.pinned && { pinned: true }),
       draft: session.draft,
       messages: session.messages.map((message) => ({
         ...message,

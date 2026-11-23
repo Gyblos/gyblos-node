@@ -1,5 +1,11 @@
 // Displays public wallet metadata; funding and signing remain disabled.
-import { Archive, ArrowCounterClockwise, Plus } from '@phosphor-icons/react';
+import {
+  Archive,
+  ArrowCounterClockwise,
+  CheckCircle,
+  Plus,
+  Warning,
+} from '@phosphor-icons/react';
 import { useEffect, useState } from 'react';
 
 import { WALLET_STATUS, type WalletSummary } from '../wallet/model';
@@ -24,7 +30,7 @@ function WalletFacts({ address }: Pick<WalletSummary, 'address'>) {
   return (
     <dl className="wallet-facts">
       <div className="wallet-fact-address">
-        <dt>Solana address</dt>
+        <dt>Wallet address</dt>
         <dd className="wallet-address">
           <code>{address ?? 'Not available'}</code>
           {address && (
@@ -36,14 +42,6 @@ function WalletFacts({ address }: Pick<WalletSummary, 'address'>) {
             />
           )}
         </dd>
-      </div>
-      <div>
-        <dt>Private key</dt>
-        <dd>Protected on this device</dd>
-      </div>
-      <div>
-        <dt>Network</dt>
-        <dd>Solana</dd>
       </div>
     </dl>
   );
@@ -67,7 +65,6 @@ export function WalletDetails({
   return (
     <section className="wallet-details" aria-label="Wallet details">
       <div className="connection-location">
-        <strong>On this device</strong>
         <Badge warm={ready && !wallet.backupVerified}>
           {ready
             ? wallet.backupVerified
@@ -147,7 +144,23 @@ function WalletRecovery({
     <>
       <List label="Wallet recovery">
         <ListRow
-          leading={null}
+          leading={
+            ready && wallet.backupVerified ? (
+              <CheckCircle
+                size={20}
+                weight="fill"
+                className="backup-verified-icon"
+                aria-hidden="true"
+              />
+            ) : ready ? (
+              <Warning
+                size={20}
+                weight="fill"
+                className="backup-needed-icon"
+                aria-hidden="true"
+              />
+            ) : null
+          }
           trailing={
             <Button
               variant={BUTTON_VARIANT.TONAL}
@@ -166,7 +179,7 @@ function WalletRecovery({
                 ? 'Available when your wallet is ready.'
                 : wallet.backupVerified
                   ? 'A recovery file has been verified for this wallet.'
-                  : 'Create a recovery file and verify it.'
+                  : 'No verified backup yet. Back up this wallet to recover it later.'
             }
           />
         </ListRow>

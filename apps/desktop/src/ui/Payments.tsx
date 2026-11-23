@@ -1,6 +1,6 @@
 // Composes wallet metadata and the guarded shared PayPal session. Navigation never starts a payment.
 import { PaypalLogo } from '@phosphor-icons/react';
-import { useState } from 'react';
+import { useState, type KeyboardEvent, type ReactNode } from 'react';
 
 import { BUYER_SESSION_DEFAULT_POLICY } from '@gyblos/config/batch-session';
 import { DEVNET } from '@gyblos/config/network';
@@ -24,15 +24,65 @@ import { displayDollars } from './history-presentation';
 import { Modal } from './Modal';
 import { PaypalSessionPanel } from './PaypalSessionPanel';
 import { SpendingHistory } from './SpendingHistory';
+import { SpendingOverview } from './SpendingOverview';
 import { Badge, Button, PagePanel } from './UI';
 import type { ActivityView } from './useActivity';
 import { useBuyerFunding } from './useBuyerFunding';
 import type { PaypalSessionView } from './usePaypalSession';
 import type { X402View } from './useX402';
 import { WalletDetails } from './WalletDetails';
-import { X402Payments } from './X402Payments';
+import { X402History, X402Payments } from './X402Payments';
+
+const TABS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'activity', label: 'Usage' },
+  { id: 'history', label: 'Payments' },
+  { id: 'limits', label: 'Limits' },
+] as const;
+type Tab = (typeof TABS)[number]['id'];
+function TabBar({ tab, onTab }: { tab: Tab; onTab(tab: Tab): void }) {
+  const move = (event: KeyboardEvent<HTMLDivElement>) => {
+    const step =
+      event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+    if (!step) return;
+    event.preventDefault();
+    const index =
+      (TABS.findIndex((item) => item.id === tab) + step + TABS.length) %
+      TABS.length;
+    const next = TABS[index];
+    if (!next) return;
+    onTab(next.id);
+    document.getElementById('preview-tab-' + next.id)?.focus();
+  };
+  return (
+    <div
+      className="preview-tabs"
+      role="tablist"
+      aria-label="Usage and payments sections"
+      onKeyDown={move}
+    >
+      {TABS.map((item) => (
+        <button
+          key={item.id}
+          id={'preview-tab-' + item.id}
+          type="button"
+          role="tab"
+          className="preview-tab"
+          aria-selected={tab === item.id}
+          aria-controls="preview-tab-panel"
+          tabIndex={tab === item.id ? 0 : -1}
+          onClick={() => onTab(item.id)}
+        >
+          {item.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 type Props = {
+  initialTab?: Tab;
+  usage: ReactNode;
   x402?: X402View;
   session: PaypalSessionView;
   activity: ActivityView;
@@ -46,32 +96,55 @@ type Props = {
   onPaymentMethod(method: PaymentMethod): boolean;
 };
 export function Payments(props: Props) {
+  const [tab, setTab] = useState<Tab>(props.initialTab ?? 'overview');
   const [walletOpen, setWalletOpen] = useState(false);
   return (
     <PagePanel>
-      {props.x402 && (
-        <X402Payments
-          buyer={props.x402}
-          onChat={() => {
-            if (props.onPaymentMethod(PAYMENT_METHOD.USDC)) props.onChat();
-          }}
-        />
-      )}
-      <WalletOverview
-        buyer={props.x402}
-        onAddFunds={props.onAddFunds}
-        onDetails={() => setWalletOpen(true)}
-      />
-      <PaypalSummary
-        session={props.session}
-        onManage={() => {
-          managePaypal(props.onPaymentMethod, () => props.onManagePaypal(true));
-        }}
-      />
-      <SpendingHistory
-        activity={props.activity}
-        onActivity={props.onActivity}
-      />
+      <TabBar tab={tab} onTab={setTab} />
+      <div
+        className="preview-tab-panel"
+        role="tabpanel"
+        id="preview-tab-panel"
+        aria-labelledby={'preview-tab-' + tab}
+      >
+        {tab === 'activity' && props.usage}
+        {tab === 'limits' && props.x402 && (
+          <X402Payments
+            buyer={props.x402}
+            onChat={() => {
+              if (props.onPaymentMethod(PAYMENT_METHOD.USDC)) props.onChat();
+            }}
+          />
+        )}
+        {tab === 'overview' && (
+          <>
+            <SpendingOverview
+              buyer={props.x402}
+              onLimits={() => setTab('limits')}
+            />
+            <WalletOverview
+              buyer={props.x402}
+              onAddFunds={props.onAddFunds}
+              onDetails={() => setWalletOpen(true)}
+            />
+            <PaypalSummary
+              session={props.session}
+              onManage={() => {
+                managePaypal(props.onPaymentMethod, () =>
+                  props.onManagePaypal(true),
+                );
+              }}
+            />
+          </>
+        )}
+        {tab === 'history' && props.x402 && <X402History buyer={props.x402} />}
+        {tab === 'history' && (
+          <SpendingHistory
+            activity={props.activity}
+            onActivity={props.onActivity}
+          />
+        )}
+      </div>
       {props.managePaypal && (
         <Modal title="PayPal Sandbox" close={() => props.onManagePaypal(false)}>
           <PaypalSessionPanel

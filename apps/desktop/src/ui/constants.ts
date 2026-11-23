@@ -234,8 +234,8 @@ export const MAIN_NAV = [
   { name: UI_VIEW.CONNECT, label: 'Connections' },
   { name: UI_VIEW.MODELS, label: 'Models' },
   { name: UI_VIEW.TOOLS, label: 'Applications' },
-  { name: UI_VIEW.ACTIVITY, label: 'Activity' },
-  { name: UI_VIEW.PAYMENTS, label: 'Payments' },
+  { name: UI_VIEW.ACTIVITY, label: 'Usage & payments' },
+  { name: UI_VIEW.PAYMENTS, label: 'Usage & payments' },
 ] as const;
 export const ROUTE_ORDER = [
   UI_VIEW.CHAT,
@@ -297,3 +297,19 @@ export const SIDEBAR_ACTION = {
 } as const;
 
 export const SIDEBAR_TYPING_POSITIONS = [88, 128, 168] as const;
+
+export const MODAL_ORIGIN = {
+  CENTER: 'center',
+  TOP: 'top',
+  BOTTOM: 'bottom',
+  LEFT: 'left',
+  RIGHT: 'right',
+} as const;
+export type ModalOrigin = (typeof MODAL_ORIGIN)[keyof typeof MODAL_ORIGIN];
+
+export const USAGE_CALENDAR = {
+  halfYearMonths: 6,
+  weekDays: 7,
+  dayMs: 86400000,
+  percentScale: 100,
+} as const;

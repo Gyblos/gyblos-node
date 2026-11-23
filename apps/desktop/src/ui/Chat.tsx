@@ -46,6 +46,7 @@ import { ChatAnswer } from './ChatAnswer';
 import { ChatComposer } from './ChatComposer';
 import { ToolsDropdown } from './ChatTools';
 import { ChatUserMessage } from './ChatUserMessage';
+import { ComposerFunding } from './ComposerFunding';
 import {
   BUTTON_VARIANT,
   CHAT_PREVIEW,
@@ -705,6 +706,9 @@ export function Chat({
             <p className="chat-notice" role="status">
               Connection paused. Your conversation and draft are kept.
             </p>
+          )}
+          {active && usingX402 && x402 && (
+            <ComposerFunding buyer={x402} offerId={model.offerId} />
           )}
           <ChatComposer
             disabled={loadingHistory}

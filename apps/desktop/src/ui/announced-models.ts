@@ -83,6 +83,8 @@ export function announcedModels(
         image: modelArtwork(item.modelId),
         category: MODEL_CATEGORY.EVERYDAY,
         context: item.contextTokens.toLocaleString(),
+        contextTokens: item.contextTokens,
+        ...(item.variant && { variant: item.variant }),
         providers: item.announcements,
         free,
         input,

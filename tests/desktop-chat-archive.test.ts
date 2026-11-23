@@ -326,3 +326,22 @@ void test('pending preview prefixes survive restoration as stopped responses', (
   assert.equal(restored.sessions[0]?.messages[1]?.text, 'Already shown prefix');
   assert.equal(restored.sessions[0]?.messages[1]?.state, MESSAGE_STATE.STOPPED);
 });
+
+void test('pinned and renamed conversations survive reopening and deletion removes the archived conversation', () => {
+  const chat = new ChatController('original');
+  chat.setDraft('Local draft');
+  chat.renameChat('original', 'Renamed');
+  chat.pinChat('original', true);
+  const archive = projectChatArchive(chat.getSnapshot());
+  assert.ok(archive);
+  const reopened = new ChatController('empty');
+  reopened.restoreArchive(archive);
+  assert.equal(reopened.getSnapshot().sessions[0]?.title, 'Renamed');
+  assert.equal(reopened.getSnapshot().sessions[0]?.pinned, true);
+  reopened.deleteChat('original', 'next');
+  assert.deepEqual(
+    reopened.getSnapshot().sessions.map((s) => s.id),
+    ['next'],
+  );
+  assert.equal(reopened.getSnapshot().activeId, 'next');
+});

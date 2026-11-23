@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { readdir, readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 
+import { previewStyles } from '../support/desktop-preview-styles';
+
 void test('Payments uses a single history table for both sources', async () => {
   const { transformBrand } =
     await import('../../lab/tools/desktop-preview/brand-build');
@@ -278,7 +280,7 @@ void test('preview model picker keeps one selection signal, short seller rows an
     'lab/tools/desktop-preview/views/ModelDropdown.tsx.preview',
     'utf8',
   );
-  const css = await readFile('lab/tools/desktop-preview/preview.css', 'utf8');
+  const css = await previewStyles();
   assert.doesNotMatch(
     picker,
     /' · Needs funds'|'Needs funds' : ''/,
@@ -357,7 +359,7 @@ void test('preview chat answers show a skeleton while the reply is pending', asy
   const source = await readFile(file, 'utf8');
   const rendered = transformBrand(source, file, 'apps/desktop') ?? source;
   assert.ok(rendered.includes('<PreviewAnswerSkeleton'));
-  const css = await readFile('lab/tools/desktop-preview/preview.css', 'utf8');
+  const css = await previewStyles();
   assert.match(css, /\.preview-answer-skeleton/);
   assert.match(
     css,
@@ -390,7 +392,7 @@ void test('Compare sellers opens the detail of that model', async () => {
 });
 
 void test('Payments history tables become cards in narrow layouts', async () => {
-  const css = await readFile('lab/tools/desktop-preview/preview.css', 'utf8');
+  const css = await previewStyles();
   assert.match(
     css,
     /@container \(max-width: 620px\)\s*\{[^@]*\.ui-table-region \.ui-data-table tbody tr \{\s*display: grid;/,

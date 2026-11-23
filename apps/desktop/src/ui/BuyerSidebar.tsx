@@ -1,13 +1,15 @@
 // Buyer navigation and local conversation history; never starts inference or payments.
-import { useState, useSyncExternalStore, type ReactNode } from 'react';
+import { Plus } from '@phosphor-icons/react';
 
 import { CHAT_STORAGE_STATE, type ChatArchiveState } from '../constants';
 import type { ChatController } from './chat-controller';
 import { MAIN_NAV, SIDEBAR_ACTION, UI_VIEW } from './constants';
+import { ConversationHistory } from './ConversationHistory';
 import type { View } from './model-types';
+import { ServiceLogo } from './ServiceLogo';
 import { SidebarActionIcon } from './SidebarActionIcon';
 import { SidebarIcon } from './SidebarIcon';
-import { Badge, Button, SearchField } from './UI';
+import { Button, IconButton } from './UI';
 
 type Props = {
   view: View;
@@ -17,7 +19,6 @@ type Props = {
   navigate: (view: View) => void;
   onNewChat: () => void;
   onOpenChat: (id: string) => void;
-  systemStatus: ReactNode;
 };
 
 function NavigationItem({
@@ -30,9 +31,10 @@ function NavigationItem({
   navigate: Props['navigate'];
 }) {
   return (
-    <Button
-      className="ui-nav-row ui-sidebar-motion-control"
-      aria-label={item.label}
+    <IconButton
+      className="preview-rail-item"
+      title={item.label}
+      label={item.label}
       aria-current={view === item.name ? 'page' : undefined}
       onClick={() => navigate(item.name)}
     >
@@ -45,9 +47,7 @@ function NavigationItem({
       ) : (
         <SidebarIcon name={item.name} />
       )}
-      <span>{item.label}</span>
-      {item.name === UI_VIEW.CONNECT && <Badge>API</Badge>}
-    </Button>
+    </IconButton>
   );
 }
 
@@ -57,70 +57,53 @@ function ConversationList({
   onOpenChat,
   storageState,
   collapsed,
-}: Pick<Props, 'chat' | 'view' | 'onOpenChat' | 'storageState' | 'collapsed'>) {
-  const { sessions, activeId } = useSyncExternalStore(
-    chat.subscribe,
-    chat.getSnapshot,
-  );
-  const [search, setSearch] = useState('');
+  onNewChat,
+  navigate,
+}: Pick<
+  Props,
+  | 'chat'
+  | 'view'
+  | 'onOpenChat'
+  | 'storageState'
+  | 'collapsed'
+  | 'onNewChat'
+  | 'navigate'
+>) {
   const loading = storageState === CHAT_STORAGE_STATE.LOADING;
-  const history = sessions
-    .map((session) => ({
-      ...session,
-      title: session.messages.length
-        ? session.title
-        : session.draft.trim() || session.title,
-    }))
-    .filter((session) => session.messages.length || session.draft.trim())
-    .filter((session) =>
-      session.title.toLowerCase().includes(search.trim().toLowerCase()),
-    )
-    .slice()
-    .reverse();
   return (
     <section
-      className="ui-sidebar-history"
+      className="preview-chat-panel"
       aria-label="Conversation history"
       inert={collapsed}
       aria-hidden={collapsed || undefined}
     >
-      <SearchField
-        leading={<SidebarActionIcon kind={SIDEBAR_ACTION.SEARCH} />}
-        clearIcon={<SidebarActionIcon kind={SIDEBAR_ACTION.CLEAR} />}
-        className="ui-sidebar-motion-control"
-        label="Search conversations"
-        placeholder="Search conversations"
-        value={search}
-        onValueChange={setSearch}
+      <Button
+        className="ui-nav-row preview-new-chat"
+        disabled={loading}
+        onClick={onNewChat}
+      >
+        <Plus size={16} />
+        <span>New chat</span>
+      </Button>
+      <Button
+        className="ui-nav-row preview-agents-entry"
+        onClick={() => navigate(UI_VIEW.CONNECT)}
+      >
+        <span className="preview-connect-logos" aria-hidden="true">
+          {['OpenCode', 'Codex', 'Claude Code', 'Pi'].map((tool) => (
+            <span className="preview-tool-logo" key={tool}>
+              <ServiceLogo service={tool} />
+            </span>
+          ))}
+        </span>
+        <span>Connect agents</span>
+      </Button>
+      <ConversationHistory
+        chat={chat}
+        chatVisible={view === UI_VIEW.CHAT}
+        loading={loading}
+        open={onOpenChat}
       />
-      <h2 className="ui-sidebar-section-title">Recent</h2>
-      <div className="ui-sidebar-history-list">
-        {history.map((session) => (
-          <Button
-            key={session.id}
-            className="ui-nav-row ui-sidebar-motion-control"
-            disabled={loading}
-            aria-current={
-              view === UI_VIEW.CHAT && activeId === session.id
-                ? 'page'
-                : undefined
-            }
-            onClick={() => onOpenChat(session.id)}
-          >
-            <SidebarActionIcon kind={SIDEBAR_ACTION.CHAT} />
-            <span>{session.title}</span>
-          </Button>
-        ))}
-        {!history.length && (
-          <p className="ui-help-text">
-            {loading
-              ? 'Loading conversations…'
-              : search
-                ? 'No conversations found.'
-                : 'Your conversations will appear here.'}
-          </p>
-        )}
-      </div>
     </section>
   );
 }
@@ -128,54 +111,28 @@ function ConversationList({
 export function BuyerSidebar(props: Props) {
   return (
     <aside id="app-sidebar" className="sidebar buyer-sidebar">
-      <nav aria-label="Main navigation" className="ui-sidebar-primary">
-        <Button
-          className="ui-nav-row ui-sidebar-motion-control"
-          aria-label="New chat"
-          disabled={props.storageState === CHAT_STORAGE_STATE.LOADING}
-          onClick={props.onNewChat}
-        >
-          <SidebarActionIcon kind={SIDEBAR_ACTION.CREATE} />
-          <span>New chat</span>
-        </Button>
-        {MAIN_NAV.filter(
-          (item) =>
-            item.name === UI_VIEW.CONNECT ||
-            item.name === UI_VIEW.MODELS ||
-            item.name === UI_VIEW.TOOLS,
-        ).map((item) => (
-          <NavigationItem
-            key={item.name}
-            item={item}
-            view={props.view}
-            navigate={props.navigate}
-          />
-        ))}
-      </nav>
-      <ConversationList {...props} />
-      <nav className="ui-sidebar-footer" aria-label="Account and activity">
-        {MAIN_NAV.filter(
-          (item) =>
-            item.name === UI_VIEW.ACTIVITY || item.name === UI_VIEW.PAYMENTS,
-        ).map((item) => (
-          <NavigationItem
-            key={item.name}
-            item={item}
-            view={props.view}
-            navigate={props.navigate}
-          />
-        ))}
-        <Button
-          className="ui-nav-row ui-sidebar-motion-control"
-          aria-label="Settings"
+      <nav aria-label="Main navigation" className="preview-rail">
+        {MAIN_NAV.filter((item) => item.name !== UI_VIEW.ACTIVITY).map(
+          (item) => (
+            <NavigationItem
+              key={item.name}
+              item={item}
+              view={props.view}
+              navigate={props.navigate}
+            />
+          ),
+        )}
+        <span className="preview-rail-spacer" />
+        <IconButton
+          label="Settings"
+          className="preview-rail-item"
           aria-current={props.view === UI_VIEW.SETTINGS ? 'page' : undefined}
           onClick={() => props.navigate(UI_VIEW.SETTINGS)}
         >
           <SidebarActionIcon kind={SIDEBAR_ACTION.SETTINGS} />
-          <span>Settings</span>
-        </Button>
-        {props.systemStatus}
+        </IconButton>
       </nav>
+      <ConversationList {...props} />
     </aside>
   );
 }

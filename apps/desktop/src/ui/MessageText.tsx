@@ -2,6 +2,8 @@
 // React escapes content; no HTML or remote markup is injected.
 import { Fragment } from 'react';
 
+import { CodeBlock, fenceLanguage } from './CodeBlock';
+
 export function MessageText({ text }: { text: string }) {
   const sections = text.split(/(```[\s\S]*?(?:```|$))/g);
   return (
@@ -10,9 +12,11 @@ export function MessageText({ text }: { text: string }) {
         if (section.startsWith('```')) {
           const code = section.replace(/^```[^\n]*\n?/, '').replace(/```$/, '');
           return (
-            <pre key={index}>
-              <code>{code}</code>
-            </pre>
+            <CodeBlock
+              key={index}
+              language={fenceLanguage(section)}
+              code={code.replace(/\n$/, '')}
+            />
           );
         }
         return (

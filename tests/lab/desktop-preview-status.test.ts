@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
+import { previewStyles } from '../support/desktop-preview-styles';
+
 const preview = new URL('../../lab/tools/desktop-preview/', import.meta.url);
 const read = (name: string) => readFile(new URL(name, preview), 'utf8');
 
@@ -12,7 +14,10 @@ void test('system status moves to a footer status bar with one checklist dialog'
   const sidebar = await read('views/BuyerSidebar.tsx.preview');
   assert.doesNotMatch(sidebar, /props\.systemStatus/);
   assert.match(build, /<PreviewStatusBar version=\{manifest\.version\}/);
-  assert.match(build, /'<UpdateNotice \/>',\s*''/);
+  assert.match(
+    await readFile('apps/desktop/src/desktop-app.tsx', 'utf8'),
+    /<footer[\s\S]*?<UpdateNotice \/>[\s\S]*?<\/footer>/,
+  );
   const status = await read('views/SystemStatus.tsx.preview');
   assert.match(
     status,
@@ -50,7 +55,7 @@ void test('the status bar shows the version and an update button only when a new
   assert.match(host, /desktopUpdate,/);
   assert.match(host, /Pick<DesktopUpdate, 'available'>/);
   assert.doesNotMatch(await read('constants.ts'), /installedVersion/);
-  const css = await read('preview.css');
+  const css = await previewStyles();
   assert.match(css, /> \.preview-status-bar \{[^}]*grid-row: 3;/);
   assert.match(css, /--pk-status-bar: 28px;/);
   assert.match(css, /\.preview-status-trigger \{[^}]*min-height: 20px;/);

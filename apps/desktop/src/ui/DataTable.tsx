@@ -1,6 +1,41 @@
-// Shared responsive data table: columns on wide pages, labeled cells on compact pages.
-import type { ReactNode } from 'react';
+import * as React from 'react';
 
+function Table({ className, ...props }: React.ComponentProps<'table'>) {
+  return (
+    <div data-slot="table-container" className="ui-data-table-wrap">
+      <table data-slot="table" className={className} {...props} />
+    </div>
+  );
+}
+
+function TableHeader({ className, ...props }: React.ComponentProps<'thead'>) {
+  return <thead data-slot="table-header" className={className} {...props} />;
+}
+
+function TableBody({ className, ...props }: React.ComponentProps<'tbody'>) {
+  return <tbody data-slot="table-body" className={className} {...props} />;
+}
+
+function TableRow({ className, ...props }: React.ComponentProps<'tr'>) {
+  return <tr data-slot="table-row" className={className} {...props} />;
+}
+
+function TableHead({ className, ...props }: React.ComponentProps<'th'>) {
+  return <th data-slot="table-head" className={className} {...props} />;
+}
+
+function TableCell({ className, ...props }: React.ComponentProps<'td'>) {
+  return <td data-slot="table-cell" className={className} {...props} />;
+}
+
+function TableCaption({
+  className,
+  ...props
+}: React.ComponentProps<'caption'>) {
+  return <caption data-slot="table-caption" className={className} {...props} />;
+}
+
+export { TableRow };
 export function DataTable({
   caption,
   headings,
@@ -8,24 +43,22 @@ export function DataTable({
 }: {
   caption: string;
   headings: readonly string[];
-  children: ReactNode;
+  children: React.ReactNode;
 }) {
   return (
-    <div className="ui-data-table-wrap">
-      <table className="ui-data-table" role="table">
-        <caption className="sr-only">{caption}</caption>
-        <thead role="rowgroup">
-          <tr role="row">
-            {headings.map((heading) => (
-              <th key={heading} scope="col" role="columnheader">
-                {heading}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody role="rowgroup">{children}</tbody>
-      </table>
-    </div>
+    <Table className="ui-data-table" role="table">
+      <TableCaption className="sr-only">{caption}</TableCaption>
+      <TableHeader role="rowgroup">
+        <TableRow role="row">
+          {headings.map((h) => (
+            <TableHead role="columnheader" scope="col" key={h}>
+              {h}
+            </TableHead>
+          ))}
+        </TableRow>
+      </TableHeader>
+      <TableBody role="rowgroup">{children}</TableBody>
+    </Table>
   );
 }
 export function DataCell({
@@ -33,14 +66,14 @@ export function DataCell({
   children,
 }: {
   label: string;
-  children: ReactNode;
+  children: React.ReactNode;
 }) {
   return (
-    <td role="cell">
+    <TableCell role="cell">
       <span className="ui-table-cell-label" aria-hidden="true">
         {label}
       </span>
       {children}
-    </td>
+    </TableCell>
   );
 }

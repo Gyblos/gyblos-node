@@ -65,17 +65,22 @@ export function Facts({
 }
 export function Section({
   title,
+  icon,
   action,
   children,
 }: {
   title: string;
+  icon?: ReactNode;
   action?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <section className="ui-section">
       <div className="ui-section-title">
-        <h2>{title}</h2>
+        <h2>
+          {icon}
+          {title}
+        </h2>
         {action}
       </div>
       {children}

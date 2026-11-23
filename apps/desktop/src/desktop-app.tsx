@@ -36,6 +36,7 @@ import {
   UI_VIEW,
   WORKSPACE_BREAKPOINT,
 } from './ui/constants';
+import { ConversationDetails } from './ui/ConversationDetails';
 import { authorizeDemo, DEMO_ACCOUNT, DEMO_AUTH } from './ui/demo-account';
 import { DesignSystem } from './ui/DesignSystem';
 import { FormField, FormInput } from './ui/Form';
@@ -398,6 +399,7 @@ export function DesktopApp() {
       }
     >
       <WindowTitlebar
+        notify={setToast}
         route={route}
         chat={chatController}
         collapsed={sidebarCollapsed}
@@ -426,16 +428,8 @@ export function DesktopApp() {
               </span>
             </Button>
           )}
-        <UpdateNotice />
       </WindowTitlebar>
       <BuyerSidebar
-        systemStatus={
-          <SystemStatus
-            state={network.state}
-            onRetry={network.retry}
-            onPayments={() => navigate(UI_VIEW.PAYMENTS)}
-          />
-        }
         view={view}
         collapsed={sidebarCollapsed}
         chat={chatController}
@@ -458,6 +452,17 @@ export function DesktopApp() {
           chat={view === UI_VIEW.CHAT}
           split={view === UI_VIEW.CONNECT}
         >
+          {view === UI_VIEW.CHAT && contextOpen && (
+            <ConversationDetails
+              chat={chatController}
+              close={() => {
+                setContextOpen(false);
+                requestAnimationFrame(() =>
+                  document.getElementById('chat-details-toggle')?.focus(),
+                );
+              }}
+            />
+          )}
           <div className="chat-root" hidden={view !== UI_VIEW.CHAT}>
             <Chat
               ref={chatRef}
@@ -540,8 +545,26 @@ export function DesktopApp() {
               />
             )}
           {view === UI_VIEW.TOOLS && <Applications />}
-          {view === UI_VIEW.PAYMENTS && (
+          {(view === UI_VIEW.PAYMENTS || view === UI_VIEW.ACTIVITY) && (
             <Payments
+              key={view}
+              initialTab={view === UI_VIEW.ACTIVITY ? 'activity' : undefined}
+              usage={
+                <Activity
+                  x402={x402}
+                  activity={activity}
+                  chat={chatController}
+                  selectedSession={activitySession}
+                  onSelectSession={setActivitySession}
+                  onPayments={() => {
+                    reviewPaypalPayments();
+                  }}
+                  onOpenChat={(id) => {
+                    chatController.openChat(id);
+                    navigate(UI_VIEW.CHAT);
+                  }}
+                />
+              }
               x402={x402}
               session={paypal}
               activity={activity}
@@ -565,24 +588,18 @@ export function DesktopApp() {
               version={manifest.version}
             />
           )}
-          {view === UI_VIEW.ACTIVITY && (
-            <Activity
-              x402={x402}
-              activity={activity}
-              chat={chatController}
-              selectedSession={activitySession}
-              onSelectSession={setActivitySession}
-              onPayments={() => {
-                reviewPaypalPayments();
-              }}
-              onOpenChat={(id) => {
-                chatController.openChat(id);
-                navigate(UI_VIEW.CHAT);
-              }}
-            />
-          )}
         </PageBody>
       </div>
+      <footer className="preview-status-bar" aria-label="App status">
+        <SystemStatus
+          state={network.state}
+          onRetry={network.retry}
+          onPayments={() => navigate(UI_VIEW.PAYMENTS)}
+        />
+        <span className="preview-status-end">
+          <UpdateNotice />v{manifest.version}
+        </span>
+      </footer>
       <MotionPresence>
         {modal === UI_DIALOG.DESIGN_SYSTEM && (
           <Modal

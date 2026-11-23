@@ -23,19 +23,14 @@ Develop visual proposals in the isolated browser preview first:
 4. Port only the approved shared design to the desktop renderer, then open the app
    and compare it with the approved mockup at the same viewport size.
 
-The preview reuses desktop components and can apply a browser-only brand proposal.
-Those proposed colors and artwork are not shipped in the desktop app until approved.
-The current preview uses the supplied brand kit 3.0.0 terminal mark, the single blue
-`#0a28f0`, and the published landing's darker neutral surfaces. Its source and tokens
-are documented beside the fixture. Product controllers never import the fixture.
-See the root `AGENTS.md` for the binding contributor workflow.
+The desktop uses the approved terminal mark and palette. The isolated preview supplies example records to exercise the same components. The Electron renderer obtains wallet, key, catalog and spending observations through its existing host bridges.
 
 ## Shared sources
 
 - `src/theme.ts`: light/dark semantic colors. The primary accent is `#0a28f0`.
-- `src/mockup-base.css`: bundled Instrument Sans, GeistMono for monospace text,
+- `src/mockup-base.css`: bundled Instrument Sans, GeistMono for technical text,
   and element defaults.
-- `src/ui/geometry.css`: panel 16 px, control 10 px, option 8 px and badge radii.
+- `src/ui/desktop-design.css` supplies the approved compact geometry, Inter variable font, shared surfaces, interactions and responsive shell. Compact controls use a 6 px radius, menus 8 px, cards 10 px and the content sheet 16 px.
 - `src/ui/ui.css`: shared primitives and spacing tokens.
 - `src/ui/buyer-design.css`: compact buyer composition, shell motion, shared
   management controls, financial tables and sidebar choreography. Loaded after
@@ -53,9 +48,9 @@ See the root `AGENTS.md` for the binding contributor workflow.
 
 | Role                                | Value                                  |
 | ----------------------------------- | -------------------------------------- |
-| Interface / supporting text         | 14 / 12 px                             |
-| Section / metric text               | 18 / 22 px                             |
-| Control / icon                      | 32 / 16 px                             |
+| Interface / supporting text         | 13 / 12 px                             |
+| Section / metric text               | 15 / 18 px                             |
+| Control / icon                      | 28 / 16 px                             |
 | Header                              | 44 px                                  |
 | Navigation / collapsed rail         | 224 / 56 px (compact desktop frame)    |
 | Context panel                       | 260 px, capped at 40% of its workspace |
@@ -104,16 +99,13 @@ reasoning settings do not enable unsupported live engine capabilities.
 
 ## Navigation and screens
 
-The sidebar groups New chat, Connections, Models and Applications above local
-conversation history. Activity, Payments, Settings and System status stay below
-it. System status opens a dialog with actual node and wallet readiness; there is
-no persistent status footer.
+The navigation rail opens Chat, Models, Connections, Applications, Usage & payments and Settings. The conversation panel supports search, unread and pinned filters, date groups, rename and deletion. The bottom status bar opens the node and wallet checklist and displays the installed version. Updates use host-validated release metadata.
 
 Chat has one transcript and draft across payment methods. Only user messages
 have bubbles, with time, copy and edit actions below them. Assistant responses
 use the page background without a model/payment heading. Preserve the Gyblos
 progress signal. The composer owns model, thinking, tools and payment choices;
-Chat has no payment footer or duplicate History/New chat toolbar. Editing only
+USDC chat displays the observed payer balance and chat limit beside the composer. Editing only
 prefills the draft. Navigation and method selection never send a request.
 
 Response metrics uses the model's existing artwork, prominent performance
@@ -142,7 +134,7 @@ Models uses a searchable list with laboratory artwork, a filter menu and a
 network-check dialog. Artwork does not establish availability. Applications
 shows unavailable web services as such, without pretend connection actions.
 Settings holds Appearance, the visual-system preview and version information.
-An update notice sits in the title bar when a newer release exists; it opens
+An update notice sits in the status bar when a newer release exists; it opens
 the release page and never installs anything.
 
 Payments prioritizes the USDC wallet with its public address and funding
@@ -153,7 +145,7 @@ never a key, path or file content. Spending filters are independent from Chat's 
 Preserve all existing checkout, capture and uncertain-payment guards. Visiting
 a route or opening a dialog never starts, approves or settles a payment.
 
-Activity separates Chat consumption, agent inference and confirmed payments.
+Usage & payments groups Overview, Usage, Payments and Limits. The Usage table uses archived reply measurements and local session counts. Aggregate PayPal sessions are grouped by last observation. Payment records retain their separate provider references.
 Shared tables preserve tabular structure at narrow widths, scroll internally,
 keep their header/identity column visible, and put pagination outside the scroll
 region. Reset the page when filtering. Loading/error states hide stale totals.

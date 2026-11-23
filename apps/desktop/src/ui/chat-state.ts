@@ -48,6 +48,7 @@ export type ChatRun = {
   offset: number;
 };
 export type ChatSession = {
+  pinned?: true;
   id: string;
   title: string;
   draft: string;

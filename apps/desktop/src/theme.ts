@@ -1,21 +1,21 @@
 import type { CSSProperties } from 'react';
 
 export const BRAND_COLORS = {
-  charcoal: '#171717',
+  charcoal: '#141414',
   panel: '#1f1f1f',
-  raised: '#242424',
-  line: '#2e2e2e',
-  inkDark: '#ededed',
-  mutedDark: '#a1a1a1',
+  raised: '#262626',
+  line: '#2a2a2a',
+  inkDark: '#f5f5f5',
+  mutedDark: '#a3a3a3',
   blue: '#0a28f0',
   onBlue: '#ffffff',
   paper: '#fcfcfc',
   panelLight: '#f4f5f6',
   raisedLight: '#eceef0',
-  lineLight: '#e4e6e8',
+  lineLight: '#dedede',
   inkLight: '#1c1c1c',
   mutedLight: '#5f6368',
-  dimLight: '#6b6b6b',
+  dimLight: '#656565',
   connected: '#68c998',
   connectedLight: '#18794e',
   warm: '#f2c26b',
@@ -56,15 +56,11 @@ export function themeStyle(light: boolean): ThemeStyle {
     '--dim': light ? colors.dimLight : colors.mutedDark,
     '--accent': colors.blue,
     '--accent-hover': 'color-mix(in srgb, var(--accent), black 8%)',
-    '--blue': light
-      ? colors.blue
-      : 'color-mix(in srgb, var(--accent), white 35%)',
+    '--blue': light ? colors.inkLight : colors.inkDark,
     '--soft': 'color-mix(in srgb, var(--accent) 13%, transparent)',
     '--selected-surface': 'var(--soft)',
     '--selected-ink': 'var(--blue)',
-    '--focus': light
-      ? colors.blue
-      : 'color-mix(in srgb, var(--accent), white 12%)',
+    '--focus': light ? colors.inkLight : colors.inkDark,
     '--primary-ink': colors.onBlue,
     '--warm': light ? colors.warmLight : colors.warm,
     '--error': light ? colors.failedLight : colors.failed,

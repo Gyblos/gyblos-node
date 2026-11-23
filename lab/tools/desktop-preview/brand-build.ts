@@ -12,7 +12,6 @@ import brand from './brand.json' with { type: 'json' };
 import * as funds from './funds-build';
 import * as layout from './layout-build';
 import { previewModels } from './models-build';
-import { withSectionIcon } from './section-build';
 
 export { brand };
 const moduleId = (value: string) => value.replaceAll('\\', '/');
@@ -39,91 +38,6 @@ export function transformBrand(source: string, id: string, desktop: string) {
         new URL(`./views/${component}.tsx.preview`, import.meta.url),
         'utf8',
       );
-  }
-  if (target === `${base}/src/ui/Management.tsx`)
-    return withSectionIcon(source);
-  if (target === `${base}/src/ui/ServiceLogo.tsx`)
-    return replaceOnce(
-      replaceOnce(
-        source,
-        "{ file: 'codex', monochrome: true }",
-        "{ file: 'codex-color' }",
-      ),
-      "{ file: 'opencode', monochrome: true }",
-      "{ file: 'opencode-color' }",
-    );
-  if (target === `${base}/src/ui/WalletDetails.tsx`) {
-    const recovery = replaceOnce(
-      source,
-      '<List label="Wallet recovery">\n        <ListRow\n          leading={null}',
-      `<List label="Wallet recovery">
-        <ListRow
-          leading={ready && wallet.backupVerified
-            ? <CheckCircle size={20} weight="fill" className="backup-verified-icon" aria-hidden="true" />
-            : ready
-              ? <Warning size={20} weight="fill" className="backup-needed-icon" aria-hidden="true" />
-              : null}`,
-    );
-    const facts = replaceEach(recovery, [
-      ['import { Archive,', 'import { CheckCircle, Warning, Archive,'],
-      [
-        'Create a recovery file and verify it.',
-        'No verified backup yet. Back up this wallet to recover it later.',
-      ],
-      ['<dt>Solana address</dt>', '<dt>Wallet address</dt>'],
-    ]);
-    return replaceOnce(
-      replaceOnce(
-        replaceOnce(
-          facts,
-          '      <div>\n        <dt>Network</dt>\n        <dd>Solana</dd>\n      </div>\n',
-          '',
-        ),
-        '      <div>\n        <dt>Private key</dt>\n        <dd>Protected on this device</dd>\n      </div>\n',
-        '',
-      ),
-      '        <strong>On this device</strong>\n',
-      '',
-    );
-  }
-  if (target === `${base}/src/ui/Modal.tsx`) {
-    const props = replaceOnce(
-      "import { MODAL_ORIGIN, type ModalOrigin } from './constants';\n" +
-        source,
-      '  compact = false,',
-      '  compact = false,\n  size,\n  origin,',
-    );
-    const typed = replaceOnce(
-      props,
-      '  compact?: boolean;',
-      "  compact?: boolean;\n  size?: 'sm' | 'md' | 'lg';\n  origin?: ModalOrigin;",
-    );
-    const restoring = replaceOnce(
-      typed,
-      '  const dismissal = useRef(createModalDismissal());',
-      '  const dismissal = useRef(createModalDismissal());\n  useEffect(() => {\n    const opener = document.activeElement;\n    return () => {\n      if (opener instanceof HTMLElement && opener.isConnected)\n        requestAnimationFrame(() => opener.focus());\n    };\n  }, []);',
-    );
-    return replaceOnce(
-      restoring,
-      '      ref={ref}',
-      "      data-size={compact ? undefined : (size ?? 'md')}\n      data-origin={origin ?? MODAL_ORIGIN.CENTER}\n      ref={ref}",
-    );
-  }
-  if (target === `${base}/src/ui/UI.tsx`) {
-    const start = source.indexOf('export function StatCard(');
-    const end = source.indexOf('export function EmptyState(', start);
-    if (start < 0 || end < start)
-      throw new Error('Missing StatCard preview hook');
-    const card = readFileSync(
-      new URL('./views/StatCard.tsx.preview', import.meta.url),
-      'utf8',
-    );
-    return (
-      "import { ChartBar, Question, type Icon } from '@phosphor-icons/react';\n" +
-      source.slice(0, start) +
-      card +
-      source.slice(end)
-    );
   }
   if (target === `${base}/src/ui/PaypalSessionPanel.tsx`) {
     return (
@@ -186,33 +100,18 @@ export function transformBrand(source: string, id: string, desktop: string) {
   }
   if (target === `${base}/src/ui/Models.tsx`) return previewModels(source);
   if (target === `${base}/src/desktop-app.tsx`) {
-    const routed = replaceOnce(
-      replaceOnce(
-        replaceOnce(
-          source,
-          '<Payments\n',
-          "<Payments key={view} chat={chatController} initialTab={view === UI_VIEW.ACTIVITY ? 'activity' : undefined} selectedSession={activitySession}\n",
-        ),
-        '{view === UI_VIEW.PAYMENTS && (',
-        '{(view === UI_VIEW.PAYMENTS || view === UI_VIEW.ACTIVITY) && (',
-      ),
-      '{view === UI_VIEW.ACTIVITY && (\n            <Activity',
-      '{false && (\n            <Activity',
+    const routed = source.replace(
+      /<Payments\s+key=\{view\}[\s\S]*?x402=\{x402\}\s+session=\{paypal\}/,
+      "<Payments key={view} chat={chatController} initialTab={view === UI_VIEW.ACTIVITY ? 'activity' : undefined} selectedSession={activitySession} x402={x402} session={paypal}",
     );
-    const statusBar = replaceEach(routed, [
+    const footer = routed.replace(
+      /<footer className="preview-status-bar"[\s\S]*?<\/footer>/,
+      '<PreviewStatusBar version={manifest.version} status={<SystemStatus state={network.state} onRetry={network.retry} onPayments={() => navigate(UI_VIEW.PAYMENTS)} />} />',
+    );
+    const statusBar = replaceEach(footer, [
       [
         "import { PageBody } from './ui/PageBody';\n",
         "import { PageBody } from './ui/PageBody';\nimport { PreviewChatDetails, PreviewStatusBar } from './ui/PreviewKit';\n",
-      ],
-      ['<UpdateNotice />', ''],
-      ...layout.APP_LAYOUT_REWRITES,
-      [
-        '        systemStatus={\n          <SystemStatus\n            state={network.state}\n            onRetry={network.retry}\n            onPayments={() => navigate(UI_VIEW.PAYMENTS)}\n          />\n        }\n',
-        '',
-      ],
-      [
-        '        </PageBody>\n      </div>\n',
-        '        </PageBody>\n      </div>\n      <PreviewStatusBar version={manifest.version} status={<SystemStatus state={network.state} onRetry={network.retry} onPayments={() => navigate(UI_VIEW.PAYMENTS)} />} />\n',
       ],
     ]);
     const funded = replaceEach(statusBar, [...funds.APP_FUNDS_REWRITES]);
@@ -226,24 +125,11 @@ export function transformBrand(source: string, id: string, desktop: string) {
       "const [light, setLight] = useState(() => new URLSearchParams(location.search).get('theme') === 'light')",
     );
   }
-  if (target === `${base}/src/ui/constants.ts`)
-    return (
-      replaceOnce(
-        replaceOnce(
-          source,
-          "{ name: UI_VIEW.ACTIVITY, label: 'Activity' }",
-          "{ name: UI_VIEW.ACTIVITY, label: 'Usage & payments' }",
-        ),
-        "{ name: UI_VIEW.PAYMENTS, label: 'Payments' }",
-        "{ name: UI_VIEW.PAYMENTS, label: 'Usage & payments' }",
-      ) +
-      "\nexport const MODAL_ORIGIN = {\n  CENTER: 'center',\n  TOP: 'top',\n  BOTTOM: 'bottom',\n  LEFT: 'left',\n  RIGHT: 'right',\n} as const;\nexport type ModalOrigin = (typeof MODAL_ORIGIN)[keyof typeof MODAL_ORIGIN];\n"
-    );
   if (target === `${base}/src/ui/BuyerSidebar.tsx`) {
     const start = source.indexOf('export function BuyerSidebar(');
     if (start < 0) throw new Error('Missing sidebar review hook');
     return (
-      "import { PREVIEW_SHORTCUT, PreviewConversationPanel, previewCompact, previewShortcut } from './PreviewKit';\nimport { IconButton } from './UI';\n" +
+      "import { PREVIEW_SHORTCUT, PreviewConversationPanel, previewCompact, previewShortcut } from './PreviewKit';\nimport type { ReactNode } from 'react';\n" +
       source.slice(0, start) +
       readFileSync(
         new URL('./views/BuyerSidebar.tsx.preview', import.meta.url),
@@ -260,31 +146,10 @@ export function transformBrand(source: string, id: string, desktop: string) {
             new URL('./views/NetworkSwitch.tsx.preview', import.meta.url),
             'utf8',
           ),
-        '{props.children}',
-        '<PreviewNetwork />{props.children}',
+        '<PaymentNetworkLabel />',
+        '<PreviewNetwork />',
       ),
       layout.TITLEBAR_REWRITES,
-    );
-  if (target === `${base}/src/ui/BuyerAgentSetup.tsx`)
-    return (
-      "import { agentCodeLanguage, CodeBlock } from './PreviewKit';\n" +
-      replaceEach(source, [
-        [
-          '      <pre className="ui-code-block" aria-label="Generated agent configuration">\n        {preview.text}\n      </pre>',
-          '      <CodeBlock language={agentCodeLanguage(preview.tool)} title="Generated agent configuration" code={preview.text} />',
-        ],
-        [
-          '<Button disabled={disabled} onClick',
-          '<Button variant={BUTTON_VARIANT.PRIMARY} disabled={disabled} onClick',
-        ],
-        ['Connect agent', 'Connect a tool'],
-        ['Connect an agent', 'Connect a tool'],
-        ['label="Agent"', 'label="Tool"'],
-        [
-          'Uses the models served by your local buyer.',
-          'Supports OpenAI Chat Completions, Responses and Anthropic Messages through your local buyer.',
-        ],
-      ])
     );
   if (target === `${base}/src/x402-model.ts`)
     return replaceEach(source, [
@@ -320,15 +185,21 @@ export function transformBrand(source: string, id: string, desktop: string) {
   if (target === `${base}/src/ui/Chat.tsx`)
     return (
       "import { PreviewConnectEntry } from './PreviewKit';\n" +
-      replaceEach(source, [
+      replaceEach(
+        source.replace(
+          /\{active && usingX402 && x402 && [\s\S]*?<ComposerFunding[\s\S]*?\/>(?:\s*\))?\}/,
+          '',
+        ),
         [
-          '<p>Choose how to pay. Keep the conversation.</p>',
-          '<p>Choose how to pay. Keep the conversation.</p>\n              <PreviewConnectEntry />',
+          [
+            '<p>Choose how to pay. Keep the conversation.</p>',
+            '<p>Choose how to pay. Keep the conversation.</p>\n              <PreviewConnectEntry />',
+          ],
+          ["'x402 · devnet'", "'x402'"],
+          ["'Free · Gyblos network'", "''"],
+          ...funds.CHAT_FUNDS_REWRITES,
         ],
-        ["'x402 · devnet'", "'x402'"],
-        ["'Free · Gyblos network'", "''"],
-        ...funds.CHAT_FUNDS_REWRITES,
-      ])
+      )
     );
   if (target === `${base}/src/theme.ts`) {
     for (const [name, value] of Object.entries(brand.themeTokens)) {
@@ -336,16 +207,7 @@ export function transformBrand(source: string, id: string, desktop: string) {
       if (!pattern.test(source)) throw new Error('Missing desktop brand token');
       source = source.replace(pattern, `  ${name}: '${value}',`);
     }
-    source = replaceOnce(
-      source,
-      "'--blue': light\n      ? colors.blue\n      : 'color-mix(in srgb, var(--accent), white 35%)',",
-      "'--blue': light ? colors.inkLight : colors.inkDark,",
-    );
-    return replaceOnce(
-      source,
-      "'--focus': light\n      ? colors.blue\n      : 'color-mix(in srgb, var(--accent), white 12%)',",
-      "'--focus': light ? colors.inkLight : colors.inkDark,",
-    );
+    return source;
   }
 }
 // Browser-only modules that the preview kit imports beside the desktop sources.
