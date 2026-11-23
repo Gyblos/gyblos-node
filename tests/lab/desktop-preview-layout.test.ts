@@ -117,14 +117,36 @@ void test('the title bar adds a conversation menu and a details panel for the ch
   assert.match(design, /PreviewChatDetails/);
 });
 
-void test('?density=compact is a comparison mode that leaves the default view unchanged', async () => {
+void test('compact density is the default and ?density=comfortable restores the previous view', async () => {
   const [browser, css, kit, settings] = await Promise.all([
     read('browser.ts'),
     read('preview.css'),
     read('views/PreviewKit.tsx.preview'),
     read('views/Settings.tsx.preview'),
   ]);
-  assert.match(browser, /get\('density'\) === 'compact'/);
+  assert.match(browser, /get\('density'\) !== 'comfortable'/);
+  for (const selector of [
+    '.ui-select-trigger',
+    '.preview-model-copy strong',
+    '.preview-settings-rows > div > span',
+    '.ui-tooltip',
+  ])
+    assert.ok(
+      new RegExp(
+        String.raw`html\[data-density='compact'\][^{]*` +
+          selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') +
+          String.raw`[^{]*\{[^}]*font-size: var\(--ui-font\);`,
+      ).test(css),
+      selector,
+    );
+  assert.match(
+    css,
+    /html\[data-density='compact'\][^{]*\.ui-section-title h2[^{]*\{[^}]*font-size: 15px;/,
+  );
+  assert.match(
+    css,
+    /html\[data-density='compact'\][^{]*\.preview-metric-card dd > span[^{]*\{[^}]*font-size: 22px;/,
+  );
   assert.match(browser, /dataset\.density = 'compact'/);
   assert.match(browser, /compact && !query\.has\('font'\)/);
   const tokens =
