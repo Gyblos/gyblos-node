@@ -192,7 +192,8 @@ function payoutFields(
     o: sql`${splits.paidOut}`,
     outflow: sql`${splits.vault}`,
   });
-  const when = sql`${page.mint} is ${DEVNET_USDC} and ${page.kind} in ${kinds(PAYING)} and ${firstPaying} and ${balanced}`;
+  const paying = sql`${page.mint} is ${DEVNET_USDC} and ${page.kind} in ${kinds(PAYING)}`;
+  const when = sql`${paying} and ${firstPaying} and ${balanced}`;
   const shown = (value: SQL | SQL.Aliased) =>
     sql<
       string | null
@@ -205,6 +206,7 @@ function payoutFields(
     programTreasury: shown(splits.programTreasury),
     refunded: shown(splits.refunded),
     channels: sql<number | null>`case when ${when} then ${splits.channels} end`,
+    batched: sql<number>`case when ${paying} and not ${firstPaying} then 1 else 0 end`,
   };
 }
 
@@ -250,6 +252,7 @@ export function chainTxReader(database: D1Database): ChainTxReader {
           splitRefunded: payout.refunded.as('split_refunded'),
           splitChannels: payout.channels.as('split_channels'),
           splitUnclassified: payout.unclassified.as('split_unclassified'),
+          batched: payout.batched.as('batched'),
         })
         .from(page)
         .leftJoin(

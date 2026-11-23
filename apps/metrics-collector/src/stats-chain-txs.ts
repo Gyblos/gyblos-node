@@ -30,6 +30,7 @@ export interface ChainTxRow extends ChainTxCursor {
   splitRefunded: string | null;
   splitChannels: number | null;
   splitUnclassified: string | null;
+  batched: number;
 }
 type SplitColumns =
   | 'splitPaidOut'
@@ -53,9 +54,13 @@ export interface ChainTxReader {
     recipient: string | null;
   }): Promise<ChainTxRow[]>;
 }
-export type ChainTx = Omit<ChainTxRow, 'recipientsJson' | SplitColumns> & {
+export type ChainTx = Omit<
+  ChainTxRow,
+  'recipientsJson' | 'batched' | SplitColumns
+> & {
   recipients: string[];
   split: PayoutSplit | null;
+  batched: boolean;
 };
 export interface ChainTxPage {
   network: string;
@@ -181,6 +186,7 @@ function chainTx(row: ChainTxRow): ChainTx {
     recipients: recipientOwners(row.recipientsJson),
     amountAtomic: row.amountAtomic,
     split: payoutSplit(row),
+    batched: row.batched === 1,
   };
 }
 

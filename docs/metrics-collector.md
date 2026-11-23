@@ -512,7 +512,8 @@ answer:
         "refunded": "999775",
         "channels": 1,
         "unclassified": "0"
-      }
+      },
+      "batched": false
     }
   ],
   "next": "431000000-<signature>-1"
@@ -557,6 +558,11 @@ hiding it; it is `0` when every unit is accounted for. Like the aggregate, a
 transaction whose parts exceed what left its channels' vaults (a transfer
 bundled with the payout), or that also pays a channel that is not Gyblos, gets
 no split.
+
+`batched` is `true` on a devnet USDC `distribute` or `reclaim` that is not its
+transaction's first such instruction: that transaction's split and amount are on
+its first paying row (a total over its channels, which may be another seller's
+channel), so this row has neither. It is `false` on every other row.
 
 The splits of a day's rows add up to that day's `gyblosFeesAtomic`,
 `programTreasuryAtomic`, `refundedAtomic` and `paidOutAtomic`, except that a
