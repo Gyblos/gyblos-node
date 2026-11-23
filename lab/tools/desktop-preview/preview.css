@@ -4033,6 +4033,28 @@ html[data-density='compact'] .app.desktop-frame .ui-section-title h2 {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  font-size: 15px;
+}
+html[data-density='compact']
+  .app.desktop-frame
+  :is(.preview-section-intro h2, .preview-tool-guide header h2) {
+  font-size: 16px;
+}
+html[data-density='compact']
+  .app.desktop-frame
+  :is(
+    .ui-select-trigger,
+    .preview-model-copy strong,
+    .preview-tool-card strong,
+    .preview-method-name h3,
+    .preview-settings-rows > div > span,
+    .preview-steps strong,
+    .ui-tooltip
+  ) {
+  font-size: var(--ui-font);
+}
+html[data-density='compact'] .app.desktop-frame .preview-metric-card dd > span {
+  font-size: 22px;
 }
 html[data-density='compact'] .app.desktop-frame .pk-section-icon {
   flex: none;

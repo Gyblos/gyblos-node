@@ -25,7 +25,7 @@ export function startPreview(examples: AgentExamples) {
   Object.assign(window, createPreviewHost(location.search, examples));
   document.title = PREVIEW.title;
   const query = new URLSearchParams(location.search);
-  const compact = query.get('density') === 'compact';
+  const compact = query.get('density') !== 'comfortable';
   if (compact) document.documentElement.dataset.density = 'compact';
   if (query.get('font') === 'inter' || (compact && !query.has('font')))
     document.documentElement.dataset.font = 'inter';

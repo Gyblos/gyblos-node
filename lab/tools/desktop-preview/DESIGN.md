@@ -120,7 +120,7 @@ follows [`apps/desktop/DESIGN.md`](../../../apps/desktop/DESIGN.md).
 - Settings rows (`preview-settings-rows`): copy and help on the left, one compact
   control on the right; Save/Cancel appear only after a change.
 
-Compact density adds these shared pieces; each renders the default markup, or nothing, without `?density=compact`:
+Compact density adds these shared pieces; each renders the comfortable markup, or nothing, with `?density=comfortable`:
 
 | Need                                 | Use                                                                                            |
 | ------------------------------------ | ---------------------------------------------------------------------------------------------- |
@@ -131,16 +131,19 @@ Compact density adds these shared pieces; each renders the default markup, or no
 | Keyboard shortcut in a menu or label | `Kbd` with `previewShortcut(PREVIEW_SHORTCUT.*)` (`⌘N` new chat, `⌘K` Models; Ctrl+ off macOS) |
 | Confirm a save or delete             | `showPreviewToast(text)`; `PreviewToaster` is mounted once by `PreviewStatusBar`               |
 
-Open `?screen=design-system` (Settings → Preview components) to review them all; the compact pieces above appear on their screens with `?density=compact`.
+Open `?screen=design-system` (Settings → Preview components) to review them all; the compact pieces above appear on their screens.
 
 ## Density
 
-`?density=compact` is a comparison mode; without it the preview is unchanged. It
-sets `data-density="compact"` and Inter (the `?font=inter` path) unless `font` is
-given.
+Compact density is the default. It sets `data-density="compact"` and Inter (the
+`?font=inter` path) unless `font` is given. `?density=comfortable` restores the
+previous density for comparison.
 
 - Sidebar, menus, tables and lists: rows of 28–32 px (`--pk-row-height`, 30 px),
-  controls of 28 px (`--control-size`) and 13 / 12 px text.
+  controls of 28 px (`--control-size`) and 13 / 12 px text, including select
+  triggers, list and card titles, Settings labels and tooltips.
+- Headings: 15 px section titles, 16 px page intros and the tool guide; 22 px
+  metric values. Chat messages stay at 14 px for reading.
 - Settings rows, forms and empty states keep 20 px of inner spacing
   (`--pk-comfort-padding`).
 - Radii by level: 6 px buttons and inputs (`--radius-control`), 8 px menus
