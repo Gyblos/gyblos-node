@@ -4077,7 +4077,9 @@ html[data-density='compact']
 html[data-density='compact'] .app.desktop-frame .preview-metric-card dd > span {
   font-size: 22px;
 }
-html[data-density='compact'] .app.desktop-frame :is(.pk-tag, .ui-badge) {
+html[data-density='compact']
+  .app.desktop-frame
+  :is(.pk-tag, .ui-badge):not(.pk-badge-line .pk-tag) {
   gap: 4px;
   height: 18px;
   padding: 0 6px;
@@ -4107,7 +4109,7 @@ html[data-density='compact'] .app.desktop-frame .preview-metric-icon svg {
 html[data-density='compact']
   .app.desktop-frame
   .content
-  .ui-button:not(.ui-icon-button, .ui-menu-trigger) {
+  .ui-button:not(.ui-icon-button, .ui-menu-trigger, .pk-switch, .pk-update) {
   --control-size: 24px;
   height: var(--control-size);
   min-height: var(--control-size);
