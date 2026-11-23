@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { getChainTxs } from '../lib/chain-txs';
 import { sellerOwners, txRow } from '../lib/chain-txs-shape';
 import { explorerAddressUrl, PAYMENT_PROGRAM_SOURCE_URL } from '../lib/config';
-import { DISPLAY } from '../lib/constants';
+import { DISPLAY, PAGING } from '../lib/constants';
 import { getDiscovery } from '../lib/discovery-render';
 import { queryHref, txPager, type ExplorerQuery } from '../lib/paging';
 import { Pager } from './pager';
@@ -93,15 +93,14 @@ function TxLine({ row, lookup }: { row: Row; lookup: boolean }) {
 function NewestLink({ query }: { query: ExplorerQuery }) {
   if (!query.before) return null;
   return (
-    <nav className="my-3 flex justify-end gap-4 font-mono text-xs text-muted">
+    <p className="my-3 text-right font-mono text-xs text-muted">
       <Link
-        className={link}
-        href={queryHref(query, { before: null })}
-        scroll={false}
+        className={`${link} py-1 underline-offset-2 hover:underline`}
+        href={`${queryHref(query, { before: null })}#${PAGING.anchors.transactions}`}
       >
-        Newest
+        Back to newest
       </Link>
-    </nav>
+    </p>
   );
 }
 
@@ -116,7 +115,11 @@ export async function ChannelTxs({ query }: { query: ExplorerQuery }) {
   const lookup = discovery.error === null;
   return (
     <>
-      <SectionTitle title={TITLE} meta={<Meta programId={page.programId} />} />
+      <SectionTitle
+        id={PAGING.anchors.transactions}
+        title={TITLE}
+        meta={<Meta programId={page.programId} />}
+      />
       <p className="-mt-2 mb-3 text-xs text-muted">
         Amounts are per row: deposit in for Deposit and Top-up, newly settled
         for Settle, paid out of the channel for Paid out and Refunded. Do not

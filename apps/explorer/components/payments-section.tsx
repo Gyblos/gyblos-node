@@ -19,14 +19,14 @@ import {
   type ChainSummary,
 } from '../lib/chain-shape';
 import { getChainStats } from '../lib/chain-stats';
-import { DISPLAY, UNITS } from '../lib/constants';
+import { DISPLAY, PAGING, UNITS } from '../lib/constants';
 import { count, settlementCount, usdc, usdcDecimal, utc } from '../lib/format';
-import { tablePage, tablePager, type ExplorerQuery } from '../lib/paging';
+import { tablePager, type ExplorerQuery } from '../lib/paging';
 import { Flow } from './board/animated-number';
 import { BarChartCard } from './board/bar-chart-card';
 import { delta, type Delta } from './board/delta';
 import { StatCard } from './board/stat-card';
-import { Pager } from './pager';
+import { pagedRows, Pager } from './pager';
 import {
   moneyCell,
   numberCell,
@@ -101,7 +101,7 @@ function PaymentStats({
 }) {
   const { totals } = summary;
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <StatCard
         icon={Coins}
         label="Settled"
@@ -195,11 +195,11 @@ function DailyTable({
   query: ExplorerQuery;
   summary: ChainSummary;
 }) {
+  const page = pagedRows(query, 'chainDaily', [...summary.days].reverse());
   if (!summary.days.length) return null;
-  const page = tablePage(query, 'chainDaily', [...summary.days].reverse());
   return (
     <>
-      <SectionTitle title="Daily on chain" />
+      <SectionTitle id={PAGING.anchors.chainDaily} title="Daily on chain" />
       <Table
         minWidth={DISPLAY.dailyTable}
         head={[

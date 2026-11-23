@@ -103,6 +103,17 @@ export const PAGING = {
     chainDaily: 'chainDailyPage',
     transactions: 'txPage',
   },
+  anchors: {
+    sellers: 'sellers',
+    offline: 'not-online',
+    models: 'models',
+    daily: 'daily',
+    demand: 'unserved-demand',
+    chainDaily: 'daily-on-chain',
+    transactions: 'channel-transactions',
+  },
+  rangeTables: ['models', 'daily', 'demand', 'chainDaily'],
+  cursorTable: 'transactions',
 } as const;
 
 export const SELLER_PAGE = {

@@ -5,7 +5,7 @@ import { Activity, BadgeCheck, Boxes, Server, Tag } from 'lucide-react';
 import Link from 'next/link';
 
 import { HOW_TO_VERIFY_URL } from '../lib/config';
-import { DISPLAY } from '../lib/constants';
+import { DISPLAY, PAGING } from '../lib/constants';
 import type { DiscoverySnapshot, Seller } from '../lib/discovery';
 import { getDiscovery } from '../lib/discovery-render';
 import { count, percent, pricePerMtok, short, usdc, utc } from '../lib/format';
@@ -16,16 +16,12 @@ import {
   type NetworkStatus,
 } from '../lib/network-status';
 import { summarizeOffers, uptimeRatio } from '../lib/offers';
-import {
-  queryHref,
-  tablePage,
-  tablePager,
-  type ExplorerQuery,
-} from '../lib/paging';
+import { queryHref, tablePager, type ExplorerQuery } from '../lib/paging';
 import {
   emptySellersMessage,
   githubByNode,
   notOnlineMeta,
+  offersCaption,
   orderSellers,
   verifiedOnly,
 } from '../lib/seller-identity';
@@ -33,7 +29,7 @@ import { Flow } from './board/animated-number';
 import { Chip } from './board/chip';
 import { StatCard } from './board/stat-card';
 import { StatusDot } from './board/status-dot';
-import { Pager } from './pager';
+import { pagedRows, Pager } from './pager';
 import { SellerCell } from './seller-cell';
 import {
   Addr,
@@ -73,7 +69,7 @@ export async function NetworkSection({ query }: { query: ExplorerQuery }) {
             : null}
         </p>
       ) : null}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <SellersOnline snapshot={snapshot} />
         <StatCard
           icon={Boxes}
@@ -158,7 +154,11 @@ function SellersBlock({
 }) {
   return (
     <>
-      <SectionTitle title="Sellers" meta={<VerifiedFilter query={query} />} />
+      <SectionTitle
+        id={PAGING.anchors.sellers}
+        title="Sellers"
+        meta={<VerifiedFilter query={query} />}
+      />
       <SellersTable
         query={query}
         sellers={sellers}
@@ -231,13 +231,10 @@ function SellersTable({
   accountsKnown: boolean;
 }) {
   const empty = emptySellersMessage(sellers, query.verified, accountsKnown);
-  const page = tablePage(
-    query,
-    'sellers',
-    sellers.flatMap((seller) =>
-      seller.models.map((model) => ({ seller, model })),
-    ),
+  const offers = sellers.flatMap((seller) =>
+    seller.models.map((model) => ({ seller, model })),
   );
+  const page = pagedRows(query, 'sellers', offers);
   return (
     <>
       <Table minWidth={DISPLAY.wideTable} head={SELLERS_HEAD}>
@@ -292,6 +289,11 @@ function SellersTable({
         ))}
       </Table>
       <Pager label="Sellers" view={tablePager(query, 'sellers', page)} />
+      {offers.length ? (
+        <p className="mt-2 text-xs text-dim">
+          {offersCaption(offers.length, sellers.length)}
+        </p>
+      ) : null}
     </>
   );
 }
@@ -346,11 +348,12 @@ function NotOnlineTable({
   const nodes = notOnline(network).filter(
     (node) => !accounts || accounts.has(node.nodeId),
   );
+  const page = pagedRows(query, 'offline', nodes);
   if (!nodes.length) return null;
-  const page = tablePage(query, 'offline', nodes);
   return (
     <>
       <SectionTitle
+        id={PAGING.anchors.offline}
         title="Not online"
         meta={notOnlineMeta(network, accounts ? nodes.length : null)}
       />

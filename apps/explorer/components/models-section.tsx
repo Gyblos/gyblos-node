@@ -2,7 +2,7 @@
 // paid prices, context) next to what was served over the range (completed requests, cancellations, the
 // first token as the seller and the buyer measured it, and the engine's speed), free and paid apart.
 import { getCollector } from '../lib/collector';
-import { DISPLAY } from '../lib/constants';
+import { DISPLAY, PAGING } from '../lib/constants';
 import { getDiscovery } from '../lib/discovery-render';
 import {
   count,
@@ -19,9 +19,9 @@ import {
   type Served,
 } from '../lib/model-table';
 import { summarizeOffers } from '../lib/offers';
-import { tablePage, tablePager, type ExplorerQuery } from '../lib/paging';
+import { tablePager, type ExplorerQuery } from '../lib/paging';
 import { pair } from '../lib/usage';
-import { Pager } from './pager';
+import { pagedRows, Pager } from './pager';
 import {
   ModelName,
   moneyCell,
@@ -65,10 +65,11 @@ export async function ModelsSection({ query }: { query: ExplorerQuery }) {
     offersKnown ? summarizeOffers(discovery).models : new Map(),
     collector.error ? [] : collector.models,
   );
-  const page = tablePage(query, 'models', rows);
+  const page = pagedRows(query, 'models', rows);
   return (
     <>
       <SectionTitle
+        id={PAGING.anchors.models}
         title="Models"
         meta={`offered now · served over ${days} days`}
       />

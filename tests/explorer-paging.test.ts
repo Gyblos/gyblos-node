@@ -4,14 +4,16 @@ import test from 'node:test';
 import { CHAIN_TXS, PAGING, RANGE } from '@gyblos/explorer/constants';
 import {
   pageOf,
+  pageRedirect,
   parsePage,
   queryHref,
   rangeSwitchHref,
   readQuery,
+  tablePage,
   tablePager,
   txPager,
 } from '@gyblos/explorer/paging';
-import { sellerHref } from '@gyblos/explorer/seller-identity';
+import { offersCaption, sellerHref } from '@gyblos/explorer/seller-identity';
 import { CHAIN_TX_PAGE } from '@gyblos/metrics-collector/constants';
 
 const SIGNATURE =
@@ -105,10 +107,19 @@ void test('every link keeps the range, the filter, the cursor and the other tabl
     );
 });
 
-void test('a date range switch keeps every table page', () => {
+void test('a date range switch resets the range-dependent tables and keeps the others', () => {
+  assert.deepEqual(PAGING.rangeTables, [
+    'models',
+    'daily',
+    'demand',
+    'chainDaily',
+  ]);
   assert.equal(
-    rangeSwitchHref('dailyPage=2&demandPage=3&chainDailyPage=4', 7),
-    '/?range=7&dailyPage=2&demandPage=3&chainDailyPage=4',
+    rangeSwitchHref(
+      `modelsPage=2&dailyPage=2&demandPage=3&chainDailyPage=4&sellersPage=2&offlinePage=3&before=${CURSOR}&txPage=2`,
+      7,
+    ),
+    `/?range=7&before=${CURSOR}&sellersPage=2&offlinePage=3&txPage=2`,
   );
   assert.equal(
     rangeSwitchHref(`range=7&before=${CURSOR}&txPage=2`, RANGE.defaultDays),
@@ -116,34 +127,83 @@ void test('a date range switch keeps every table page', () => {
   );
 });
 
-void test('a table pager counts its rows and links First, Previous and Next', () => {
+void test('a table pager links to its table and keeps First, Previous and Next in place, unavailable ones linking to the current page', () => {
   const query = readQuery({ range: '7', offlinePage: '2' });
   assert.equal(tablePager(query, 'models', pageOf(rows(25), 1)), null);
+  const models = `#${PAGING.anchors.models}`;
   const first = tablePager(query, 'models', pageOf(rows(1200), 1));
   assert.deepEqual(first, {
     rows: 'Rows 1–25 of 1,200',
-    links: [{ label: 'Next', href: '/?range=7&offlinePage=2&modelsPage=2' }],
-  });
-  const middle = tablePager(query, 'offline', pageOf(rows(60), 2));
-  assert.deepEqual(middle, {
-    rows: 'Rows 26–50 of 60',
     links: [
-      { label: 'First', href: '/?range=7' },
-      { label: 'Previous', href: '/?range=7' },
-      { label: 'Next', href: '/?range=7&offlinePage=3' },
+      {
+        label: 'First',
+        href: `/?range=7&offlinePage=2${models}`,
+        available: false,
+      },
+      {
+        label: 'Previous',
+        href: `/?range=7&offlinePage=2${models}`,
+        available: false,
+      },
+      {
+        label: 'Next',
+        href: `/?range=7&offlinePage=2&modelsPage=2${models}`,
+        available: true,
+      },
     ],
   });
+  const anchor = `#${PAGING.anchors.offline}`;
+  assert.deepEqual(tablePager(query, 'offline', pageOf(rows(60), 2)), {
+    rows: 'Rows 26–50 of 60',
+    links: [
+      { label: 'First', href: `/?range=7${anchor}`, available: true },
+      { label: 'Previous', href: `/?range=7${anchor}`, available: true },
+      {
+        label: 'Next',
+        href: `/?range=7&offlinePage=3${anchor}`,
+        available: true,
+      },
+    ],
+  });
+  assert.deepEqual(
+    tablePager(query, 'offline', pageOf(rows(60), 3))?.links.at(-1),
+    {
+      label: 'Next',
+      href: `/?range=7&offlinePage=3${anchor}`,
+      available: false,
+    },
+  );
+});
+
+void test('an out-of-range page is replaced by the canonical URL without it', () => {
+  const query = readQuery({ range: '7', modelsPage: '9', dailyPage: '2' });
+  assert.equal(
+    pageRedirect(query, 'models', tablePage(query, 'models', rows(3))),
+    '/?range=7&dailyPage=2',
+  );
+  assert.equal(
+    pageRedirect(query, 'daily', tablePage(query, 'daily', rows(30))),
+    null,
+  );
+  assert.equal(
+    pageRedirect(query, 'sellers', tablePage(query, 'sellers', rows(3))),
+    null,
+  );
 });
 
 void test('the transaction pager counts rows without a total and keeps its cursor paging', () => {
+  const anchor = `#${PAGING.anchors.transactions}`;
+  assert.equal(PAGING.cursorTable, 'transactions');
   assert.equal(CHAIN_TXS.pageRows, CHAIN_TX_PAGE.defaultLimit);
   assert.equal(txPager(readQuery({}), 3, null), null);
   assert.deepEqual(txPager(readQuery({ sellersPage: '2' }), 25, OLDER), {
     rows: 'Rows 1–25',
     links: [
+      { label: 'Newest', href: `/?sellersPage=2${anchor}`, available: false },
       {
         label: 'Older',
-        href: `/?before=${OLDER}&sellersPage=2&txPage=2`,
+        href: `/?before=${OLDER}&sellersPage=2&txPage=2${anchor}`,
+        available: true,
       },
     ],
   });
@@ -152,15 +212,28 @@ void test('the transaction pager counts rows without a total and keeps its curso
     {
       rows: 'Rows 26–50',
       links: [
-        { label: 'Newest', href: '/?range=7' },
-        { label: 'Older', href: `/?range=7&before=${OLDER}&txPage=3` },
+        { label: 'Newest', href: `/?range=7${anchor}`, available: true },
+        {
+          label: 'Older',
+          href: `/?range=7&before=${OLDER}&txPage=3${anchor}`,
+          available: true,
+        },
       ],
     },
   );
   assert.deepEqual(txPager(readQuery({ before: CURSOR }), 4, null), {
     rows: null,
-    links: [{ label: 'Newest', href: '/' }],
+    links: [
+      { label: 'Newest', href: `/${anchor}`, available: true },
+      { label: 'Older', href: `/?before=${CURSOR}${anchor}`, available: false },
+    ],
   });
+});
+
+void test('the Sellers caption counts offers and sellers apart from rows', () => {
+  assert.equal(offersCaption(90, 60), '90 offers from 60 sellers');
+  assert.equal(offersCaption(1, 1), '1 offer from 1 seller');
+  assert.equal(offersCaption(1_200, 2), '1,200 offers from 2 sellers');
 });
 
 void test('a seller links to its own page by NodeId', () => {

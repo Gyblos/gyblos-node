@@ -137,4 +137,9 @@ void test('llms.txt states the table paging parameters and the seller page', () 
   for (const param of Object.values(PAGING.params))
     assert.ok(llms.includes(`\`${param}\``), param);
   assert.ok(llms.includes(`\`${SELLER_PAGE.path}/<NodeId>\``));
+  assert.ok(
+    llms.includes(
+      'A range switch returns Models, Usage daily, Unserved demand and Daily on chain to page 1',
+    ),
+  );
 });

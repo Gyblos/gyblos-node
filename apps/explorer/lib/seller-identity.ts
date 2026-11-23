@@ -1,5 +1,6 @@
 import { DISPLAY, IDENTITY, SELLER_PAGE, UNITS } from './constants';
 import type { Seller } from './discovery-shape';
+import { count } from './format';
 import type { GithubAccount, NetworkStatus } from './network-status';
 import { uptimeRatio } from './offers';
 
@@ -114,4 +115,11 @@ export function notOnlineMeta(
 
 export function sellerHref(nodeId: string): string {
   return `${SELLER_PAGE.path}/${encodeURIComponent(nodeId)}`;
+}
+
+const plural = (value: number, word: string) =>
+  `${count(value)} ${word}${value === 1 ? '' : 's'}`;
+
+export function offersCaption(offers: number, sellers: number): string {
+  return `${plural(offers, 'offer')} from ${plural(sellers, 'seller')}`;
 }

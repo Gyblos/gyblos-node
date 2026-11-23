@@ -15,9 +15,9 @@ import {
   type NetworkDay,
   type NetworkSide,
 } from '../lib/collector';
-import { DISPLAY } from '../lib/constants';
+import { DISPLAY, PAGING } from '../lib/constants';
 import { count, usdcDecimal } from '../lib/format';
-import { tablePage, tablePager, type ExplorerQuery } from '../lib/paging';
+import { tablePager, type ExplorerQuery } from '../lib/paging';
 import {
   countText,
   dailyRequests,
@@ -34,7 +34,7 @@ import { Flow, FlowPair } from './board/animated-number';
 import { BarChartCard } from './board/bar-chart-card';
 import { delta, type Delta } from './board/delta';
 import { StatCard } from './board/stat-card';
-import { Pager } from './pager';
+import { pagedRows, Pager } from './pager';
 import { numberCell, SectionTitle, Table, td, Unavailable } from './ui';
 
 const buyersText = (side: NetworkSide | null) =>
@@ -113,7 +113,7 @@ export async function UsageSection({ query }: { query: ExplorerQuery }) {
         title={`Usage · ${days} days`}
         meta={usageMeta(days, snapshot.aggregatedAt, change !== null)}
       />
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard
           icon={MessagesSquare}
           label="Requests free · paid"
@@ -216,7 +216,7 @@ function DailyTable({
   query: ExplorerQuery;
   days: NetworkDay[];
 }) {
-  const page = tablePage(query, 'daily', [...days].reverse());
+  const page = pagedRows(query, 'daily', [...days].reverse());
   const head = [
     { label: 'Day (UTC)' },
     ...figureHead('Seller first token'),
@@ -225,7 +225,7 @@ function DailyTable({
   ];
   return (
     <>
-      <SectionTitle title="Daily" />
+      <SectionTitle id={PAGING.anchors.daily} title="Daily" />
       <Table minWidth={DISPLAY.dailyTable} head={head}>
         {days.length ? null : (
           <tr>
@@ -261,11 +261,11 @@ function DemandTable({
   query: ExplorerQuery;
   demand: [string, number][];
 }) {
+  const page = pagedRows(query, 'demand', demand);
   if (!demand.length) return null;
-  const page = tablePage(query, 'demand', demand);
   return (
     <>
-      <SectionTitle title="Unserved demand" />
+      <SectionTitle id={PAGING.anchors.demand} title="Unserved demand" />
       <Table
         minWidth={DISPLAY.narrowTable}
         head={[
