@@ -221,8 +221,8 @@ export function SpendingLimits({
   return (
     <>
       <div className="preview-usage-grid">
-        <section className="preview-panel" aria-label="Limit used">
-          <h3>Spending limit used</h3>
+        <section className="preview-panel" aria-label="Spending by source">
+          <h3>Spending by source</h3>
           <div className="preview-panel-row">
             <span>
               {total === null
@@ -240,11 +240,11 @@ export function SpendingLimits({
         <section className="preview-panel" aria-label="Spending breakdown">
           <h3>Spending</h3>
           <div className="preview-panel-row">
-            <span>Chat</span>
+            <span>Chat · current session</span>
             <strong>{money(chat)}</strong>
           </div>
           <div className="preview-panel-row">
-            <span>API keys</span>
+            <span>API keys · lifetime</span>
             <strong>{money(keySpent)}</strong>
           </div>
           <div className="preview-panel-row">
