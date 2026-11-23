@@ -7,8 +7,12 @@ import { Tag } from './Tag';
 
 export function ModelMenuBadges({
   offers,
+  countLabel,
+  locked = false,
 }: {
   offers: readonly ModelOption[];
+  countLabel?: string;
+  locked?: boolean;
 }) {
   const free = offers.some((offer) => offer.free);
   const paid = offers.some((offer) => !offer.free);
@@ -22,12 +26,14 @@ export function ModelMenuBadges({
           <Tag>
             {offers.length > 1 ? 'from ' : ''}
             {usdPerMtok(Math.min(...offers.map((offer) => offer.input)))}/M
-            input
+            <span className="sr-only"> input tokens</span>
           </Tag>
         )}
         <Tag>
-          {offers.length} {offers.length === 1 ? 'offer' : 'offers'}
+          {countLabel ??
+            (offers.length === 1 ? '1 offer' : offers.length + ' offers')}
         </Tag>
+        {locked && <span className="sr-only">Needs funds</span>}
       </span>
     </>
   );

@@ -1,5 +1,5 @@
 // Quick model selection for chat; the full catalog remains a separate screen.
-import { CaretDown, Check, Plus, Wallet } from '@phosphor-icons/react';
+import { CaretDown, Check } from '@phosphor-icons/react';
 import { useState } from 'react';
 
 import type { BuyerFunding } from '../funding/model';
@@ -10,9 +10,10 @@ import { Modal } from './Modal';
 import { priceRange, usdPerMtok } from './model-price';
 import type { ModelOption } from './model-types';
 import { ModelImage } from './ModelImage';
+import { ModelMenuBalance } from './ModelMenuBalance';
 import { NetworkSellerMenu } from './NetworkSellerMenu';
 import { OfferComparison } from './SellerStrategies';
-import { Badge, Button, MenuItem } from './UI';
+import { Badge, MenuItem } from './UI';
 
 export type { ModelOption } from './model-types';
 
@@ -100,8 +101,12 @@ export function ModelDropdown(props: PickerProps) {
         {(close, query) => (
           <>
             {props.networkOnly && (
-              <MenuBalance
-                funding={funding}
+              <ModelMenuBalance
+                amount={
+                  funding?.balanceAtomic == null
+                    ? undefined
+                    : fundingAmount(funding.balanceAtomic)
+                }
                 onAdd={() => {
                   close();
                   setAddingFunds(true);
@@ -253,29 +258,5 @@ function PickerTrigger({
         aria-hidden="true"
       />
     </>
-  );
-}
-
-function MenuBalance({
-  funding,
-  onAdd,
-}: {
-  funding?: BuyerFunding | null;
-  onAdd(): void;
-}) {
-  return (
-    <p className="pk-balance-line">
-      <Wallet size={14} />
-      <span>Last checked balance</span>
-      <strong>
-        {funding?.balanceAtomic == null
-          ? 'Unavailable'
-          : fundingAmount(funding.balanceAtomic)}
-      </strong>
-      <Button className="pk-balance-add" onClick={onAdd}>
-        <Plus size={12} />
-        Add funds
-      </Button>
-    </p>
   );
 }

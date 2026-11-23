@@ -269,9 +269,19 @@ void test('preview menus, number fields and model rows follow the shared compone
     2,
   );
   const dropdown = await view('ModelDropdown.tsx.preview');
-  assert.match(dropdown, /<ModelBadges offers=\{list\}/);
-  assert.match(dropdown, /\{free \? 'Free' : 'Paid'\}/);
-  assert.match(dropdown, /className="pk-balance-add"/);
+  assert.match(dropdown, /<ModelMenuBadges offers=\{list\}/);
+  const desktop = await readFile(
+    'apps/desktop/src/ui/ModelDropdown.tsx',
+    'utf8',
+  );
+  for (const picker of [desktop, dropdown])
+    assert.match(picker, /<ModelMenuBalance/);
+  const balance = await readFile(
+    'apps/desktop/src/ui/ModelMenuBalance.tsx',
+    'utf8',
+  );
+  assert.match(balance, /<span>Balance<\/span>/);
+  assert.match(balance, /className="pk-balance-add"/);
 });
 
 void test('model picker lets Paid speak for itself and sizes the seller flyout to its content', async () => {
@@ -288,7 +298,7 @@ void test('model picker lets Paid speak for itself and sizes the seller flyout t
 
 void test('model picker announces Needs funds only on rows that are actually disabled', async () => {
   const dropdown = await view('ModelDropdown.tsx.preview');
-  assert.match(dropdown, /<ModelBadges offers=\{list\} locked=\{locked\} \/>/);
+  assert.match(dropdown, /<ModelMenuBadges [^>]+locked=\{locked\} \/>/);
   assert.match(
     dropdown,
     /title=\{\s*soon\s*\? PREVIEW_COPY\.sellerModeSoon\s*: locked\s*\? PREVIEW_COPY\.needsFunds\s*: detail\s*\}/,

@@ -349,7 +349,8 @@ html
   color: var(--pk-success);
 }
 html .app.desktop-frame .pk-balance-line {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 6px;
   margin: 0 0 4px;
@@ -363,7 +364,12 @@ html .app.desktop-frame .pk-balance-line strong {
   font-family: var(--font-mono);
   font-weight: 500;
   color: var(--ink);
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+}
+html .app.desktop-frame .pk-balance-line strong[data-unavailable] {
+  font-family: inherit;
+  font-weight: inherit;
+  color: var(--muted);
 }
 html .app.desktop-frame .preview-trigger-caret {
   color: var(--muted);
