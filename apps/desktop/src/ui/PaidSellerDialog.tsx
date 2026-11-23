@@ -180,21 +180,13 @@ type TermsProps = SellerDialogProps & {
   replacement?: string;
   availableMaximum?: string;
 };
-function SellerTerms({
-  model,
-  buyer,
-  close,
-  confirm,
-  remaining,
-  switching,
-  availableMaximum,
-  replacement,
-}: TermsProps) {
+function SellerTerms(props: TermsProps) {
+  const { model, buyer, close, confirm } = props;
   const { maximum, setMaximum, error, setError, saving, select } =
-    useSellerConfirmation(model, buyer, confirm, availableMaximum);
+    useSellerConfirmation(model, buyer, confirm, props.availableMaximum);
   const { policy } = buyer.state;
   const deposit =
-    replacement ??
+    props.replacement ??
     policy?.depositAtomic ??
     BUYER_SESSION_DEFAULT_POLICY.depositAtomic;
   const minutes =
@@ -231,8 +223,8 @@ function SellerTerms({
           }}
         />
         <ChannelTerms
-          switching={switching}
-          remaining={remaining}
+          switching={props.switching}
+          remaining={props.remaining}
           deposit={deposit}
           minutes={minutes}
         />
