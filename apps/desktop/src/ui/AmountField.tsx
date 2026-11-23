@@ -2,8 +2,10 @@ import { Minus, Plus } from '@phosphor-icons/react';
 
 import { IconButton } from './UI';
 
-type CompactProps = {
+type AmountFieldProps = {
   id: string;
+  compact?: boolean;
+  autoFocus?: boolean;
   value: string;
   onChange(value: string): void;
   unit: string;
@@ -17,8 +19,10 @@ type CompactProps = {
   onEnter?(): void;
   onEscape?(): void;
 };
-export function CompactAmount({
+export function AmountField({
   id,
+  compact = false,
+  autoFocus,
   value,
   onChange,
   unit,
@@ -31,16 +35,20 @@ export function CompactAmount({
   describedBy,
   onEnter,
   onEscape,
-}: CompactProps) {
+}: AmountFieldProps) {
   const atomic = value.trim() ? parse(value.trim()) : null;
   const nudge = (direction: bigint) => {
     const next = (atomic ?? 0n) + direction * step;
     onChange(format(next > 0n ? next : 0n));
   };
   return (
-    <div className="preview-compact-amount" data-invalid={invalid}>
+    <div
+      className={compact ? 'preview-compact-amount' : 'preview-amount-field'}
+      data-invalid={invalid}
+    >
       <input
         id={id}
+        autoFocus={autoFocus}
         disabled={disabled}
         inputMode="decimal"
         autoComplete="off"

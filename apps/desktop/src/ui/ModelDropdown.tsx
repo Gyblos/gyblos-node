@@ -262,7 +262,7 @@ function MenuBalance({
   return (
     <p className="pk-balance-line">
       <Wallet size={14} />
-      <span>Balance</span>
+      <span>Last checked balance</span>
       <strong>
         {funding?.balanceAtomic == null
           ? 'Unavailable'

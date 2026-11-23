@@ -13,6 +13,8 @@ export function ComposerFunding({
   funding: BuyerFunding | null;
 }) {
   const { policy, summary, error } = buyer.state;
+  const matchingBudget =
+    !!policy && summary.policy?.policyId === policy.policyId;
   return (
     <div className="pk-composer-tab">
       <span className="pk-tab-item" data-network="testnet">
@@ -26,9 +28,13 @@ export function ComposerFunding({
           : 'Last checked · ' + fundingAmount(funding.balanceAtomic)}
       </span>
       <span className="pk-tab-item pk-tab-limit">
-        {policy && !error && summary.active && !summary.blocked
+        {matchingBudget &&
+        !error &&
+        summary.available &&
+        summary.active &&
+        !summary.blocked
           ? 'Chat limit · ' + x402Amount(summary.limitAtomic, policy)
-          : summary.blocked
+          : summary.blocked || (summary.active && !matchingBudget)
             ? 'Review payment'
             : 'Chat limit unavailable'}
       </span>

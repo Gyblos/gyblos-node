@@ -8,7 +8,7 @@ import type { BuyerApiKeysSnapshot } from '@gyblos/protocol/buyer-api-keys';
 
 import { RESPONSE_METRICS } from '../constants';
 import { x402BudgetInput } from '../x402-model';
-import { CompactAmount } from './CompactAmount';
+import { AmountField } from './AmountField';
 import { Modal } from './Modal';
 import { TONE, type Tone } from './status-tone';
 import { Button, IconButton } from './UI';
@@ -122,15 +122,12 @@ function KeyLimits({
     </section>
   );
 }
-function LimitControl({
-  buyer,
-  policy,
-  open,
-}: {
+type LimitControlProps = {
   buyer: X402View;
   policy: BuyerApiPolicy | null;
   open(amount: string): void;
-}) {
+};
+function LimitControl({ buyer, policy, open }: LimitControlProps) {
   const [amount, setAmount] = useState('');
   const available =
     !!policy &&
@@ -146,14 +143,20 @@ function LimitControl({
     <section className="ui-section" aria-label="Spending limit">
       <div className="preview-settings-rows">
         <div className="preview-setting-row">
-          <label className="preview-setting-copy" htmlFor="chat-limit-amount">
-            Spending limit
+          <div className="preview-setting-copy">
+            <label htmlFor="chat-limit-amount">Spending limit</label>
             <small id="chat-limit-help" className="ui-help-text">
               Applies to this chat session. API keys have separate limits.
             </small>
-          </label>
+            {!available && (
+              <Button disabled={buyer.busy} onClick={() => open('')}>
+                Manage chat budget
+              </Button>
+            )}
+          </div>
           <div className="preview-setting-control">
-            <CompactAmount
+            <AmountField
+              compact
               disabled={!available}
               id="chat-limit-amount"
               value={
@@ -185,12 +188,12 @@ function LimitControl({
               }}
               onEscape={() => setAmount('')}
             />
-            {(!available || amount) && (
+            {available && amount && (
               <Button
-                disabled={buyer.busy || (available && !valid)}
-                onClick={() => open(available ? amount : '')}
+                disabled={buyer.busy || !valid}
+                onClick={() => open(amount)}
               >
-                {available ? 'Review limit' : 'Manage chat budget'}
+                Review limit
               </Button>
             )}
           </div>

@@ -1901,7 +1901,7 @@ html .app.desktop-frame .ui-select-trigger[aria-expanded='true']::after {
 html
   .app.desktop-frame
   .preview-model-menu:has(.dropdown-search input:focus:not(:placeholder-shown))
-  .preview-model-list
+  :nth-child(1 of .preview-model-list)
   > :nth-child(1 of [data-model-row]:not(:disabled)) {
   background: color-mix(in srgb, var(--ink) 7%, transparent);
 }

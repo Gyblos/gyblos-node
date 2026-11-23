@@ -1,7 +1,6 @@
-import { Minus, Plus } from '@phosphor-icons/react';
 import type { ReactNode } from 'react';
 
-import { IconButton } from './UI';
+import { AmountField } from './AmountField';
 
 type AmountProps = {
   id: string;
@@ -37,48 +36,26 @@ export function AmountEditor({
   disabled = false,
   autoFocus = false,
 }: AmountProps) {
-  const text = value.trim();
-  const atomic = text ? parse(text) : null;
-  const nudge = (direction: bigint) => {
-    const next = (atomic ?? 0n) + direction * step;
-    onChange(format(next > 0n ? next : 0n));
-  };
   return (
     <div className="preview-amount-editor">
       <label htmlFor={id} className="preview-limit-label">
         {label}
       </label>
-      <div className="preview-amount-field" data-invalid={!!error}>
-        <input
-          id={id}
-          autoFocus={autoFocus}
-          inputMode="decimal"
-          autoComplete="off"
-          placeholder={empty?.placeholder}
-          disabled={disabled}
-          value={value}
-          aria-invalid={!!error}
-          aria-describedby={id + '-help'}
-          onChange={(event) => onChange(event.target.value.replace(',', '.'))}
-          onKeyDown={(event) => {
-            if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-              event.preventDefault();
-              nudge(event.key === 'ArrowUp' ? 1n : -1n);
-            }
-            if (event.key === 'Enter' && onEnter) {
-              event.preventDefault();
-              onEnter();
-            }
-          }}
-        />
-        <span className="preview-amount-unit">{unit}</span>
-        <AmountSteppers
-          stepLabel={format(step) + ' ' + unit}
-          disabled={!!disabled}
-          canDecrease={!!atomic}
-          nudge={nudge}
-        />
-      </div>
+      <AmountField
+        id={id}
+        value={value}
+        onChange={onChange}
+        unit={unit}
+        parse={parse}
+        format={format}
+        step={step}
+        invalid={!!error}
+        disabled={disabled}
+        autoFocus={autoFocus}
+        placeholder={empty?.placeholder}
+        describedBy={id + '-help'}
+        onEnter={onEnter}
+      />
       <Presets
         presets={presets}
         empty={empty}
@@ -133,36 +110,5 @@ function Presets({
         </button>
       )}
     </div>
-  );
-}
-
-function AmountSteppers({
-  stepLabel,
-  disabled,
-  canDecrease,
-  nudge,
-}: {
-  stepLabel: string;
-  disabled: boolean;
-  canDecrease: boolean;
-  nudge(direction: bigint): void;
-}) {
-  return (
-    <span className="preview-steppers">
-      <IconButton
-        label={'Decrease by ' + stepLabel}
-        disabled={disabled || !canDecrease}
-        onClick={() => nudge(-1n)}
-      >
-        <Minus size={14} />
-      </IconButton>
-      <IconButton
-        label={'Increase by ' + stepLabel}
-        disabled={disabled}
-        onClick={() => nudge(1n)}
-      >
-        <Plus size={14} />
-      </IconButton>
-    </span>
   );
 }
