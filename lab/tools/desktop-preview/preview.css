@@ -3804,6 +3804,8 @@ html .app.desktop-frame .preview-rail {
   align-items: center;
   gap: var(--space-1);
   min-height: 0;
+  position: relative;
+  z-index: 1;
   padding: var(--space-2) 0 var(--space-3);
   background: var(--pk-rail);
 }
@@ -3831,15 +3833,31 @@ html .app.desktop-frame .preview-rail-item.ui-icon-button[aria-current='page'] {
   border-inline-start: 1px solid var(--line);
   border-end-start-radius: var(--pk-radius-sheet);
   background: var(--pk-side);
+  box-sizing: border-box;
+  width: calc(var(--compact-navigation-width) - var(--navigation-rail-width));
+  justify-self: start;
 }
 .desktop-frame.sidebar-collapsed .preview-chat-panel {
-  display: none;
+  translate: -100% 0;
+  visibility: hidden;
+  pointer-events: none;
 }
-html .app.desktop-frame.sidebar-collapsed > .buyer-sidebar {
-  grid-template-columns: var(--navigation-rail-width);
+@media (prefers-reduced-motion: no-preference) {
+  .desktop-frame .preview-chat-panel {
+    transition:
+      translate var(--motion-push) var(--motion-push-ease),
+      visibility 0s;
+  }
+  .desktop-frame.sidebar-collapsed .preview-chat-panel {
+    transition:
+      translate var(--motion-push) var(--motion-push-ease),
+      visibility 0s var(--motion-push);
+  }
 }
-html .app.desktop-frame.sidebar-collapsed,
-html .app.desktop-frame.sidebar-collapsed > .ui-window-chrome {
+html .app.desktop-frame.sidebar-collapsed:not(.sidebar-moving),
+html
+  .app.desktop-frame.sidebar-collapsed:not(.sidebar-moving)
+  > .ui-window-chrome {
   background: var(--pk-rail);
 }
 .desktop-frame .preview-agents-entry .preview-connect-logos .preview-tool-logo {
@@ -4109,6 +4127,99 @@ html[data-density='compact'] .app.desktop-frame .preview-metric-icon {
 html[data-density='compact'] .app.desktop-frame .preview-metric-icon svg {
   width: 16px;
   height: 16px;
+}
+html[data-density='compact']
+  .app.desktop-frame
+  .content
+  :is(
+    .preview-metric-card,
+    .preview-settings-rows,
+    .preview-panel,
+    .preview-method-list,
+    .preview-simple-table-region,
+    .ui-table-region,
+    .preview-tool-guide,
+    .preview-tool-card,
+    .preview-limit-card,
+    .application-card,
+    .ui-list
+  ) {
+  border-radius: var(--radius-panel);
+}
+html[data-density='compact'] .app.desktop-frame .content .preview-metric-grid {
+  gap: 12px;
+}
+html[data-density='compact'] .app.desktop-frame .content .preview-metric-card {
+  padding: 12px 14px;
+}
+html[data-density='compact'] .app.desktop-frame .preview-metric-card dt {
+  font-size: var(--ui-detail);
+}
+html[data-density='compact'] .app.desktop-frame .preview-metric-card dd > span {
+  font-size: 18px;
+  line-height: 24px;
+  white-space: nowrap;
+}
+html[data-density='compact'] .app.desktop-frame .preview-tool-guide {
+  gap: 16px;
+  padding: 16px;
+}
+html[data-density='compact']
+  .app.desktop-frame
+  .preview-tool-guide
+  > header
+  .preview-tool-logo {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-control);
+}
+html[data-density='compact']
+  .app.desktop-frame
+  .preview-tool-guide
+  > header
+  .preview-tool-logo
+  img {
+  width: 16px;
+  height: 16px;
+}
+html[data-density='compact'] .app.desktop-frame .preview-steps li {
+  grid-template-columns: 20px minmax(0, 1fr);
+  column-gap: 10px;
+  padding-bottom: 16px;
+}
+html[data-density='compact'] .app.desktop-frame .preview-steps li:last-child {
+  padding-bottom: 0;
+}
+html[data-density='compact']
+  .app.desktop-frame
+  .preview-steps
+  li:not(:last-child)::before {
+  top: 24px;
+  bottom: 4px;
+  left: 10px;
+}
+html[data-density='compact'] .app.desktop-frame .preview-steps li > span {
+  width: 20px;
+  height: 20px;
+}
+html[data-density='compact'] .app.desktop-frame .preview-steps li > span svg {
+  width: 12px;
+  height: 12px;
+}
+html[data-density='compact'] .app.desktop-frame .preview-steps strong {
+  line-height: 20px;
+}
+html[data-density='compact']
+  .app.desktop-frame
+  :is(
+    .preview-steps small,
+    .preview-tool-guide > header small,
+    .content .preview-settings-rows small,
+    .content .preview-metric-detail,
+    .content .ui-help-text
+  ) {
+  font-size: var(--ui-detail);
+  line-height: 16px;
 }
 html[data-density='compact']
   .app.desktop-frame

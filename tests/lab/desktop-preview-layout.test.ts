@@ -84,7 +84,7 @@ void test('the title bar adds a conversation menu and a details panel for the ch
   );
   assert.match(
     css,
-    /\.sidebar-collapsed,\s*html \.app\.desktop-frame\.sidebar-collapsed > \.ui-window-chrome \{\s*background: var\(--pk-rail\);/,
+    /\.sidebar-collapsed:not\(\.sidebar-moving\),\s*html\s+\.app\.desktop-frame\.sidebar-collapsed:not\(\.sidebar-moving\)\s+>\s+\.ui-window-chrome \{\s*background: var\(--pk-rail\);/,
   );
   assert.doesNotMatch(
     css,
@@ -279,4 +279,50 @@ void test('compact pills, buttons, icons, digits and code line numbers', async (
   );
   assert.match(css, /\.pk-code-line::before \{[^}]*padding-inline: 12px;/);
   assert.doesNotMatch(css, /\.pk-code-line::before \{[^}]*margin-right/);
+});
+
+void test('compact cards and connection steps use the compact scale', async () => {
+  const css = (await read('preview.css')).replace(/\s+/g, ' ');
+  const compact = (selector: string, declaration: string) =>
+    assert.ok(
+      new RegExp(
+        String.raw`html\[data-density='compact'\][^{]*` +
+          selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') +
+          String.raw`[^{]*\{[^}]*` +
+          declaration.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+      ).test(css),
+      selector + ' ' + declaration,
+    );
+  compact('.preview-metric-card', 'padding: 12px 14px;');
+  compact('.preview-metric-card', 'border-radius: var(--radius-panel);');
+  compact('.preview-metric-card dt', 'font-size: var(--ui-detail);');
+  compact('.preview-metric-card dd > span', 'font-size: 18px;');
+  compact('.preview-metric-card dd > span', 'white-space: nowrap;');
+  compact('.preview-tool-guide', 'padding: 16px;');
+  compact('.preview-tool-logo', 'width: 28px;');
+  compact('.preview-steps li > span', 'width: 20px;');
+  compact('.preview-steps li > span svg', 'width: 12px;');
+  compact('.preview-steps small', 'font-size: var(--ui-detail);');
+  compact('.ui-help-text', 'font-size: var(--ui-detail);');
+});
+
+void test('the conversation panel slides under the rail like a stacked sheet', async () => {
+  const css = (await read('preview.css')).replace(/\s+/g, ' ');
+  assert.doesNotMatch(
+    css,
+    /\.sidebar-collapsed \.preview-chat-panel \{ display: none;/,
+  );
+  assert.match(
+    css,
+    /\.sidebar-collapsed \.preview-chat-panel \{[^}]*translate: -100% 0;[^}]*visibility: hidden;/,
+  );
+  assert.match(
+    css,
+    /prefers-reduced-motion: no-preference\) \{ \.desktop-frame \.preview-chat-panel \{ transition: translate var\(--motion-push\) var\(--motion-push-ease\)/,
+  );
+  assert.match(
+    css,
+    /\.app\.desktop-frame\.sidebar-collapsed:not\(\.sidebar-moving\), html \.app\.desktop-frame\.sidebar-collapsed:not\(\.sidebar-moving\) > \.ui-window-chrome \{ background: var\(--pk-rail\);/,
+  );
+  assert.match(css, /\.desktop-frame \.preview-rail \{[^}]*z-index: 1;/);
 });

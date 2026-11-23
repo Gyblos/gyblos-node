@@ -18,13 +18,13 @@ Views never use raw color values; colors come from theme variables or `--pk-*` t
 
 ## Surfaces
 
-| Layer               | Dark       | Use                                                                                                                                                                                                                                                           |
-| ------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Page (`--bg`)       | `charcoal` | Route background: an inset sheet with a 1 px border and `--radius-panel` start corners                                                                                                                                                                        |
-| Frame (`--pk-side`) | `panel`    | Conversation panel and title bar; rail, status bar and sidebar backdrop use `--pk-rail` (55% frame toward page); the panel has a `--line` left and bottom edge with a rounded bottom-left corner; with the sidebar collapsed the whole frame uses `--pk-rail` |
-| Panel (`--panel`)   | `panel`    | Grouped settings, usage panels, tables                                                                                                                                                                                                                        |
-| Raised (`--raised`) | `raised`   | Selected pills, chips, controls on panels                                                                                                                                                                                                                     |
-| Line (`--line`)     | `line`     | 1 px borders and row dividers                                                                                                                                                                                                                                 |
+| Layer               | Dark       | Use                                                                                                                                                                                                                                                                                                                           |
+| ------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Page (`--bg`)       | `charcoal` | Route background: an inset sheet with a 1 px border and `--radius-panel` start corners                                                                                                                                                                                                                                        |
+| Frame (`--pk-side`) | `panel`    | Conversation panel and title bar; rail, status bar and sidebar backdrop use `--pk-rail` (55% frame toward page); the panel has a `--line` left and bottom edge with a rounded bottom-left corner; when the sidebar folds, the panel slides under the rail while the page sheet follows, then the whole frame uses `--pk-rail` |
+| Panel (`--panel`)   | `panel`    | Grouped settings, usage panels, tables                                                                                                                                                                                                                                                                                        |
+| Raised (`--raised`) | `raised`   | Selected pills, chips, controls on panels                                                                                                                                                                                                                                                                                     |
+| Line (`--line`)     | `line`     | 1 px borders and row dividers                                                                                                                                                                                                                                                                                                 |
 
 ## Tones
 
@@ -149,8 +149,12 @@ previous density for comparison.
   (`--shell-control-size`). Icon tiles are 28 px with 16 px glyphs, metric icons
   24 px.
 - Digits keep the fixed-width `Gyblos Digits` face under Inter as well.
-- Headings: 15 px section titles, 16 px page intros and the tool guide; 22 px
-  metric values. Chat messages stay at 14 px for reading.
+- Headings: 15 px section titles, 16 px page intros and the tool guide; 18 px
+  metric values on one line. Chat messages stay at 14 px for reading.
+- Cards (metric, settings, payment methods, tables, tool guide, tool and
+  application cards) share `--radius-panel`; metric cards pad 12 / 14 px with
+  12 px labels. Help and detail text is 12 px. Tool guide steps use 20 px
+  markers with 12 px glyphs and a 28 px tool logo.
 - Settings rows, forms and empty states keep 20 px of inner spacing
   (`--pk-comfort-padding`).
 - Radii by level: 6 px buttons and inputs (`--radius-control`), 8 px menus
