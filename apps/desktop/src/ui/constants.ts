@@ -233,11 +233,11 @@ export const ADDITIONAL_MODEL_ARTWORK = [
 
 export const MAIN_NAV = [
   { name: UI_VIEW.CHAT, label: 'Chat' },
-  { name: UI_VIEW.CONNECT, label: 'Connections' },
   { name: UI_VIEW.MODELS, label: 'Models' },
-  { name: UI_VIEW.TOOLS, label: 'Applications' },
+  { name: UI_VIEW.CONNECT, label: 'Connections' },
   { name: UI_VIEW.ACTIVITY, label: 'Usage & payments' },
   { name: UI_VIEW.PAYMENTS, label: 'Usage & payments' },
+  { name: UI_VIEW.TOOLS, label: 'Applications' },
 ] as const;
 export const ROUTE_ORDER = [
   UI_VIEW.CHAT,

@@ -96,3 +96,18 @@ void test('every searchable desktop menu shows an empty state when nothing match
   }
   assert.ok(menus.includes('Management.tsx'));
 });
+
+void test('desktop detail and confirmation dialogs use the approved widths', async () => {
+  const ui = 'apps/desktop/src/ui/';
+  const settings = await readFile(ui + 'Settings.tsx', 'utf8');
+  assert.match(settings, /title="About Gyblos"\s+size="sm"/);
+  assert.match(settings, /title="Design system"\s+size="lg"/);
+  assert.match(
+    await readFile(ui + 'Payments.tsx', 'utf8'),
+    /title="Wallet details"\s+size="lg"/,
+  );
+  assert.match(
+    await readFile(ui + 'UsdcApiKeyDetails.tsx', 'utf8'),
+    /title="Revoke API key\?"\s+size="sm"/,
+  );
+});

@@ -69,7 +69,7 @@ import { Settings } from './ui/Settings';
 import { SystemStatus } from './ui/SystemStatus';
 import type { ToolId } from './ui/tools';
 import { Button, IconButton } from './ui/UI';
-import { UpdateNotice } from './ui/UpdateNotice';
+import { UpdateNotice, useDesktopUpdate } from './ui/UpdateNotice';
 import { UsdcApiKeys } from './ui/UsdcApiKeys';
 import { useActivity } from './ui/useActivity';
 import { useChatArchive } from './ui/useChatArchive';
@@ -115,6 +115,8 @@ export function DesktopApp() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => window.innerWidth < WORKSPACE_BREAKPOINT.SIDEBAR,
   );
+  const update = useDesktopUpdate();
+  const [updateOpen, setUpdateOpen] = useState(false);
   const [contextOpen, setContextOpen] = useState(false);
   const [managePaypal, setManagePaypal] = useState(false);
   const [sidebarMoving, setSidebarMoving] = useState(false);
@@ -486,6 +488,7 @@ export function DesktopApp() {
               online={online}
               onAuthorize={authorizeChatRequest}
               connectedTools={connectedTools}
+              onConnections={() => navigate(UI_VIEW.CONNECT)}
               onBrowseApplications={() => navigate(UI_VIEW.TOOLS)}
               models={chatModels}
               confirmedPolicy={confirmedPolicy}
@@ -566,6 +569,11 @@ export function DesktopApp() {
                   }}
                 />
               }
+              chat={chatController}
+              onOpenChat={(id) => {
+                chatRef.current?.openChat(id);
+                navigate(UI_VIEW.CHAT);
+              }}
               x402={x402}
               session={paypal}
               activity={activity}
@@ -593,12 +601,19 @@ export function DesktopApp() {
       </div>
       <footer className="preview-status-bar" aria-label="App status">
         <SystemStatus
+          update={update}
+          onUpdate={() => setUpdateOpen(true)}
           state={network.state}
           onRetry={network.retry}
           onPayments={() => navigate(UI_VIEW.PAYMENTS)}
         />
         <span className="preview-status-end">
-          <UpdateNotice />v{manifest.version}
+          <UpdateNotice
+            update={update}
+            open={updateOpen}
+            setOpen={setUpdateOpen}
+          />
+          <span className="preview-version">Gyblos {manifest.version}</span>
         </span>
       </footer>
       <MotionPresence>
@@ -614,7 +629,7 @@ export function DesktopApp() {
       </MotionPresence>
       <MotionPresence>
         {modal === UI_DIALOG.ADD_FUNDS && (
-          <Modal title="Add funds" close={() => setModal(null)}>
+          <Modal title="Add funds · Testnet" close={() => setModal(null)}>
             <AddBuyerFunds payer={x402.state.policy?.payer} />
           </Modal>
         )}

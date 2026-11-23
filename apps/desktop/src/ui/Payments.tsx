@@ -6,6 +6,7 @@ import {
   PAYMENT_METHOD,
   type PaymentMethod,
 } from '../paypal-model';
+import type { ChatController } from './chat-controller';
 import { FormActions } from './Form';
 import { Modal } from './Modal';
 import { PaypalSummary, WalletOverview } from './PaymentMethods';
@@ -19,11 +20,12 @@ import type { ActivityView } from './useActivity';
 import type { PaypalSessionView } from './usePaypalSession';
 import type { X402View } from './useX402';
 import { WalletDetails } from './WalletDetails';
-import { X402History } from './X402Payments';
 
 type Props = {
   initialTab?: Tab;
   usage: ReactNode;
+  chat: ChatController;
+  onOpenChat(id: string): void;
   x402?: X402View;
   session: PaypalSessionView;
   activity: ActivityView;
@@ -86,9 +88,11 @@ export function Payments(props: Props) {
             </section>
           </>
         )}
-        {tab === 'history' && props.x402 && <X402History buyer={props.x402} />}
         {tab === 'history' && (
           <SpendingHistory
+            buyer={props.x402}
+            chat={props.chat}
+            onChat={props.onOpenChat}
             activity={props.activity}
             onActivity={props.onActivity}
           />
@@ -96,18 +100,7 @@ export function Payments(props: Props) {
       </div>
       <PaypalManagement {...props} />
       {walletOpen && (
-        <Modal title="Wallet details" close={() => setWalletOpen(false)}>
-          <WalletDetails
-            onBackup={() => {
-              setWalletOpen(false);
-              props.onBackup();
-            }}
-            onAddFunds={() => {
-              setWalletOpen(false);
-              props.onAddFunds();
-            }}
-          />
-        </Modal>
+        <PaymentWallet props={props} close={() => setWalletOpen(false)} />
       )}
     </PagePanel>
   );
@@ -117,7 +110,7 @@ function PaypalManagement(props: Props) {
   return (
     <>
       {props.managePaypal && (
-        <Modal title="PayPal Sandbox" close={() => props.onManagePaypal(false)}>
+        <Modal title="PayPal session" close={() => props.onManagePaypal(false)}>
           <PaypalSessionPanel
             session={props.session}
             onChat={() => {
@@ -138,5 +131,24 @@ function PaypalManagement(props: Props) {
         </Modal>
       )}
     </>
+  );
+}
+
+function PaymentWallet({ props, close }: { props: Props; close(): void }) {
+  return (
+    <Modal title="Wallet details" size="lg" close={close}>
+      <WalletDetails
+        payer={props.x402?.state.policy?.payer}
+        depositAtomic={props.x402?.state.policy?.depositAtomic}
+        onBackup={() => {
+          close();
+          props.onBackup();
+        }}
+        onAddFunds={() => {
+          close();
+          props.onAddFunds();
+        }}
+      />
+    </Modal>
   );
 }

@@ -70,7 +70,11 @@ export function ModelDropdown(props: PickerProps) {
         />
       )}
       {addingFunds && (
-        <Modal title="Add funds" close={() => setAddingFunds(false)}>
+        <Modal
+          title="Add funds · Testnet"
+          description="Your draft stays in the chat."
+          close={() => setAddingFunds(false)}
+        >
           <AddBuyerFunds payer={funding?.payer} />
         </Modal>
       )}

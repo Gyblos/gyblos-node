@@ -347,7 +347,7 @@ void test('preview Connections leads with a tool grid and an inline setup guide'
   const source = await readFile(chat, 'utf8');
   const rendered = transformBrand(source, chat, 'apps/desktop') ?? source;
   assert.ok(
-    rendered.includes('<PreviewConnectEntry'),
+    rendered.includes('<ConnectEntry'),
     'the empty chat offers to connect a dev tool',
   );
 });

@@ -8,6 +8,7 @@ import {
   type LocalNodeState,
 } from '../node-status';
 import { LOCAL_NODE_LABELS } from './constants';
+import { NodeGlyph } from './NodeGlyph';
 
 declare global {
   interface Window {
@@ -104,6 +105,7 @@ export function NetworkStatus({
           </g>
         </svg>
         <span className="network-status-dot" />
+        <NodeGlyph />
       </span>
       <span className="network-status-copy">
         <span>Local node</span>
@@ -111,6 +113,7 @@ export function NetworkStatus({
           {label}
         </strong>
       </span>
+      {retry && <span className="preview-node-retry">Retry</span>}
     </button>
   );
 }

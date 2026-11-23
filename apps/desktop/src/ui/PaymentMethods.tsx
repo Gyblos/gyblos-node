@@ -1,23 +1,18 @@
 import { PaypalLogo, Wallet } from '@phosphor-icons/react';
-import { useState } from 'react';
 
-import { BUYER_SESSION_DEFAULT_POLICY } from '@gyblos/config/batch-session';
 import { DEVNET } from '@gyblos/config/network';
 import {
   PAYPAL_SESSION_PHASE,
   PAYPAL_SESSION_STATUS,
 } from '@gyblos/node/constants';
 
-import { depositShortfall } from '../funding/model';
 import {
   paypalPaymentSummary,
   paypalSessionCanConnectAgent,
 } from '../paypal-model';
-import { BuyerFundingAddress, fundingAmount } from './BuyerFunding';
+import { fundingAmount } from './BuyerFunding';
 import { BUTTON_VARIANT } from './constants';
-import { FormActions } from './Form';
 import { displayDollars } from './history-presentation';
-import { Modal } from './Modal';
 import { TONE } from './status-tone';
 import { Tag } from './Tag';
 import { Button } from './UI';
@@ -34,19 +29,8 @@ export function WalletOverview({
   onAddFunds(): void;
   onDetails(): void;
 }) {
-  const [open, setOpen] = useState(false);
-  const { funding, loading, refresh } = useBuyerFunding(
-    buyer?.state.policy?.payer,
-  );
+  const { funding, loading } = useBuyerFunding(buyer?.state.policy?.payer);
   const balance = funding?.balanceAtomic;
-  const needed =
-    balance != null
-      ? depositShortfall(
-          balance,
-          buyer?.state.policy?.depositAtomic ??
-            BUYER_SESSION_DEFAULT_POLICY.depositAtomic,
-        )
-      : null;
   return (
     <li className="preview-method-row" aria-label="USDC buyer wallet">
       <span className="ui-icon-tile" aria-hidden="true">
@@ -76,32 +60,8 @@ export function WalletOverview({
         >
           Add funds
         </Button>
-        <Button onClick={() => setOpen(true)}>Details</Button>
+        <Button onClick={onDetails}>Details</Button>
       </div>
-      {open && (
-        <Modal title="USDC buyer wallet" close={() => setOpen(false)}>
-          <p>
-            {balance == null ? 'Balance unavailable' : fundingAmount(balance)}
-          </p>
-          {needed && needed !== '0' && (
-            <p>Add {fundingAmount(needed)} to open a new channel.</p>
-          )}
-          {funding && <BuyerFundingAddress funding={funding} />}
-          <FormActions align="start">
-            <Button disabled={loading} onClick={refresh}>
-              Refresh balance
-            </Button>
-            <Button
-              onClick={() => {
-                setOpen(false);
-                onDetails();
-              }}
-            >
-              Desktop wallet details
-            </Button>
-          </FormActions>
-        </Modal>
-      )}
     </li>
   );
 }

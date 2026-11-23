@@ -47,6 +47,7 @@ import { ChatComposer } from './ChatComposer';
 import { ToolsDropdown } from './ChatTools';
 import { ChatUserMessage } from './ChatUserMessage';
 import { ComposerFunding } from './ComposerFunding';
+import { ConnectEntry } from './ConnectEntry';
 import {
   BUTTON_VARIANT,
   CHAT_PREVIEW,
@@ -94,6 +95,7 @@ type Props = {
   active?: boolean;
   showToolbar?: boolean;
   connectedTools: ToolId[];
+  onConnections(): void;
   onBrowseApplications: () => void;
   models: readonly ModelOption[];
   onSelectModel: (id: string) => void;
@@ -154,6 +156,7 @@ export function Chat({
   online,
   active = true,
   connectedTools,
+  onConnections,
   onBrowseApplications,
   models,
   onSelectModel,
@@ -619,6 +622,7 @@ export function Chat({
               />
               <h2>Start a conversation</h2>
               <p>Choose how to pay. Keep the conversation.</p>
+              <ConnectEntry open={onConnections} />
             </div>
           ) : (
             <div

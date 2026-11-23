@@ -220,7 +220,6 @@
   "apps/desktop/src/ui/SidebarActionIcon.tsx": 1,
   "apps/desktop/src/ui/SidebarIcon.tsx": 2,
   "apps/desktop/src/ui/Signal.tsx": 1,
-  "apps/desktop/src/ui/SpendingHistory.tsx": 1,
   "apps/desktop/src/ui/StartupScreen.tsx": 1,
   "apps/desktop/src/ui/StartupSplash.tsx": 1,
   "apps/desktop/src/ui/Tooltip.tsx": 2,

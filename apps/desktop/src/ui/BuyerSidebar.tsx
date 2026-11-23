@@ -3,10 +3,10 @@ import { Plus } from '@phosphor-icons/react';
 
 import { CHAT_STORAGE_STATE, type ChatArchiveState } from '../constants';
 import type { ChatController } from './chat-controller';
+import { AgentLogos } from './ConnectEntry';
 import { MAIN_NAV, SIDEBAR_ACTION, UI_VIEW } from './constants';
 import { ConversationHistory } from './ConversationHistory';
 import type { View } from './model-types';
-import { ServiceLogo } from './ServiceLogo';
 import { SidebarActionIcon } from './SidebarActionIcon';
 import { SidebarIcon } from './SidebarIcon';
 import { Button, IconButton } from './UI';
@@ -89,13 +89,7 @@ function ConversationList({
         className="ui-nav-row preview-agents-entry"
         onClick={() => navigate(UI_VIEW.CONNECT)}
       >
-        <span className="preview-connect-logos" aria-hidden="true">
-          {['OpenCode', 'Codex', 'Claude Code', 'Pi'].map((tool) => (
-            <span className="preview-tool-logo" key={tool}>
-              <ServiceLogo service={tool} />
-            </span>
-          ))}
-        </span>
+        <AgentLogos />
         <span>Connect agents</span>
       </Button>
       <ConversationHistory

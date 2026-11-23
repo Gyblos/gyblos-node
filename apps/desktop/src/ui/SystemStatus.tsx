@@ -7,6 +7,7 @@ import {
 import { useState } from 'react';
 
 import { LOCAL_NODE_STATE, type LocalNodeState } from '../node-status';
+import type { DesktopUpdate } from '../update-check';
 import { WALLET_STATUS } from '../wallet/model';
 import { LOCAL_NODE_LABELS } from './constants';
 import { Modal } from './Modal';
@@ -43,10 +44,14 @@ export function SystemStatus({
   state,
   onRetry,
   onPayments,
+  update,
+  onUpdate,
 }: {
   state: LocalNodeState;
   onRetry(): void;
   onPayments(): void;
+  update: DesktopUpdate | null;
+  onUpdate(): void;
 }) {
   const [open, setOpen] = useState(false);
   const wallet = useDesktopWallet();
@@ -59,6 +64,10 @@ export function SystemStatus({
     },
   };
   const { checks, tone, summary } = summarizeStatus(wallet, state, manage);
+  const versionCheck = updateCheck(update, () => {
+    setOpen(false);
+    onUpdate();
+  });
   return (
     <>
       <Button
@@ -80,27 +89,13 @@ export function SystemStatus({
                 <NetworkStatus state={state} onRetry={onRetry} />
               </section>
               <ul className="preview-status-list" aria-label="Checks">
-                {checks.map((check) => {
-                  const Glyph = GLYPH[check.tone];
-                  return (
-                    <li
-                      key={check.label}
-                      className="preview-status-row"
-                      data-tone={check.tone}
-                    >
-                      <Glyph size={18} weight="fill" aria-hidden="true" />
-                      <span className="preview-status-copy">
-                        <strong>{check.label}</strong>
-                        <small>{check.value}</small>
-                      </span>
-                      {check.action && (
-                        <Button onClick={check.action.run}>
-                          {check.action.label}
-                        </Button>
-                      )}
-                    </li>
-                  );
-                })}
+                <StatusRows
+                  checks={[
+                    ...checks.slice(0, -1),
+                    versionCheck,
+                    ...checks.slice(-1),
+                  ]}
+                />
               </ul>
               <p className="ui-help-text">
                 Sellers are checked when you send a message.
@@ -195,4 +190,49 @@ function summarizeStatus(
             ? 'Loading wallet'
             : 'All systems ready'));
   return { checks, tone, summary };
+}
+
+function updateCheck(
+  update: DesktopUpdate | null,
+  open: () => void,
+): StatusCheck {
+  return {
+    label: 'Desktop app',
+    value: update?.available
+      ? 'Gyblos ' + update.available + ' is available'
+      : 'Installed version ' + (update?.current ?? 'unavailable'),
+    tone: update?.available ? TONE.INFO : TONE.NEUTRAL,
+    ...(update?.available && {
+      action: {
+        label: 'View update',
+        run: open,
+      },
+    }),
+  };
+}
+
+function StatusRows({ checks }: { checks: StatusCheck[] }) {
+  return (
+    <>
+      {checks.map((check) => {
+        const Glyph = GLYPH[check.tone];
+        return (
+          <li
+            key={check.label}
+            className="preview-status-row"
+            data-tone={check.tone}
+          >
+            <Glyph size={18} weight="fill" aria-hidden="true" />
+            <span className="preview-status-copy">
+              <strong>{check.label}</strong>
+              <small>{check.value}</small>
+            </span>
+            {check.action && (
+              <Button onClick={check.action.run}>{check.action.label}</Button>
+            )}
+          </li>
+        );
+      })}
+    </>
+  );
 }

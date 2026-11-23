@@ -2,14 +2,13 @@ import { CaretRight, Check } from '@phosphor-icons/react';
 import { useState, type ComponentProps } from 'react';
 
 import { useCatalogFilters } from './catalog-filters';
+import { CatalogSellerDialog } from './CatalogSellerDialog';
 import { ChoiceMenu } from './Management';
-import { moveMenuFocus } from './menu-keyboard';
-import { Modal } from './Modal';
 import { groupPrice } from './model-price';
 import type { CatalogModel } from './model-types';
 import { ModelImage } from './ModelImage';
 import { MotionPresence } from './Motion';
-import { NetworkSellerMenu } from './NetworkSellerMenu';
+import type { NetworkSellerMenu } from './NetworkSellerMenu';
 import { List } from './UI';
 
 function CatalogRows({
@@ -54,14 +53,19 @@ function CatalogRows({
                   {[
                     ...new Set(rows.map((row) => row.variant).filter(Boolean)),
                   ].join(', ')}{' '}
-                  · {[...new Set(rows.map((row) => row.context))].join(', ')}{' '}
+                  {[...new Set(rows.map((row) => row.context))].join(', ')}{' '}
                   context
                 </small>
               </span>
               <span className="preview-model-stats">
                 {rows.reduce((count, row) => count + row.providers, 0)} offers
               </span>
-              <span className="ui-price">{groupPrice(rows)}</span>
+              <span className="preview-model-mode">
+                {selected ? (automatic ? 'Auto' : 'Selected') : '—'}
+              </span>
+              <span className="ui-price">
+                <strong>{groupPrice(rows)}</strong>
+              </span>
               <CaretRight size={14} />
             </button>
           </div>
@@ -121,27 +125,23 @@ export function CatalogOffers(
       </List>
       <MotionPresence>
         {name && offers && (
-          <Modal title={name} size="lg" close={() => setName(undefined)}>
-            <div className="preview-seller-drawer">
-              <h3>Choose a seller</h3>
-              <div
-                role="menu"
-                aria-label="Seller options"
-                onKeyDown={moveMenuFocus}
-              >
-                <NetworkSellerMenu
-                  {...props}
-                  models={offers}
-                  initiallyExpanded={name}
-                  onSelect={pick}
-                  onAuto={(model) => {
+          <CatalogSellerDialog
+            key={name}
+            name={name}
+            offers={offers}
+            selected={props.selected}
+            automatic={props.automatic}
+            choose={pick}
+            close={() => setName(undefined)}
+            auto={
+              props.buyerModels.includes(name)
+                ? () => {
                     setName(undefined);
-                    props.onAuto(model);
-                  }}
-                />
-              </div>
-            </div>
-          </Modal>
+                    props.onAuto(name);
+                  }
+                : undefined
+            }
+          />
         )}
       </MotionPresence>
     </>

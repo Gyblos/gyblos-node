@@ -1,14 +1,14 @@
 // Flat appearance and product information use the shared compact design primitives.
-import { Code, Coins, Info, Palette, UsersThree } from '@phosphor-icons/react';
+import { Code, Info, Palette, Storefront, Wallet } from '@phosphor-icons/react';
 import { useState } from 'react';
 
 import { Appearance } from './Appearance';
 import { BUTTON_VARIANT } from './constants';
-import { FormField, FormInput } from './Form';
 import { setInterfaceFont } from './interface-font';
 import { ChoiceMenu, Section } from './Management';
 import { Modal } from './Modal';
-import { Button, PagePanel } from './UI';
+import { MotionPresence } from './Motion';
+import { Button, IconButton, PagePanel } from './UI';
 
 export function Settings({
   light,
@@ -28,7 +28,7 @@ export function Settings({
   const [aboutOpen, setAboutOpen] = useState(false);
   return (
     <PagePanel>
-      <Section title="Appearance" icon={<Palette size={16} />}>
+      <Section title="Appearance" icon={<Palette size={16} weight="bold" />}>
         <div className="preview-settings-rows preview-settings-appearance">
           <Appearance
             label="Theme"
@@ -55,7 +55,7 @@ export function Settings({
         </div>
       </Section>
       <PolicySettings />
-      <Section title="About" icon={<Info size={16} />}>
+      <Section title="About" icon={<Info size={16} weight="bold" />}>
         <div className="preview-settings-rows">
           <div>
             <span>Design system</span>
@@ -67,18 +67,26 @@ export function Settings({
           </div>
         </div>
       </Section>
-      {aboutOpen && (
-        <Modal title="About Gyblos" close={() => setAboutOpen(false)}>
-          <div className="ui-section">
-            <p>Gyblos desktop</p>
-            <p className="ui-help-text">Version {version}</p>
-            <p className="ui-help-text">Local desktop application</p>
-          </div>
-        </Modal>
-      )}
-      {designOpen && (
-        <DesignDialog font={font} close={() => setDesignOpen(false)} />
-      )}
+      <MotionPresence>
+        {aboutOpen && (
+          <Modal
+            title="About Gyblos"
+            size="sm"
+            close={() => setAboutOpen(false)}
+          >
+            <div className="ui-section">
+              <p>Gyblos desktop</p>
+              <p className="ui-help-text">Version {version}</p>
+              <p className="ui-help-text">Local desktop application</p>
+            </div>
+          </Modal>
+        )}
+      </MotionPresence>
+      <MotionPresence>
+        {designOpen && (
+          <DesignDialog font={font} close={() => setDesignOpen(false)} />
+        )}
+      </MotionPresence>
     </PagePanel>
   );
 }
@@ -86,7 +94,7 @@ export function Settings({
 function PolicySettings() {
   return (
     <>
-      <Section title="Sellers" icon={<UsersThree size={16} />}>
+      <Section title="Sellers" icon={<Storefront size={16} weight="bold" />}>
         <div className="preview-settings-rows">
           <div>
             <span>
@@ -99,7 +107,7 @@ function PolicySettings() {
           </div>
         </div>
       </Section>
-      <Section title="Funds" icon={<Coins size={16} />}>
+      <Section title="Funds" icon={<Wallet size={16} weight="bold" />}>
         <div className="preview-settings-rows">
           <div>
             <span>
@@ -120,7 +128,7 @@ function PolicySettings() {
           </div>
         </div>
       </Section>
-      <Section title="Developer" icon={<Code size={16} />}>
+      <Section title="Developer" icon={<Code size={16} weight="bold" />}>
         <div className="preview-settings-rows">
           <div>
             <span>
@@ -148,8 +156,30 @@ function PolicySettings() {
 function DesignDialog({ font, close }: { font: string; close(): void }) {
   return (
     <>
-      <Modal title="Design system" close={close}>
+      <Modal title="Design system" size="lg" close={close}>
         <div className="ui-section">
+          <Section title="Buttons">
+            <div className="preview-settings-rows">
+              <div>
+                <span>Standard action</span>
+                <Button>Copy</Button>
+              </div>
+              <div>
+                <span>Primary action</span>
+                <Button variant={BUTTON_VARIANT.PRIMARY}>Connect a tool</Button>
+              </div>
+              <div>
+                <span>Integrated icon</span>
+                <IconButton label="Information example">
+                  <Info size={16} />
+                </IconButton>
+              </div>
+              <div>
+                <span>Disabled</span>
+                <Button disabled>Create key</Button>
+              </div>
+            </div>
+          </Section>
           <Section title="Typography">
             <p className="ui-help-text">
               {font} · 13 px interface · 15 px sections
@@ -163,21 +193,6 @@ function DesignDialog({ font, close }: { font: string; close(): void }) {
               <span className="ui-swatch ui-swatch--panel">Surface</span>
               <span className="ui-swatch ui-swatch--accent">#0A28F0</span>
             </div>
-          </Section>
-          <Section title="Controls">
-            <div className="ui-inline-actions">
-              <Button variant={BUTTON_VARIANT.PRIMARY}>Primary</Button>
-              <Button variant={BUTTON_VARIANT.SECONDARY}>Secondary</Button>
-              <Button>Outline</Button>
-              <Button disabled>Disabled</Button>
-            </div>
-            <FormField label="Example input" htmlFor="review-design-input">
-              <FormInput
-                id="review-design-input"
-                value="28 px shared control"
-                readOnly
-              />
-            </FormField>
           </Section>
           <Section title="Spacing">
             <p className="ui-help-text">

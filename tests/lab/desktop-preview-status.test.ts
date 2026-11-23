@@ -16,7 +16,7 @@ void test('system status moves to a footer status bar with one checklist dialog'
   assert.match(build, /<PreviewStatusBar version=\{manifest\.version\}/);
   assert.match(
     await readFile('apps/desktop/src/desktop-app.tsx', 'utf8'),
-    /<footer[\s\S]*?<UpdateNotice \/>[\s\S]*?<\/footer>/,
+    /<footer[\s\S]*?<UpdateNotice\s[\s\S]*?<\/footer>/,
   );
   const status = await read('views/SystemStatus.tsx.preview');
   assert.match(

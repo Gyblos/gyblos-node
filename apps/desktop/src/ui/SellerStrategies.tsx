@@ -10,8 +10,9 @@ import { Modal } from './Modal';
 import { priceRange } from './model-price';
 import type { ModelOption } from './model-types';
 import { ModelMenuTrail } from './ModelMenuBadges';
+import { OfferTable } from './OfferTable';
 import { Tag } from './Tag';
-import { Button, MenuItem } from './UI';
+import { MenuItem } from './UI';
 
 function Strategy({
   icon: Icon,
@@ -53,6 +54,15 @@ function Strategy({
     />
   );
 }
+export function lowestRate(offers: readonly ModelOption[]) {
+  return offers.reduce((best, item) =>
+    (item.free && !best.free) ||
+    (item.free === best.free &&
+      item.input + item.output < best.input + best.output)
+      ? item
+      : best,
+  );
+}
 export function SellerStrategies({
   name,
   offers,
@@ -68,13 +78,7 @@ export function SellerStrategies({
   choose: (id: string) => void;
   compare: () => void;
 }) {
-  const lowest = offers.reduce((best, item) =>
-    (item.free && !best.free) ||
-    (item.free === best.free &&
-      item.input + item.output < best.input + best.output)
-      ? item
-      : best,
-  );
+  const lowest = lowestRate(offers);
   return (
     <>
       <Strategy
@@ -130,38 +134,12 @@ export function OfferComparison({
       <p className="ui-help-text">
         Advertised input and output prices per million tokens.
       </p>
-      <div className="preview-simple-table-region">
-        <table className="preview-simple-table">
-          <caption className="sr-only">Offers for {name}</caption>
-          <thead>
-            <tr>
-              <th scope="col">Seller / variant</th>
-              <th scope="col" className="preview-num">
-                In / out
-              </th>
-              <th scope="col">
-                <span className="sr-only">Action</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {offers.map((offer) => (
-              <tr key={offer.id}>
-                <th scope="row">{offer.family || name}</th>
-                <td className="preview-num preview-tabular">
-                  {offer.free ? 'Free' : priceRange(offer)}
-                </td>
-                <td className="preview-num">
-                  <Button onClick={() => choose(offer.id)}>
-                    {selected === offer.id ? 'In use' : 'Choose offer'}
-                  </Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      {!offers.length && <p role="status">No matching offers remain.</p>}
+      <OfferTable
+        name={name}
+        offers={offers}
+        selected={selected}
+        choose={choose}
+      />
     </Modal>
   );
 }

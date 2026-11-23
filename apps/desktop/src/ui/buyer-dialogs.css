@@ -1,0 +1,259 @@
+.desktop-frame .preview-key-budget {
+  display: grid;
+  gap: 8px;
+  padding-block: 12px;
+  border-block: 1px solid var(--line);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.preview-key-budget > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px 16px;
+  flex-wrap: wrap;
+}
+.preview-key-budget progress {
+  width: 100%;
+  height: 4px;
+  border: 0;
+  appearance: none;
+  background: var(--raised);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.preview-key-budget progress::-webkit-progress-bar {
+  background: var(--raised);
+}
+.preview-key-budget progress::-webkit-progress-value {
+  background: var(--accent);
+}
+
+.network-status-symbol .preview-node-hex {
+  display: none;
+}
+.desktop-frame .modal .network-status-symbol .preview-node-hex {
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: var(--ink);
+}
+.modal .preview-node-hex g {
+  fill: none;
+  stroke: var(--circuit);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.desktop-frame dialog.modal:has(.preview-node-hex) {
+  --modal-width: 440px;
+  gap: 8px;
+}
+.desktop-frame .modal:has(.preview-node-hex) .ui-section {
+  gap: 0;
+}
+.desktop-frame .modal:has(.preview-node-hex) .ui-status-item {
+  padding-block: 8px;
+}
+.desktop-frame .modal:has(.preview-node-hex) .network-status-symbol {
+  flex: 0 1 124px;
+  height: 108px;
+}
+.preview-node-retry {
+  margin-inline-start: auto;
+  padding: 5px 10px;
+  border-radius: var(--radius-control);
+  background: var(--preview-button-surface);
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.desktop-frame .modal:has(.preview-node-hex) > header {
+  display: grid;
+  grid-template-columns: 28px 1fr 28px;
+  align-items: center;
+  margin-bottom: 0;
+}
+.desktop-frame .modal:has(.preview-node-hex) > header > div:first-child {
+  grid-column: 2;
+  text-align: center;
+}
+.desktop-frame .modal:has(.preview-node-hex) .network-status {
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 0;
+  text-align: center;
+}
+.desktop-frame .modal:has(.preview-node-hex) .network-status-symbol {
+  flex: none;
+  width: 110px;
+  height: 92px;
+}
+.desktop-frame .modal:has(.preview-node-hex) .preview-node-retry {
+  margin: 4px 0 0;
+}
+html .app.desktop-frame .pk-update {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 20px;
+  min-height: 20px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-badge);
+  background: color-mix(in srgb, var(--pk-info) 16%, transparent);
+  color: color-mix(in srgb, var(--pk-info) 82%, var(--ink));
+  font-size: 12px;
+  font-weight: 500;
+}
+html .app.desktop-frame .pk-update:hover {
+  background: color-mix(in srgb, var(--pk-info) 26%, transparent);
+}
+.preview-version {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.desktop-frame .preview-model-head-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.desktop-frame .preview-strategy {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  justify-self: start;
+}
+html .app.desktop-frame .preview-strategy button {
+  padding: 5px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+html
+  .app.desktop-frame
+  .preview-strategy
+  button:is([aria-checked='true'], [aria-pressed='true']) {
+  background: var(--raised);
+  color: var(--ink);
+}
+.desktop-frame .preview-route {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--pk-tone) 35%, var(--line));
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--pk-tone) 6%, var(--panel));
+  transition:
+    border-color var(--pk-menu-motion) ease,
+    background-color var(--pk-menu-motion) ease;
+}
+.desktop-frame .preview-route[data-tone='neutral'] {
+  border-color: var(--line);
+  background: var(--panel);
+}
+.desktop-frame .preview-route .ui-icon-tile {
+  color: var(--pk-tone);
+}
+.desktop-frame .preview-route-copy {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+}
+.desktop-frame .preview-route-copy strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+.desktop-frame .preview-route-copy small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.desktop-frame .preview-seller-name {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.desktop-frame .pk-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+html .app.desktop-frame .pk-chips button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+html .app.desktop-frame .pk-chips button[aria-checked='true'] {
+  border-color: var(--line);
+  background: var(--raised);
+  color: var(--ink);
+}
+html .app.desktop-frame .pk-chips button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+.desktop-frame .pk-count {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.desktop-frame .preview-history-filters {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.desktop-frame .preview-connect-entry {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 12px;
+  padding: 7px 12px 7px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--motion-overlay) ease;
+}
+.desktop-frame .preview-connect-entry:hover {
+  border-color: color-mix(in srgb, var(--ink) 24%, transparent);
+}
+.desktop-frame .preview-connect-copy {
+  display: grid;
+}
+.desktop-frame .chat-start .preview-connect-copy strong {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+.desktop-frame .preview-connect-copy small {
+  font-size: 12px;
+}
