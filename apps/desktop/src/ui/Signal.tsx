@@ -1,8 +1,7 @@
 // The desktop uses the terminal mark approved in the preview in both themes.
-import { SIGNAL_STATE } from './constants';
+import { SIGNAL_STATE, type SignalState } from './constants';
 
 export { SIGNAL_STATE } from './constants';
-type SignalState = (typeof SIGNAL_STATE)[keyof typeof SIGNAL_STATE];
 export function SignalMark({
   state = SIGNAL_STATE.IDLE,
 }: {

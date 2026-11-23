@@ -39,6 +39,7 @@ export const SIGNAL_STATE = {
   STOPPED: 'stopped',
   PAUSED: 'paused',
 } as const;
+export type SignalState = (typeof SIGNAL_STATE)[keyof typeof SIGNAL_STATE];
 
 export const SLIDE_DIRECTION = {
   FORWARD: 'forward',

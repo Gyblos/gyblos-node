@@ -2,14 +2,22 @@
 // Execution, clipboard state and session transitions remain with the caller.
 import { ArrowClockwise, Check, Copy, Info } from '@phosphor-icons/react';
 
-import { MESSAGE_STATE, type ChatMessage } from './chat-state';
+import {
+  CHAT_PHASE,
+  MESSAGE_STATE,
+  type ChatMessage,
+  type ChatRun,
+} from './chat-state';
 import { AssistantProgress } from './ChatMessageParts';
 import { MessageText } from './MessageText';
+import { SIGNAL_STATE } from './Signal';
+import { SignalFace } from './SignalFace';
 import { TurnActivity } from './TurnActivity';
 import { IconButton } from './UI';
 
 type Props = {
   message: ChatMessage;
+  run: ChatRun | null;
   copied: boolean;
   canReuse: boolean;
   reuseDisabled: boolean;
@@ -68,7 +76,7 @@ function AnswerActions({
 }
 
 export function ChatAnswer(props: Props) {
-  const { message } = props;
+  const { message, run } = props;
   return (
     <article
       className="chat-answer"
@@ -85,7 +93,19 @@ export function ChatAnswer(props: Props) {
         />
       )}
       {!message.activity && message.state === MESSAGE_STATE.PENDING && (
-        <AssistantProgress>
+        <AssistantProgress
+          mark={
+            <SignalFace
+              state={
+                run?.phase === CHAT_PHASE.CONNECTING
+                  ? SIGNAL_STATE.CONNECTING
+                  : run?.phase === CHAT_PHASE.TOOLS
+                    ? SIGNAL_STATE.WORKING
+                    : SIGNAL_STATE.RESPONDING
+              }
+            />
+          }
+        >
           {message.text ? 'Writing…' : 'Preparing response'}
         </AssistantProgress>
       )}

@@ -3,33 +3,30 @@
 // index. The per-model table lives in the Models section.
 import { Activity, BadgeCheck, Boxes, Server, Tag } from 'lucide-react';
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 
 import { HOW_TO_VERIFY_URL } from '../lib/config';
 import { DISPLAY, PAGING } from '../lib/constants';
 import type { DiscoverySnapshot, Seller } from '../lib/discovery';
 import { getDiscovery } from '../lib/discovery-render';
-import { count, percent, pricePerMtok, short, usdc, utc } from '../lib/format';
-import {
-  notOnline,
-  type GithubAccount,
-  type NetworkStatus,
-} from '../lib/network-status';
+import { count, percent, pricePerMtok, usdc, utc } from '../lib/format';
+import type { GithubAccount } from '../lib/network-status';
 import { summarizeOffers, uptimeRatio } from '../lib/offers';
 import { queryHref, tablePager, type ExplorerQuery } from '../lib/paging';
 import {
   emptySellersMessage,
   githubByNode,
-  notOnlineMeta,
+  namesByNode,
   offersCaption,
   orderSellers,
   sellerHref,
   verifiedOnly,
 } from '../lib/seller-identity';
-import { SELLER_STATUS_LABELS } from '../lib/seller-profile';
 import { Flow } from './board/animated-number';
 import { Chip } from './board/chip';
 import { StatCard } from './board/stat-card';
 import { StatusDot } from './board/status-dot';
+import { NotOnline } from './not-online';
 import { pagedRows, Pager } from './pager';
 import { SellerCell } from './seller-cell';
 import {
@@ -61,6 +58,7 @@ export async function NetworkSection({ query }: { query: ExplorerQuery }) {
     );
   const summary = summarizeOffers(snapshot);
   const accounts = githubByNode(snapshot.network);
+  const names = namesByNode(snapshot.network);
   const ordered = orderSellers(snapshot.sellers, snapshot.generatedAt);
   const shown = verified ? verifiedOnly(ordered, accounts) : ordered;
   return (
@@ -111,6 +109,7 @@ export async function NetworkSection({ query }: { query: ExplorerQuery }) {
         query={query}
         sellers={shown}
         accounts={accounts}
+        names={names}
         accountsKnown={!!snapshot.network && !snapshot.network.truncated}
       />
       <NotOnline
@@ -152,11 +151,13 @@ function SellersBlock({
   query,
   sellers,
   accounts,
+  names,
   accountsKnown,
 }: {
   query: ExplorerQuery;
   sellers: Seller[];
   accounts: Map<string, GithubAccount>;
+  names: Map<string, string>;
   accountsKnown: boolean;
 }) {
   return (
@@ -170,6 +171,7 @@ function SellersBlock({
         query={query}
         sellers={sellers}
         accounts={accounts}
+        names={names}
         accountsKnown={accountsKnown}
       />
       <p className="mt-2 flex items-center gap-1 text-xs text-dim">
@@ -180,7 +182,8 @@ function SellersBlock({
         <span>
           The discovery index checked that the named GitHub account published
           the seller&apos;s NodeId. It links the seller to that account; it does
-          not identify a person and says nothing about quality.{' '}
+          not identify a person and says nothing about quality. Names under an
+          account are chosen by sellers and not verified.{' '}
           <a className="text-muted hover:text-brand" href={HOW_TO_VERIFY_URL}>
             How to verify
           </a>
@@ -231,21 +234,70 @@ const sellerOffers = (sellers: Seller[]) =>
     seller.models.map((model) => ({ seller, model })),
   );
 
+function OfferRow({
+  seller,
+  model,
+  cell,
+}: {
+  seller: Seller;
+  model: Seller['models'][number];
+  cell: ReactNode;
+}) {
+  return (
+    <tr className="border-t border-line">
+      <td className={`${td} font-mono`} title={`Node ${seller.nodeId}`}>
+        {cell}
+      </td>
+      <td className={td}>
+        <Chip tone="brand">
+          <StatusDot />
+          Online
+        </Chip>
+      </td>
+      <td className={td}>
+        <ModelName
+          modelId={model.modelId}
+          variant={model.variant}
+          quantization={model.quantization}
+        />
+      </td>
+      <td className={numberCell}>{count(model.contextTokens)}</td>
+      <td className={moneyCell}>
+        {pricePerMtok(model.pricing.inputAtomicPerMtok)}
+      </td>
+      <td className={moneyCell}>
+        {pricePerMtok(model.pricing.outputAtomicPerMtok)}
+      </td>
+      <td className={numberCell}>
+        {ratioText(uptimeRatio(seller, DISPLAY.dayWindow))} ·{' '}
+        {ratioText(uptimeRatio(seller, DISPLAY.weekWindow))}
+      </td>
+      <td className={timeCell}>{utc(seller.uptime?.firstSeenAt ?? null)}</td>
+    </tr>
+  );
+}
+
 function SellersTable({
   query,
   sellers,
   accounts,
+  names,
   accountsKnown,
 }: {
   query: ExplorerQuery;
   sellers: Seller[];
   accounts: Map<string, GithubAccount>;
+  names: Map<string, string>;
   accountsKnown: boolean;
 }) {
   const empty = emptySellersMessage(sellers, query.verified, accountsKnown);
   const offers = sellerOffers(sellers);
-  const complete = !query.verified || accountsKnown;
-  const page = pagedRows(query, 'sellers', offers, complete);
+  const page = pagedRows(
+    query,
+    'sellers',
+    offers,
+    !query.verified || accountsKnown,
+  );
   return (
     <>
       <Table minWidth={DISPLAY.wideTable} head={SELLERS_HEAD}>
@@ -257,47 +309,21 @@ function SellersTable({
           </tr>
         ) : null}
         {page.rows.map(({ seller, model }) => (
-          <tr
+          <OfferRow
             key={`${seller.nodeId}:${model.modelId}:${model.variant}:${model.quantization}`}
-            className="border-t border-line"
-          >
-            <td className={`${td} font-mono`} title={`Node ${seller.nodeId}`}>
+            seller={seller}
+            model={model}
+            cell={
               <SellerCell
                 nodeId={seller.nodeId}
                 github={accounts.get(seller.nodeId) ?? null}
+                name={names.get(seller.nodeId) ?? null}
                 href={sellerHref(seller.nodeId, query)}
               >
                 <Addr value={seller.owner} />
               </SellerCell>
-            </td>
-            <td className={td}>
-              <Chip tone="brand">
-                <StatusDot />
-                Online
-              </Chip>
-            </td>
-            <td className={td}>
-              <ModelName
-                modelId={model.modelId}
-                variant={model.variant}
-                quantization={model.quantization}
-              />
-            </td>
-            <td className={numberCell}>{count(model.contextTokens)}</td>
-            <td className={moneyCell}>
-              {pricePerMtok(model.pricing.inputAtomicPerMtok)}
-            </td>
-            <td className={moneyCell}>
-              {pricePerMtok(model.pricing.outputAtomicPerMtok)}
-            </td>
-            <td className={numberCell}>
-              {ratioText(uptimeRatio(seller, DISPLAY.dayWindow))} ·{' '}
-              {ratioText(uptimeRatio(seller, DISPLAY.weekWindow))}
-            </td>
-            <td className={timeCell}>
-              {utc(seller.uptime?.firstSeenAt ?? null)}
-            </td>
-          </tr>
+            }
+          />
         ))}
       </Table>
       <Pager label="Sellers" view={tablePager(query, 'sellers', page)} />
@@ -306,93 +332,6 @@ function SellersTable({
           {offersCaption(offers.length, sellers.length)}
         </p>
       ) : null}
-    </>
-  );
-}
-
-function NotOnline({
-  query,
-  network,
-  accounts,
-}: {
-  query: ExplorerQuery;
-  network: NetworkStatus | null;
-  accounts: Map<string, GithubAccount> | null;
-}) {
-  return (
-    <>
-      {network ? (
-        <>
-          <NotOnlineTable query={query} network={network} accounts={accounts} />
-          {network.truncated ? (
-            <p className="mt-2 text-xs text-dim">
-              The index reached one of its limits: these lists and their counts
-              may be incomplete.
-            </p>
-          ) : null}
-        </>
-      ) : (
-        <p className="mt-2 text-xs text-dim">
-          The index&apos;s network status could not be read: offline and not
-          published sellers are unknown.
-        </p>
-      )}
-    </>
-  );
-}
-
-// Registered or recently seen sellers without a live presence now. Offline ones were seen before;
-// unpublished ones were never seen or withdrew their catalog.
-function NotOnlineTable({
-  query,
-  network,
-  accounts,
-}: {
-  query: ExplorerQuery;
-  network: NetworkStatus;
-  accounts: Map<string, GithubAccount> | null;
-}) {
-  const nodes = notOnline(network).filter(
-    (node) => !accounts || accounts.has(node.nodeId),
-  );
-  const page = pagedRows(query, 'offline', nodes, !network.truncated);
-  if (!nodes.length) return null;
-  return (
-    <>
-      <SectionTitle
-        id={PAGING.anchors.offline}
-        title="Not online"
-        meta={notOnlineMeta(network, accounts ? nodes.length : null)}
-      />
-      <Table
-        minWidth={DISPLAY.defaultTable}
-        head={[
-          { label: 'Node' },
-          { label: 'Status' },
-          { label: 'Last seen' },
-          { label: 'First seen' },
-        ]}
-      >
-        {page.rows.map((node) => (
-          <tr key={node.nodeId} className="border-t border-line">
-            <td className={`${td} font-mono`} title={`Node ${node.nodeId}`}>
-              <SellerCell
-                nodeId={node.nodeId}
-                github={node.github}
-                href={sellerHref(node.nodeId, query)}
-              >
-                {node.github ? short(node.nodeId) : null}
-              </SellerCell>
-            </td>
-            <td className={td}>
-              <Chip>{SELLER_STATUS_LABELS[node.state]}</Chip>
-            </td>
-            <td className={timeCell}>{utc(node.lastSeenAt)}</td>
-            <td className={timeCell}>{utc(node.firstSeenAt)}</td>
-          </tr>
-        ))}
-      </Table>
-      <Pager label="Not online" view={tablePager(query, 'offline', page)} />
     </>
   );
 }
