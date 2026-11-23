@@ -90,30 +90,15 @@ export function SpendingHistory(props: Props) {
       session.messages.map((message) => [message.id, session] as const),
     ),
   );
-  const {
-    method,
-    period,
-    source,
-    current,
-    size,
-    filtered,
-    rows,
-    setPage,
-    setMethod,
-    setPeriod,
-    setSource,
-    setSize,
-  } = useHistoryFilters(props);
+  const filters = useHistoryFilters(props);
+  const { method, period, source, current, size, filtered, setPage, setSize } =
+    filters;
   const references = activity.references.available
     ? activity.references.references
     : [];
   return (
     <Section title="Payment history">
-      <HistoryFilters
-        rows={rows}
-        {...{ source, method, period }}
-        {...{ setSource, setMethod, setPeriod }}
-      />
+      <HistoryFilters {...filters} />
       {method !== HISTORY_METHOD.USDC && !activity.state?.available && (
         <p role="status">
           {activity.state
