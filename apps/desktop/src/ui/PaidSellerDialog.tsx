@@ -221,12 +221,19 @@ function SellerTerms(props: TermsProps) {
             setError('');
           }}
         />
-        <ChannelTerms
-          switching={props.switching}
-          remaining={props.remaining}
-          deposit={deposit}
-          minutes={minutes}
-        />
+        {policy ? (
+          <ChannelTerms
+            switching={props.switching}
+            remaining={props.remaining}
+            deposit={deposit}
+            minutes={minutes}
+          />
+        ) : (
+          <p className="ui-help-text">
+            Channel and deposit requirements are checked after buyer
+            configuration.
+          </p>
+        )}
         <SellerRates model={model} />
         {error && (
           <p
