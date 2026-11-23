@@ -8,14 +8,18 @@ import type { GithubAccount } from '../lib/network-status';
 import { sellerHref } from '../lib/seller-identity';
 import { Identicon } from './identicon';
 
+const SELLER_NAME_TITLE = 'Self-chosen name, not verified';
+
 export function SellerCell({
   nodeId,
   github,
+  name = null,
   children,
   href = sellerHref(nodeId),
 }: {
   nodeId: string;
   github: GithubAccount | null;
+  name?: string | null;
   children?: ReactNode;
   href?: string | null;
 }) {
@@ -30,7 +34,17 @@ export function SellerCell({
         <Identicon nodeId={nodeId} />
       )}
       <div className="min-w-0">
-        <div className="flex items-center gap-1 font-mono">
+        {name ? (
+          <div
+            className="truncate font-sans text-ink"
+            title={SELLER_NAME_TITLE}
+          >
+            <bdi>{name}</bdi>
+          </div>
+        ) : null}
+        <div
+          className={`flex items-center gap-1 font-mono${name ? ' text-xs' : ''}`}
+        >
           {href ? (
             <Link className="text-ink hover:text-brand" href={href}>
               {label}

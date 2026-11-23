@@ -5,6 +5,15 @@ import type { GithubAccount, NetworkStatus } from './network-status';
 import { uptimeRatio } from './offers';
 import { queryHref, type ExplorerQuery } from './paging';
 
+export function namesByNode(
+  network: NetworkStatus | null,
+): Map<string, string> {
+  const names = new Map<string, string>();
+  for (const node of network?.nodes ?? [])
+    if (node.name) names.set(node.nodeId, node.name);
+  return names;
+}
+
 export function githubByNode(
   network: NetworkStatus | null,
 ): Map<string, GithubAccount> {
