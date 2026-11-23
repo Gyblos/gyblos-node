@@ -149,6 +149,15 @@ void test('desktop announcement contract accepts only bounded exact model identi
     models: [],
     truncated: false,
   };
+  for (const value of [
+    undefined,
+    { malformed: true },
+    emptyCatalog(CATALOG_STATE.ERROR),
+  ])
+    assert.deepEqual(
+      parseNetworkCatalog(value, snapshot.query),
+      emptyCatalog(CATALOG_STATE.ERROR, snapshot.query),
+    );
   assert.deepEqual(parseNetworkCatalog(snapshot), snapshot);
   assert.equal(
     parseNetworkCatalog({ ...snapshot, nodeId: 'synthetic private identity' })

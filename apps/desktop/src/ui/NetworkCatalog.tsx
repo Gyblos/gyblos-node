@@ -38,6 +38,7 @@ export function useNetworkCatalog() {
         await (query === undefined
           ? window.desktopCatalog?.summary()
           : window.desktopCatalog?.lookup(query)),
+        query,
       );
     } catch {
       /* No raw network/native diagnostics belong in the renderer. */
