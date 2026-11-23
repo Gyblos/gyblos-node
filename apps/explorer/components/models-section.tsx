@@ -65,7 +65,12 @@ export async function ModelsSection({ query }: { query: ExplorerQuery }) {
     offersKnown ? summarizeOffers(discovery).models : new Map(),
     collector.error ? [] : collector.models,
   );
-  const page = pagedRows(query, 'models', rows);
+  const page = pagedRows(
+    query,
+    'models',
+    rows,
+    offersKnown && !collector.error,
+  );
   return (
     <>
       <SectionTitle

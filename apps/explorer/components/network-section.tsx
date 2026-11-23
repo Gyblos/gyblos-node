@@ -219,6 +219,11 @@ const SELLERS_HEAD = [
   { label: 'Online since' },
 ];
 
+const sellerOffers = (sellers: Seller[]) =>
+  sellers.flatMap((seller) =>
+    seller.models.map((model) => ({ seller, model })),
+  );
+
 function SellersTable({
   query,
   sellers,
@@ -231,10 +236,9 @@ function SellersTable({
   accountsKnown: boolean;
 }) {
   const empty = emptySellersMessage(sellers, query.verified, accountsKnown);
-  const offers = sellers.flatMap((seller) =>
-    seller.models.map((model) => ({ seller, model })),
-  );
-  const page = pagedRows(query, 'sellers', offers);
+  const offers = sellerOffers(sellers);
+  const complete = !query.verified || accountsKnown;
+  const page = pagedRows(query, 'sellers', offers, complete);
   return (
     <>
       <Table minWidth={DISPLAY.wideTable} head={SELLERS_HEAD}>
@@ -348,7 +352,7 @@ function NotOnlineTable({
   const nodes = notOnline(network).filter(
     (node) => !accounts || accounts.has(node.nodeId),
   );
-  const page = pagedRows(query, 'offline', nodes);
+  const page = pagedRows(query, 'offline', nodes, !network.truncated);
   if (!nodes.length) return null;
   return (
     <>

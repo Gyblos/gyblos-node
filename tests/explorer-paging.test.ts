@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import { CHAIN_TXS, PAGING, RANGE } from '@gyblos/explorer/constants';
 import {
+  canonicalPageHref,
   pageOf,
   pageRedirect,
   parsePage,
@@ -189,6 +190,30 @@ void test('an out-of-range page is replaced by the canonical URL without it', ()
     pageRedirect(query, 'sellers', tablePage(query, 'sellers', rows(3))),
     null,
   );
+});
+
+void test('a partial source never rewrites a table page', () => {
+  const query = readQuery({ modelsPage: '3' });
+  const page = tablePage(query, 'models', rows(30));
+  assert.equal(pageRedirect(query, 'models', page, false), null);
+  assert.equal(pageRedirect(query, 'models', page, true), '/');
+  assert.equal(pageRedirect(query, 'models', page), '/');
+});
+
+void test('an invalid page parameter is dropped from the URL', () => {
+  assert.equal(
+    canonicalPageHref({ range: '7', modelsPage: 'abc' }),
+    '/?range=7',
+  );
+  assert.equal(canonicalPageHref({ modelsPage: ['2', '3'] }), '/');
+  assert.equal(
+    canonicalPageHref({ dailyPage: '1', sellersPage: '2' }),
+    '/?sellersPage=2',
+  );
+  assert.equal(canonicalPageHref({ txPage: '2' }), '/');
+  assert.equal(canonicalPageHref({ sellersPage: '2', other: 'x' }), null);
+  assert.equal(canonicalPageHref({ before: CURSOR, txPage: '2' }), null);
+  assert.equal(canonicalPageHref({}), null);
 });
 
 void test('the transaction pager counts rows without a total and keeps its cursor paging', () => {
