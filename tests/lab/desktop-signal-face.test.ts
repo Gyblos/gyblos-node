@@ -20,6 +20,10 @@ void test('a pending desktop answer shows the animated bracketed face, and still
   assert.match(face, /className="signal-mark signal-face"/);
   assert.match(face, /className="signal-brackets"/);
   assert.match(face, /data-working=\{working\}/);
+  assert.match(
+    face,
+    /const working =\s*expression === SIGNAL_STATE\.CONNECTING \|\|\s*expression === SIGNAL_STATE\.WORKING \|\|\s*expression === SIGNAL_STATE\.RESPONDING;/,
+  );
   assert.match(face, /signal-orbit-left[\s\S]*signal-orbit-right/);
 
   const css = await source('signal.css');
