@@ -6,8 +6,14 @@ import test from 'node:test';
 
 import { ERROR_DIAGNOSTICS, PAID_BUYER_CODES } from '@gyblos/buyer/constants';
 import { httpDiagnostics } from '@gyblos/buyer/http-diagnostics';
+import { BuyerRoutingError } from '@gyblos/core/buyer-routing';
+import { BUYER_ROUTING_CODES } from '@gyblos/core/constants';
 import { PaidBuyerError } from '@gyblos/node/buyer-paid-error';
+import { UnsentSellerBusyError } from '@gyblos/node/buyer-routing';
+import { UnsentChannelRequestError } from '@gyblos/node/buyer-session';
+import { BatchChannelError } from '@gyblos/protocol/batch-channel';
 import { PAYMENT_ERROR_CODES } from '@gyblos/protocol/constants';
+import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import { PaymentError } from '@gyblos/protocol/payment';
 import {
   PaymentSessionError,
@@ -59,5 +65,32 @@ void test('buyer HTTP failures keep the payment cause from closed catalogs', () 
   assert.equal(
     failed(new Error('PRIVATE_SENTINEL')).code,
     ERROR_DIAGNOSTICS.UNKNOWN,
+  );
+});
+
+void test('buyer HTTP failures keep routing and unsent channel codes', () => {
+  for (const code of Object.values(BUYER_ROUTING_CODES))
+    assert.equal(failed(new BuyerRoutingError(code)).code, code);
+  assert.equal(
+    failed(new UnsentSellerBusyError('a'.repeat(64))).code,
+    BUYER_ROUTING_CODES.BUSY,
+  );
+  assert.equal(
+    failed(
+      new UnsentChannelRequestError(
+        'a'.repeat(64),
+        new BatchChannelError(PAID_EXECUTION_CODES.TIMEOUT),
+      ),
+    ).code,
+    PAID_EXECUTION_CODES.TIMEOUT,
+  );
+  assert.equal(
+    failed(
+      new UnsentChannelRequestError(
+        'a'.repeat(64),
+        new Error('PRIVATE_SENTINEL'),
+      ),
+    ).code,
+    SESSION_CODES.UNAVAILABLE,
   );
 });
