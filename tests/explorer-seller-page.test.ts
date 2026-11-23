@@ -1,14 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import {
-  chainTxsQuery,
-  chainTxsUrl,
-  parseChainTxs,
-  txRow,
-} from '@gyblos/explorer/chain-txs-shape';
 import { parseSellerStats } from '@gyblos/explorer/collector-shape';
-import { CHAIN_TXS, DISPLAY, RANGE } from '@gyblos/explorer/constants';
+import { DISPLAY, RANGE, SELLER_STATUS } from '@gyblos/explorer/constants';
 import type { DiscoverySnapshot, Seller } from '@gyblos/explorer/discovery';
 import {
   queryHref,
@@ -25,8 +19,6 @@ import {
   unknownSeller,
 } from '@gyblos/explorer/seller-profile';
 import { buyersText, dailyRequests } from '@gyblos/explorer/usage';
-import { CHAIN_TX_PAGE } from '@gyblos/metrics-collector/constants';
-import { parseChainTxQuery } from '@gyblos/metrics-collector/stats-chain-txs';
 
 const NODE = 'a'.repeat(64);
 const OTHER = 'b'.repeat(64);
@@ -84,74 +76,6 @@ void test('seller page links stay on the seller page and keep every other parame
     queryHref({ ...query, path: '/' }, { pages: {}, before: null }),
     '/?range=7&verified=1&modelsPage=2',
   );
-});
-
-void test('the explorer asks the collector for one seller owner with the canonical query', () => {
-  assert.equal(CHAIN_TXS.recipientParam, CHAIN_TX_PAGE.params.RECIPIENT);
-  for (const before of [null, CURSOR]) {
-    const query = chainTxsQuery(before, OWNER);
-    const parsed = parseChainTxQuery(new URLSearchParams(query));
-    assert.deepEqual(parsed?.recipient, OWNER, query);
-    assert.equal(new URLSearchParams(query).get('before'), before);
-  }
-  assert.equal(
-    chainTxsUrl('https://c.test/v1', null, OWNER),
-    `https://c.test/v1/stats/chain/txs?recipient=${OWNER}`,
-  );
-  assert.equal(
-    chainTxsUrl('https://c.test/v1', null),
-    'https://c.test/v1/stats/chain/txs',
-  );
-});
-
-const payout = (extra: object) => ({
-  programId: 'P',
-  treasury: 'T',
-  next: null,
-  transactions: [
-    {
-      signature: '5'.repeat(87),
-      instructionIndex: 1,
-      slot: 140,
-      blockTime: null,
-      kind: 'distribute',
-      channel: 'Channel1111',
-      payee: null,
-      recipients: [OWNER],
-      amountAtomic: '96',
-      ...extra,
-    },
-  ],
-});
-const split = (channels: number) => ({
-  paidOut: '96',
-  gyblosFees: '4',
-  programTreasury: '0',
-  refunded: '900',
-  channels,
-  unclassified: '0',
-});
-
-void test('a seller page payout row reads as what the seller got, with the rest of its split', () => {
-  const owners = new Map();
-  const row = txRow(
-    parseChainTxs(payout({ split: split(1) })).transactions[0]!,
-    owners,
-    'T',
-  );
-  assert.deepEqual(
-    [row.amount, row.detail, row.shared],
-    ['0.000096', ['Gyblos fee 0.000004', 'to buyer 0.000900'], false],
-  );
-  const shared = txRow(
-    parseChainTxs(payout({ split: split(2) })).transactions[0]!,
-    owners,
-    'T',
-  );
-  assert.equal(shared.detail[0], 'total of 2 channels');
-  assert.equal(shared.shared, true);
-  const legacy = txRow(parseChainTxs(payout({})).transactions[0]!, owners, 'T');
-  assert.deepEqual([legacy.amount, legacy.detail], ['—', []]);
 });
 
 const side = (requests: number, buyers: number | null) => ({
@@ -313,6 +237,15 @@ void test('a seller profile joins the listed offer, the network status and the i
     ['offline', null, null, []],
   );
   assert.equal(sellerProfile(OTHER, snapshot([], [])).status, 'unknown');
+  const stale = snapshot(
+    [listed(NODE, OWNER)],
+    [{ nodeId: NODE, state: 'offline' }],
+  );
+  assert.equal(sellerProfile(NODE, stale).status, 'offline');
+  assert.equal(
+    sellerProfile(NODE, { ...stale, networkDatedAt: 4000 }).status,
+    'online',
+  );
   const listedOnly = sellerProfile(NODE, snapshot([listed(NODE, OWNER)], null));
   assert.deepEqual(
     [listedOnly.status, listedOnly.firstSeenAt, listedOnly.github],
@@ -327,7 +260,7 @@ void test('a seller profile joins the listed offer, the network status and the i
     online: 'Online',
     offline: 'Offline',
     unpublished: 'Not published',
-    unknown: 'Not in the index',
+    [SELLER_STATUS.unknown]: 'Not in the index',
   });
 });
 

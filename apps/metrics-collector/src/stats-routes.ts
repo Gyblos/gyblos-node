@@ -61,8 +61,10 @@ export function statsRoutes(
   app.get(COLLECTOR_ROUTES.STATS_CHAIN, handle(chainStats));
   app.get(COLLECTOR_ROUTES.STATS_CHAIN_TXS, async (context) => {
     if (!chainTxs) return rejection(context, COLLECTOR_ERRORS.UNAVAILABLE);
-    const query = parseChainTxQuery(new URL(context.req.url).searchParams);
-    if (!query) return rejection(context, COLLECTOR_ERRORS.INVALID_QUERY);
+    const url = new URL(context.req.url);
+    const query = parseChainTxQuery(url.searchParams);
+    if (!query || url.search.slice(1) !== url.searchParams.toString())
+      return rejection(context, COLLECTOR_ERRORS.INVALID_QUERY);
     const body = await chainTransactions(chainTxs, query);
     context.header(
       COLLECTOR_HEADERS.CACHE_CONTROL,

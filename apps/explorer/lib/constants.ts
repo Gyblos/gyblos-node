@@ -121,6 +121,10 @@ export const SELLER_PAGE = {
   path: '/sellers',
 } as const;
 
+export const SELLER_STATUS = {
+  unknown: 'unknown',
+} as const;
+
 // The date range control: preset spans of UTC days ending today. The collector answers at most 92 days
 // (AGGREGATES.maxRangeDays) and 30 by default.
 export const RANGE = {

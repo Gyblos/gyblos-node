@@ -104,6 +104,9 @@ void test('a malformed, repeated or misplaced recipient answers 400 INVALID_QUER
     `?recipient=${SELLER}&before=30-${sig('T1')}-0`,
     `?limit=4&before=30-${sig('T1')}-0&recipient=${SELLER}`,
     `?recipient=${'2'.repeat(45)}`,
+    `?recipient=%${SELLER.charCodeAt(0).toString(16)}${SELLER.slice(1)}`,
+    `?limit=%32`,
+    `?before=%310-${sig('S1')}-0`,
   ]) {
     const { status, cache, body } = await get(app, query);
     assert.equal(status, 400, query);

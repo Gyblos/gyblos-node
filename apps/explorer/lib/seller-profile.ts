@@ -1,16 +1,16 @@
 import type { ModelStat, SellerDay, Totals } from './collector-shape';
-import { DISPLAY } from './constants';
+import { DISPLAY, SELLER_STATUS } from './constants';
 import type { DiscoverySnapshot, OfferedModel } from './discovery';
 import type { GithubAccount, NodeState } from './network-status';
 import { modelKey, uptimeRatio } from './offers';
 import { sideFigures } from './usage';
 
-export type SellerStatus = NodeState | 'unknown';
+export type SellerStatus = NodeState | typeof SELLER_STATUS.unknown;
 export const SELLER_STATUS_LABELS: Record<SellerStatus, string> = {
   online: 'Online',
   offline: 'Offline',
   unpublished: 'Not published',
-  unknown: 'Not in the index',
+  [SELLER_STATUS.unknown]: 'Not in the index',
 };
 
 export interface SellerProfile {
@@ -27,6 +27,15 @@ export interface SellerProfile {
   offers: OfferedModel[];
 }
 
+function sellerStatus(
+  state: NodeState | undefined,
+  listed: boolean,
+  networkStale: boolean,
+): SellerStatus {
+  if (listed && (networkStale || !state)) return 'online';
+  return state ?? SELLER_STATUS.unknown;
+}
+
 export function sellerProfile(
   nodeId: string,
   snapshot: DiscoverySnapshot,
@@ -36,7 +45,11 @@ export function sellerProfile(
   const owner = listed?.owner ?? null;
   return {
     nodeId,
-    status: node?.state ?? (listed ? 'online' : 'unknown'),
+    status: sellerStatus(
+      node?.state,
+      !!listed,
+      snapshot.networkDatedAt !== null,
+    ),
     name: node?.name ?? null,
     github: node?.github ?? null,
     owner,
@@ -118,6 +131,7 @@ export function unknownSeller(
 ) {
   if (snapshot.error || stats.error || stats.models.length) return false;
   if (!snapshot.network || snapshot.network.truncated) return false;
-  if (sellerProfile(nodeId, snapshot).status !== 'unknown') return false;
+  if (sellerProfile(nodeId, snapshot).status !== SELLER_STATUS.unknown)
+    return false;
   return sellerTotals(stats.days).active.length === 0;
 }

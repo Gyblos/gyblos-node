@@ -482,10 +482,11 @@ at most once and in this order:
 
 Numbers are canonical (`0` or no leading zero). Any other parameter (an unnamed
 one included), a repeated one, another order, `limit=25` (the default is sent by
-omitting it), a `limit` outside 1 to 50, a malformed cursor or a `recipient`
-that is not a canonical 32-byte base58 address answers `400 INVALID_QUERY`, so
-each page has one cache key. Caching, the read budget and
-`503 COLLECTOR_UNAVAILABLE` are as for the other stats routes. The answer:
+omitting it), a percent-encoded character, a `limit` outside 1 to 50, a
+malformed cursor or a `recipient` that is not a canonical 32-byte base58 address
+answers `400 INVALID_QUERY`, so each page has one cache key. Caching, the read
+budget and `503 COLLECTOR_UNAVAILABLE` are as for the other stats routes. The
+answer:
 
 ```json
 {
