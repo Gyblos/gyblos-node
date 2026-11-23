@@ -21,7 +21,7 @@ export function namesByNode(
   return names;
 }
 
-export const sellerNameHint = (name: string) => `${name} · ${SELLER_NAME.hint}`;
+export const sellerNameHint = (name: string) => `${name} (${SELLER_NAME.hint})`;
 
 export function githubByNode(
   network: NetworkStatus | null,
@@ -129,7 +129,7 @@ export function notOnlineMeta(
   if (verifiedShown !== null)
     return `${verifiedShown} verified ${verifiedShown === 1 ? 'seller' : 'sellers'} not online`;
   const { offline, unpublished } = network.counts;
-  return `${offline} offline · ${unpublished} not published`;
+  return `${offline} offline, ${unpublished} not published`;
 }
 
 export function sellerHref(nodeId: string, query?: ExplorerQuery): string {

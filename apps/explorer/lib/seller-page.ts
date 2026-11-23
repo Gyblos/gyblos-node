@@ -1,4 +1,4 @@
-import { SELLER_PAGE } from './constants';
+import { PAGES, SELLER_PAGE } from './constants';
 
 const NODE_ID = /^[0-9a-f]{64}$/;
 
@@ -10,5 +10,6 @@ export function pagePath(pathname: string) {
   const nodeId = pathname.startsWith(prefix)
     ? sellerNodeId(pathname.slice(prefix.length))
     : null;
-  return nodeId ? pathname : '/';
+  const page = Object.values(PAGES).find((path) => path === pathname);
+  return nodeId ? pathname : (page ?? PAGES.network);
 }

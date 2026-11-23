@@ -1,11 +1,16 @@
+import { Chip, type ChipColor } from '@/components/base/badges/chip';
 import { ArrowUpRight } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 import { getChainTxs } from '../lib/chain-txs';
-import { sellerOwners, txRow } from '../lib/chain-txs-shape';
-import { explorerAddressUrl, PAYMENT_PROGRAM_SOURCE_URL } from '../lib/config';
-import { DISPLAY, PAGING } from '../lib/constants';
+import { sellerOwners, txRow, type ChainTxKind } from '../lib/chain-txs-shape';
+import {
+  explorerAddressUrl,
+  HELP_URL,
+  PAYMENT_PROGRAM_SOURCE_URL,
+} from '../lib/config';
+import { DISPLAY, PAGES, PAGING } from '../lib/constants';
 import { getDiscovery } from '../lib/discovery-render';
 import { short } from '../lib/format';
 import { txPager, type ExplorerQuery } from '../lib/paging';
@@ -14,6 +19,7 @@ import { Pager } from './pager';
 import {
   Addr,
   moneyCell,
+  MoreLink,
   numberCell,
   SectionTitle,
   Table,
@@ -23,12 +29,20 @@ import {
 } from './ui';
 
 const TITLE = 'Channel transactions';
-const link = 'inline-flex items-center gap-1 hover:text-brand';
+const link =
+  'inline-flex items-center gap-1 hover:text-ink hover:underline underline-offset-2';
 const muted = `${td} text-muted`;
+export const TX_AMOUNT_HEAD = [
+  { label: 'Amount', right: true, group: 'USDC' },
+  { label: 'Gyblos fee', right: true, group: 'USDC' },
+  { label: 'Program', right: true, group: 'USDC' },
+  { label: 'To buyer', right: true, group: 'USDC' },
+];
+
 const HEAD = [
   { label: 'Time (UTC)' },
   { label: 'Type' },
-  { label: 'Amount (USDC)', right: true },
+  ...TX_AMOUNT_HEAD,
   { label: 'Transaction' },
   { label: 'Seller' },
   { label: 'Channel' },
@@ -38,7 +52,7 @@ type Row = ReturnType<typeof txRow>;
 function Meta({ programId }: { programId: string }) {
   return (
     <span className="flex flex-wrap gap-4">
-      <span>Latest, all time · not filtered by range</span>
+      <span>Newest first, all time, not filtered by range</span>
       <a className={link} href={explorerAddressUrl(programId)}>
         Payments program
         <ArrowUpRight aria-hidden className="size-3" />
@@ -67,7 +81,7 @@ function Seller({
     return (
       <span className="font-mono">
         <Link
-          className="text-ink hover:text-brand"
+          className="text-ink underline-offset-2 hover:underline"
           href={sellerHref(row.seller.nodeId, query)}
           title={`Node ${row.seller.nodeId}`}
         >
@@ -85,21 +99,38 @@ function Seller({
   );
 }
 
+const KIND_COLORS: Record<ChainTxKind, ChipColor> = {
+  open: 'blue',
+  top_up: 'blue',
+  settle: 'soft',
+  settle_and_seal: 'soft',
+  request_close: 'soft',
+  seal: 'soft',
+  distribute: 'lime',
+  reclaim: 'neutral',
+};
+
 export function TxAmount({ row }: { row: Row }) {
+  const part = (value: string | null) => (
+    <td className={`${numberCell} text-muted`}>{value ?? '—'}</td>
+  );
   return (
-    <td className={row.muted ? `${numberCell} text-muted` : moneyCell}>
-      {row.amount}
-      {[row.hint, ...row.detail].map((line) =>
-        line ? (
+    <>
+      <td className={row.muted ? `${numberCell} text-muted` : moneyCell}>
+        {row.amount}
+        {row.detail.map((line) => (
           <div
             key={line}
-            className="ml-auto max-w-40 font-mono text-xs whitespace-normal text-muted"
+            className="ml-auto max-w-48 font-sans text-xs whitespace-normal text-dim"
           >
             {line}
           </div>
-        ) : null,
-      )}
-    </td>
+        ))}
+      </td>
+      {part(row.parts.gyblosFees)}
+      {part(row.parts.programTreasury)}
+      {part(row.parts.refunded)}
+    </>
   );
 }
 
@@ -108,7 +139,9 @@ export function TxLine({ row, seller }: { row: Row; seller?: ReactNode }) {
     <tr className="border-t border-line">
       <td className={timeCell}>{row.time}</td>
       <td className={td} title={row.kind}>
-        {row.label}
+        <Chip variant="caption" color={KIND_COLORS[row.kind]}>
+          {row.label}
+        </Chip>
       </td>
       <TxAmount row={row} />
       <td className={`${td} font-mono`}>
@@ -125,7 +158,13 @@ export function TxLine({ row, seller }: { row: Row; seller?: ReactNode }) {
   );
 }
 
-export async function ChannelTxs({ query }: { query: ExplorerQuery }) {
+export async function ChannelTxs({
+  query,
+  preview = false,
+}: {
+  query: ExplorerQuery;
+  preview?: boolean;
+}) {
   const { before } = query;
   const [page, discovery] = await Promise.all([
     getChainTxs(before),
@@ -142,21 +181,21 @@ export async function ChannelTxs({ query }: { query: ExplorerQuery }) {
       <SectionTitle
         id={PAGING.anchors.transactions}
         title={TITLE}
+        help={HELP_URL.channelTransactions}
         meta={<Meta programId={page.programId} />}
       />
-      <p className="-mt-2 mb-3 text-xs text-muted">
-        Amounts are per row: the buyer deposit for Deposit and Top-up, newly
-        settled for Settle, what the seller side (payee and payout recipients)
-        received for Paid out, the only amount in green, and what went back to
-        the buyer for Refunded; below a payout, the rest of its split (Gyblos
-        fee, payments program, to buyer). Payments program: the payment
-        program&apos;s own treasury (rounding remainders, or a share it could
-        not deliver), not a Gyblos fee; unclassified: USDC that left the channel
-        to no party it names. A payout of several channels shows its batch total
-        on its first row; its other rows point to the transaction. Do not add
-        them up.
-      </p>
-      <Table minWidth={DISPLAY.wideTable} head={HEAD}>
+      <Table
+        minWidth={DISPLAY.txTable}
+        head={HEAD}
+        footer={
+          preview ? undefined : (
+            <Pager
+              label={TITLE}
+              view={txPager(query, page.transactions.length, page.next)}
+            />
+          )
+        }
+      >
         {page.transactions.length ? null : (
           <tr>
             <td className={muted} colSpan={HEAD.length}>
@@ -177,10 +216,9 @@ export async function ChannelTxs({ query }: { query: ExplorerQuery }) {
           );
         })}
       </Table>
-      <Pager
-        label={TITLE}
-        view={txPager(query, page.transactions.length, page.next)}
-      />
+      {preview ? (
+        <MoreLink href={PAGES.transactions} label="All transactions" />
+      ) : null}
     </>
   );
 }

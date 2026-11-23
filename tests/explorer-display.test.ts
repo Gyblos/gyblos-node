@@ -103,11 +103,7 @@ void test('a change says its direction and whether it is good news', () => {
     direction: 'up',
     tone: 'neutral',
   });
-  assert.deepEqual(delta(68, 0), {
-    label: 'New',
-    direction: 'up',
-    tone: 'good',
-  });
+  assert.equal(delta(68, 0), null);
   assert.deepEqual(delta(0, 0), {
     label: '0%',
     direction: 'flat',
@@ -291,7 +287,7 @@ void test('the Usage note names the comparison only when the earlier span was re
   const at = Date.UTC(2026, 10, 19, 20, 10);
   assert.equal(
     usageMeta(30, at, true),
-    'vs previous 30 days · updated 2026-11-19 20:10 UTC',
+    'vs previous 30 days, updated 2026-11-19 20:10 UTC',
   );
   assert.equal(usageMeta(30, at, false), 'updated 2026-11-19 20:10 UTC');
   assert.equal(usageMeta(30, null, true), 'no data yet');

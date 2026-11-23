@@ -27,6 +27,7 @@ const JOURNEY = [
   'reference/cli',
   'reference/configuration',
   'reference/data-and-privacy',
+  'reference/explorer',
   'help/troubleshooting',
 ];
 

@@ -1,0 +1,61 @@
+---
+title: Explorador
+description: Qué significan las marcas de verificación, los nombres y los montos del explorador de Gyblos.
+---
+
+El [explorador de Gyblos](https://explorer.gyblos.com) muestra los vendedores, modelos, uso y pagos de la
+red. Esta página explica qué significan sus marcas y montos. El **?** junto al título de una sección del
+explorador lleva aquí.
+
+## Páginas [#paginas]
+
+| Página          | Qué muestra                                                                           |
+| --------------- | ------------------------------------------------------------------------------------- |
+| Red (`/`)       | Un resumen del rango, los primeros vendedores y las últimas transacciones de canales. |
+| `/sellers`      | Cada vendedor en línea ahora, y los que están desconectados o sin publicar.           |
+| `/models`       | Cada modelo ofrecido ahora, sus precios pagados más bajos y lo servido en el rango.   |
+| `/transactions` | Cada transacción de canal de Gyblos, de la más nueva a la más vieja.                  |
+| `/stats`        | Uso y pagos en el rango, con sus tablas diarias y la demanda sin atender.             |
+
+Un vendedor cuenta como en línea cuando el índice de descubrimiento lo lista, así el resumen y las tablas coinciden. Cada sección que cubre un período (Overview, Models, Usage, Payments y la actividad de un vendedor) tiene su propio control de 7, 30 o 90 días, guardado en la dirección de la página. Las columnas con flechas ordenan la tabla: de mayor a menor, de menor a mayor y vuelta al orden por defecto.
+
+## Marca de verificación y nombres [#verificado]
+
+Un ✓ junto a un vendedor significa que el índice de descubrimiento comprobó que la cuenta de GitHub
+indicada publicó el NodeId del vendedor en un gist. Vincula al vendedor con esa cuenta. No identifica a una
+persona ni dice nada sobre la calidad de las respuestas del vendedor. Los vendedores sin verificar no
+llevan marca. Los vendedores lo configuran con
+[Verifica tu cuenta de GitHub](/es/sellers/identity#verificar-github).
+
+Un nombre en letra más pequeña bajo una cuenta o un NodeId es un nombre que eligió el vendedor. Nadie lo
+verifica, y otro vendedor puede usar el mismo nombre. El ✓ siempre es de la cuenta de GitHub, nunca del
+nombre.
+
+## Transacciones de canales [#transacciones-de-canales]
+
+Cada fila es un cambio en un canal de pago de Gyblos. El monto depende del tipo:
+
+| Tipo            | Monto                                                                            |
+| --------------- | -------------------------------------------------------------------------------- |
+| Deposit, Top-up | Lo que el comprador puso en el canal.                                            |
+| Settle          | Lo que se liquidó por primera vez.                                               |
+| Paid out        | Lo que recibió el lado del vendedor (beneficiario y destinatarios). Va en verde. |
+| Refunded        | Lo que volvió al comprador.                                                      |
+
+Junto a un pago, sus propias columnas muestran el resto del reparto:
+
+- **Gyblos fee**: la comisión del protocolo Gyblos.
+- **Program**: la tesorería propia del programa de pagos, para restos de redondeo o una parte que
+  no pudo entregar. No es una comisión de Gyblos.
+- **To buyer**: lo que volvió al comprador.
+- **Unclassified**: USDC que salió del canal hacia nadie que el canal nombre. Aparece bajo el monto.
+
+Una transacción puede pagar varios canales. Su total del lote aparece en su primera fila, y las demás filas
+apuntan a esa transacción. No sumes los montos: contarías el mismo USDC más de una vez.
+
+## Transacciones de un vendedor [#transacciones-del-vendedor]
+
+La página de un vendedor lista los canales cuyo destinatario de pago es la dirección de dueño que declaró
+el vendedor. El vendedor elige esa dirección, así que no está verificada. Si otro vendedor listado declara
+la misma dirección, el explorador lo avisa, y los canales pueden ser de cualquiera de los dos. Los montos se
+leen como en [Transacciones de canales](#transacciones-de-canales).

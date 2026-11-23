@@ -13,7 +13,11 @@ import {
   type ChainTx,
 } from '@gyblos/explorer/chain-txs-shape';
 import { CHAIN_TXS, RANGE } from '@gyblos/explorer/constants';
-import { queryHref, rangeSwitchHref, readQuery } from '@gyblos/explorer/paging';
+import {
+  queryHref,
+  readQuery,
+  sectionRangeHref,
+} from '@gyblos/explorer/paging';
 import {
   CHAIN_INSTRUCTIONS,
   CHAIN_TX_PAGE,
@@ -90,7 +94,7 @@ void test('the collector query the explorer sends is the canonical one the colle
     const query = chainTxsQuery(before);
     const params = new URLSearchParams(query);
     assert.ok(parseChainTxQuery(params), query);
-    assert.equal(params.get('limit'), null);
+    assert.equal(params.get('limit'), '5');
     assert.equal(params.get('before'), before);
   }
 });
@@ -188,7 +192,7 @@ void test('a row is labeled plainly with a fixed six-decimal amount and a Solana
     seller: SELLER,
     amount: '1.500000',
     muted: false,
-    hint: null,
+    parts: parts(null, null, null),
     detail: [],
     shared: false,
     signature: `${SIGNATURE.slice(0, 6)}…${SIGNATURE.slice(-6)}`,
@@ -248,28 +252,14 @@ void test('pager links keep the range and carry the cursor', () => {
   assert.equal(txPageHref(90, null), '/?range=90');
 });
 
-void test('switching the date range keeps a valid transaction page', () => {
-  assert.equal(
-    rangeSwitchHref(`before=${CURSOR}`, 7),
-    `/?range=7&before=${CURSOR}`,
-  );
-  assert.equal(
-    rangeSwitchHref(`range=7&before=${CURSOR}`, RANGE.defaultDays),
-    `/?before=${CURSOR}`,
-  );
-  assert.equal(rangeSwitchHref('range=7', 90), '/?range=90');
-  assert.equal(rangeSwitchHref('range=7&before=bad', RANGE.defaultDays), '/');
-  assert.equal(rangeSwitchHref('', 7), '/?range=7');
-});
-
-void test('the newest page URL has no empty query, so it shares the collector cache key', () => {
+void test('every page URL asks for a 5-row page in canonical order', () => {
   assert.equal(
     chainTxsUrl('https://c.test/v1', null),
-    'https://c.test/v1/stats/chain/txs',
+    'https://c.test/v1/stats/chain/txs?limit=5',
   );
   assert.equal(
     chainTxsUrl('https://c.test/v1', CURSOR),
-    `https://c.test/v1/stats/chain/txs?before=${CURSOR}`,
+    `https://c.test/v1/stats/chain/txs?before=${CURSOR}&limit=5`,
   );
 });
 
@@ -279,7 +269,7 @@ void test('transaction pages keep the verified seller filter', () => {
     `/?range=7&verified=1&before=${CURSOR}`,
   );
   assert.equal(
-    rangeSwitchHref(`verified=1&before=${CURSOR}`, 30),
+    sectionRangeHref(`verified=1&before=${CURSOR}`, 'payments', 30),
     `/?verified=1&before=${CURSOR}`,
   );
 });
@@ -299,7 +289,11 @@ function payout(kind: string, amountAtomic: string, split: object) {
   return parseChainTxs(body).transactions[0]!;
 }
 
-void test('a paid out row shows the seller amount and the rest of the split, one part per line', () => {
+type Part = string | null;
+const parts = (gyblosFees: Part, programTreasury: Part, refunded: Part) =>
+  ({ gyblosFees, programTreasury, refunded }) as const;
+
+void test('a paid out row shows the seller amount and the rest of the split, one column per part', () => {
   const tx = payout('distribute', '213', SPLIT);
   assert.deepEqual(tx.split, {
     paidOut: 213n,
@@ -311,35 +305,31 @@ void test('a paid out row shows the seller amount and the rest of the split, one
   });
   const row = txRow(tx, new Map(), TREASURY);
   assert.deepEqual(
-    [row.amount, row.muted, row.detail, row.shared],
-    ['0.000213', false, ['Gyblos fee 0.000009', 'to buyer 0.999778'], false],
+    [row.amount, row.muted, row.parts, row.detail, row.shared],
+    ['0.000213', false, parts('0.000009', null, '0.999778'), [], false],
   );
-  assert.deepEqual(
-    txRow(
-      payout('distribute', '213', { ...SPLIT, programTreasury: '3' }),
-      new Map(),
-      TREASURY,
-    ).detail,
-    ['Gyblos fee 0.000009', 'payments program 0.000003', 'to buyer 0.999778'],
-  );
+  const program = payout('distribute', '213', {
+    ...SPLIT,
+    programTreasury: '3',
+  });
+  const shown = txRow(program, new Map(), TREASURY).parts;
+  assert.deepEqual(shown, parts('0.000009', '0.000003', '0.999778'));
 });
 
 void test('a refunded row shows just its refund, and a zero payout is muted', () => {
   const refund = txRow(
     payout('reclaim', '500', {
+      ...SPLIT,
       paidOut: '0',
       gyblosFees: '0',
-      programTreasury: '0',
       refunded: '500',
-      channels: 1,
-      unclassified: '0',
     }),
     new Map(),
     TREASURY,
   );
   assert.deepEqual(
-    [refund.label, refund.amount, refund.detail],
-    ['Refunded', '0.000500', []],
+    [refund.label, refund.amount, refund.parts, refund.detail],
+    ['Refunded', '0.000500', parts(null, null, null), []],
   );
   const nothing = txRow(
     payout('distribute', '0', { ...SPLIT, paidOut: '0' }),

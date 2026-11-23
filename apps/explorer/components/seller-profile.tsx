@@ -87,7 +87,7 @@ export async function SellerProfileSection({ nodeId }: { nodeId: string }) {
       {dated.length ? (
         <p className="-mt-2 mb-3 text-xs text-dim">{dated.join(' ')}</p>
       ) : null}
-      <div className="rounded-2xl border border-line bg-panel p-4 text-sm sm:p-5">
+      <div className="rounded-xl border border-line bg-panel p-4 text-sm sm:p-5">
         <Identity profile={profile} />
         <dl className="mt-4 grid gap-3 sm:grid-cols-2">
           <Field label="NodeId">

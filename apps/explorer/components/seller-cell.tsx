@@ -35,7 +35,10 @@ export function SellerCell({
       <div className="min-w-0">
         <div className="flex items-center gap-1 font-mono">
           {href ? (
-            <Link className="text-ink hover:text-brand" href={href}>
+            <Link
+              className="text-ink underline-offset-2 hover:underline"
+              href={href}
+            >
               {label}
             </Link>
           ) : (
@@ -43,7 +46,7 @@ export function SellerCell({
           )}
           {github ? (
             <a
-              className="inline-flex hover:text-brand"
+              className="inline-flex hover:text-ink hover:underline underline-offset-2"
               href={gistUrl(github)}
               title="GitHub account verified by the discovery index: open the proof gist"
             >

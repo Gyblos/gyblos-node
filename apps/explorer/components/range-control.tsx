@@ -7,8 +7,8 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useTransition } from 'react';
 
 import { RANGE } from '../lib/constants';
-import { rangeSwitchHref } from '../lib/paging';
-import type { RangeDays } from '../lib/range';
+import { sectionRangeHref } from '../lib/paging';
+import type { RangeDays, RangeSection } from '../lib/range';
 import { pagePath } from '../lib/seller-page';
 import { SegmentedControl } from './board/segmented-control';
 
@@ -17,7 +17,13 @@ const OPTIONS = RANGE.presets.map((days) => ({
   label: `${days}d`,
 }));
 
-export function RangeControl({ days }: { days: RangeDays }) {
+export function RangeControl({
+  section,
+  days,
+}: {
+  section: RangeSection;
+  days: RangeDays;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -25,14 +31,15 @@ export function RangeControl({ days }: { days: RangeDays }) {
   return (
     <div className={pending ? 'opacity-60 transition-opacity' : undefined}>
       <SegmentedControl
-        label="Date range"
+        label={`Date range for ${section}`}
         options={OPTIONS}
         selected={days}
         onChange={(next) =>
           startTransition(() =>
             router.push(
-              rangeSwitchHref(
+              sectionRangeHref(
                 searchParams.toString(),
+                section,
                 next,
                 pagePath(pathname),
               ),

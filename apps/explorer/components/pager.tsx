@@ -1,24 +1,27 @@
-import Link from 'next/link';
+import { Pagination } from '@/components/base/pagination/pagination';
 import { redirect } from 'next/navigation';
 
 import {
   pageRedirect,
+  sortedRows,
   tablePage,
   type ExplorerQuery,
   type PagedTable,
   type PagerView,
+  type Sortable,
+  type SortedTable,
 } from '../lib/paging';
-
-const LINK = 'py-1 underline-offset-2 hover:text-brand hover:underline';
-const UNAVAILABLE = 'pointer-events-none py-1 text-dim';
 
 export function pagedRows<T>(
   query: ExplorerQuery,
   table: PagedTable,
   rows: readonly T[],
   complete = true,
+  by?: Record<string, (row: T) => Sortable>,
 ) {
-  const page = tablePage(query, table, rows);
+  const sort =
+    by && table in query.sorts ? query.sorts[table as SortedTable] : undefined;
+  const page = tablePage(query, table, by ? sortedRows(rows, sort, by) : rows);
   const canonical = pageRedirect(query, table, page, complete);
   if (canonical) redirect(canonical);
   return page;
@@ -33,24 +36,18 @@ export function Pager({
 }) {
   if (!view) return null;
   return (
-    <nav
-      aria-label={`${label} pages`}
-      className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 font-mono text-xs text-muted"
-    >
-      <span>{view.rows}</span>
-      <span className="flex flex-wrap gap-4">
-        {view.links.map((link) => (
-          <Link
-            key={link.label}
-            className={link.available ? LINK : UNAVAILABLE}
-            href={link.href}
-            aria-disabled={link.available ? undefined : 'true'}
-            tabIndex={link.available ? undefined : -1}
-          >
-            {link.label}
-          </Link>
-        ))}
-      </span>
-    </nav>
+    <div className="flex items-center justify-between gap-3 border-t border-separator-border px-4 py-1.5">
+      <span className="font-mono text-xs text-dim">{view.rows}</span>
+      <Pagination
+        dense
+        aria-label={`${label} pages`}
+        page={view.page}
+        totalPages={view.pages}
+        hrefs={view.hrefs}
+        showPages={view.showPages}
+        previousLabel={view.previousLabel}
+        nextLabel={view.nextLabel}
+      />
+    </div>
   );
 }

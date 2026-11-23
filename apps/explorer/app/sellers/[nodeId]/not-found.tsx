@@ -11,7 +11,7 @@ export default function SellerNotFound() {
       </p>
       <Link
         href={`/#${PAGING.anchors.sellers}`}
-        className="mt-4 inline-block text-sm hover:text-brand"
+        className="mt-4 inline-block text-sm hover:text-ink hover:underline underline-offset-2"
       >
         See the sellers in the explorer
       </Link>

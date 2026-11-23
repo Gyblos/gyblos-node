@@ -1,10 +1,11 @@
 import { getChainTxs } from '../lib/chain-txs';
 import { txRow } from '../lib/chain-txs-shape';
+import { HELP_URL } from '../lib/config';
 import { DISPLAY, PAGING } from '../lib/constants';
 import { getDiscovery } from '../lib/discovery-render';
 import { txPager, type ExplorerQuery } from '../lib/paging';
 import { sellerProfile } from '../lib/seller-profile';
-import { TxLine } from './channel-txs';
+import { TX_AMOUNT_HEAD, TxLine } from './channel-txs';
 import { Pager } from './pager';
 import { SectionTitle, Table, td, Unavailable } from './ui';
 
@@ -14,7 +15,7 @@ const NO_OWNERS = new Map<string, never>();
 const HEAD = [
   { label: 'Time (UTC)' },
   { label: 'Type' },
-  { label: 'Amount (USDC)', right: true },
+  ...TX_AMOUNT_HEAD,
   { label: 'Transaction' },
   { label: 'Channel' },
 ];
@@ -23,7 +24,7 @@ function Note({ children }: { children: string }) {
   return (
     <>
       <SectionTitle id={PAGING.anchors.transactions} title={TITLE} />
-      <div className="rounded-2xl border border-line bg-panel p-5 text-sm text-muted">
+      <div className="rounded-xl border border-line bg-panel p-5 text-sm text-muted">
         {children}
       </div>
     </>
@@ -54,21 +55,25 @@ export async function SellerTxs({
       <SectionTitle
         id={PAGING.anchors.transactions}
         title={TITLE}
-        meta="Latest, all time · not filtered by range"
+        help={HELP_URL.sellerTransactions}
+        meta="Newest first, all time, not filtered by range"
       />
-      <p className="-mt-2 mb-3 text-xs text-muted">
-        Channels whose payout recipient is this seller&apos;s self-declared
-        owner address. Paid out, the only amount in green, is what the seller
-        side (payee and payout recipients) received; below it, the rest of the
-        split. A batch total covers every channel its transaction paid, possibly
-        other sellers&apos; too, and a row marked as part of such a payout has
-        its amount on that transaction&apos;s first row. Do not add the amounts
-        up.
-        {profile.ownerShared
-          ? ' Another listed seller publishes the same owner address, so these channels may belong to either of them.'
-          : null}
-      </p>
-      <Table minWidth={DISPLAY.defaultTable} head={HEAD}>
+      {profile.ownerShared ? (
+        <p className="-mt-2 mb-3 text-xs text-muted">
+          Another listed seller publishes the same owner address, so these
+          channels may belong to either of them.
+        </p>
+      ) : null}
+      <Table
+        minWidth={DISPLAY.txTable}
+        head={HEAD}
+        footer={
+          <Pager
+            label={TITLE}
+            view={txPager(query, page.transactions.length, page.next)}
+          />
+        }
+      >
         {page.transactions.length ? null : (
           <tr>
             <td className={`${td} text-muted`} colSpan={HEAD.length}>
@@ -83,10 +88,6 @@ export async function SellerTxs({
           return <TxLine key={row.key} row={row} />;
         })}
       </Table>
-      <Pager
-        label={TITLE}
-        view={txPager(query, page.transactions.length, page.next)}
-      />
     </>
   );
 }

@@ -109,3 +109,29 @@ export const normalizeNetwork = (
       github: node.github ?? null,
     })),
   };
+
+export function listedOnline(
+  status: NetworkStatus | null,
+  listed: readonly string[],
+): NetworkStatus | null {
+  if (!status) return null;
+  const online = new Set(listed);
+  const counts = { ...status.counts };
+  const nodes = status.nodes.map((node) => {
+    const state: NodeState = online.has(node.nodeId)
+      ? NODE_STATE.online
+      : node.state === NODE_STATE.online
+        ? NODE_STATE.offline
+        : node.state;
+    counts[node.state] -= 1;
+    counts[state] += 1;
+    return state === node.state ? node : { ...node, state };
+  });
+  const known = new Set(status.nodes.map((node) => node.nodeId));
+  const unknown = [...online].filter((nodeId) => !known.has(nodeId)).length;
+  if (!status.truncated) {
+    counts.online += unknown;
+    counts.total += unknown;
+  }
+  return { ...status, counts, nodes };
+}

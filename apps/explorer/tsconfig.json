@@ -18,7 +18,10 @@
         "name": "next"
       }
     ],
-    "incremental": true
+    "incremental": true,
+    "paths": {
+      "@/*": ["./boardui/*"]
+    }
   },
   "include": [
     "**/*.ts",

@@ -1,4 +1,7 @@
 @import 'tailwindcss';
+@import '../boardui/styles/typography.css';
+@import '../boardui/styles/tokens.css';
+@import '../boardui/styles/boardui.css' layer(components);
 
 /* Gyblos brand tokens (DESIGN.md): one blue, neutral surfaces; light values match the web's. The
    signal tone is the brand blue on light surfaces and #2e6bff on dark ones, for status dots and focus
@@ -70,8 +73,31 @@ body {
   scroll-timeline: --table-scroll inline;
 }
 
-.explorer-table thead {
+.explorer-table thead,
+.explorer-table thead th {
   background: color-mix(in srgb, var(--raised) 50%, var(--panel));
+}
+
+.explorer-table thead th {
+  border-top: 0;
+  border-bottom: 0;
+}
+
+.explorer-table thead {
+  border-bottom: 1px solid var(--line);
+}
+
+.explorer-table tbody td {
+  transition: box-shadow 80ms ease-out;
+}
+
+.explorer-table [data-cross] {
+  box-shadow: inset 0 0 0 100vmax color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+.explorer-table [data-cross='cell'] {
+  box-shadow: inset 0 0 0 100vmax
+    color-mix(in srgb, var(--ink) 13%, transparent);
 }
 
 .explorer-table :is(tbody, tr) {
