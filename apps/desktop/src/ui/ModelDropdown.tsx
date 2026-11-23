@@ -184,14 +184,13 @@ function matchingModels(
   ordered: readonly ModelOption[],
   query: string,
   network: boolean,
-) {
+): readonly ModelOption[] {
   const filtered = ordered.filter((item) =>
     `${item.name} ${item.family ?? ''}`
       .toLowerCase()
       .includes(query.trim().toLowerCase()),
   );
-  return;
-  network || query.trim()
+  return network || query.trim()
     ? filtered
     : filtered.slice(0, MENU_GEOMETRY.QUICK_MODELS);
 }
