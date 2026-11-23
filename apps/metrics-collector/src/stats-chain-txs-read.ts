@@ -1,9 +1,23 @@
-import { and, desc, eq, inArray, isNotNull, lte, max, sql } from 'drizzle-orm';
+import {
+  and,
+  desc,
+  eq,
+  gt,
+  inArray,
+  isNotNull,
+  lte,
+  max,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
+import { alias } from 'drizzle-orm/sqlite-core';
 
 import { DEVNET_USDC } from '@gyblos/config/network';
 
+import { payoutParts } from './aggregate-chain';
 import {
   asInteger,
+  channelJoin,
   col,
   from,
   K,
@@ -22,6 +36,7 @@ import {
   chainTokenDeltas,
   chainTxs,
 } from './schema';
+import { literal } from './sql-primitives';
 import type { ChainTxCursor, ChainTxReader } from './stats-chain-txs';
 
 type ChainTxPageQuery = Parameters<ChainTxReader['transactions']>[0];
@@ -50,7 +65,9 @@ function pageKeys(
         channel: ins.channel,
         payee: chainChannels.payee,
         recipientsJson: chainChannels.recipientsJson,
-        mint: chainChannels.mint,
+        mint: sql<
+          string | null
+        >`coalesce(${chainChannels.mint}, ${ins.mint})`.as('mint'),
         depositAtomic: ins.amountAtomic,
         cumulativeAtomic: ins.cumulativeAtomic,
       })
@@ -123,22 +140,85 @@ function settleIncrements(
     .as('settles');
 }
 
+const usdcMint = (instruction: string, channel: string) =>
+  sql`coalesce(${col(channel, chainChannels.mint)}, ${col(instruction, ins.mint)}) = ${DEVNET_USDC}`;
+
+function payoutSplits(
+  orm: CollectorDatabase,
+  page: ReturnType<typeof pageKeys>,
+) {
+  const deltas = alias(chainTokenDeltas, 'd');
+  const parts = payoutParts();
+  const paying = orm
+    .select({ signature: page.signature })
+    .from(page)
+    .where(inArray(page.kind, PAYING));
+  const channels = sql`(select count(distinct ${col('n', ins.channel)}) from ${from(ins, 'n')} ${channelJoin('n', 'nc')}
+    where ${col('n', ins.signature)} = ${parts.signature} and ${col('n', ins.kind)} in ${kinds(PAYING)} and ${usdcMint('n', 'nc')})`;
+  return orm
+    .select({
+      signature: sql<string>`${parts.signature}`.as('split_signature'),
+      gyblosFees: parts.part(parts.toGyblos).as('gyblos_fees'),
+      programTreasury: parts.part(parts.toProgram).as('program_treasury'),
+      refunded: parts.part(parts.toPayer).as('refunded'),
+      paidOut: parts.part(parts.toOthers).as('paid_out'),
+      vault: sql<number>`max(${parts.vault})`.as('vault'),
+      channels: sql<number>`max(${channels})`.as('channels'),
+    })
+    .from(deltas)
+    .where(
+      and(
+        inArray(deltas.signature, paying),
+        eq(deltas.mint, DEVNET_USDC),
+        gt(parts.amount, 0),
+        sql`not exists ${parts.otherChannelPaid}`,
+      ),
+    )
+    .groupBy(deltas.signature)
+    .as('splits');
+}
+
+function payoutFields(
+  page: ReturnType<typeof pageKeys>,
+  splits: ReturnType<typeof payoutSplits>,
+) {
+  const firstPaying = sql`not exists (select 1 from ${from(ins, 'e')} ${channelJoin('e', 'ec')}
+    where ${col('e', ins.signature)} = ${page.signature} and ${usdcMint('e', 'ec')}
+      and ${col('e', ins.kind)} in ${kinds(PAYING)} and ${col('e', ins.instructionIndex)} < ${page.instructionIndex})`;
+  const balanced = payoutParts().balanced({
+    g: sql`${splits.gyblosFees}`,
+    pt: sql`${splits.programTreasury}`,
+    r: sql`${splits.refunded}`,
+    o: sql`${splits.paidOut}`,
+    outflow: sql`${splits.vault}`,
+  });
+  const when = sql`${page.mint} is ${DEVNET_USDC} and ${page.kind} in ${kinds(PAYING)} and ${firstPaying} and ${balanced}`;
+  const shown = (value: SQL | SQL.Aliased) =>
+    sql<
+      string | null
+    >`case when ${when} then cast(cast(${value} as integer) as text) end`;
+  const unclassified = sql`${splits.vault} - (${splits.gyblosFees} + ${splits.programTreasury} + ${splits.refunded} + ${splits.paidOut})`;
+  return {
+    unclassified: shown(unclassified),
+    paidOut: shown(splits.paidOut),
+    gyblosFees: shown(splits.gyblosFees),
+    programTreasury: shown(splits.programTreasury),
+    refunded: shown(splits.refunded),
+    channels: sql<number | null>`case when ${when} then ${splits.channels} end`,
+  };
+}
+
 function amountOf(
   page: ReturnType<typeof pageKeys>,
   settles: ReturnType<typeof settleIncrements>,
+  payout: ReturnType<typeof payoutFields>,
 ) {
-  const firstPaying = sql`not exists (select 1 from ${from(ins, 'e')}
-    where ${col('e', ins.signature)} = ${page.signature} and ${col('e', ins.channel)} = ${page.channel}
-      and ${col('e', ins.kind)} in ${kinds(PAYING)} and ${col('e', ins.instructionIndex)} < ${page.instructionIndex})`;
-  const delta = asInteger(col('d', chainTokenDeltas.deltaAtomic));
-  const vaultOut = sql`(select -${delta} from ${from(chainTokenDeltas, 'd')}
-    where ${col('d', chainTokenDeltas.signature)} = ${page.signature} and ${col('d', chainTokenDeltas.owner)} = ${page.channel}
-      and ${col('d', chainTokenDeltas.mint)} = ${DEVNET_USDC} and ${delta} < 0)`;
   return sql<string | null>`case
     when ${page.mint} is not ${DEVNET_USDC} then null
     when ${page.kind} in ${kinds(DEPOSITING)} then ${page.depositAtomic}
     when ${page.kind} in ${kinds(SETTLING)} then cast(cast(${settles.increment} as integer) as text)
-    when ${page.kind} in ${kinds(PAYING)} and ${firstPaying} then cast(${vaultOut} as text)
+    when ${page.kind} = ${literal(K.DISTRIBUTE)} then ${payout.paidOut}
+    when ${page.kind} = ${literal(K.RECLAIM)} then ${payout.refunded}
   end`;
 }
 
@@ -148,6 +228,8 @@ export function chainTxReader(database: D1Database): ChainTxReader {
     transactions: (query) => {
       const page = pageKeys(orm, query);
       const settles = settleIncrements(orm, page);
+      const splits = payoutSplits(orm, page);
+      const payout = payoutFields(page, splits);
       return orm
         .with(page)
         .select({
@@ -159,7 +241,15 @@ export function chainTxReader(database: D1Database): ChainTxReader {
           channel: page.channel,
           payee: page.payee,
           recipientsJson: page.recipientsJson,
-          amountAtomic: amountOf(page, settles),
+          amountAtomic: amountOf(page, settles, payout),
+          splitPaidOut: payout.paidOut.as('split_paid_out'),
+          splitGyblosFees: payout.gyblosFees.as('split_gyblos_fees'),
+          splitProgramTreasury: payout.programTreasury.as(
+            'split_program_treasury',
+          ),
+          splitRefunded: payout.refunded.as('split_refunded'),
+          splitChannels: payout.channels.as('split_channels'),
+          splitUnclassified: payout.unclassified.as('split_unclassified'),
         })
         .from(page)
         .leftJoin(
@@ -169,6 +259,7 @@ export function chainTxReader(database: D1Database): ChainTxReader {
             eq(settles.position, page.instructionIndex),
           ),
         )
+        .leftJoin(splits, eq(splits.signature, page.signature))
         .orderBy(
           desc(page.slot),
           desc(page.signature),

@@ -133,7 +133,7 @@ export const GLOBAL_LIMIT_KEY = 'global';
 export const AGGREGATES = {
   // 2: origin and failure breakdowns (recomputes every day once).
   // 3: per-model observations (recomputes every day once).
-  formulaVersion: 3,
+  formulaVersion: 4,
   // Upper bounds of the latency histogram buckets, in ms; one more bucket holds everything above.
   // Fixed so histograms can be summed across hours, days, sellers and models.
   latencyBucketsMs: [

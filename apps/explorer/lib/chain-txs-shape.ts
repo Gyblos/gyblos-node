@@ -45,7 +45,29 @@ export interface ChainTx {
   channel: string;
   recipients: string[];
   amount: bigint | null;
+  split: PayoutSplit | null;
 }
+export interface PayoutSplit {
+  paidOut: bigint;
+  gyblosFees: bigint;
+  programTreasury: bigint;
+  refunded: bigint;
+  channels: number;
+  unclassified: bigint;
+}
+type SplitPart = Exclude<keyof PayoutSplit, 'channels'>;
+const SPLIT_LABELS: [SplitPart, string][] = [
+  ['paidOut', 'seller'],
+  ['gyblosFees', 'Gyblos fee'],
+  ['programTreasury', 'payments program'],
+  ['refunded', 'to buyer'],
+  ['unclassified', 'unclassified'],
+];
+const MAIN_PART: Partial<Record<ChainTxKind, SplitPart>> = {
+  distribute: 'paidOut',
+  reclaim: 'refunded',
+};
+const PAYING = new Set(Object.keys(MAIN_PART));
 export interface ChainTxPage {
   programId: string;
   treasury: string;
@@ -68,8 +90,24 @@ function kind(value: unknown): ChainTxKind {
   return known;
 }
 
+function payoutSplit(value: unknown): PayoutSplit {
+  const source = record(value, 'tx.split');
+  const part = (key: SplitPart) =>
+    BigInt(integerText(source[key], `tx.split.${key}`));
+  return {
+    paidOut: part('paidOut'),
+    gyblosFees: part('gyblosFees'),
+    programTreasury: part('programTreasury'),
+    refunded: part('refunded'),
+    channels: num(source.channels, 'tx.split.channels'),
+    unclassified: part('unclassified'),
+  };
+}
+
 function transaction(value: unknown): ChainTx {
   const source = record(value, 'tx');
+  const kindRead = kind(source.kind);
+  const legacyPayout = PAYING.has(kindRead) && !('split' in source);
   return {
     signature: text(source.signature, 'tx.signature'),
     instructionIndex: num(source.instructionIndex, 'tx.instructionIndex'),
@@ -77,14 +115,17 @@ function transaction(value: unknown): ChainTx {
     blockTime: nullable(source.blockTime, (present) =>
       num(present, 'tx.blockTime'),
     ),
-    kind: kind(source.kind),
+    kind: kindRead,
     channel: text(source.channel, 'tx.channel'),
     recipients: list(source.recipients, 'tx.recipients').map((owner) =>
       text(owner, 'tx.recipient'),
     ),
-    amount: nullable(source.amountAtomic, (present) =>
-      BigInt(integerText(present, 'tx.amountAtomic')),
-    ),
+    amount: legacyPayout
+      ? null
+      : nullable(source.amountAtomic, (present) =>
+          BigInt(integerText(present, 'tx.amountAtomic')),
+        ),
+    split: nullable(source.split, payoutSplit),
   };
 }
 
@@ -140,6 +181,18 @@ export function sellerOwners(sellers: ListedOwner[]) {
   );
 }
 
+function splitLines(tx: ChainTx): string[] {
+  if (!tx.split) return [];
+  const split = tx.split;
+  const main = MAIN_PART[tx.kind];
+  const parts = SPLIT_LABELS.flatMap(([key, label]) =>
+    key !== main && split[key] ? [`${label} ${usdcFixed(split[key])}`] : [],
+  );
+  return split.channels > 1
+    ? [`total of ${split.channels} channels`, ...parts]
+    : parts;
+}
+
 function amountText(tx: ChainTx) {
   if (tx.amount === null) return '—';
   if (tx.amount === 0n && SETTLING.includes(tx.kind)) return NO_CHANGE;
@@ -152,6 +205,7 @@ export function txRow(
   treasury: string,
 ) {
   const payTo = tx.recipients[0] ?? null;
+  const shared = (tx.split?.channels ?? 1) > 1;
   return {
     key: `${tx.signature}:${tx.instructionIndex}`,
     time: utcMinute(tx.blockTime),
@@ -159,9 +213,14 @@ export function txRow(
     label: CHAIN_TX_LABELS[tx.kind],
     channel: tx.channel,
     payTo,
-    seller: payTo && payTo !== treasury ? (owners.get(payTo) ?? null) : null,
+    seller:
+      payTo && payTo !== treasury && !shared
+        ? (owners.get(payTo) ?? null)
+        : null,
     amount: amountText(tx),
-    muted: tx.amount === null || amountText(tx) === NO_CHANGE,
+    muted: !tx.amount,
+    detail: splitLines(tx),
+    shared,
     signature: short(
       tx.signature,
       DISPLAY.signatureEdge,

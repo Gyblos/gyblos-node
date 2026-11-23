@@ -24,6 +24,27 @@ export interface ChainTxRow extends ChainTxCursor {
   payee: string | null;
   recipientsJson: string | null;
   amountAtomic: string | null;
+  splitPaidOut: string | null;
+  splitGyblosFees: string | null;
+  splitProgramTreasury: string | null;
+  splitRefunded: string | null;
+  splitChannels: number | null;
+  splitUnclassified: string | null;
+}
+type SplitColumns =
+  | 'splitPaidOut'
+  | 'splitGyblosFees'
+  | 'splitProgramTreasury'
+  | 'splitRefunded'
+  | 'splitChannels'
+  | 'splitUnclassified';
+export interface PayoutSplit {
+  paidOut: string;
+  gyblosFees: string;
+  programTreasury: string;
+  refunded: string;
+  channels: number;
+  unclassified: string;
 }
 export interface ChainTxReader {
   transactions(page: {
@@ -32,8 +53,9 @@ export interface ChainTxReader {
     recipient: string | null;
   }): Promise<ChainTxRow[]>;
 }
-export type ChainTx = Omit<ChainTxRow, 'recipientsJson'> & {
+export type ChainTx = Omit<ChainTxRow, 'recipientsJson' | SplitColumns> & {
   recipients: string[];
+  split: PayoutSplit | null;
 };
 export interface ChainTxPage {
   network: string;
@@ -127,6 +149,41 @@ function recipientOwners(json: string | null): string[] {
   }
 }
 
+function payoutSplit(row: ChainTxRow): PayoutSplit | null {
+  if (
+    row.splitPaidOut === null ||
+    row.splitGyblosFees === null ||
+    row.splitProgramTreasury === null ||
+    row.splitRefunded === null ||
+    row.splitChannels === null ||
+    row.splitUnclassified === null
+  )
+    return null;
+  return {
+    paidOut: row.splitPaidOut,
+    gyblosFees: row.splitGyblosFees,
+    programTreasury: row.splitProgramTreasury,
+    refunded: row.splitRefunded,
+    channels: row.splitChannels,
+    unclassified: row.splitUnclassified,
+  };
+}
+
+function chainTx(row: ChainTxRow): ChainTx {
+  return {
+    signature: row.signature,
+    instructionIndex: row.instructionIndex,
+    slot: row.slot,
+    blockTime: row.blockTime,
+    kind: row.kind,
+    channel: row.channel,
+    payee: row.payee,
+    recipients: recipientOwners(row.recipientsJson),
+    amountAtomic: row.amountAtomic,
+    split: payoutSplit(row),
+  };
+}
+
 export async function chainTransactions(
   reader: ChainTxReader,
   query: ChainTxQuery,
@@ -143,10 +200,7 @@ export async function chainTransactions(
     programId: CHANNEL_PROGRAM,
     mint: DEVNET_USDC,
     treasury: DEVNET_GYBLOS_TREASURY,
-    transactions: page.map(({ recipientsJson, ...row }) => ({
-      ...row,
-      recipients: recipientOwners(recipientsJson),
-    })),
+    transactions: page.map(chainTx),
     next: rows.length > query.limit && last ? cursorOf(last) : null,
   };
 }
