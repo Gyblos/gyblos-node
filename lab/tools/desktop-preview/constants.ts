@@ -1,4 +1,8 @@
 // Visual-fixture settings only; never operator configuration, credentials or payment permission.
+export const PREVIEW_DENSITY = {
+  COMPACT: 'compact',
+  COMFORTABLE: 'comfortable',
+} as const;
 export const PREVIEW = {
   platform: 'darwin',
   nodeStartupMs: 3000,

@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, useSyn
 
 import { AGENT_TOOLS, type AgentTool } from '@gyblos/node/agent-setup-constants';
 
+import { PREVIEW_DENSITY } from '../../../../lab/tools/desktop-preview/constants';
 import { DESKTOP_UPDATE } from '../constants';
 import { observeDesktopUpdates } from '../update-session';
 import { AddBuyerFunds } from './BuyerFunding';
@@ -285,8 +286,8 @@ export function PreviewKitShowcase() {
       <Panel title="Agents and conversation state">
         <div className="pk-row">
           <PreviewAgentLogos />
-          <PreviewChatState state="running" />
-          <PreviewChatState state="unread" />
+          <PreviewChatState state={CHAT_STATE.RUNNING} />
+          <PreviewChatState state={CHAT_STATE.UNREAD} />
         </div>
       </Panel>
       <Panel title="Tags">
@@ -721,7 +722,7 @@ export function PreviewAnswerSkeleton() {
   );
 }
 
-export const previewCompact = () => document.documentElement.dataset.density === 'compact';
+export const previewCompact = () => document.documentElement.dataset.density === PREVIEW_DENSITY.COMPACT;
 export function previewIcon(size: number): { size: number; weight?: IconWeight } {
   return previewCompact() ? { size: 16, weight: 'bold' } : { size };
 }
@@ -943,16 +944,19 @@ const DAY_GROUPS = ['Today', 'Yesterday', 'Previous 7 days', 'Older'] as const;
 function dayGroup(days: number): (typeof DAY_GROUPS)[number] {
   return days < 1 ? 'Today' : days < 2 ? 'Yesterday' : days < 8 ? 'Previous 7 days' : 'Older';
 }
-const CHAT_FILTERS = ['All chats', 'Unread', 'Pinned'] as const;
-type ChatFilter = (typeof CHAT_FILTERS)[number];
+const CHAT_FILTER = { ALL: 'All chats', UNREAD: 'Unread', PINNED: 'Pinned' } as const;
+type ChatFilter = (typeof CHAT_FILTER)[keyof typeof CHAT_FILTER];
+const CHAT_FILTERS = Object.values(CHAT_FILTER);
+const CHAT_STATE = { RUNNING: 'running', UNREAD: 'unread' } as const;
+type ChatState = (typeof CHAT_STATE)[keyof typeof CHAT_STATE];
 
-function PreviewChatState({ state }: { state: 'running' | 'unread' }) {
+function PreviewChatState({ state }: { state: ChatState }) {
   return (
     <span
       className="preview-chat-state"
       data-state={state}
       role="img"
-      aria-label={state === 'running' ? 'Answering' : 'New answer'}
+      aria-label={state === CHAT_STATE.RUNNING ? 'Answering' : 'New answer'}
     />
   );
 }
@@ -970,7 +974,7 @@ export function PreviewConversationPanel({ chat, view, collapsed, loading, onNew
   const state = usePreviewConversations();
   const [searching, setSearching] = useState(false);
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<ChatFilter>('All chats');
+  const [filter, setFilter] = useState<ChatFilter>(CHAT_FILTER.ALL);
   const running = useRef(new Set<string>());
   useEffect(() => {
     const now = new Set(sessions.filter((session) => session.run || session.paypalRun).map((session) => session.id));
@@ -986,7 +990,7 @@ export function PreviewConversationPanel({ chat, view, collapsed, loading, onNew
     .filter((session) => !state.removed.includes(session.id))
     .filter((session) => conversationTitle(session, state.titles).toLowerCase().includes(query))
     .filter((session) =>
-      filter === 'Unread' ? state.unread.includes(session.id) : filter === 'Pinned' ? state.pinned.includes(session.id) : true,
+      filter === CHAT_FILTER.UNREAD ? state.unread.includes(session.id) : filter === CHAT_FILTER.PINNED ? state.pinned.includes(session.id) : true,
     )
     .slice()
     .reverse();
@@ -1031,7 +1035,7 @@ export function PreviewConversationPanel({ chat, view, collapsed, loading, onNew
           label={'Filter conversations: ' + filter}
           iconOnly
           className="preview-chat-filter"
-          trigger={<FunnelSimple size={14} weight={filter === 'All chats' ? 'regular' : 'fill'} aria-hidden="true" />}
+          trigger={<FunnelSimple size={14} weight={filter === CHAT_FILTER.ALL ? 'regular' : 'fill'} aria-hidden="true" />}
         >
           {(close) =>
             CHAT_FILTERS.map((option) => (
@@ -1060,7 +1064,7 @@ export function PreviewConversationPanel({ chat, view, collapsed, loading, onNew
           <section key={group.title} aria-label={group.title}>
             <h3 className="preview-chat-group-title">{group.title}</h3>
             {group.items.map((session) => {
-              const status = session.run || session.paypalRun ? 'running' : state.unread.includes(session.id) ? 'unread' : null;
+              const status = session.run || session.paypalRun ? CHAT_STATE.RUNNING : state.unread.includes(session.id) ? CHAT_STATE.UNREAD : null;
               const pinned = state.pinned.includes(session.id);
               return (
                 <div key={session.id} className="preview-chat-row">
@@ -1090,8 +1094,8 @@ export function PreviewConversationPanel({ chat, view, collapsed, loading, onNew
           (loading && previewCompact() ? (
             <PreviewSkeletonRows count={5} />
           ) : (
-            <PreviewEmptyLine icon={!loading && (query || filter !== 'All chats') ? MagnifyingGlass : ChatCircle}>
-              {loading ? 'Loading conversations…' : query || filter !== 'All chats' ? 'No conversations found.' : 'Your conversations will appear here.'}
+            <PreviewEmptyLine icon={!loading && (query || filter !== CHAT_FILTER.ALL) ? MagnifyingGlass : ChatCircle}>
+              {loading ? 'Loading conversations…' : query || filter !== CHAT_FILTER.ALL ? 'No conversations found.' : 'Your conversations will appear here.'}
             </PreviewEmptyLine>
           ))}
       </div>
@@ -1204,7 +1208,15 @@ export function PreviewChatDetails({ chat, onClose }: { chat: ChatController; on
   const sum = (pick: (metrics: NonNullable<(typeof answers)[number]['metrics']>) => number | null | undefined) =>
     answers.reduce((total, message) => total + (message.metrics ? pick(message.metrics) ?? 0 : 0), 0);
   const latency = answers.length ? Math.round(sum((metrics) => metrics.responseMs) / answers.length) : null;
-  const spend = sum((metrics) => Number(metrics.cost?.amount ?? 0));
+  const totals: Record<string, number> = {};
+  for (const message of answers) {
+    const cost = message.metrics?.cost;
+    if (cost) totals[cost.unit] = (totals[cost.unit] ?? 0) + Number(cost.amount);
+  }
+  const spend = Object.entries(totals)
+    .filter(([, amount]) => amount > 0)
+    .map(([unit, amount]) => amount.toLocaleString('en-US', { maximumFractionDigits: 6 }) + ' ' + unit)
+    .join(' · ');
   return (
     <aside className="ui-context-panel preview-chat-details" aria-label="Conversation details">
       <header className="ui-context-heading">
@@ -1224,7 +1236,7 @@ export function PreviewChatDetails({ chat, onClose }: { chat: ChatController; on
           <Pair label="Seller" value={last?.model.free ? 'Community seller · Free' : 'Chosen by Auto'} />
           <Pair label="Messages" value={String(session.messages.length)} />
           <Pair label="Tokens" value={sum((metrics) => metrics.inputTokens).toLocaleString() + ' in · ' + sum((metrics) => metrics.outputTokens).toLocaleString() + ' out'} />
-          <Pair label="Spend" value={spend ? spend.toFixed(4) + ' USDC' : 'Free'} />
+          <Pair label="Spend" value={spend || 'Free'} />
           <Pair label="Avg. response" value={latency === null ? '—' : (latency / 1000).toFixed(1) + ' s'} />
         </Facts>
       )}

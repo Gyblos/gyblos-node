@@ -129,13 +129,15 @@ void test('the title bar adds a conversation menu and a details panel for the ch
 });
 
 void test('compact density is the default and ?density=comfortable restores the previous view', async () => {
-  const [browser, css, kit, settings] = await Promise.all([
+  const [browser, constants, css, kit, settings] = await Promise.all([
     read('browser.ts'),
+    read('constants.ts'),
     read('preview.css'),
     read('views/PreviewKit.tsx.preview'),
     read('views/Settings.tsx.preview'),
   ]);
-  assert.match(browser, /get\('density'\) !== 'comfortable'/);
+  assert.match(constants, /COMFORTABLE: 'comfortable'/);
+  assert.match(browser, /get\('density'\) !== PREVIEW_DENSITY\.COMFORTABLE/);
   for (const selector of [
     '.ui-select-trigger',
     '.preview-model-copy strong',
@@ -158,7 +160,8 @@ void test('compact density is the default and ?density=comfortable restores the 
     css,
     /html\[data-density='compact'\][^{]*\.preview-metric-card dd > span[^{]*\{[^}]*font-size: 18px;/,
   );
-  assert.match(browser, /dataset\.density = 'compact'/);
+  assert.match(constants, /COMPACT: 'compact'/);
+  assert.match(browser, /dataset\.density = PREVIEW_DENSITY\.COMPACT/);
   assert.match(browser, /compact && !query\.has\('font'\)/);
   const tokens =
     /html\[data-density='compact'\] \.app\.desktop-frame \{([^}]*)\}/.exec(
@@ -356,4 +359,11 @@ void test('connection tool cards stretch with the sheet instead of snapping to e
     '.preview-tool-card .preview-tool-logo',
     'grid-row: auto;',
   );
+});
+
+void test('conversation details total spend in each charge unit', async () => {
+  const kit = await read('views/PreviewKit.tsx.preview');
+  const details = kit.slice(kit.indexOf('export function PreviewChatDetails'));
+  assert.doesNotMatch(details, /' USDC'/);
+  assert.match(details, /totals\[cost\.unit\]/);
 });

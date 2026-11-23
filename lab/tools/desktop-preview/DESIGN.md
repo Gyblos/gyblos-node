@@ -20,7 +20,7 @@ Views never use raw color values; colors come from theme variables or `--pk-*` t
 
 | Layer               | Dark       | Use                                                                                                                                                                                                                                                                                                                           |
 | ------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Page (`--bg`)       | `charcoal` | Route background: an inset sheet with a 1 px border and `--radius-panel` start corners                                                                                                                                                                                                                                        |
+| Page (`--bg`)       | `charcoal` | Route background: an inset sheet with a 1 px border and `--pk-radius-sheet` start corners (16 px in compact density)                                                                                                                                                                                                          |
 | Frame (`--pk-side`) | `panel`    | Conversation panel and title bar; rail, status bar and sidebar backdrop use `--pk-rail` (55% frame toward page); the panel has a `--line` left and bottom edge with a rounded bottom-left corner; when the sidebar folds, the panel slides under the rail while the page sheet follows, then the whole frame uses `--pk-rail` |
 | Panel (`--panel`)   | `panel`    | Grouped settings, usage panels, tables                                                                                                                                                                                                                                                                                        |
 | Raised (`--raised`) | `raised`   | Selected pills, chips, controls on panels                                                                                                                                                                                                                                                                                     |
@@ -52,9 +52,14 @@ This table governs the mockup. `CodeBlock`, `DetailSummary`, `Tag`,
 `Panel`, `TableRow`, `AmountEditor`, `CompactAmount`, `PreviewAnswerSkeleton`,
 `Notice`, `Switch`, `PreviewFundsDialog`, `PreviewStatusBar`,
 `PreviewUpdateButton`, `PreviewSkeletonRows`, `PreviewEmptyLine`,
-`PreviewSectionIcon`, `Kbd`, `PreviewToaster` / `showPreviewToast`
+`PreviewSectionIcon`, `Kbd`, `PreviewToaster` / `showPreviewToast`,
+`PreviewConversationPanel`, `PreviewConversationMenu`, `PreviewChatDetails`,
+`PreviewAgentLogos`, `previewIcon`
 exist only in the preview views until a port is approved; shipped desktop code
 follows [`apps/desktop/DESIGN.md`](../../../apps/desktop/DESIGN.md).
+
+In the preview, Delete only hides a conversation in memory. A port must erase
+its transcript, draft and archive entry, and keep payment journals and receipts.
 
 | Need                              | Use                                                                                                                                                                                                | Not                                                    |
 | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |

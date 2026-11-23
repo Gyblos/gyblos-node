@@ -1,7 +1,7 @@
 // Installs synthetic browser-only host adapters explicitly; importing this module has no side effects.
 import { UI_VIEW } from '@gyblos/desktop/catalog-state';
 
-import { PREVIEW } from './constants';
+import { PREVIEW, PREVIEW_DENSITY } from './constants';
 import { createPreviewHost } from './host';
 import type { AgentExamples } from './input';
 
@@ -25,8 +25,9 @@ export function startPreview(examples: AgentExamples) {
   Object.assign(window, createPreviewHost(location.search, examples));
   document.title = PREVIEW.title;
   const query = new URLSearchParams(location.search);
-  const compact = query.get('density') !== 'comfortable';
-  if (compact) document.documentElement.dataset.density = 'compact';
+  const compact = query.get('density') !== PREVIEW_DENSITY.COMFORTABLE;
+  if (compact)
+    document.documentElement.dataset.density = PREVIEW_DENSITY.COMPACT;
   if (query.get('font') === 'inter' || (compact && !query.has('font')))
     document.documentElement.dataset.font = 'inter';
   const screen = query.get('screen') ?? '';
