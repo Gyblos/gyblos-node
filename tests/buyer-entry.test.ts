@@ -91,11 +91,14 @@ void test('the buyer routes cover exactly the declared commands', () => {
 void test('the buyer executable runs each subcommand and keeps its exit code and messages', async (t) => {
   const directory = await mkdtemp(join(tmpdir(), 'gyblos-buyer-entry-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
+  const executable = new URL('../apps/buyer/src/bin.ts', import.meta.url)
+    .pathname;
   const spawn = (...args: string[]) =>
     spawnSync(
       process.execPath,
-      ['--import', 'tsx', 'apps/buyer/src/bin.ts', ...args],
+      ['--import', import.meta.resolve('tsx'), executable, ...args],
       {
+        cwd: directory,
         env: { ...process.env, GYBLOS_HOME: directory },
         encoding: 'utf8',
       },
@@ -119,22 +122,26 @@ void test('the buyer executable runs each subcommand and keeps its exit code and
   assert.match(unknown.stderr, /^Usage: buyer <command>/);
 });
 
-void test('every root buyer script runs the one buyer executable with a declared subcommand', async () => {
+void test('every root buyer script runs the one buyer executable with its own subcommand', async () => {
   const manifest: unknown = JSON.parse(await readFile('package.json', 'utf8'));
   assert.ok(manifest && typeof manifest === 'object' && 'scripts' in manifest);
   const scripts = manifest.scripts;
   assert.ok(scripts && typeof scripts === 'object');
-  const buyer = Object.entries(scripts).filter(
-    ([name]) => name === 'buyer' || name.startsWith('buyer:'),
+  const buyer = Object.fromEntries(
+    Object.entries(scripts).filter(
+      ([name]) => name === 'buyer' || name.startsWith('buyer:'),
+    ),
   );
-  assert.equal(buyer.length, COMMANDS.length);
-  const used = buyer.map(([name, script]) => {
-    assert.equal(typeof script, 'string', name);
-    const match = /^node --import tsx apps\/buyer\/src\/bin\.ts (\S+)$/.exec(
-      String(script),
-    );
-    assert.ok(match, `${name}: ${String(script)}`);
-    return match[1];
+  const script = (command: string) =>
+    `node --import tsx apps/buyer/src/bin.ts ${command}`;
+  assert.deepEqual(buyer, {
+    buyer: script(BUYER_COMMANDS.START),
+    'buyer:free': script(BUYER_COMMANDS.FREE),
+    'buyer:chat': script(BUYER_COMMANDS.CHAT),
+    'buyer:init': script(BUYER_COMMANDS.INIT),
+    'buyer:setup': script(BUYER_COMMANDS.SETUP),
+    'buyer:auto': script(BUYER_COMMANDS.AUTO),
+    'buyer:agent': script(BUYER_COMMANDS.AGENT),
+    'buyer:withdraw:paid': script(BUYER_COMMANDS.WITHDRAW),
   });
-  assert.deepEqual([...used].sort(), [...COMMANDS].sort());
 });

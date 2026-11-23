@@ -273,6 +273,10 @@ export const BUYER_INIT_FLAGS = {
   ADVANCED: '--advanced',
   HELP: '--help',
 } as const;
+export const BUYER_HELP_FLAGS: readonly string[] = [
+  BUYER_INIT_FLAGS.HELP,
+  '-h',
+];
 
 // Operational HTTP diagnostics, separate from inference observations and receipts.
 export const BUYER_HTTP_DIAGNOSTICS = {

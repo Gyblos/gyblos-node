@@ -1,4 +1,4 @@
-import { BUYER_COMMANDS } from './constants';
+import { BUYER_COMMANDS, BUYER_HELP_FLAGS } from './constants';
 
 type BuyerCommand = (typeof BUYER_COMMANDS)[keyof typeof BUYER_COMMANDS];
 type BuyerRoute = (args: readonly string[]) => Promise<unknown>;
@@ -7,8 +7,6 @@ export type BuyerRoutes = Readonly<Record<BuyerCommand, BuyerRoute>>;
 interface Output {
   write(text: string): unknown;
 }
-
-const HELP_FLAGS: readonly string[] = ['--help', '-h'];
 
 const USAGE = `Usage: buyer <command> [options]
        buyer ${BUYER_COMMANDS.START}      (the buyer endpoint: free or paid, chosen from each signed quote)
@@ -48,7 +46,7 @@ export async function run(
   },
 ): Promise<1 | undefined> {
   const [command, ...rest] = args;
-  if (command !== undefined && HELP_FLAGS.includes(command)) {
+  if (command !== undefined && BUYER_HELP_FLAGS.includes(command)) {
     output.out.write(USAGE);
     return undefined;
   }
