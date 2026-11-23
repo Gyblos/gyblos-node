@@ -494,7 +494,13 @@ and `503 COLLECTOR_UNAVAILABLE` are as for the other stats routes. The answer:
       "channel": "<address>",
       "payee": "<address>",
       "recipients": ["<address>", "<address>"],
-      "amountAtomic": "1500000"
+      "amountAtomic": "213",
+      "split": {
+        "paidOut": "213",
+        "gyblosFee": "9",
+        "programFee": "3",
+        "refunded": "999775"
+      }
     }
   ],
   "next": "431000000-<signature>-1"
@@ -516,8 +522,19 @@ was not read. `amountAtomic` is devnet USDC as a decimal string:
   deposits, in the daily aggregate's order (slot, capped cumulative, signature,
   instruction index), so the rows of a day add up to its `settledAtomic`; `0`
   when it adds nothing;
-- `distribute` and `reclaim`: the USDC that left the channel's vault in that
-  transaction, on the first such instruction of the channel in it.
+- `distribute`: `split.paidOut`, what the seller side received;
+- `reclaim`: `split.refunded`, what went back to the payer.
+
+`split` is set only on the first `distribute` or `reclaim` instruction of a
+transaction, and `null` on every other row. It classifies the transaction's
+positive devnet USDC changes exactly as the daily aggregate's payout totals do:
+`gyblosFee` (the Gyblos fee treasury), `programFee` (the program's own
+treasury), `refunded` (a payer of a channel the transaction names) and `paidOut`
+(that channel's payee or a distribute recipient), as decimal strings. The rows'
+splits add up to the days' `gyblosFeesAtomic`, `programTreasuryAtomic`,
+`refundedAtomic` and `paidOutAtomic`. Like the aggregate, a transaction whose
+parts exceed what left its channels' vaults (a transfer bundled with the
+payout), or that also pays a channel that is not Gyblos, gets no split.
 
 `amountAtomic` is `null` when:
 
@@ -525,8 +542,9 @@ was not read. `amountAtomic` is devnet USDC as a decimal string:
   never read;
 - the kind is `request_close` or `seal`;
 - a settle carries no voucher, or its transaction has no block time;
-- a `distribute` or `reclaim` has no negative USDC change of the channel's vault
-  in its transaction, or is not the channel's first paying instruction in it.
+- a `distribute` or `reclaim` has no `split`: it is not the transaction's first
+  paying instruction, the transaction moved no USDC to anyone, or its parts
+  exceed the vault outflow, or it also pays a channel that is not Gyblos.
 
 The list is as complete as the chain index: channels it never read, and history
 before its floor, are missing.

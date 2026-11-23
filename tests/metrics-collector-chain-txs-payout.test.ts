@@ -152,9 +152,7 @@ void test('the devnet lifecycle payout splits add up to the daily chain stats', 
   );
   const amountOf = (kind: string) =>
     body.transactions.find((row) => row.kind === kind)?.amountAtomic;
-  const distribute = body.transactions.find(
-    (row) => row.kind === 'distribute',
-  );
+  const distribute = body.transactions.find((row) => row.kind === 'distribute');
   assert.equal(amountOf('distribute'), distribute?.split?.paidOut ?? null);
   assert.ok(
     total(days.map((day) => day.paidOutAtomic)) <
