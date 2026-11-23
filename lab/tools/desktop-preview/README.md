@@ -78,6 +78,10 @@ newer version. The button opens a dialog; nothing is downloaded and no release
 page is opened. Open `review=system-status` to start with the checklist open,
 combined with `node-state=error` or `backup=needed`.
 
+The preview uses the compact density described in [DESIGN.md](DESIGN.md#density)
+with Inter unless `font` is set. Add `density=comfortable` to compare the
+previous density.
+
 ## Validation and limits
 
 Run `node --import tsx --test "tests/lab/desktop-preview*.test.ts"` for the

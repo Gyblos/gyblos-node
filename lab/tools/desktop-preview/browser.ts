@@ -24,9 +24,12 @@ declare global {
 export function startPreview(examples: AgentExamples) {
   Object.assign(window, createPreviewHost(location.search, examples));
   document.title = PREVIEW.title;
-  if (new URLSearchParams(location.search).get('font') === 'inter')
+  const query = new URLSearchParams(location.search);
+  const compact = query.get('density') !== 'comfortable';
+  if (compact) document.documentElement.dataset.density = 'compact';
+  if (query.get('font') === 'inter' || (compact && !query.has('font')))
     document.documentElement.dataset.font = 'inter';
-  const screen = new URLSearchParams(location.search).get('screen') ?? '';
+  const screen = query.get('screen') ?? '';
   const target = SCREEN_VIEW[screen];
   if (!target || target === UI_VIEW.CHAT) return;
   const observer = new MutationObserver(() => {

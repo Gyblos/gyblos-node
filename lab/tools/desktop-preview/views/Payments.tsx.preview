@@ -15,7 +15,7 @@ import { X402_ACTION, x402Amount, x402Asset, x402BudgetInput } from '../x402-mod
 import type { BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 import { WALLET_STATUS } from '../wallet/model';
 import { BUTTON_VARIANT } from './constants';
-import { CompactAmount, FUNDS_HOST, openPreviewFunds, PreviewFundsDialog, SegmentedBar, Tag, TONE, useSpending } from './PreviewKit';
+import { CompactAmount, FUNDS_HOST, openPreviewFunds, PreviewFundsDialog, SegmentedBar, showPreviewToast, Tag, TONE, useSpending } from './PreviewKit';
 import { FormActions } from './Form';
 import { Modal } from './Modal';
 import { MotionPresence } from './Motion';
@@ -290,7 +290,7 @@ function LimitRow({ buyer, policy, spent, current, limited }: {
     setSaveError('');
     if (atomic === null) return;
     void buyer.run({ action: X402_ACTION.AUTHORIZE, limitAtomic: String(atomic) })
-      .then(result => { if (!result || result.error) setSaveError(result?.error ?? 'Could not save the limit.'); })
+      .then(result => { if (!result || result.error) setSaveError(result?.error ?? 'Could not save the limit.'); else showPreviewToast('Spending limit saved'); })
       .catch(() => setSaveError('Could not save the limit.'));
   };
   return (

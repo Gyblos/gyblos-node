@@ -1,6 +1,6 @@
 // Appearance, account-wide buyer preferences (seller mode, free-model fallback, Testnet) with the
 // proposed buyer config.toml, and product information, built from the shared compact primitives.
-import { Check, Info } from '@phosphor-icons/react';
+import { Check, Code, FileText, Info, Palette, Storefront, Wallet } from '@phosphor-icons/react';
 import { useState } from 'react';
 
 import { Appearance } from './Appearance';
@@ -17,6 +17,8 @@ import {
   PREVIEW_COPY,
   PREVIEW_EVENT,
   PreviewKitShowcase,
+  previewCompact,
+  PreviewSectionIcon,
   READY_SELLER_MODES,
   SELLER_MODES,
   setPreviewSetting,
@@ -30,6 +32,7 @@ const FONTS = ['Instrument Sans', 'Inter'] as const;
 function chooseFont(font: (typeof FONTS)[number]) {
   const params = new URLSearchParams(location.search);
   if (font === 'Inter') params.set('font', 'inter');
+  else if (previewCompact()) params.set('font', 'instrument-sans');
   else params.delete('font');
   location.search = params.toString();
 }
@@ -62,7 +65,7 @@ function BuyerPreferences() {
   const showTestnet = usePreviewSetting('showTestnet');
   return (
     <>
-      <Section title="Sellers">
+      <Section title="Sellers" icon={<PreviewSectionIcon icon={Storefront} />}>
         <div className="preview-settings-rows">
           <div>
             <span>
@@ -94,7 +97,7 @@ function BuyerPreferences() {
           </div>
         </div>
       </Section>
-      <Section title="Funds">
+      <Section title="Funds" icon={<PreviewSectionIcon icon={Wallet} />}>
         <div className="preview-settings-rows">
           <div>
             <span>
@@ -105,7 +108,7 @@ function BuyerPreferences() {
           </div>
         </div>
       </Section>
-      <Section title="Developer">
+      <Section title="Developer" icon={<PreviewSectionIcon icon={Code} />}>
         <div className="preview-settings-rows">
           <div>
             <span>
@@ -116,7 +119,7 @@ function BuyerPreferences() {
           </div>
         </div>
       </Section>
-      <Section title="Configuration file">
+      <Section title="Configuration file" icon={<PreviewSectionIcon icon={FileText} />}>
         <p className="ui-help-text">These settings live in the buyer configuration file. Proposed file and path; the app does not read it yet.</p>
         <CodeBlock
           code={buyerConfig(mode, freeFallback, showTestnet)}
@@ -149,7 +152,7 @@ export function Settings({
     );
   return (
     <PagePanel>
-      <Section title="Appearance">
+      <Section title="Appearance" icon={<PreviewSectionIcon icon={Palette} />}>
         <div className="preview-settings-rows preview-settings-appearance">
           <Appearance label="Theme" light={light} onLightChange={onLightChange} />
           <div>
@@ -167,7 +170,7 @@ export function Settings({
         </div>
       </Section>
       <BuyerPreferences />
-      <Section title="About">
+      <Section title="About" icon={<PreviewSectionIcon icon={Info} />}>
       <section className="preview-settings-rows">
         <div>
           <span>Design system</span>

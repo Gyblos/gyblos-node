@@ -18,13 +18,13 @@ Views never use raw color values; colors come from theme variables or `--pk-*` t
 
 ## Surfaces
 
-| Layer               | Dark       | Use                                                                                                                                                                                                                                                           |
-| ------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Page (`--bg`)       | `charcoal` | Route background: an inset sheet with a 1 px border and `--radius-panel` start corners                                                                                                                                                                        |
-| Frame (`--pk-side`) | `panel`    | Conversation panel and title bar; rail, status bar and sidebar backdrop use `--pk-rail` (55% frame toward page); the panel has a `--line` left and bottom edge with a rounded bottom-left corner; with the sidebar collapsed the whole frame uses `--pk-rail` |
-| Panel (`--panel`)   | `panel`    | Grouped settings, usage panels, tables                                                                                                                                                                                                                        |
-| Raised (`--raised`) | `raised`   | Selected pills, chips, controls on panels                                                                                                                                                                                                                     |
-| Line (`--line`)     | `line`     | 1 px borders and row dividers                                                                                                                                                                                                                                 |
+| Layer               | Dark       | Use                                                                                                                                                                                                                                                                                                                           |
+| ------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Page (`--bg`)       | `charcoal` | Route background: an inset sheet with a 1 px border and `--radius-panel` start corners                                                                                                                                                                                                                                        |
+| Frame (`--pk-side`) | `panel`    | Conversation panel and title bar; rail, status bar and sidebar backdrop use `--pk-rail` (55% frame toward page); the panel has a `--line` left and bottom edge with a rounded bottom-left corner; when the sidebar folds, the panel slides under the rail while the page sheet follows, then the whole frame uses `--pk-rail` |
+| Panel (`--panel`)   | `panel`    | Grouped settings, usage panels, tables                                                                                                                                                                                                                                                                                        |
+| Raised (`--raised`) | `raised`   | Selected pills, chips, controls on panels                                                                                                                                                                                                                                                                                     |
+| Line (`--line`)     | `line`     | 1 px borders and row dividers                                                                                                                                                                                                                                                                                                 |
 
 ## Tones
 
@@ -50,8 +50,9 @@ in the same change. Agents load this through the
 This table governs the mockup. `CodeBlock`, `DetailSummary`, `Tag`,
 `statusTone`, `FilterChips`, `Delta`, `Savings`, `SegmentedBar`, `StatGrid`,
 `Panel`, `TableRow`, `AmountEditor`, `CompactAmount`, `PreviewAnswerSkeleton`,
-`Notice`, `Switch`, `PreviewFundsDialog`, `PreviewStatusBar` and
-`PreviewUpdateButton`
+`Notice`, `Switch`, `PreviewFundsDialog`, `PreviewStatusBar`,
+`PreviewUpdateButton`, `PreviewSkeletonRows`, `PreviewEmptyLine`,
+`PreviewSectionIcon`, `Kbd`, `PreviewToaster` / `showPreviewToast`
 exist only in the preview views until a port is approved; shipped desktop code
 follows [`apps/desktop/DESIGN.md`](../../../apps/desktop/DESIGN.md).
 
@@ -112,14 +113,62 @@ follows [`apps/desktop/DESIGN.md`](../../../apps/desktop/DESIGN.md).
   to the composer and carries its actions inline.
 - `Switch`: `role="switch"` button for account-wide settings (the buyer
   `config.toml`); the row beside it carries the label and help.
-- `CodeBlock`: language label (Shell, JSON, TOML, TypeScript, Text), optional file
+- `CodeBlock`: language label (Shell, JSON, TOML, TypeScript, Text), line numbers, optional file
   title, highlighted tokens and a Copy button that shows "Copied" only after a
   confirmed copy. Chat fences map through `fenceLanguage`, tools through
   `agentCodeLanguage`.
 - Settings rows (`preview-settings-rows`): copy and help on the left, one compact
   control on the right; Save/Cancel appear only after a change.
 
-Open `?screen=design-system` (Settings → Preview components) to review them all.
+Compact density adds these shared pieces; each renders the comfortable markup, or nothing, with `?density=comfortable`:
+
+| Need                                 | Use                                                                                            |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| Loading list                         | `PreviewSkeletonRows` with `count`                                                             |
+| Empty list or search                 | `PreviewEmptyLine` with an `icon` and one line of text                                         |
+| Settings header icon                 | `Section` `icon` with `PreviewSectionIcon`                                                     |
+| Menu or header glyph                 | `previewIcon(size)`: 16 px with a 1.5 px stroke (`bold`) in compact density                    |
+| Keyboard shortcut in a menu or label | `Kbd` with `previewShortcut(PREVIEW_SHORTCUT.*)` (`⌘N` new chat, `⌘K` Models; Ctrl+ off macOS) |
+| Confirm a save or delete             | `showPreviewToast(text)`; `PreviewToaster` is mounted once by `PreviewStatusBar`               |
+
+Open `?screen=design-system` (Settings → Preview components) to review them all; the compact pieces above appear on their screens.
+
+## Density
+
+Compact density is the default. It sets `data-density="compact"` and Inter (the
+`?font=inter` path) unless `font` is given. `?density=comfortable` restores the
+previous density for comparison.
+
+- Sidebar, menus, tables and lists: rows of 28–32 px (`--pk-row-height`, 30 px),
+  controls of 28 px (`--control-size`) and 13 / 12 px text, including select
+  triggers, list and card titles, Settings labels and tooltips.
+- Pills (`Tag`, `Badge`) are 18 px with 11 px text; the badge line in the model
+  picker keeps its 16 px tags. Text buttons in the content area are 24 px with
+  12 px text; switches, the theme switch and dialog buttons keep their own size.
+  Title-bar buttons are 28 px
+  (`--shell-control-size`). Icon tiles are 28 px with 16 px glyphs, metric icons
+  24 px.
+- Digits keep the fixed-width `Gyblos Digits` face under Inter as well.
+- Headings: 15 px section titles, 16 px page intros and the tool guide; 18 px
+  metric values. Chat messages stay at 14 px for reading.
+- Cards (metric, settings, payment methods, tables, lists, tool guide,
+  limit, tool and application cards) share `--radius-panel`; metric cards pad 12 / 14 px with
+  12 px labels. Help and detail text is 12 px. Tool guide steps use 20 px
+  markers with 12 px glyphs and a 28 px tool logo. Tool cards stack the
+  logo above the name and stretch to fill the row (112 px minimum track), so at
+  desktop widths every tool stays in one row while the sheet resizes; narrower
+  sheets wrap onto a second row.
+- Settings rows, forms and empty states keep 20 px of inner spacing
+  (`--pk-comfort-padding`).
+- Radii by level: 6 px buttons and inputs (`--radius-control`), 8 px menus
+  (`--pk-radius-menu`), 10 px cards (`--radius-panel`) and 16 px for the content
+  sheet (`--pk-radius-sheet`).
+- Icons in "…" menus, Settings headers and empty states use the 16 px, 1.5 px
+  stroke set.
+- Hover and focus transitions take 150 ms (none with reduced motion). Copy shows
+  ✓ for 1 s. Saving or deleting shows a toast. Loading lists show skeleton rows.
+  New chat (`⌘N`) and Models (`⌘K`), the desktop app's existing shortcuts, show them in tooltips
+  and the conversation "…" menu.
 
 ## Type
 

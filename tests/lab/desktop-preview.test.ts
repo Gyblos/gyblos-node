@@ -55,7 +55,11 @@ async function fixture(search = '?state=ready&connection-state=ready') {
   const window: Record<string, unknown> = { setTimeout, clearTimeout };
   runInNewContext(await readFile(bridge, 'utf8'), {
     window,
-    document: { title: '', documentElement: {}, querySelectorAll: () => [] },
+    document: {
+      title: '',
+      documentElement: { dataset: {} },
+      querySelectorAll: () => [],
+    },
     MutationObserver: class {
       observe() {
         observations.push(true);
