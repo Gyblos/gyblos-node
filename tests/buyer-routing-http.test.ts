@@ -9,6 +9,7 @@ import { HTTP_STATUS } from '@gyblos/config';
 import { BuyerRoutingError } from '@gyblos/core/buyer-routing';
 import { BUYER_ROUTING_CODES } from '@gyblos/core/constants';
 import { UnsentSellerBusyError } from '@gyblos/node/buyer-routing';
+import type { DiagnosticRecord } from '@gyblos/runtime/diagnostics';
 
 import { freeSellerFixture } from './support/free-seller';
 
@@ -26,6 +27,7 @@ void test('routing busy and independently proven unsent remote busy are classifi
 void test('the real loopback buyer endpoint returns a static unsent routing-busy response', async (t) => {
   const source = await freeSellerFixture();
   const request = await source.request();
+  const records: DiagnosticRecord[] = [];
   const host = await startFreeBuyerHttp(
     async () => {
       throw new BuyerRoutingError(BUYER_ROUTING_CODES.BUSY);
@@ -34,7 +36,11 @@ void test('the real loopback buyer endpoint returns a static unsent routing-busy
       selection: request.quote.offer.selection,
       maxTokens: request.quote.offer.maxTokens,
     },
-    { port: 0, classify: classifyPaidError },
+    {
+      port: 0,
+      classify: classifyPaidError,
+      diagnostics: (record) => records.push(record),
+    },
   );
   t.after(host.close);
   const response = await fetch(host.url, {
@@ -50,6 +56,10 @@ void test('the real loopback buyer endpoint returns a static unsent routing-busy
   const result = await response.json();
   assert.equal(result.error.code, BUYER_ROUTING_CODES.BUSY);
   assert.equal(response.headers.get(FREE_BUYER.noRetryHeader), null);
+  assert.deepEqual(
+    records.map((record) => record.code),
+    [BUYER_ROUTING_CODES.BUSY],
+  );
 });
 
 void test('a local queue expiry is a typed unsent gateway timeout', () => {
