@@ -142,8 +142,10 @@ previous density for comparison.
 - Sidebar, menus, tables and lists: rows of 28–32 px (`--pk-row-height`, 30 px),
   controls of 28 px (`--control-size`) and 13 / 12 px text, including select
   triggers, list and card titles, Settings labels and tooltips.
-- Pills (`Tag`, `Badge`) are 18 px with 11 px text. Text buttons in the content
-  area are 24 px with 12 px text; title-bar buttons are 28 px
+- Pills (`Tag`, `Badge`) are 18 px with 11 px text; the badge line in the model
+  picker keeps its 16 px tags. Text buttons in the content area are 24 px with
+  12 px text; switches, the theme switch and dialog buttons keep their own size.
+  Title-bar buttons are 28 px
   (`--shell-control-size`). Icon tiles are 28 px with 16 px glyphs, metric icons
   24 px.
 - Digits keep the fixed-width `Gyblos Digits` face under Inter as well.
