@@ -4182,8 +4182,6 @@ html[data-density='compact'] .app.desktop-frame .preview-tool-grid {
 html[data-density='compact'] .app.desktop-frame .preview-tool-card {
   grid-template-columns: minmax(0, 1fr);
   align-content: start;
-  row-gap: var(--space-1);
-  padding: var(--space-3);
 }
 html[data-density='compact']
   .app.desktop-frame

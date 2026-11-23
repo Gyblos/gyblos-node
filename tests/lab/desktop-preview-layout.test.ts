@@ -332,7 +332,7 @@ void test('connection tool cards stretch with the sheet instead of snapping to e
     css,
     /\.desktop-frame \.preview-tool-grid \{[^}]*grid-template-columns: repeat\(auto-fit, minmax\(min\(100%, 150px\), 1fr\)\);/,
   );
-  assert.doesNotMatch(css, /auto-fill/);
+  assert.doesNotMatch(css, /\.preview-tool-grid \{[^}]*auto-fill/);
   assertCompact(
     css,
     '.preview-tool-grid',
@@ -343,5 +343,10 @@ void test('connection tool cards stretch with the sheet instead of snapping to e
     '.preview-tool-card',
     'grid-template-columns: minmax(0, 1fr);',
   );
-  assertCompact(css, '.preview-tool-card) .preview-tool-logo', 'width: 28px;');
+  assertCompact(css, '.preview-tool-card', 'width: 28px;');
+  assertCompact(
+    css,
+    '.preview-tool-card .preview-tool-logo',
+    'grid-row: auto;',
+  );
 });
