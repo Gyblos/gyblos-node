@@ -92,14 +92,7 @@ export function ModelDropdown(props: PickerProps) {
             model.name
         }
         className={props.toolbar ? 'model-picker' : 'ui-model-trigger'}
-        trigger={
-          <PickerTrigger
-            model={model}
-            models={models}
-            network={network}
-            contextLabel={props.contextLabel}
-          />
-        }
+        trigger={<PickerTrigger {...props} network={network} />}
       >
         {(close, query) => (
           <>
