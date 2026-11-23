@@ -259,7 +259,7 @@ export const CHAIN_CHANNEL_CLOSED = 'closed';
 export const CHAIN_TX_PAGE = {
   defaultLimit: 25,
   maxLimit: 50,
-  params: { BEFORE: 'before', LIMIT: 'limit' },
+  params: { BEFORE: 'before', LIMIT: 'limit', RECIPIENT: 'recipient' },
 } as const;
 // The address holds no channel of this program (another owner, or another size).
 export const CHAIN_CHANNEL_UNKNOWN = 'unknown';

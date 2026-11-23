@@ -5,7 +5,12 @@ import {
   DEVNET_USDC,
 } from '@gyblos/config/network';
 
-import { CHAIN_TX_PAGE, type ChainInstructionKind } from './constants';
+import { base58Decode, base58Encode } from './chain/base58';
+import {
+  CHAIN_LAYOUT,
+  CHAIN_TX_PAGE,
+  type ChainInstructionKind,
+} from './constants';
 
 export interface ChainTxCursor {
   slot: number;
@@ -24,6 +29,7 @@ export interface ChainTxReader {
   transactions(page: {
     before: ChainTxCursor | null;
     rows: number;
+    recipient: string | null;
   }): Promise<ChainTxRow[]>;
 }
 export type ChainTx = Omit<ChainTxRow, 'recipientsJson'> & {
@@ -40,13 +46,19 @@ export interface ChainTxPage {
 export interface ChainTxQuery {
   before: ChainTxCursor | null;
   limit: number;
+  recipient: string | null;
 }
 
 const CURSOR =
   /^(0|[1-9]\d{0,14})-([1-9A-HJ-NP-Za-km-z]{32,88})-(0|[1-9]\d{0,2})$/;
 const LIMIT = /^[1-9]\d{0,2}$/;
+const ADDRESS = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 const PARAMS = CHAIN_TX_PAGE.params;
-const PARAM_ORDER: readonly string[] = [PARAMS.BEFORE, PARAMS.LIMIT];
+const PARAM_ORDER: readonly string[] = [
+  PARAMS.BEFORE,
+  PARAMS.LIMIT,
+  PARAMS.RECIPIENT,
+];
 
 export const cursorOf = (row: ChainTxCursor) =>
   `${row.slot}-${row.signature}-${row.instructionIndex}`;
@@ -69,6 +81,16 @@ function parseLimit(value: string | null): number | undefined {
     : undefined;
 }
 
+function parseRecipient(value: string | null): string | null | undefined {
+  if (value === null) return null;
+  if (!ADDRESS.test(value)) return undefined;
+  const bytes = base58Decode(value);
+  return bytes.length === CHAIN_LAYOUT.pubkeyBytes &&
+    base58Encode(bytes) === value
+    ? value
+    : undefined;
+}
+
 export function parseChainTxQuery(
   params: URLSearchParams,
 ): ChainTxQuery | undefined {
@@ -82,8 +104,10 @@ export function parseChainTxQuery(
   const limit = parseLimit(params.get(PARAMS.LIMIT));
   const text = params.get(PARAMS.BEFORE);
   const before = text === null ? null : parseCursor(text);
-  if (limit === undefined || before === undefined) return undefined;
-  return { before, limit };
+  const recipient = parseRecipient(params.get(PARAMS.RECIPIENT));
+  if (limit === undefined || before === undefined || recipient === undefined)
+    return undefined;
+  return { before, limit, recipient };
 }
 
 function recipientOwners(json: string | null): string[] {
@@ -110,6 +134,7 @@ export async function chainTransactions(
   const rows = await reader.transactions({
     before: query.before,
     rows: query.limit + 1,
+    recipient: query.recipient,
   });
   const page = rows.slice(0, query.limit);
   const last = page.at(-1);

@@ -24,16 +24,20 @@ import {
 } from './schema';
 import type { ChainTxCursor, ChainTxReader } from './stats-chain-txs';
 
+type ChainTxPageQuery = Parameters<ChainTxReader['transactions']>[0];
+
 const ins = chainInstructions;
 const DEPOSITING = [K.OPEN, K.TOP_UP];
+
+const firstRecipient = (owner: string) =>
+  sql`json_extract(${chainChannels.recipientsJson}, '$[0].owner') = ${owner}`;
 
 const earlierThan = (cursor: ChainTxCursor) =>
   sql`(${chainTxs.slot}, ${ins.signature}, ${ins.instructionIndex}) < (${cursor.slot}, ${cursor.signature}, ${cursor.instructionIndex})`;
 
 function pageKeys(
   orm: CollectorDatabase,
-  before: ChainTxCursor | null,
-  rows: number,
+  { before, rows, recipient }: ChainTxPageQuery,
 ) {
   return orm.$with('page').as(
     orm
@@ -58,6 +62,7 @@ function pageKeys(
           eq(chainChannels.gyblos, 1),
           eq(chainTxs.failed, 0),
           before ? earlierThan(before) : undefined,
+          recipient ? firstRecipient(recipient) : undefined,
         ),
       )
       .orderBy(
@@ -140,8 +145,8 @@ function amountOf(
 export function chainTxReader(database: D1Database): ChainTxReader {
   const orm = createD1Orm(database);
   return {
-    transactions: ({ before, rows }) => {
-      const page = pageKeys(orm, before, rows);
+    transactions: (query) => {
+      const page = pageKeys(orm, query);
       const settles = settleIncrements(orm, page);
       return orm
         .with(page)

@@ -470,13 +470,19 @@ at most once and in this order:
 
 - `before`: the `next` cursor of the previous page,
   `<slot>-<signature>-<instructionIndex>`;
-- `limit`: rows per page, 1 to 50; omit it for the default of 25.
+- `limit`: rows per page, 1 to 50; omit it for the default of 25;
+- `recipient`: a Solana address (canonical base58 of 32 bytes); only the rows of
+  channels whose first split recipient as opened (`recipients[0]`, the seller's
+  payout address for Gyblos sessions) is that owner. Channels whose open was not
+  read never match. The filter goes into the page's row selection, so the page
+  stays one bounded read-only statement.
 
 Numbers are canonical (`0` or no leading zero). Any other parameter (an unnamed
 one included), a repeated one, another order, `limit=25` (the default is sent by
-omitting it), a `limit` outside 1 to 50 or a malformed cursor answers
-`400 INVALID_QUERY`, so each page has one cache key. Caching, the read budget
-and `503 COLLECTOR_UNAVAILABLE` are as for the other stats routes. The answer:
+omitting it), a `limit` outside 1 to 50, a malformed cursor or a `recipient`
+that is not a canonical 32-byte base58 address answers `400 INVALID_QUERY`, so
+each page has one cache key. Caching, the read budget and
+`503 COLLECTOR_UNAVAILABLE` are as for the other stats routes. The answer:
 
 ```json
 {
