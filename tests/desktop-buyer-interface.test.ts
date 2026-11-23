@@ -138,12 +138,28 @@ void test('the native Limits view fits the approved narrow window and identifies
 });
 
 void test('the chat picker refreshes its balance on open and distinguishes a missing payer from a pending read', async () => {
-  const chat = await readFile('apps/desktop/src/ui/Chat.tsx', 'utf8');
+  const { buyerBalanceStatus, emptyX402 } =
+    await import('@gyblos/desktop/x402-model');
+  const summary = emptyX402();
+  assert.equal(buyerBalanceStatus(true, undefined, false), 'Checking…');
+  assert.equal(buyerBalanceStatus(false, undefined, false), 'No status');
+  assert.equal(
+    buyerBalanceStatus(false, { summary, error: 'failed' }, false),
+    'No status',
+  );
+  assert.equal(
+    buyerBalanceStatus(
+      false,
+      { summary: { ...summary, available: false } },
+      false,
+    ),
+    'No status',
+  );
+  assert.equal(buyerBalanceStatus(false, { summary }, false), 'No payer');
+  assert.equal(buyerBalanceStatus(false, { summary }, true), 'No reading');
   const picker = await readFile(
     'apps/desktop/src/ui/ModelDropdown.tsx',
     'utf8',
   );
-  assert.match(chat, /fundingLoading\s*\? 'Checking…'/);
-  assert.match(chat, /payer\s*\? 'No reading'\s*: 'No payer'/);
   assert.match(picker, /onOpen=\{props.refreshFunding\}/);
 });

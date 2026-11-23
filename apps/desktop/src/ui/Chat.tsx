@@ -31,6 +31,7 @@ import {
   type PaymentMethod,
 } from '../paypal-model';
 import {
+  buyerBalanceStatus,
   chatBudgetReady,
   paidSellerLimitNotice,
   X402_ACTION,
@@ -193,12 +194,11 @@ export function Chat({
     model.offerId,
     active && usingX402 && !!payer,
   );
-  const fundingLoading = payer ? loading : x402?.busy;
-  const balanceStatus = fundingLoading
-    ? 'Checking…'
-    : payer
-      ? 'No reading'
-      : 'No payer';
+  const balanceStatus = buyerBalanceStatus(
+    payer ? loading : !!x402?.busy,
+    x402?.state,
+    !!payer,
+  );
   const freeOnly =
     model.source === MODEL_SOURCE.ANNOUNCED &&
     model.free &&

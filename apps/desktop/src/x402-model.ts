@@ -51,6 +51,16 @@ export function emptyX402(): X402Summary {
     records: [],
   };
 }
+export function buyerBalanceStatus(
+  checking: boolean,
+  state: Pick<X402Result, 'summary' | 'error'> | undefined,
+  hasPayer: boolean,
+) {
+  if (checking) return 'Checking…';
+  if (hasPayer) return 'No reading';
+  return state?.summary.available && !state.error ? 'No payer' : 'No status';
+}
+
 export function chatBudgetReady(
   active: boolean,
   selectedOffer: boolean,
