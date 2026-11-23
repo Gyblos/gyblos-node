@@ -152,6 +152,7 @@ for (const kind of STORE_KINDS) {
       lastSeenAt: clock.now,
       models: [OTHER_MODEL, MODEL].sort(),
       github: null,
+      name: null,
     });
     // A seller the index admitted without a registration (allowlist or open) is listed once seen.
     assert.equal(byNode.get(listed.nodeId)?.state, 'online');
@@ -162,6 +163,7 @@ for (const kind of STORE_KINDS) {
       lastSeenAt: awaySeen,
       models: [],
       github: null,
+      name: null,
     });
     assert.deepEqual(byNode.get(silent.nodeId), {
       nodeId: silent.nodeId,
@@ -170,6 +172,7 @@ for (const kind of STORE_KINDS) {
       lastSeenAt: null,
       models: [],
       github: null,
+      name: null,
     });
     // Withdrawn ("unpublish"): not offline, the seller chose to leave.
     assert.equal(byNode.get(withdrawn.nodeId)?.state, 'unpublished');
@@ -224,6 +227,7 @@ for (const kind of STORE_KINDS) {
         lastSeenAt: null,
         models: [],
         github: null,
+        name: null,
       },
     ]);
   });

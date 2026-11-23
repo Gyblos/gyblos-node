@@ -1,7 +1,12 @@
 // Owns what the Usage section computes over the collector's daily answers. Free and paid are never
 // added up: every figure is computed per side and shown as a "free · paid" pair. Percentiles come from
 // summed histograms, never from averaged percentiles. Pure functions, no I/O.
-import type { CollectorSnapshot, NetworkDay, Totals } from './collector-shape';
+import type {
+  CollectorSnapshot,
+  NetworkDay,
+  NetworkSide,
+  Totals,
+} from './collector-shape';
 import { DISPLAY } from './constants';
 import { count, latencyMs, percent, utc } from './format';
 import { mergedLatency } from './latency';
@@ -88,7 +93,9 @@ export function relayText(day: NetworkDay): string {
 }
 
 // One point per day of the range, oldest first: each side's headline requests (0 without receipts).
-export function dailyRequests(days: NetworkDay[]) {
+export function dailyRequests(
+  days: readonly { day: string; free: Section; paid: Section }[],
+) {
   return days.map((day) => ({
     day: day.day,
     free: day.free?.requests.headline ?? 0,
@@ -106,3 +113,12 @@ export function usageMeta(
   const updated = `updated ${utc(aggregatedAt)}`;
   return compared ? `vs previous ${days} days · ${updated}` : updated;
 }
+
+export const buyersText = (
+  side: Pick<NetworkSide, 'buyers' | 'withheld'> | null,
+) =>
+  !side
+    ? '—'
+    : side.withheld
+      ? `< ${DISPLAY.minPublicBuyers}`
+      : count(side.buyers ?? 0);

@@ -4,7 +4,11 @@
 // on conclusive checks: an outage keeps the state and moves checked_at alone. A cancel keeps a
 // tombstone, and POSTs fetch a NodeId's gist at most once per GITHUB_CLAIM.minFetchIntervalMs.
 import { CONTROL_CODES, CONTROL_LIMITS } from '@gyblos/protocol/constants';
-import { verifyIdentityClaim } from '@gyblos/protocol/identity-claim';
+import {
+  IDENTITY_CLAIM,
+  IDENTITY_CLAIM_KINDS,
+  verifyIdentityClaim,
+} from '@gyblos/protocol/identity-claim';
 
 import { decodeUtf8, parseJson } from './body';
 import {
@@ -120,7 +124,10 @@ async function check(
 }
 
 // A seller the index already knows: an active registration or a stored catalog.
-async function known(context: GithubClaimContext, nodeId: string) {
+export async function known(
+  context: Pick<GithubClaimContext, 'registrations' | 'storage'>,
+  nodeId: string,
+) {
   if (await context.registrations?.active(nodeId)) return true;
   return !!(await context.storage.state(nodeId))?.catalog;
 }
@@ -128,17 +135,18 @@ async function known(context: GithubClaimContext, nodeId: string) {
 async function verifiedClaim(bytes: ArrayBuffer, now: number) {
   const code = INDEX_ERRORS.INVALID_CLAIM;
   const body = parseJson(decodeUtf8(bytes, code), code);
-  const { claim } = await protocolStep(
+  const signed = await protocolStep(
     () => verifyIdentityClaim(body),
     (failure) =>
       failure === CONTROL_CODES.SIGNATURE
         ? INDEX_ERRORS.INVALID_SIGNATURE
         : code,
   );
+  const { claim } = signed;
   if (claim.issuedAt > now + CONTROL_LIMITS.clockSkewMs) indexFail(code);
   if (claim.issuedAt < now - GITHUB_CLAIM.maxAgeMs)
     indexFail(INDEX_ERRORS.STALE_CLAIM);
-  return claim;
+  return signed;
 }
 
 // Throws IndexError with a static code; storage failures propagate (503). A cancel needs no known
@@ -149,7 +157,7 @@ export async function submitGithubClaim(
   context: GithubClaimContext,
 ): Promise<GithubClaimResult> {
   const { claims, now } = context;
-  const claim = await verifiedClaim(bytes, now);
+  const { claim, signature } = await verifiedClaim(bytes, now);
   const stored = await claims.get(claim.nodeId);
   if (stored && stored.issuedAt >= claim.issuedAt)
     indexFail(INDEX_ERRORS.STALE_CLAIM);
@@ -175,6 +183,7 @@ export async function submitGithubClaim(
     account: claim.account,
     gist: claim.gist,
     issuedAt: claim.issuedAt,
+    signature,
     state: same?.state ?? GITHUB_CLAIM_STATES.PENDING,
     reason: same?.reason ?? null,
     checkedAt: same?.checkedAt ?? null,
@@ -220,6 +229,27 @@ export function parseGithubClaimPath(url: string, nodeId: string | undefined) {
   return nodeId;
 }
 
+async function servedSignature(row: GithubClaimRow) {
+  if (row.signature === null) return null;
+  const { nodeId, account, gist, issuedAt } = row;
+  try {
+    await verifyIdentityClaim({
+      claim: {
+        schemaVersion: IDENTITY_CLAIM.schemaVersion,
+        kind: IDENTITY_CLAIM_KINDS.GITHUB,
+        nodeId,
+        account,
+        gist,
+        issuedAt,
+      },
+      signature: row.signature,
+    });
+    return row.signature;
+  } catch {
+    return null;
+  }
+}
+
 // The public view of one claim, or null (404) when the NodeId has none or cancelled it.
 export async function githubClaimPage(
   claims: GithubClaimStore,
@@ -227,7 +257,7 @@ export async function githubClaimPage(
 ): Promise<string | null> {
   const row = await claims.get(nodeId);
   if (!row || row.state === null) return null;
-  const { account, gist, state, reason, checkedAt, verifiedAt } = row;
+  const { account, gist, state, reason, checkedAt, verifiedAt, issuedAt } = row;
   return JSON.stringify({
     nodeId,
     account,
@@ -236,5 +266,7 @@ export async function githubClaimPage(
     reason,
     checkedAt,
     verifiedAt,
+    issuedAt,
+    signature: await servedSignature(row),
   });
 }

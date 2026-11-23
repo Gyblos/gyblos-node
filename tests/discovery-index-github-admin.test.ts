@@ -8,13 +8,19 @@ import { githubClaimTombstone } from '@gyblos/discovery-index/github-claim-store
 import { runGithubClaims } from '@gyblos/discovery-index/github-claims-admin';
 
 import { T0 } from './support/discovery-index-fixture';
-import { ACCOUNT, claimStoreOf, GIST } from './support/github-claim-fixture';
+import {
+  ACCOUNT,
+  claimStoreOf,
+  GIST,
+  SIGNATURE,
+} from './support/github-claim-fixture';
 
 const row = (index: number) => ({
   nodeId: index.toString(16).padStart(64, '0'),
   account: ACCOUNT,
   gist: GIST,
   issuedAt: T0,
+  signature: SIGNATURE,
   state: 'pending' as const,
   reason: null,
   checkedAt: null,

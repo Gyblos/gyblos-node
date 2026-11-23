@@ -1,6 +1,6 @@
 // Bounded host-side responses from the owner-authenticated loopback buyer.
 import { HTTP_STATUS, LOCALHOST, ROUTES } from '@gyblos/config';
-import { BATCH_CHANNEL } from '@gyblos/protocol/batch-channel';
+import { withBatchOutputLimit } from '@gyblos/protocol/batch-channel';
 import {
   BUYER_API,
   type BuyerApiPolicy,
@@ -24,13 +24,8 @@ export function policyForRoute(
   paid = false,
 ) {
   if (!route) return policy;
-  return {
-    ...policy,
-    model: route.id,
-    maxTokens: paid
-      ? Math.min(route.maxTokens, BATCH_CHANNEL.maxOutputTokens)
-      : route.maxTokens,
-  };
+  const routed = { ...policy, model: route.id, maxTokens: route.maxTokens };
+  return paid ? withBatchOutputLimit(routed) : routed;
 }
 
 export function policyForSeller(
@@ -38,15 +33,11 @@ export function policyForSeller(
   choice?: BuyerSellerChoice,
 ): BuyerApiPolicy {
   if (!choice) return policy;
-  return {
+  return withBatchOutputLimit({
     ...policy,
     model: choice.modelId,
-    maxTokens: Math.min(
-      choice.contextTokens,
-      policy.maxTokens,
-      BATCH_CHANNEL.maxOutputTokens,
-    ),
-  };
+    maxTokens: Math.min(choice.contextTokens, policy.maxTokens),
+  });
 }
 export function sellerFields(choice?: DesktopSellerChoice) {
   if (choice === OFFER_PRICING_KINDS.FREE)

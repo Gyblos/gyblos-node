@@ -349,7 +349,7 @@
   "apps/discovery-index/migrations/0006_presence_version.sql": 2,
   "apps/discovery-index/migrations/0007_github_claims.sql": 14,
   "apps/discovery-index/scripts/admin.ts": 9,
-  "apps/discovery-index/scripts/github-claims.ts": 7,
+  "apps/discovery-index/scripts/github-claims.ts": 6,
   "apps/discovery-index/scripts/wrangler-d1.ts": 15,
   "apps/discovery-index/src/app.ts": 11,
   "apps/discovery-index/src/body.ts": 12,

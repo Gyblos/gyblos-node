@@ -8,7 +8,12 @@ import { resolve } from 'node:path';
 import test from 'node:test';
 
 import { INDEX_ROUTES } from '@gyblos/discovery-index/constants';
-import { DISPLAY, RANGE } from '@gyblos/explorer/constants';
+import {
+  DISPLAY,
+  PAGING,
+  RANGE,
+  SELLER_PAGE,
+} from '@gyblos/explorer/constants';
 import {
   AGGREGATES,
   COLLECTOR_ROUTES,
@@ -121,6 +126,20 @@ void test('llms.txt states the range presets, the buyer threshold, the longest r
     `${collector}${COLLECTOR_ROUTES.STATS_NETWORK})`,
     `\`${COLLECTOR_ROUTES.STATS_MODELS}\``,
     `\`${COLLECTOR_ROUTES.STATS_CHAIN}\``,
+    `\`${COLLECTOR_ROUTES.STATS_CHAIN_TXS}\``,
   ])
     assert.ok(llms.includes(route), route);
+});
+
+void test('llms.txt states the table paging parameters and the seller page', () => {
+  const llms = read('public/llms.txt');
+  assert.ok(llms.includes(`${PAGING.rowsPerPage} rows per page`));
+  for (const param of Object.values(PAGING.params))
+    assert.ok(llms.includes(`\`${param}\``), param);
+  assert.ok(llms.includes(`\`${SELLER_PAGE.path}/<NodeId>\``));
+  assert.ok(
+    llms.includes(
+      'A range switch returns Models, Usage daily, Unserved demand and Daily on chain to page 1',
+    ),
+  );
 });

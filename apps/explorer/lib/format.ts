@@ -38,6 +38,16 @@ export function usdc(
   return `${sign}$${whole.toLocaleString(LOCALE)}${decimals}`;
 }
 
+export function usdcFixed(atomic: bigint): string {
+  const negative = atomic < 0n;
+  const magnitude = negative ? -atomic : atomic;
+  const base = DECIMAL_BASE ** BigInt(UNITS.usdcDecimals);
+  const fraction = (magnitude % base)
+    .toString()
+    .padStart(UNITS.usdcDecimals, '0');
+  return `${negative ? '-' : ''}${(magnitude / base).toLocaleString(LOCALE)}.${fraction}`;
+}
+
 // An exact USDC decimal string ("0.000032") from atomic units, for animated figures.
 export function usdcDecimal(atomic: bigint): `${number}` {
   const { sign, whole, decimals } = usdcParts(atomic);
@@ -61,9 +71,16 @@ export function short(
     : `${value.slice(0, head)}…${value.slice(-tail)}`;
 }
 
-export function utc(ms: number | null): string {
+export function utcMinute(ms: number | null): string {
   if (!ms) return '—';
-  return `${new Date(ms).toISOString().replace('T', ' ').slice(0, DISPLAY.minutePrecision)} UTC`;
+  return new Date(ms)
+    .toISOString()
+    .replace('T', ' ')
+    .slice(0, DISPLAY.minutePrecision);
+}
+
+export function utc(ms: number | null): string {
+  return ms ? `${utcMinute(ms)} UTC` : '—';
 }
 
 export function percent(ratio: number): string {

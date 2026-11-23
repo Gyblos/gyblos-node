@@ -7,7 +7,7 @@
 // lagging node that ignored `until`) is refused rather than counted twice.
 import { CHANNEL_PROGRAM } from '@gyblos/config/network';
 
-import { CHAIN_INDEX } from '../constants';
+import { CHAIN_CURSOR_ID, CHAIN_INDEX } from '../constants';
 import type { ChainTransaction } from './decode';
 import { ChainRpcError, type ChainSignature } from './rpc';
 import { readTransaction, type ChainRun } from './run';
@@ -18,8 +18,6 @@ import {
   transactionWrites,
   type ChainCursorState,
 } from './writes';
-
-export const CHAIN_CURSOR_ID = 1;
 
 // Counts a list page (newest first) and reads its Gyblos opens, as far as the budget allows; stores
 // what it covered with the cursor `after(stored, complete)` leaves. Complete means the whole page was

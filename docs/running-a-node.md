@@ -453,13 +453,24 @@ pnpm gyblos seller verify github --cancel
 ```
 
 `seller verify github` shows buyers which GitHub account runs this seller. It
-needs a seller the index already knows (registered with `seller register`, or
-publishing). The binding has two public halves that anyone can re-check: a gist
-owned by `<user>` with a file named `gyblos-proof.txt` that contains the line
-`gyblos-node=<NodeId>` (an unlisted gist works too: the index publishes its id,
-so the proof is public either way), and a claim signed by the node key naming
-the account and the gist, which the discovery index checks
-([discovery-index.md](discovery-index.md#github-claims)).
+needs a seller the index already knows: registered (`seller register`) or with a
+catalog the index still stores. A seller leaves the listing soon after it stops
+publishing (its presence lasts 90 seconds, its catalog 10 minutes), but the
+index deletes expired catalogs only when it prunes, which happens only when a
+NodeId it has never stored publishes (at most once a minute per Worker
+instance), so an unregistered seller may stay eligible for a while; only
+registration or ongoing publishing is reliable. The binding has two halves: a
+gist owned by `<user>` with a file named `gyblos-proof.txt` that contains the
+line `gyblos-node=<NodeId>` (an unlisted gist works too: the index publishes its
+id, so the proof is public either way), and a claim signed by the node key
+naming the account and the gist, which the discovery index checks
+([discovery-index.md](discovery-index.md#github-claims)). Anyone can re-check
+the gist; the index does not keep or serve the signature. One `gyblos-proof.txt`
+may hold several sellers' proof lines, one per line; only its first 16 KiB
+(about 200 lines) is read. The command reads the same part before it sends a
+claim, so a line beyond it stops the command with `VERIFY_PROOF_MISSING` and no
+claim is sent; a line that moves there after verification turns the seller
+`lost` at the next check.
 
 1. The account is lowercased and checked (letters, digits and single hyphens, at
    most 39 characters).
@@ -481,10 +492,11 @@ the account and the gist, which the discovery index checks
    what to do: `GIST_NOT_FOUND`, `NODE_ID_MISSING`, or `GITHUB_UNAVAILABLE` (the
    claim stays pending; run it again later). When the index checked this seller
    less than a minute ago (`CHECK_DEFERRED`), a wait of up to 2 minutes is
-   waited out once and the claim sent again; a longer one is reported. A
-   `DISCOVERY_STALE_CLAIM` answer is re-signed once with a newer time. A
-   `DISCOVERY_UNKNOWN_NODE` refusal means the index does not know the seller
-   yet: register or publish first.
+   waited out once and the claim sent again; a longer wait, or a second
+   `CHECK_DEFERRED` after that wait, is reported. A `DISCOVERY_STALE_CLAIM`
+   answer is re-signed once with a newer time. A `DISCOVERY_UNKNOWN_NODE`
+   refusal means the index does not know the seller yet: register it, or publish
+   its models, first.
 
 Progress (account, gist id and last step) is saved in
 `<GYBLOS_HOME>/seller/github-verification.json`, owner-only and written
@@ -495,12 +507,68 @@ GitHub is dropped, so a plain rerun makes a new one. Failures lead with a
 sentence saying what to do and end with the static code in brackets. A finished
 verification run again just says `Already verified`.
 
-`--status` prints the index's view: account, gist URL, state, reason and when it
-was last checked. `--cancel` signs a cancel claim, so the index stops linking
-the seller to the account, and removes the progress file. The gist stays on
-GitHub; delete it yourself. Only `verified` means the index found the proof. The
+`--status` prints the index's view: account, gist URL, state, reason, the last
+check attempt (which may be one GitHub did not answer) and, while verified,
+since when. `--cancel` signs a cancel claim, so the index stops linking the
+seller to the account, and removes the progress file. The gist stays on GitHub;
+delete it yourself, or, when other sellers share it, remove only this seller's
+line, since deleting it turns their verified links `lost` at their next check.
+Only `verified` means the index found the proof; the explorer
+(https://explorer.gyblos.com) then shows `@<user>` with a ✓ next to the seller,
+and its `Verified only` filter (`?verified=1`) lists only such sellers. The
 command prints public identifiers only (NodeId, account, gist URL and the index
 origin), never a key or the home location.
+
+### Seller display name
+
+```sh
+pnpm gyblos seller name "<name>"
+pnpm gyblos seller name --clear
+pnpm gyblos seller name --status
+```
+
+`seller name` sets an optional public name for this seller, which the discovery
+index lists beside its NodeId (`name` in `GET /v1/network`). The name is chosen
+by the seller: it is not verified and not unique, so it never proves who runs a
+seller; only [GitHub verification](#github-verification) does. Unquoted words
+are joined with one space; put `--` before a name that starts with `-`
+(`pnpm gyblos seller name -- "-Lab"`). The command checks the name locally with
+the shared rule (`parseSellerName` in `@gyblos/protocol/profile-claim`, see
+[the profile claim](../packages/protocol/SPEC.md#profile-claim-v1)): 1 to 32
+letters, numbers, spaces and `-`, `_`, `.`, `'` after NFKC (typographic
+apostrophes become `'`), with accents and other marks only after a letter,
+letters from one widely used writing system (Latin may join Han with kana,
+Hangul or Bopomofo), no emoji, symbols, joiners, middle dots, modifier letters,
+small capitals or invisible characters, and no `gyblos`, `verified`,
+`verificado`, `official` or `oficial` even spelled with look-alike letters,
+digits or separators. A refused name stops with `NAME_INVALID` or
+`NAME_RESERVED` and a sentence saying which part failed, before the key or the
+index is used. If the name holds `?` or U+FFFD, the message adds that the
+terminal probably did not send UTF-8 (on Windows, use Windows Terminal or
+PowerShell 7); if it holds another quote mark such as `‘`, it asks for a
+straight apostrophe.
+
+It then signs the name with the node key and sends it to `discovery.url`
+([discovery-index.md](discovery-index.md#seller-names)) and says the index may
+take up to 10 seconds to show it (or, after `--clear`, to stop showing it).
+Success lines name the index by its host, such as
+`the index at discovery.gyblos.com`. Setting a name needs a seller the index
+already knows, as for GitHub verification (`DISCOVERY_UNKNOWN_NODE` otherwise);
+clearing does not. `--clear` signs an empty name, so the index stops showing
+one. `--status` prints the name the index holds and when it was set, that there
+is none, or that an index operator removed it (on an index without seller names
+it ends with `DISCOVERY_HTTP_STATUS`). Index refusals end with the static code
+in brackets. `DISCOVERY_STALE_CLAIM` means this computer's clock may be behind
+(or wrong, when it is ahead) or a newer name was already sent;
+`DISCOVERY_CLAIM_REJECTED` mentions the clock only when it is at least 3 seconds
+ahead of the index. When the index's answer has a `Date` header, clock messages
+add a gap of 2 seconds or more, in seconds up to 120, then in minutes, then in
+hours. `DISCOVERY_PROFILE_HELD` means an index operator removed the name;
+`DISCOVERY_HTTP_STATUS` on an index without the route says it does not take
+seller names yet. Nothing is stored locally. The command prints public
+identifiers only (NodeId, the name and the index host), never a key or the home
+location. With Docker, run it as
+`docker compose exec seller gyblos seller name "<name>"`.
 
 ### Docker
 

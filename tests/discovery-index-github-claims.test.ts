@@ -9,6 +9,11 @@ import test from 'node:test';
 
 import { recheckGithubClaims } from '@gyblos/discovery-index/github-claims';
 import { inviteHash } from '@gyblos/discovery-index/registrations';
+import {
+  IDENTITY_CLAIM,
+  IDENTITY_CLAIM_KINDS,
+  verifyIdentityClaim,
+} from '@gyblos/protocol/identity-claim';
 
 import {
   deny,
@@ -52,7 +57,9 @@ for (const kind of CLAIM_KINDS) {
     assert.equal(response.headers.get('Access-Control-Allow-Origin'), '*');
     assert.equal(response.headers.get('Cache-Control'), 'public, max-age=10');
     const now = index.clock.now;
-    assert.deepEqual(await response.json(), {
+    const signed = await signedClaim(node, { issuedAt: now });
+    const page = await response.json();
+    assert.deepEqual(page, {
       nodeId: node.nodeId,
       account: ACCOUNT,
       gist: GIST,
@@ -60,7 +67,21 @@ for (const kind of CLAIM_KINDS) {
       reason: null,
       checkedAt: now,
       verifiedAt: now,
+      issuedAt: now,
+      signature: signed.signature,
     });
+    const rebuilt = await verifyIdentityClaim({
+      claim: {
+        schemaVersion: IDENTITY_CLAIM.schemaVersion,
+        kind: IDENTITY_CLAIM_KINDS.GITHUB,
+        nodeId: page.nodeId,
+        account: page.account,
+        gist: page.gist,
+        issuedAt: page.issuedAt,
+      },
+      signature: page.signature,
+    });
+    assert.equal(rebuilt.claim.nodeId, node.nodeId);
     const network = await (await index.call('/v1/network')).json();
     assert.deepEqual(network.nodes[0].github, { account: ACCOUNT, gist: GIST });
   });
@@ -99,6 +120,7 @@ for (const kind of CLAIM_KINDS) {
         state: 'lost',
         reason: 'GIST_NOT_FOUND',
       });
+      const issuedAt: number = index.clock.now;
       assert.deepEqual(await (await index.read(node.nodeId)).json(), {
         nodeId: node.nodeId,
         account: ACCOUNT,
@@ -107,6 +129,8 @@ for (const kind of CLAIM_KINDS) {
         reason: 'GIST_NOT_FOUND',
         checkedAt: index.clock.now,
         verifiedAt,
+        issuedAt,
+        signature: (await signedClaim(node, { issuedAt })).signature,
       });
     }
     // Lost becomes verified again with a new streak.

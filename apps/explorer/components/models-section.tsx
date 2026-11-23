@@ -2,7 +2,7 @@
 // paid prices, context) next to what was served over the range (completed requests, cancellations, the
 // first token as the seller and the buyer measured it, and the engine's speed), free and paid apart.
 import { getCollector } from '../lib/collector';
-import { DISPLAY } from '../lib/constants';
+import { DISPLAY, PAGING } from '../lib/constants';
 import { getDiscovery } from '../lib/discovery-render';
 import {
   count,
@@ -19,8 +19,9 @@ import {
   type Served,
 } from '../lib/model-table';
 import { summarizeOffers } from '../lib/offers';
-import type { RangeDays } from '../lib/range';
+import { tablePager, type ExplorerQuery } from '../lib/paging';
 import { pair } from '../lib/usage';
+import { pagedRows, Pager } from './pager';
 import {
   ModelName,
   moneyCell,
@@ -52,20 +53,29 @@ function price(now: ModelRow['now']): { text: string; money: boolean } {
   };
 }
 
-export async function ModelsSection({ days }: { days: RangeDays }) {
+export async function ModelsSection({ query }: { query: ExplorerQuery }) {
+  const { days } = query;
   const [discovery, collector] = await Promise.all([
     getDiscovery(),
     getCollector(days),
   ]);
-  if (discovery.error && collector.error) return <Unavailable title="Models" />;
+  if (discovery.error && collector.error)
+    return <Unavailable title="Models" anchors={[PAGING.anchors.models]} />;
   const offersKnown = !discovery.error;
   const rows = modelRows(
     offersKnown ? summarizeOffers(discovery).models : new Map(),
     collector.error ? [] : collector.models,
   );
+  const page = pagedRows(
+    query,
+    'models',
+    rows,
+    offersKnown && !collector.error,
+  );
   return (
     <>
       <SectionTitle
+        id={PAGING.anchors.models}
         title="Models"
         meta={`offered now · served over ${days} days`}
       />
@@ -91,7 +101,7 @@ export async function ModelsSection({ days }: { days: RangeDays }) {
             </td>
           </tr>
         )}
-        {rows.map((row) => (
+        {page.rows.map((row) => (
           <ModelRowView
             key={`${row.modelId}:${row.variant}:${row.quantization}`}
             row={row}
@@ -99,6 +109,7 @@ export async function ModelsSection({ days }: { days: RangeDays }) {
           />
         ))}
       </Table>
+      <Pager label="Models" view={tablePager(query, 'models', page)} />
       {discovery.datedAt ? (
         <p className="mt-1 text-xs text-dim">
           Offers as of {utc(discovery.datedAt)}.

@@ -13,11 +13,21 @@ export async function withBuyerApiKeys(
   const { role, prepared } = context;
   if (!runtime.token || role.role !== P2P_ROLES.BUYER) return runtime;
   try {
-    const apiKeys = await openBuyerApiKeys(process.env, {
-      network: prepared.config.request.network,
-      mint: prepared.config.request.asset,
-      payer: role.buyer,
-    });
+    const apiKeys = await openBuyerApiKeys(
+      process.env,
+      {
+        network: prepared.config.request.network,
+        mint: prepared.config.request.asset,
+        payer: role.buyer,
+      },
+      runtime.confirmUnchargedKey,
+    );
+    try {
+      await apiKeys.reconcileAbandoned();
+    } catch (error) {
+      await apiKeys.close();
+      throw error;
+    }
     return {
       ...runtime,
       apiKeys,

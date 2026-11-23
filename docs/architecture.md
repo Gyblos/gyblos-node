@@ -223,6 +223,8 @@ explicit manual trust remains available. See
 `@gyblos/protocol/identity-claim` owns the node-signed GitHub account claim; the
 discovery index checks its gist and publishes the result, and no trust policy
 reads it ([identity.md](identity.md#github-account-claim)).
+`@gyblos/protocol/profile-claim` owns the node-signed, unverified seller display
+name and its validation rule; the discovery index stores and lists it.
 
 ## Local data
 

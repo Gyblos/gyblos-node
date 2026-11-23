@@ -1,8 +1,11 @@
 // Owns the explorer's single page: the network, models, usage and payments sections, each streamed on its own
 // so a slow source never blocks the others. The `range` search parameter picks the days shown; a range
 // switch keeps the sections mounted so their figures roll to the new values.
+import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
 
+import { ChannelTxs } from '../components/channel-txs';
+import { HashScroll } from '../components/hash-scroll';
 import { LiveRefresh } from '../components/live-refresh';
 import { ModelsSection } from '../components/models-section';
 import { NetworkSection } from '../components/network-section';
@@ -11,8 +14,7 @@ import { PaymentsSection } from '../components/payments-section';
 import { RangeControl } from '../components/range-control';
 import { Loading } from '../components/ui';
 import { UsageSection } from '../components/usage-section';
-import { RANGE } from '../lib/constants';
-import { parseRange } from '../lib/range';
+import { canonicalPageHref, readQuery } from '../lib/paging';
 
 // Every request renders. The collector caches its answers at its own edge (5 minutes); the discovery
 // index is read into KV by the Worker's scheduled run, and renders read KV (lib/discovery-render.ts).
@@ -23,10 +25,15 @@ export default async function Home({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const days = parseRange((await searchParams)[RANGE.param]);
+  const params = await searchParams;
+  const canonical = canonicalPageHref(params);
+  if (canonical) redirect(canonical);
+  const query = readQuery(params);
+  const { days } = query;
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pb-16 sm:px-6">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line py-5">
+        <h1 className="sr-only">Gyblos Explorer</h1>
         <div className="flex items-baseline gap-3">
           <span className="text-xl font-medium tracking-tight">gyblos</span>
           <span className="text-muted">Explorer</span>
@@ -38,17 +45,21 @@ export default async function Home({
         </div>
       </header>
       <Suspense fallback={<Loading />}>
-        <NetworkSection />
+        <NetworkSection query={query} />
       </Suspense>
       <Suspense fallback={<Loading />}>
-        <ModelsSection days={days} />
+        <ModelsSection query={query} />
       </Suspense>
       <Suspense fallback={<Loading />}>
-        <UsageSection days={days} />
+        <UsageSection query={query} />
       </Suspense>
       <Suspense fallback={<Loading />}>
-        <PaymentsSection days={days} />
+        <PaymentsSection query={query} />
       </Suspense>
+      <Suspense fallback={<Loading />}>
+        <ChannelTxs query={query} />
+      </Suspense>
+      <HashScroll />
     </div>
   );
 }

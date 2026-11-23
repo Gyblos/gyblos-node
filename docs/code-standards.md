@@ -129,6 +129,51 @@ file paths). Fixed operational values live in the owning module or its
 `constants.ts`; config is not a place for unrelated constants. Dependency
 versions come from manifests and the lockfile.
 
+## D1 migrations
+
+The Cloudflare Workers with D1 (`apps/discovery-index`,
+`apps/metrics-collector`) declare their tables once in Drizzle
+(`src/schema*.ts`). Migrations are generated with drizzle-kit from that schema:
+`pnpm index:db:generate --name <change>` or
+`pnpm collector:db:generate --name <change>`. Never write migration SQL by hand,
+never edit or rename a migration that has been applied, and apply migrations to
+the remote databases only with founder approval. The hand-written `0001`–`0007`
+files of each app predate drizzle-kit and stay byte-for-byte unchanged.
+
+Commit the generated `.sql` file together with `migrations/meta/` (journal,
+snapshot and `_sha256.json`). The generate scripts record each new file's
+SHA-256 once in `_sha256.json` (`tooling/d1-migrations.ts`); recorded hashes are
+never rewritten, so editing any existing migration fails the tests, because
+Wrangler would never re-apply it. `pnpm lint` runs `drizzle-kit check`, and
+`tests/drizzle-migrations.test.ts` fails when `schema.ts` changed without a
+generated migration. Schema checks inline their values (`.inlineParams()`),
+since a bound parameter would be written to the migration as `?`.
+
+The single exception to generated SQL is a data-only change (an `UPDATE`,
+`DELETE` or backfill that drizzle-kit cannot derive): create it with
+`pnpm index:db:generate --custom --name <change>` (or the collector script), so
+drizzle-kit numbers and journals it, write only data statements in its body,
+then run `pnpm db:hashes` to record it. It is reviewed like code, and a test
+rejects schema statements (`CREATE`, `ALTER`, `DROP`) in it. Schema changes are
+always generated.
+
+- Tables created by generated migrations are ordinary rowid tables; Drizzle
+  cannot declare the `WITHOUT ROWID` layout of the hand-written baseline tables.
+  A change that makes drizzle-kit rebuild a baseline table is rejected by a test
+  and needs a founder decision.
+- Never run `drizzle-kit push`, `pull` or `introspect` against the D1 databases:
+  they would rebuild every table and drop `WITHOUT ROWID`. The configs carry no
+  credentials. Only `generate` plus `wrangler d1 migrations apply` change D1,
+  and `--remote` only with founder approval.
+- Migration hashes in `_sha256.json` are taken over LF-normalized text, so a
+  Windows checkout records and compares the same value.
+- `collector_envelopes` enforces `(uploader_node_id, nonce)` with the inline
+  `UNIQUE` of `0001`, but the drizzle-kit snapshot records it as a named index
+  `collector_envelopes_uploader_node_id_nonce_unique`. Removing or changing that
+  `unique()` in `schema.ts` would generate a `DROP INDEX` that fails on D1,
+  because the index does not exist there. Change it only through a hand-reviewed
+  table rebuild approved by the founder.
+
 ## Errors and external boundaries
 
 - New package errors use typed codes from their owning catalog. Plain `Error`

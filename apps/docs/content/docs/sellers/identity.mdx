@@ -112,12 +112,15 @@ logs or screenshots of the registration prompt. Ask for help in the [Gyblos Tele
 
 ## Verify your GitHub account [#verify-github]
 
-You can show buyers which GitHub account runs your seller. This is optional. The index must already know your
-seller: an active registration or a catalog it has stored (for example, after you published at least once). Turning on publishing alone isn't enough, and the
-seller doesn't need to be online. The link has two public parts that anyone can check: a gist owned by your GitHub
-account with a file named `gyblos-proof.txt` that contains the line `gyblos-node=NODEID`, and a claim signed
-by your node key that names the account and the gist. The discovery index checks the gist itself, with no
-GitHub token.
+You can show buyers which GitHub account runs your seller. This is optional. The index must already know
+your seller: it must be registered, or have published its models so the index keeps their catalog. The
+index can keep a catalog for a while after the seller stops publishing, even when it is no longer listed,
+but don't count on that: register the seller or keep it publishing. The link has two parts: a
+gist owned by your GitHub account with a file named `gyblos-proof.txt` that contains the line
+`gyblos-node=NODEID`, and a claim signed by your node key that names the account and the gist. The
+discovery index checks the signature when it receives the claim, and checks the gist itself, with no GitHub
+token. It also serves your signed claim at `GET /v1/identity/github/<NodeId>`, so anyone can check the gist
+and that your node signed the claim, without trusting the index.
 
 A verified account is a public label. It doesn't prove the quality of your answers or the code your seller
 runs. Your GitHub account name and gist become public: see what is shared in
@@ -188,11 +191,11 @@ and skips what is done.
 
 ### What each state means [#github-states]
 
-| State      | What it means                                                                                                                                                                                                                                               |
-| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `verified` | At the last check that reached GitHub, the index found the proof line in your gist. Buyers see the account and the gist in the index's network list.                                                                                                        |
-| `pending`  | The index has your claim but hasn't found the proof yet. It isn't shown in the network list, but anyone can read it at `GET /v1/identity/github/<NodeId>`. The index checks again about every 6 hours, for up to 7 days; after that, run the command again. |
-| `lost`     | The account was verified, but the last check didn't find the proof: the gist, the file or the line is gone, or the account was renamed. Buyers no longer see it.                                                                                            |
+| State      | What it means                                                                                                                                                                                                                                                                                |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `verified` | The last check GitHub answered found the proof line in your gist. Buyers see the account and the gist in the index's network list, and the [explorer](https://explorer.gyblos.com) shows the account with a ✓ next to your seller; its **Verified only** filter lists only verified sellers. |
+| `pending`  | The index has your claim but hasn't found the proof yet. It isn't shown in the network list, but anyone can read it at `GET /v1/identity/github/<NodeId>`. The index checks again about every 6 hours, for up to 7 days; after that, run the command again.                                  |
+| `lost`     | The account was verified, but the last check didn't find the proof: the gist, the file or the line is gone, or the account was renamed. Buyers no longer see it.                                                                                                                             |
 
 Only `verified` means the proof was found. When GitHub doesn't answer, the claim keeps its current state:
 `pending` stays `pending` and `verified` stays `verified`. The check time shows the last attempt, even one
@@ -201,14 +204,19 @@ that failed.
 ### Good to know [#github-good-to-know]
 
 - **The index checked moments ago.** The command prints `waiting N s to ask again (Ctrl+C is safe)` and asks
-  once more by itself. If the wait is longer than 2 minutes, or the index asks it to wait a second time, it
-  stops and tells you to run it again later.
+  once more by itself. It waits only once: if the wait is longer than 2 minutes, or the index answers the
+  same after that wait, it stops and tells you to run it again later.
 - **Change the account or the gist.** Run the command again with the new `USER`, or with `--gist` and the new
   gist. The claim goes back to `pending` until the index checks the new gist.
 - **Keep the gist.** The index checks it again about every 6 hours. If you delete the gist, rename its file or
-  remove the line, the state becomes `lost`.
-- **Several sellers.** One GitHub account can verify several sellers. Each seller has its own NodeId and its own
-  proof line. One `gyblos-proof.txt` file can hold one line per seller.
+  remove the line, a verified link becomes `lost`; a `pending` one stays `pending`.
+- **Several sellers.** One GitHub account can verify several sellers, each with its own
+  `gyblos-node=NODEID` line. With `gh`, the command makes one gist per seller. By hand, the simplest is one
+  gist: add each seller's line, on its own line, to the same `gyblos-proof.txt` and pass that gist to each
+  seller with `--gist`. Removing a line from the shared file affects only that seller. The index reads only the first 16 KiB
+  of the file, about 200 lines, and the command reads the same part before it sends a claim. If a seller's
+  line is beyond that, the command stops with `VERIFY_PROOF_MISSING` and sends nothing; if the line moves
+  there after the seller was verified, the next check turns it `lost`.
 
 ### Check the state [#github-check]
 
@@ -217,13 +225,14 @@ gyblos seller verify github --status
 gyblos seller status --online
 ```
 
-`--status` shows the account, the gist address, the state, the reason and when the index last checked.
-`gyblos seller status --online` shows the same link in its `github` line, with the gist
-address only when the state is `verified`.
+`--status` shows the account, the gist address, the state, the reason, when the index last tried to check
+and, while `verified`, since when. The last try can be one where GitHub didn't answer, so it isn't the last
+time the proof was found.
 
-The `github` line is hidden when publishing is off or no model is listed.
-
-For a Docker seller, put `docker compose exec seller` in front of both.
+`gyblos seller status --online` shows the account and state in its `github` line, and the gist address only
+while `verified`. It asks the index only when publishing is on and the seller lists at least one model;
+otherwise the line is missing, for example on a registered seller with publishing off: use
+`gyblos seller verify github --status` instead. For a Docker seller, put `docker compose exec seller` in front of both.
 
 ### Remove it [#github-remove]
 
@@ -232,7 +241,9 @@ gyblos seller verify github --cancel
 ```
 
 The index stops linking your seller to the account and the command removes its progress file. The gist
-stays on GitHub: delete it yourself at [gist.github.com](https://gist.github.com) if you no longer want it.
+stays on GitHub: delete it yourself at [gist.github.com](https://gist.github.com) if you no longer want it. If
+other sellers share that gist, remove only this seller's line instead: deleting the gist turns their verified links
+`lost` at their next check.
 
 ### Common errors [#github-errors]
 
@@ -245,9 +256,9 @@ Each error starts with a sentence that says what to do and ends with a code in b
 | `VERIFY_GIST_OWNER_MISMATCH`                             | The gist belongs to another GitHub account. Create the gist while signed in as `USER`.                                                                                          |
 | `VERIFY_GIST_NOT_FOUND`                                  | GitHub has no such gist for `USER`: check the address and the user name. If the gist was deleted, run the command again to make a new one, or pass a new address with `--gist`. |
 | `VERIFY_NOT_VERIFIED` with `could not reach GitHub`      | The index couldn't reach GitHub. Your claim keeps its current state. Run the command again in a few minutes.                                                                    |
-| `VERIFY_NOT_VERIFIED` with `checked this seller moments` | The index checked your seller moments ago and the wait is longer than 2 minutes, or it asked to wait a second time. Run the command again after the time it shows.              |
+| `VERIFY_NOT_VERIFIED` with `checked this seller moments` | The index checked your seller moments ago, and the wait is longer than 2 minutes or the index still said so after the one wait. Run the command again in a minute.              |
 | `VERIFY_GH_FAILED`                                       | The GitHub CLI couldn't create the gist. Create it by hand and run the command with `--gist`.                                                                                   |
-| `DISCOVERY_UNKNOWN_NODE`                                 | The index doesn't know your seller yet. [Register](/en/sellers/register-publish) first, or publish so the index stores your catalog.                                            |
+| `DISCOVERY_UNKNOWN_NODE`                                 | The index doesn't know your seller yet. [Register](/en/sellers/register-publish) it, or publish its models, first.                                                              |
 | `DISCOVERY_STALE_CLAIM`                                  | The index holds a newer claim from this seller. The command already tried once more. Check this computer's clock, then run the command again.                                   |
 | `DISCOVERY_RATE_LIMITED`                                 | The index got too many attempts. Wait a minute and run the command again.                                                                                                       |
 | `VERIFY_ACCOUNT_INVALID`                                 | That is not a GitHub user name. Use letters, digits and single hyphens, at most 39 characters.                                                                                  |
@@ -255,6 +266,31 @@ Each error starts with a sentence that says what to do and ends with a code in b
 | `VERIFY_NO_GIST`                                         | The command couldn't ask for the gist address, for example in a script. Create the gist, then run the command with `--gist`.                                                    |
 | `VERIFY_SIGNING_FAILED`                                  | The node key couldn't sign the claim. Run `gyblos doctor`.                                                                                                                      |
 | `VERIFY_STATE_FAILED`                                    | The command couldn't save its progress in the seller home. Check that the seller folder is yours and writable (`gyblos doctor`), then run the command again.                    |
+
+## Choose a public name [#seller-name]
+
+You can give your seller an optional public name. The discovery index shows it next to your NodeId in the
+index's network list (`/v1/network`). You choose it, so the index doesn't verify it and another seller can use the same name. It
+never gets a check mark: only a [verified GitHub account](#verify-github) shows who runs a seller. To set a
+name, the index must already know your seller, as for GitHub verification; clearing it works either way.
+
+```sh
+gyblos seller name "NAME"
+gyblos seller name --status
+gyblos seller name --clear
+```
+
+Replace `NAME` with the name you want. For a Docker seller, run them from `~/gyblos-seller` with `docker compose exec seller` in front, for example
+`docker compose exec seller gyblos seller name "My Seller"`.
+
+A name has 1 to 32 characters: letters and numbers, spaces and `-` `_` `.` `'`, with at least one letter or
+number. Accents and other marks are allowed after a letter, so names in Hindi, Thai, Arabic, Hebrew, Yoruba
+and many other languages work, but all letters must come from one widely used writing system. Latin can be mixed with Chinese characters and Japanese kana, Korean Hangul or Bopomofo. Typographic apostrophes such as ’ become a straight apostrophe; use a straight apostrophe `'`. Joiners (ZWNJ, ZWJ) and the `·` and `・` middle dots are not accepted. Emoji, symbols such as
+check marks, invisible characters and any name that contains `gyblos`, `verified`, `verificado`, `official`
+or `oficial` are refused (`NAME_INVALID` or `NAME_RESERVED`, with a sentence saying which part failed). The
+index may take up to 10 seconds to show a new name. The name is public, so don't put your legal name, email
+or location in it: see [Data and privacy](/en/reference/data-and-privacy#seller-name). Every option is in the
+[CLI reference](/en/reference/cli#seller-name).
 
 ## Privacy [#buyer-data-and-network-privacy]
 

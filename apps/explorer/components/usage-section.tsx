@@ -10,15 +10,12 @@ import {
   Wallet,
 } from 'lucide-react';
 
-import {
-  getCollector,
-  type NetworkDay,
-  type NetworkSide,
-} from '../lib/collector';
-import { DISPLAY } from '../lib/constants';
+import { getCollector, type NetworkDay } from '../lib/collector';
+import { DISPLAY, PAGING } from '../lib/constants';
 import { count, usdcDecimal } from '../lib/format';
-import type { RangeDays } from '../lib/range';
+import { tablePager, type ExplorerQuery } from '../lib/paging';
 import {
+  buyersText,
   countText,
   dailyRequests,
   latencyText,
@@ -34,14 +31,9 @@ import { Flow, FlowPair } from './board/animated-number';
 import { BarChartCard } from './board/bar-chart-card';
 import { delta, type Delta } from './board/delta';
 import { StatCard } from './board/stat-card';
+import { pagedRows, Pager } from './pager';
 import { numberCell, SectionTitle, Table, td, Unavailable } from './ui';
 
-const buyersText = (side: NetworkSide | null) =>
-  !side
-    ? '—'
-    : side.withheld
-      ? `< ${DISPLAY.minPublicBuyers}`
-      : count(side.buyers ?? 0);
 // One row's "free · paid" figure cells.
 function FigureCells({
   free,
@@ -96,12 +88,19 @@ function changes(
   };
 }
 
-export async function UsageSection({ days }: { days: RangeDays }) {
+export async function UsageSection({ query }: { query: ExplorerQuery }) {
+  const { days } = query;
   const [snapshot, before] = await Promise.all([
     getCollector(days),
     getCollector(days, 1),
   ]);
-  if (snapshot.error) return <Unavailable title="Usage" />;
+  if (snapshot.error)
+    return (
+      <Unavailable
+        title="Usage"
+        anchors={[PAGING.anchors.daily, PAGING.anchors.demand]}
+      />
+    );
   const usage = summarizeUsage(snapshot);
   const change = changes(usage, before.error ? null : summarizeUsage(before));
   const { free, paid } = usage;
@@ -111,7 +110,7 @@ export async function UsageSection({ days }: { days: RangeDays }) {
         title={`Usage · ${days} days`}
         meta={usageMeta(days, snapshot.aggregatedAt, change !== null)}
       />
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard
           icon={MessagesSquare}
           label="Requests free · paid"
@@ -164,8 +163,8 @@ export async function UsageSection({ days }: { days: RangeDays }) {
         />
       </div>
       <RequestCharts days={snapshot.days} change={change?.requests ?? null} />
-      <DailyTable days={usage.active} />
-      <DemandTable demand={usage.demand} />
+      <DailyTable query={query} days={usage.active} />
+      <DemandTable query={query} demand={usage.demand} />
     </>
   );
 }
@@ -207,7 +206,14 @@ function RequestCharts({
   );
 }
 
-function DailyTable({ days }: { days: NetworkDay[] }) {
+function DailyTable({
+  query,
+  days,
+}: {
+  query: ExplorerQuery;
+  days: NetworkDay[];
+}) {
+  const page = pagedRows(query, 'daily', [...days].reverse());
   const head = [
     { label: 'Day (UTC)' },
     ...figureHead('Seller first token'),
@@ -216,7 +222,7 @@ function DailyTable({ days }: { days: NetworkDay[] }) {
   ];
   return (
     <>
-      <SectionTitle title="Daily" />
+      <SectionTitle id={PAGING.anchors.daily} title="Daily" />
       <Table minWidth={DISPLAY.dailyTable} head={head}>
         {days.length ? null : (
           <tr>
@@ -225,7 +231,7 @@ function DailyTable({ days }: { days: NetworkDay[] }) {
             </td>
           </tr>
         )}
-        {[...days].reverse().map((day) => (
+        {page.rows.map((day) => (
           <tr key={day.day} className="border-t border-line">
             <td className={`${td} font-mono`}>{day.day}</td>
             <FigureCells
@@ -240,15 +246,23 @@ function DailyTable({ days }: { days: NetworkDay[] }) {
           </tr>
         ))}
       </Table>
+      <Pager label="Daily" view={tablePager(query, 'daily', page)} />
     </>
   );
 }
 
-function DemandTable({ demand }: { demand: [string, number][] }) {
+function DemandTable({
+  query,
+  demand,
+}: {
+  query: ExplorerQuery;
+  demand: [string, number][];
+}) {
+  const page = pagedRows(query, 'demand', demand);
   if (!demand.length) return null;
   return (
     <>
-      <SectionTitle title="Unserved demand" />
+      <SectionTitle id={PAGING.anchors.demand} title="Unserved demand" />
       <Table
         minWidth={DISPLAY.narrowTable}
         head={[
@@ -256,7 +270,7 @@ function DemandTable({ demand }: { demand: [string, number][] }) {
           { label: 'Requests', right: true },
         ]}
       >
-        {demand.map(([model, requests]) => (
+        {page.rows.map(([model, requests]) => (
           <tr key={model} className="border-t border-line">
             <td className={td} title={model}>
               <span className="block max-w-full truncate">{model}</span>
@@ -265,6 +279,7 @@ function DemandTable({ demand }: { demand: [string, number][] }) {
           </tr>
         ))}
       </Table>
+      <Pager label="Unserved demand" view={tablePager(query, 'demand', page)} />
     </>
   );
 }

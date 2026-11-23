@@ -1,22 +1,37 @@
 // Owns the Network section: sellers online and offline, the models offered and their cheapest prices,
 // each online seller's offers and uptime, and the registered sellers not online now, from the discovery
 // index. The per-model table lives in the Models section.
-import { Activity, Boxes, Server, Tag } from 'lucide-react';
+import { Activity, BadgeCheck, Boxes, Server, Tag } from 'lucide-react';
+import Link from 'next/link';
 
-import { DISPLAY } from '../lib/constants';
+import { HOW_TO_VERIFY_URL } from '../lib/config';
+import { DISPLAY, PAGING } from '../lib/constants';
 import type { DiscoverySnapshot, Seller } from '../lib/discovery';
 import { getDiscovery } from '../lib/discovery-render';
 import { count, percent, pricePerMtok, short, usdc, utc } from '../lib/format';
 import {
   notOnline,
-  type NetworkNode,
+  type GithubAccount,
   type NetworkStatus,
 } from '../lib/network-status';
 import { summarizeOffers, uptimeRatio } from '../lib/offers';
+import { queryHref, tablePager, type ExplorerQuery } from '../lib/paging';
+import {
+  emptySellersMessage,
+  githubByNode,
+  notOnlineMeta,
+  offersCaption,
+  orderSellers,
+  sellerHref,
+  verifiedOnly,
+} from '../lib/seller-identity';
+import { SELLER_STATUS_LABELS } from '../lib/seller-profile';
 import { Flow } from './board/animated-number';
 import { Chip } from './board/chip';
 import { StatCard } from './board/stat-card';
 import { StatusDot } from './board/status-dot';
+import { pagedRows, Pager } from './pager';
+import { SellerCell } from './seller-cell';
 import {
   Addr,
   ModelName,
@@ -34,10 +49,20 @@ const ratioText = (ratio: number | undefined | null) =>
 const priceText = (value: bigint | null) =>
   value === null ? '—' : usdc(value);
 
-export async function NetworkSection() {
+export async function NetworkSection({ query }: { query: ExplorerQuery }) {
+  const { verified } = query;
   const snapshot = await getDiscovery();
-  if (snapshot.error) return <Unavailable title="Network" />;
+  if (snapshot.error)
+    return (
+      <Unavailable
+        title="Network"
+        anchors={[PAGING.anchors.sellers, PAGING.anchors.offline]}
+      />
+    );
   const summary = summarizeOffers(snapshot);
+  const accounts = githubByNode(snapshot.network);
+  const ordered = orderSellers(snapshot.sellers, snapshot.generatedAt);
+  const shown = verified ? verifiedOnly(ordered, accounts) : ordered;
   return (
     <>
       <SectionTitle title="Network" meta={utc(snapshot.generatedAt)} />
@@ -51,7 +76,7 @@ export async function NetworkSection() {
             : null}
         </p>
       ) : null}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <SellersOnline snapshot={snapshot} />
         <StatCard
           icon={Boxes}
@@ -82,16 +107,17 @@ export async function NetworkSection() {
         />
       </div>
 
-      <SectionTitle title="Sellers" />
-      <SellersTable sellers={snapshot.sellers} />
-      {snapshot.network ? (
-        <NotOnlineTable network={snapshot.network} />
-      ) : (
-        <p className="mt-2 text-xs text-dim">
-          The index&apos;s network status could not be read: offline and not
-          published sellers are unknown.
-        </p>
-      )}
+      <SellersBlock
+        query={query}
+        sellers={shown}
+        accounts={accounts}
+        accountsKnown={!!snapshot.network && !snapshot.network.truncated}
+      />
+      <NotOnline
+        query={query}
+        network={snapshot.network}
+        accounts={verified ? accounts : null}
+      />
     </>
   );
 }
@@ -122,34 +148,127 @@ function SellersOnline({ snapshot }: { snapshot: DiscoverySnapshot }) {
   );
 }
 
-function SellersTable({ sellers }: { sellers: Seller[] }) {
-  const head = [
-    { label: 'Seller' },
-    { label: 'Status' },
-    { label: 'Model' },
-    { label: 'Context', right: true },
-    { label: 'Input / 1M', right: true },
-    { label: 'Output / 1M', right: true },
-    { label: 'Uptime 24 h · 7 d', right: true },
-    { label: 'Online since' },
-  ];
+function SellersBlock({
+  query,
+  sellers,
+  accounts,
+  accountsKnown,
+}: {
+  query: ExplorerQuery;
+  sellers: Seller[];
+  accounts: Map<string, GithubAccount>;
+  accountsKnown: boolean;
+}) {
   return (
-    <Table minWidth={DISPLAY.wideTable} head={head}>
-      {sellers.some((seller) => seller.models.length > 0) ? null : (
-        <tr>
-          <td className={`${td} text-muted`} colSpan={head.length}>
-            No offers from online sellers.
-          </td>
-        </tr>
-      )}
-      {sellers.flatMap((seller) =>
-        seller.models.map((model) => (
+    <>
+      <SectionTitle
+        id={PAGING.anchors.sellers}
+        title="Sellers"
+        meta={<VerifiedFilter query={query} />}
+      />
+      <SellersTable
+        query={query}
+        sellers={sellers}
+        accounts={accounts}
+        accountsKnown={accountsKnown}
+      />
+      <p className="mt-2 flex items-center gap-1 text-xs text-dim">
+        <BadgeCheck
+          aria-hidden="true"
+          className="size-3.5 shrink-0 text-signal"
+        />
+        <span>
+          The discovery index checked that the named GitHub account published
+          the seller&apos;s NodeId. It links the seller to that account; it does
+          not identify a person and says nothing about quality.{' '}
+          <a className="text-muted hover:text-brand" href={HOW_TO_VERIFY_URL}>
+            How to verify
+          </a>
+        </span>
+      </p>
+    </>
+  );
+}
+
+function VerifiedFilter({ query }: { query: ExplorerQuery }) {
+  const filterHref = (verified: boolean) =>
+    queryHref(query, { verified, pages: { sellers: 1, offline: 1 } });
+  const option = (label: string, href: string, current: boolean) => (
+    <Link
+      href={href}
+      scroll={false}
+      aria-current={current ? 'true' : undefined}
+      className={
+        current
+          ? 'rounded-md bg-raised px-1.5 py-0.5 text-ink'
+          : 'rounded-md px-1.5 py-0.5 hover:text-ink'
+      }
+    >
+      {label}
+    </Link>
+  );
+  return (
+    <span className="flex items-center gap-1">
+      {option('All', filterHref(false), !query.verified)}
+      {option('Verified only', filterHref(true), query.verified)}
+    </span>
+  );
+}
+
+const SELLERS_HEAD = [
+  { label: 'Seller' },
+  { label: 'Status' },
+  { label: 'Model' },
+  { label: 'Context', right: true },
+  { label: 'Input / 1M', right: true },
+  { label: 'Output / 1M', right: true },
+  { label: 'Uptime 24 h · 7 d', right: true },
+  { label: 'Online since' },
+];
+
+const sellerOffers = (sellers: Seller[]) =>
+  sellers.flatMap((seller) =>
+    seller.models.map((model) => ({ seller, model })),
+  );
+
+function SellersTable({
+  query,
+  sellers,
+  accounts,
+  accountsKnown,
+}: {
+  query: ExplorerQuery;
+  sellers: Seller[];
+  accounts: Map<string, GithubAccount>;
+  accountsKnown: boolean;
+}) {
+  const empty = emptySellersMessage(sellers, query.verified, accountsKnown);
+  const offers = sellerOffers(sellers);
+  const complete = !query.verified || accountsKnown;
+  const page = pagedRows(query, 'sellers', offers, complete);
+  return (
+    <>
+      <Table minWidth={DISPLAY.wideTable} head={SELLERS_HEAD}>
+        {empty ? (
+          <tr>
+            <td className={`${td} text-muted`} colSpan={SELLERS_HEAD.length}>
+              {empty}
+            </td>
+          </tr>
+        ) : null}
+        {page.rows.map(({ seller, model }) => (
           <tr
             key={`${seller.nodeId}:${model.modelId}:${model.variant}:${model.quantization}`}
             className="border-t border-line"
           >
             <td className={`${td} font-mono`} title={`Node ${seller.nodeId}`}>
-              <Addr value={seller.owner} />
+              <SellerCell
+                nodeId={seller.nodeId}
+                github={accounts.get(seller.nodeId) ?? null}
+                href={sellerHref(seller.nodeId, query)}
+              >
+                <Addr value={seller.owner} />
+              </SellerCell>
             </td>
             <td className={td}>
               <Chip tone="brand">
@@ -179,28 +298,71 @@ function SellersTable({ sellers }: { sellers: Seller[] }) {
               {utc(seller.uptime?.firstSeenAt ?? null)}
             </td>
           </tr>
-        )),
-      )}
-    </Table>
+        ))}
+      </Table>
+      <Pager label="Sellers" view={tablePager(query, 'sellers', page)} />
+      {offers.length ? (
+        <p className="mt-2 text-xs text-dim">
+          {offersCaption(offers.length, sellers.length)}
+        </p>
+      ) : null}
+    </>
   );
 }
 
-const STATE_LABELS: Record<Exclude<NetworkNode['state'], 'online'>, string> = {
-  offline: 'Offline',
-  unpublished: 'Not published',
-};
+function NotOnline({
+  query,
+  network,
+  accounts,
+}: {
+  query: ExplorerQuery;
+  network: NetworkStatus | null;
+  accounts: Map<string, GithubAccount> | null;
+}) {
+  return (
+    <>
+      {network ? (
+        <>
+          <NotOnlineTable query={query} network={network} accounts={accounts} />
+          {network.truncated ? (
+            <p className="mt-2 text-xs text-dim">
+              The index reached one of its limits: these lists and their counts
+              may be incomplete.
+            </p>
+          ) : null}
+        </>
+      ) : (
+        <p className="mt-2 text-xs text-dim">
+          The index&apos;s network status could not be read: offline and not
+          published sellers are unknown.
+        </p>
+      )}
+    </>
+  );
+}
 
 // Registered or recently seen sellers without a live presence now. Offline ones were seen before;
 // unpublished ones were never seen or withdrew their catalog.
-function NotOnlineTable({ network }: { network: NetworkStatus }) {
-  const nodes = notOnline(network);
+function NotOnlineTable({
+  query,
+  network,
+  accounts,
+}: {
+  query: ExplorerQuery;
+  network: NetworkStatus;
+  accounts: Map<string, GithubAccount> | null;
+}) {
+  const nodes = notOnline(network).filter(
+    (node) => !accounts || accounts.has(node.nodeId),
+  );
+  const page = pagedRows(query, 'offline', nodes, !network.truncated);
   if (!nodes.length) return null;
-  const { offline, unpublished } = network.counts;
   return (
     <>
       <SectionTitle
+        id={PAGING.anchors.offline}
         title="Not online"
-        meta={`${count(offline)} offline · ${count(unpublished)} not published`}
+        meta={notOnlineMeta(network, accounts ? nodes.length : null)}
       />
       <Table
         minWidth={DISPLAY.defaultTable}
@@ -211,27 +373,26 @@ function NotOnlineTable({ network }: { network: NetworkStatus }) {
           { label: 'First seen' },
         ]}
       >
-        {nodes.map((node) => (
+        {page.rows.map((node) => (
           <tr key={node.nodeId} className="border-t border-line">
             <td className={`${td} font-mono`} title={`Node ${node.nodeId}`}>
-              {short(node.nodeId)}
+              <SellerCell
+                nodeId={node.nodeId}
+                github={node.github}
+                href={sellerHref(node.nodeId, query)}
+              >
+                {node.github ? short(node.nodeId) : null}
+              </SellerCell>
             </td>
             <td className={td}>
-              <Chip>
-                {node.state === 'online' ? 'Online' : STATE_LABELS[node.state]}
-              </Chip>
+              <Chip>{SELLER_STATUS_LABELS[node.state]}</Chip>
             </td>
             <td className={timeCell}>{utc(node.lastSeenAt)}</td>
             <td className={timeCell}>{utc(node.firstSeenAt)}</td>
           </tr>
         ))}
       </Table>
-      {network.truncated ? (
-        <p className="mt-2 text-xs text-dim">
-          The index reached one of its limits: this list and its counts may be
-          incomplete.
-        </p>
-      ) : null}
+      <Pager label="Not online" view={tablePager(query, 'offline', page)} />
     </>
   );
 }

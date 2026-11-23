@@ -50,6 +50,7 @@ export const COLLECTOR_ROUTES = {
   STATS_MODELS: '/v1/stats/models',
   STATS_SELLER: '/v1/stats/sellers/:nodeId',
   STATS_CHAIN: '/v1/stats/chain',
+  STATS_CHAIN_TXS: '/v1/stats/chain/txs',
   // The operator's RPC probe (rpc-probe.ts): 404 unless its admin token is set and sent.
   RPC_PROBE: '/v1/admin/rpc-probe',
 } as const;
@@ -132,7 +133,7 @@ export const GLOBAL_LIMIT_KEY = 'global';
 export const AGGREGATES = {
   // 2: origin and failure breakdowns (recomputes every day once).
   // 3: per-model observations (recomputes every day once).
-  formulaVersion: 3,
+  formulaVersion: 4,
   // Upper bounds of the latency histogram buckets, in ms; one more bucket holds everything above.
   // Fixed so histograms can be summed across hours, days, sellers and models.
   latencyBucketsMs: [
@@ -172,6 +173,7 @@ export const FIRST_SEEN_KINDS = {
 } as const;
 // The single row of collector_agg_state.
 export const AGG_STATE_ID = 1;
+export const CHAIN_CURSOR_ID = 1;
 
 // Chain index (#349): the x402 payment-channels program (@x402/svm 2.28 Codama client). Discriminators
 // are one u8 at data[0]; account positions are the program's instruction account order.
@@ -254,6 +256,11 @@ export const CHAIN_CHANNEL_STATUSES = [
   'distributed',
 ] as const;
 export const CHAIN_CHANNEL_CLOSED = 'closed';
+export const CHAIN_TX_PAGE = {
+  defaultLimit: 25,
+  maxLimit: 50,
+  params: { BEFORE: 'before', LIMIT: 'limit', RECIPIENT: 'recipient' },
+} as const;
 // The address holds no channel of this program (another owner, or another size).
 export const CHAIN_CHANNEL_UNKNOWN = 'unknown';
 export const CHAIN_PROGRAMS = {

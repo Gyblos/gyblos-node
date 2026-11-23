@@ -28,6 +28,9 @@ export const coveringIndex = (
   name: DiscoveryListingIndex,
 ) => sql`${table} indexed by ${sql.identifier(name)}`;
 
+export const jsonTextValues = (values: readonly string[]) =>
+  sql`(select value from json_each(${JSON.stringify(values)}))`;
+
 // SQLite's scalar length has no Drizzle builder; schema checks must retain the physical bounds.
 export const textLength = (column: AnySQLiteColumn) =>
   sql<number>`length(${column})`;

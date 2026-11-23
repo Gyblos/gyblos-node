@@ -37,7 +37,12 @@ export interface BuyerApiKeyFiles {
 }
 export type BuyerApiKeyQuote = Omit<BuyerKeyReservation, 'id' | 'keyId'>;
 const digest = (value: string) => createHash('sha256').update(value).digest();
+export type ConfirmUnchargedKey = (
+  reservation: BuyerApiKeyQuote,
+  scope: BuyerKeyScope,
+) => Promise<boolean>;
 export class BuyerApiKeys {
+  private proof?: Promise<void>;
   private failed = false;
   private closed = false;
   private queue: Promise<unknown> = Promise.resolve();
@@ -45,6 +50,7 @@ export class BuyerApiKeys {
   constructor(
     private state: BuyerKeyState,
     private readonly files: BuyerApiKeyFiles,
+    private readonly confirmUncharged?: ConfirmUnchargedKey,
   ) {}
   private serial<T>(work: () => Promise<T>) {
     const result = this.queue.then(work);
@@ -189,27 +195,56 @@ export class BuyerApiKeys {
     });
   }
   private complete(id: string, charge: string, kind: BuyerKeyCharge) {
-    return this.serial(async () => {
-      this.writable();
-      const pending = this.state.pending.find((entry) => entry.id === id);
-      if (
-        !pending ||
-        !buyerAtomic(charge) ||
-        BigInt(charge) > BigInt(pending.maxAtomic) ||
-        !Object.values(BUYER_KEY_CHARGE).includes(kind)
-      )
-        return buyerKeyFail(BUYER_KEY_CODES.REVIEW);
-      await this.save({
-        ...this.state,
-        keys: this.state.keys.map((key) =>
-          key.id === pending.keyId
-            ? parseCompletedKey(key, pending.maxAtomic, charge, kind)
-            : key,
-        ),
-        pending: this.state.pending.filter((entry) => entry.id !== id),
-      });
-      this.active.delete(id);
+    return this.serial(() => this.finish(id, charge, kind));
+  }
+  private async finish(id: string, charge: string, kind: BuyerKeyCharge) {
+    this.writable();
+    const pending = this.state.pending.find((entry) => entry.id === id);
+    if (
+      !pending ||
+      !buyerAtomic(charge) ||
+      BigInt(charge) > BigInt(pending.maxAtomic) ||
+      !Object.values(BUYER_KEY_CHARGE).includes(kind)
+    )
+      return buyerKeyFail(BUYER_KEY_CODES.REVIEW);
+    await this.save({
+      ...this.state,
+      keys: this.state.keys.map((key) =>
+        key.id === pending.keyId
+          ? parseCompletedKey(key, pending.maxAtomic, charge, kind)
+          : key,
+      ),
+      pending: this.state.pending.filter((entry) => entry.id !== id),
     });
+    this.active.delete(id);
+  }
+  reconcileAbandoned() {
+    if (!this.proof)
+      this.proof = this.recoverUncharged().finally(() => {
+        this.proof = undefined;
+      });
+    return this.proof;
+  }
+  private async recoverUncharged() {
+    const prove = this.confirmUncharged;
+    const [orphan] = this.state.pending;
+    if (
+      !prove ||
+      this.state.pending.length !== 1 ||
+      !orphan ||
+      this.active.size
+    )
+      return;
+    const proved = await prove(orphan, this.state.scope).catch(() => false);
+    if (proved)
+      await this.serial(async () => {
+        if (
+          this.state.pending.length === 1 &&
+          this.state.pending[0]?.id === orphan.id &&
+          !this.active.size
+        )
+          await this.finish(orphan.id, '0', BUYER_KEY_CHARGE.SETTLED);
+      });
   }
   operation(keyId: string) {
     this.assertReady();
@@ -296,10 +331,12 @@ export type BuyerApiKeyOperation = ReturnType<BuyerApiKeys['operation']>;
 export async function createBuyerApiKeys(options: {
   files: BuyerApiKeyFiles;
   scope: BuyerKeyScope;
+  confirmUncharged?: ConfirmUnchargedKey;
 }) {
   const scope = parseBuyerKeyScope(options.scope);
   return new BuyerApiKeys(
     buyerKeyState(await options.files.read(), scope),
     options.files,
+    options.confirmUncharged,
   );
 }

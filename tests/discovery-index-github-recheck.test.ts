@@ -27,6 +27,7 @@ import {
   fakeGists,
   GIST,
   gistUrl,
+  SIGNATURE,
   type GistAnswer,
 } from './support/github-claim-fixture';
 
@@ -43,6 +44,7 @@ function row(index: number, patch: Partial<GithubClaimRow> = {}) {
     account: ACCOUNT,
     gist: GIST,
     issuedAt: T0,
+    signature: SIGNATURE,
     state: 'pending',
     reason: null,
     checkedAt: null,

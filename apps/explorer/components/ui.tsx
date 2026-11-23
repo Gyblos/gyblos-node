@@ -23,22 +23,37 @@ export function Loading() {
 export function SectionTitle({
   title,
   meta,
+  id,
 }: {
   title: string;
-  meta?: string;
+  meta?: ReactNode;
+  id?: string;
 }) {
   return (
-    <div className="mt-10 mb-4 flex flex-wrap items-baseline justify-between gap-2">
+    <div
+      id={id}
+      className="mt-10 mb-4 flex scroll-mt-4 flex-wrap items-baseline justify-between gap-2"
+    >
       <h2 className="text-xl font-medium">{title}</h2>
       {meta ? <span className="font-mono text-xs text-dim">{meta}</span> : null}
     </div>
   );
 }
 
-export function Unavailable({ title }: { title: string }) {
+export function Unavailable({
+  title,
+  anchors = [],
+}: {
+  title: string;
+  anchors?: readonly string[];
+}) {
+  const [first, ...rest] = anchors;
   return (
     <>
-      <SectionTitle title={title} />
+      {rest.map((anchor) => (
+        <span key={anchor} id={anchor} className="block scroll-mt-4" />
+      ))}
+      <SectionTitle id={first} title={title} />
       <div className="rounded-2xl border border-line bg-panel p-5 text-sm text-muted">
         Source unavailable.
       </div>

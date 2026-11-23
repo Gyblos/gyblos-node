@@ -40,6 +40,7 @@ Signed records and envelopes outside the Iroh channels:
 | Receipt upload envelope     | v1 (v2 contract only, not wired) | `receipt-upload-v1.json`, `receipt-upload-v2.json` | [v1](#receipt-upload-envelope-v1), [v2](#receipt-upload-envelope-v2)                                 |
 | Observation upload envelope | v1                               | `observation-upload-v1.json`                       | [Observation upload envelope v1](#observation-upload-envelope-v1)                                    |
 | Identity claim              | v1                               | `identity-claim-v1.json`                           | [Identity claim v1](#identity-claim-v1)                                                              |
+| Profile claim               | v1                               | `profile-claim-v1.json`                            | [Profile claim v1](#profile-claim-v1)                                                                |
 
 ## Contents
 
@@ -62,6 +63,7 @@ Signed records and envelopes outside the Iroh channels:
 - [Receipt upload envelope v2](#receipt-upload-envelope-v2)
 - [Observation upload envelope v1](#observation-upload-envelope-v1)
 - [Identity claim v1](#identity-claim-v1)
+- [Profile claim v1](#profile-claim-v1)
 
 ## Canonical JSON and signing bytes
 
@@ -1849,3 +1851,66 @@ on a line of its own, the proof line `gyblos-node=<nodeId>` (`githubProofLine`).
 node signature only; checking the gist, freshness and replay (keeping the newest
 `issuedAt` per node) belong to the verifier, such as the discovery index. It is
 not part of any public discovery record, so record parsers are unchanged.
+
+## Profile claim v1
+
+`@gyblos/protocol/profile-claim` defines a seller's optional public display
+name. The signed object is `{ claim, signature }`: `signature` is hex Ed25519 by
+`claim.nodeId` over the prefix `gyblos/profile-claim/v1\n` (real LF). Vectors
+are `vectors/profile-claim-v1.json`.
+
+`claim` has exactly the fields `schemaVersion` (`1`; any other value is
+`VERSION`), `nodeId` (64 lowercase hex), `name` and `issuedAt` (a non-negative
+safe integer, milliseconds). `name` is `null`, which clears the node's name, or
+a name already in the canonical form `parseSellerName` returns; any other value
+is `INVALID`.
+
+`parseSellerName` is the one rule every producer and verifier uses. In order:
+
+1. The input is a string of at most 256 UTF-16 code units. It is
+   NFKC-normalized, and the typographic apostrophes U+2019, U+02BC, U+02BB and
+   U+05F3 become `'`.
+2. Any control, format, private use, surrogate, unassigned, line or paragraph
+   separator or default-ignorable character (bidi controls, zero-width
+   characters including ZWNJ and ZWJ, variation selectors, Hangul fillers) is
+   `characters`. Any enclosing mark (`\p{Me}`) or decorative mark is `marks`:
+   U+0305, U+0332, U+0333, U+0334 to U+0338, U+033F, U+035C to U+0362, U+1AB0
+   to U+1AFF, U+20D0 to U+20FF and U+FE20 to U+FE2F.
+3. Each run of space separators becomes one space and the ends are trimmed. The
+   result must have 1 to 32 code points (`length`).
+4. It may hold only letters (`\p{L}`), nonspacing and spacing marks (`\p{Mn}`,
+   `\p{Mc}`), numbers (`\p{N}`), spaces and `-`, `_`, `.`, `'`, with at least
+   one letter or number. Modifier letters (`\p{Lm}`, such as `ˇ`) are refused,
+   except `々`, `ー`, `ゝ`, `ゞ`, `ヽ` and `ヾ`; so are small capital letters
+   (such as `ɢ ʏ ʙ ʟ ᴏ ꜱ`) and the check-like letters U+2C71 `ⱱ` and U+2C74 `ⱴ`
+   (`characters`). Emoji, symbols such as check marks, and punctuation such as
+   the middle dots `·` and `・` are never accepted.
+5. A mark must follow a letter or another mark (never at the start, after a
+   space, a digit or punctuation), with at most 3 marks in a row counted on the
+   NFD form (`marks`).
+6. Every letter, mark and non-ASCII number must belong to the Recommended
+   scripts of UTS #31 (Table 5: Arabic, Armenian, Bengali, Bopomofo, Cyrillic,
+   Devanagari, Ethiopic, Georgian, Greek, Gujarati, Gurmukhi, Han, Hangul,
+   Hebrew, Hiragana, Kannada, Katakana, Khmer, Lao, Latin, Malayalam, Myanmar,
+   Oriya, Sinhala, Tamil, Telugu, Thaana, Thai, Tibetan) by its
+   Script_Extensions, and all of them must share one script, as in UTS #39
+   Highly Restrictive: one script, or Latin with Han, Hiragana and Katakana,
+   Latin with Han and Hangul, or Latin with Han and Bopomofo. Characters whose
+   extensions include Common or Inherited are always allowed; ASCII digits are
+   not checked. Anything else is `scripts`, so Lisu, Cherokee or Coptic letters
+   and digits of another script are refused.
+7. On a skeleton of the name (NFD with marks removed, lowercase, without
+   spaces, `_`, `.`, `'` and `-`, with Latin look-alike letters such as `ɡ`,
+   `ɑ`, `ł`, `ø`, `ƒ`, `ʋ`, `ɩ` and `ꞵ` read as their base letter, `0` and the
+   zero digits of Devanagari, Bengali, Gujarati, Malayalam, Thai, NKo and
+   U+3007 read as `o`, `5` as `s`, and `1`, `i`, `ı` and `ǀ` all read as `l`)
+   it must not contain the skeleton of `gyblos`, `verified`, `verificado`,
+   `official` or `oficial` (`reserved`).
+
+Issues are `length`, `characters`, `marks`, `scripts` or `reserved`.
+
+The name is self-chosen: it is not unique, and nothing verifies it. This
+contract owns shape and the node signature only; freshness and replay (keeping
+the newest `issuedAt` per node) belong to the verifier, such as the discovery
+index. It is not part of any public discovery record or offer, so record and
+offer parsers are unchanged.

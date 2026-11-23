@@ -46,26 +46,29 @@ accepts an optional `timeoutMs` and `signal`.
 | `publishRecord({ baseUrl, record, fetch })`                                    | Posts one signed record (body at most 34,816 bytes). Resolves `{ ok: true }` on `201`.                                                                                                                                                                                               |
 | `registerSeller({ baseUrl, invite, nodeId, fetch })`                           | Trades a one-use invite code for permission to publish (`POST /registrations`). Resolves `registered` (`201`) or `already-active` (`200`). The invite code never appears in an error.                                                                                                |
 | `submitGithubClaim({ baseUrl, signed, fetch })`                                | Posts a node-signed GitHub claim (`POST /identity/github`). Resolves `{ state, reason, retryAfter? }`; `retryAfter` (seconds) comes only with `CHECK_DEFERRED`.                                                                                                                      |
-| `fetchGithubClaim({ baseUrl, nodeId, fetch })`                                 | Reads one NodeId's GitHub claim (`GET /identity/github/<nodeId>`), or `null` when the index has none.                                                                                                                                                                                |
+| `fetchGithubClaim({ baseUrl, nodeId, fetch })`                                 | Reads one NodeId's GitHub claim (`GET /identity/github/<nodeId>`), with its `issuedAt` and node `signature` (`signature` is null when the index has none that verifies for the served claim; both are null from an index that predates them), or `null` when the index has none.     |
+| `submitSellerProfile({ baseUrl, signed, fetch })`                              | Posts a node-signed seller display name or clear (`POST /profile`). Resolves `{ name }`.                                                                                                                                                                                             |
+| `fetchSellerProfile({ baseUrl, nodeId, fetch })`                               | Reads one NodeId's display name (`GET /profile/<nodeId>`) with its `issuedAt` and node `signature`, or `null` on `404 NO_PROFILE`; any other `404` (an index without the route) is `DISCOVERY_HTTP_STATUS`.                                                                          |
 | `validateDiscoveryBaseUrl(url)`                                                | Applies the client's URL policy to operator configuration: `https`, or `http` on loopback; no credentials, query string or fragment.                                                                                                                                                 |
 
 Failures throw `DiscoveryError` with a static code from `DISCOVERY_ERROR_CODES`
 and, when a response arrived, its `status`. Messages never echo input or
 response text.
 
-| Index answer                                                                      | Client code                                                                            |
-| --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `400` `INVALID_RECORD`, `INVALID_SIGNATURE`, `EXPIRED_RECORD`, `UNKNOWN_CATALOG`  | `DISCOVERY_` plus the same name                                                        |
-| `400` with an unreadable body or another code on publish                          | `DISCOVERY_RECORD_REJECTED`                                                            |
-| `400 HTTPS_REQUIRED`                                                              | `DISCOVERY_INSECURE_URL`                                                               |
-| `409` on publish or read                                                          | `DISCOVERY_STALE_RECORD`                                                               |
-| `403` on publish                                                                  | `DISCOVERY_PUBLISH_NOT_ALLOWED` (the index does not accept this NodeId as a publisher) |
-| `403` `INVITE_INVALID`, `IDENTITY_NOT_REGISTERED`, `NODE_REVOKED` on registration | `DISCOVERY_` plus the same name                                                        |
-| `400 INVALID_REGISTRATION`, or another `400`/`403` body on registration           | `DISCOVERY_REGISTRATION_REJECTED`                                                      |
-| `400 INVALID_CLAIM` or another `400`/`403` body on a GitHub claim                 | `DISCOVERY_CLAIM_REJECTED` (`INVALID_SIGNATURE` stays `DISCOVERY_INVALID_SIGNATURE`)   |
-| `403 UNKNOWN_NODE` and `409` on a GitHub claim                                    | `DISCOVERY_UNKNOWN_NODE`, `DISCOVERY_STALE_CLAIM`                                      |
-| `413`, `429`, `503`                                                               | `DISCOVERY_PAYLOAD_TOO_LARGE`, `DISCOVERY_RATE_LIMITED`, `DISCOVERY_UNAVAILABLE`       |
-| Any other status                                                                  | `DISCOVERY_HTTP_STATUS`                                                                |
+| Index answer                                                                         | Client code                                                                            |
+| ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| `400` `INVALID_RECORD`, `INVALID_SIGNATURE`, `EXPIRED_RECORD`, `UNKNOWN_CATALOG`     | `DISCOVERY_` plus the same name                                                        |
+| `400` with an unreadable body or another code on publish                             | `DISCOVERY_RECORD_REJECTED`                                                            |
+| `400 HTTPS_REQUIRED`                                                                 | `DISCOVERY_INSECURE_URL`                                                               |
+| `409` on publish or read                                                             | `DISCOVERY_STALE_RECORD`                                                               |
+| `403` on publish                                                                     | `DISCOVERY_PUBLISH_NOT_ALLOWED` (the index does not accept this NodeId as a publisher) |
+| `403` `INVITE_INVALID`, `IDENTITY_NOT_REGISTERED`, `NODE_REVOKED` on registration    | `DISCOVERY_` plus the same name                                                        |
+| `400 INVALID_REGISTRATION`, or another `400`/`403` body on registration              | `DISCOVERY_REGISTRATION_REJECTED`                                                      |
+| `400 INVALID_CLAIM` or another `400`/`403` body on a GitHub claim or `POST /profile` | `DISCOVERY_CLAIM_REJECTED` (`INVALID_SIGNATURE` stays `DISCOVERY_INVALID_SIGNATURE`)   |
+| `403 UNKNOWN_NODE` and `409` on a GitHub claim or `POST /profile`                    | `DISCOVERY_UNKNOWN_NODE`, `DISCOVERY_STALE_CLAIM`                                      |
+| `403 PROFILE_HELD` on `POST /profile` or `GET /profile/<nodeId>`                     | `DISCOVERY_PROFILE_HELD`                                                               |
+| `413`, `429`, `503`                                                                  | `DISCOVERY_PAYLOAD_TOO_LARGE`, `DISCOVERY_RATE_LIMITED`, `DISCOVERY_UNAVAILABLE`       |
+| Any other status                                                                     | `DISCOVERY_HTTP_STATUS`                                                                |
 
 A deadline is always `DISCOVERY_TIMEOUT`, including one that ends while reading
 a rejection body. A caller `signal` cancels header and body reads with
@@ -448,4 +451,6 @@ The reference index also serves `GET /uptime?node=<NodeId>`, a public uptime
 report built from the presences it accepted. It is not part of the contract a
 client relies on; see [discovery-index.md](discovery-index.md#uptime). It also
 accepts and serves seller GitHub claims under `/identity/github`, outside the
-client contract; see [discovery-index.md](discovery-index.md#github-claims).
+client contract; see [discovery-index.md](discovery-index.md#github-claims). It
+also accepts and serves seller display names under `/profile`, outside the
+client contract; see [discovery-index.md](discovery-index.md#seller-names).

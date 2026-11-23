@@ -17,6 +17,7 @@ desactivar lo que es opcional.
 | [Registros públicos del vendedor](#descubrimiento)          | El índice de descubrimiento, `discovery.gyblos.com`          | Mientras el vendedor está listado; la lista de la red, más tiempo                                       | En parte: pon `publish = false`                                  |
 | [Registro](#descubrimiento)                                 | El índice de descubrimiento y Solana devnet                  | Una vez, cuando ejecutas `gyblos seller register`                                                       | Tú decides si te registras                                       |
 | [Verificación de GitHub](#github)                           | El índice de descubrimiento, que luego lee tu gist en GitHub | Solo cuando ejecutas `gyblos seller verify github`; el índice vuelve a revisar cada 6 horas más o menos | Tú decides si verificas; `--cancel` lo quita                     |
+| [Nombre del vendedor](#nombre-del-vendedor)                 | El índice de descubrimiento                                  | Solo cuando ejecutas `gyblos seller name`                                                               | Tú decides si pones uno; `--clear` lo quita                      |
 | [Búsqueda de actualizaciones](#búsqueda-de-actualizaciones) | La API de GitHub                                             | App de escritorio: al iniciar y cada 5 minutos. Vendedor: con `status`                                  | Sí: `GYBLOS_UPDATE_CHECK=0`                                      |
 | [Metadatos de red](#red)                                    | Relays, pares, el índice, el recolector y el RPC de Solana   | En cada conexión                                                                                        | En parte: [modo solo relay](/es/reference/configuration)         |
 
@@ -176,8 +177,8 @@ Vincular una cuenta de GitHub a tu vendedor es opcional. No se envía nada salvo
 
 **Qué se vuelve público.** El índice publica tu declaración en `GET /v1/identity/github/<NodeId>`: tu
 NodeId, el nombre de tu cuenta de GitHub, el id del gist, el estado (`pending`, `verified` o `lost`), el
-motivo del último resultado, cuándo revisó el índice por última vez y desde cuándo la cuenta está
-verificada. Cualquiera puede leerla, sea cual sea el estado. Mientras el estado es `verified`, la lista de la
+motivo del último resultado, cuándo intentó revisar el índice por última vez (aunque GitHub no respondiera) y desde cuándo estuvo verificada por última vez
+(se sigue mostrando después de pasar a `lost`), y la hora en que tu nodo firmó la declaración junto con su firma, para que cualquiera pueda comprobarla sin confiar en el índice. Cualquiera puede leerla, sea cual sea el estado. Mientras el estado es `verified`, la lista de la
 red (`/v1/network`) también muestra la cuenta y el gist junto a tu vendedor. El gist en sí es público en
 GitHub. Un gist secreto también sirve, pero su id se publica, así que trátalo como público.
 
@@ -191,19 +192,48 @@ consultas vienen del índice, no de tu equipo.
 **Qué envía tu equipo.** El comando firma la declaración con la llave del nodo y la envía al índice: tu
 NodeId, la cuenta, el id del gist y la hora. También lee el mismo archivo del gist desde tu equipo (y, si ese
 archivo falta, la dirección raw del gist sin nombre de archivo, para distinguir un nombre de archivo equivocado de
-un gist que no existe), así que GitHub ve tu dirección IP. Si usas la CLI de GitHub (`gh`), esta usa tu sesión de GitHub para leer el nombre
-de tu cuenta, listar tus gists públicos y crear el gist de prueba. `gyblos seller status --online` y
+un gist que no existe), así que GitHub ve tu dirección IP. Si la CLI de GitHub (`gh`) está instalada, el
+comando le pregunta a GitHub a través de `gh` con qué cuenta tiene `gh` la sesión iniciada, pero solo cuando
+no tiene un gist que pueda reutilizar para esa cuenta: sin `--gist`, sin uno guardado para esa cuenta y sin
+uno en el índice (un gist guardado que resultó borrado no cuenta). Pregunta aunque después no use `gh`. Cuando es la cuenta que
+indicaste, usa tu sesión de GitHub para listar tus gists públicos y crear el gist de prueba. `gyblos seller status --online` y
 `--status` le piden tu declaración al índice por tu NodeId.
 
 **En tu equipo.** El comando guarda su avance (una versión del formato, tu NodeId, la cuenta, el id del gist y el último paso) en
 `github-verification.json`, dentro de la carpeta `seller/` del home del vendedor. Solo tú puedes leerlo.
 
 **Cómo quitarlo.** Ejecuta `gyblos seller verify github --cancel`. El índice deja de mostrar la cuenta, la
-ruta GET responde `404` y el comando borra el archivo de avance. El índice guarda solo tu NodeId, la hora de
-la cancelación y la hora de la última revisión que pediste con el comando (las revisiones programadas no la
-cambian), y nunca los muestra; así nadie puede volver a enviar
-una declaración vieja. El gist sigue en GitHub: bórralo
-tú. Las copias que otros hicieron mientras era público quedan fuera del control de Gyblos.
+ruta GET responde `404` y el comando borra el archivo de avance. El índice guarda solo tres cosas, y nunca
+las muestra: tu NodeId, la hora firmada de la cancelación y la última hora en que una declaración reservó una
+lectura de tu gist. Esa reserva se escribe antes de que el índice contacte a GitHub, aunque después la lectura
+falle, y las revisiones programadas no la cambian. La hora de la cancelación hace que el índice rechace
+cualquier declaración más vieja, así que nadie puede volver a enviar una declaración vieja; la hora de la
+reserva evita que una declaración nueva haga que el índice lea GitHub más de una vez por minuto. El gist sigue
+en GitHub: bórralo tú o, si otros vendedores lo usan, quita solo la línea de este vendedor. Las copias que otros hicieron mientras era público quedan fuera del control de Gyblos.
+
+## Nombre del vendedor [#nombre-del-vendedor]
+
+Un nombre público para tu vendedor es opcional. No se envía nada salvo que ejecutes `gyblos seller name`
+(consulta [`seller name`](/es/reference/cli#nombre-del-vendedor)).
+
+**Qué se vuelve público.** El índice publica el nombre en `GET /v1/profile/<NodeId>`, con tu NodeId, la hora
+en que tu nodo lo firmó y la firma, y lo muestra junto a tu vendedor en la lista de la red (`/v1/network`).
+Cualquiera puede leerlo. El nombre no está verificado y no es único: quien lo vea debe tomarlo como una
+etiqueta que elegiste, no como prueba de quién opera el vendedor. No pongas tu nombre legal, tu correo ni tu
+ubicación. El nombre queda ligado a tu NodeId y, a través de él, al uptime público, los modelos y la wallet
+del dueño de tu vendedor, así que cualquiera puede relacionarlos.
+
+**Qué envía tu equipo.** El comando firma el nombre con la llave del nodo y lo envía al índice: tu NodeId, el
+nombre y la hora. `--status` le pide el nombre al índice por tu NodeId. No se guarda nada en tu equipo.
+
+**Cómo quitarlo.** Ejecuta `gyblos seller name --clear`. El índice deja de mostrar el nombre, la ruta GET
+responde `404` y el índice guarda solo tu NodeId y la hora firmada del borrado, así que nadie puede volver a
+enviar un nombre más viejo. Las copias que otros hicieron mientras era público quedan fuera del control de
+Gyblos.
+
+**Retiro por el operador.** El operador del índice puede quitar un nombre, por ejemplo uno que suplanta a
+alguien, e impedir que se vuelva a poner hasta que el operador lo permita; entonces el comando termina con
+`DISCOVERY_PROFILE_HELD`. El índice también deja de mostrar un nombre cuando ya no conoce tu vendedor.
 
 ## Solana devnet [#solana]
 
@@ -211,6 +241,31 @@ El registro y los pagos son transacciones públicas en devnet: cualquiera puede 
 montos en un explorador de Solana. Los compradores y la app de escritorio también leen el registro de
 agentes 8004 mediante un RPC de Solana (por defecto `https://api.devnet.solana.com`) para comprobar la
 identidad de cada vendedor. El proveedor del RPC ve esas consultas y tu dirección IP.
+
+El explorador de Gyblos (`explorer.gyblos.com`) lista las transacciones en cadena más recientes de los
+canales de Gyblos (aquellos cuya apertura lleva un memo de Gyblos, o cuyo reparto paga a la tesorería de
+Gyblos), de la más reciente a la más antigua: hora, tipo de instrucción, monto en USDC (en un pago, cómo
+se repartió entre el vendedor, la comisión de Gyblos, la tesorería del programa y la devolución al
+comprador), firma, vendedor y canal, desde la ruta pública `GET /v1/stats/chain/txs` del recolector de
+métricas. La columna de vendedor muestra un vendedor listado cuando el destinatario del pago del canal
+(su primer destinatario del reparto) coincide con la dirección del dueño que uno, y solo uno, de los
+vendedores listados publica en el índice de descubrimiento, y enlaza a la página de ese vendedor; un pago
+compartido por varios canales dice "Several channels", y si no, dice "Unlisted seller". Esa dirección
+del dueño es autodeclarada, así que la columna es una ayuda visual, no una prueba de a quién se pagó. Sí
+vincula la dirección del dueño de un vendedor listado con los canales que le pagaron y con los montos.
+
+Cada vendedor tiene además una página en el explorador, `explorer.gyblos.com/sellers/<NodeId>`, que reúne lo
+que ya es público sobre él: su nombre elegido por él mismo y su cuenta de GitHub verificada cuando los
+definió, su NodeId y la dirección del dueño, su estado en línea y su disponibilidad desde el índice de
+descubrimiento, sus totales por día y por modelo desde la ruta pública `GET /v1/stats/sellers/<NodeId>` del
+recolector de métricas (con los conteos de compradores menores que 5 ocultos, como arriba) y las
+transacciones de canales de Gyblos cuyo destinatario del pago es la dirección del dueño, desde
+`GET /v1/stats/chain/txs?recipient=<dirección del dueño>`. La dirección del dueño se muestra solo mientras
+el vendedor está en línea, y otros vendedores pueden publicar la misma, así que las transacciones listadas
+pueden ser de cualquiera de ellos. Desconectarse solo oculta las transacciones de esa página: cualquiera
+puede pedir al recolector los canales de cualquier dirección destinataria, y las transacciones siguen
+siendo públicas en la cadena. Los canales de un comprador con un vendedor, con sus depósitos, pagos y
+reembolsos, aparecen en la página de ese vendedor.
 
 ## Búsqueda de actualizaciones [#búsqueda-de-actualizaciones]
 

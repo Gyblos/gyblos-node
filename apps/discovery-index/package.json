@@ -3,9 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "scripts": {
+    "db:generate": "node --import tsx ../../tooling/d1-migrations.ts generate .",
+    "db:check": "drizzle-kit check"
+  },
   "exports": {
     "./admin": "./scripts/admin.ts",
     "./github-claims-admin": "./scripts/github-claims.ts",
+    "./seller-profiles-admin": "./scripts/seller-profiles.ts",
     "./wrangler-d1": "./scripts/wrangler-d1.ts",
     "./app": "./src/app.ts",
     "./constants": "./src/constants.ts",
@@ -14,6 +19,8 @@
     "./github-claims": "./src/github-claims.ts",
     "./github-gist": "./src/github-gist.ts",
     "./network": "./src/network.ts",
+    "./profile-store": "./src/profile-store.ts",
+    "./profile-store-d1": "./src/profile-store-d1.ts",
     "./publishers": "./src/publishers.ts",
     "./registration-store": "./src/registration-store.ts",
     "./registration-store-d1": "./src/registration-store-d1.ts",

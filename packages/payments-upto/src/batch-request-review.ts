@@ -1,9 +1,11 @@
 import type { BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
+import type { BuyerKeyScope } from '@gyblos/protocol/buyer-api-keys';
+import { SESSION_STATES } from '@gyblos/protocol/payment-session';
 
 import { blockCharge } from './batch-block-state';
 import { batchSessionObserver } from './batch-session-observer';
 import { readBatchRecord } from './batch-session-state';
-import type { BatchPaths } from './batch-session-types';
+import type { BatchPaths, BatchRecord } from './batch-session-types';
 import { BATCH_BUYER_CHECKPOINTS } from './constants';
 
 export async function finalizedRequestCharge(
@@ -73,4 +75,77 @@ export async function finalizedRequestCharge(
     return undefined;
   const charge = delta <= 0n ? 0n : delta < authorized ? delta : authorized;
   return { chargeAtomic: String(charge), transaction: confirmed.transaction };
+}
+
+interface KeyReservation {
+  requestId: string;
+  maxAtomic: string;
+  sellerNodeId: string;
+}
+function uncharged(
+  record: BatchRecord | undefined,
+  ref: KeyReservation,
+  scope: BuyerKeyScope,
+  buyerNodeId: string,
+) {
+  if (
+    !record?.channelId ||
+    record.terms.buyer !== scope.payer ||
+    record.terms.network !== scope.network ||
+    record.terms.mint !== scope.mint ||
+    record.terms.buyerNodeId !== buyerNodeId ||
+    record.terms.sellerNodeId !== ref.sellerNodeId ||
+    record.history?.some((entry) =>
+      Object.hasOwn(entry.requests, ref.requestId),
+    )
+  )
+    return false;
+  const target = record.requests[ref.requestId];
+  if (
+    !target ||
+    target.accepted ||
+    target.bill ||
+    target.maxAtomic !== ref.maxAtomic
+  )
+    return false;
+  const progress = record.blocks?.[ref.requestId];
+  if (
+    progress &&
+    (progress.accepted ||
+      progress.pending ||
+      progress.baseAtomic !== record.cumulativeAtomic)
+  )
+    return false;
+  let total = 0n;
+  for (const item of Object.values(record.requests)) {
+    if (item.requestId === ref.requestId) continue;
+    if (!item.accepted || !item.bill) return false;
+    total += BigInt(item.bill.chargedAtomic);
+  }
+  return total === BigInt(record.cumulativeAtomic);
+}
+export async function finalizedUnchargedRequest(
+  paths: BatchPaths,
+  ref: KeyReservation,
+  scope: BuyerKeyScope,
+  buyerNodeId: string,
+  observe: () => Promise<unknown>,
+) {
+  let record = await readBatchRecord(paths);
+  if (!record || !uncharged(record, ref, scope, buyerNodeId)) return false;
+  if (!record.settlement) {
+    const channel = record.channelId;
+    await observe();
+    record = await readBatchRecord(paths);
+    if (
+      record?.channelId !== channel ||
+      !uncharged(record, ref, scope, buyerNodeId)
+    )
+      return false;
+  }
+  return (
+    record?.state === SESSION_STATES.CLOSED &&
+    !!record.settlement?.transaction &&
+    record.settlement.chargedAtomic === record.cumulativeAtomic
+  );
 }
