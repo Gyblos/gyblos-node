@@ -42,7 +42,7 @@ export function StatCard({
         <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
           <span
             className={cx(
-              'font-mono text-2xl whitespace-nowrap text-ink',
+              'max-w-full min-w-0 font-mono text-xl text-ink sm:text-2xl sm:whitespace-nowrap',
               money && 'text-money',
             )}
           >
