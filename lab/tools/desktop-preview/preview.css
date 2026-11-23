@@ -3519,10 +3519,13 @@ html .app.desktop-frame .pk-code pre {
     12px/1.7 GeistMono,
     monospace;
 }
-.desktop-frame .pk-code-line {
-  display: block;
+html .app.desktop-frame .pk-code pre code {
+  display: grid;
   width: max-content;
   min-width: 100%;
+}
+.desktop-frame .pk-code-line {
+  display: block;
 }
 .desktop-frame .pk-code-line::before {
   counter-increment: pk-code-line;
