@@ -90,7 +90,11 @@ export async function PaymentsSection({ query }: { query: ExplorerQuery }) {
         total={totals.settled}
         change={change?.settled[0]}
       />
-      <DailyTable query={query} summary={summary} />
+      <DailyTable
+        query={query}
+        summary={summary}
+        complete={chain.backfillDone === true}
+      />
     </>
   );
 }
@@ -194,11 +198,18 @@ function SettledChart({
 function DailyTable({
   query,
   summary,
+  complete,
 }: {
   query: ExplorerQuery;
   summary: ChainSummary;
+  complete: boolean;
 }) {
-  const page = pagedRows(query, 'chainDaily', [...summary.days].reverse());
+  const page = pagedRows(
+    query,
+    'chainDaily',
+    [...summary.days].reverse(),
+    complete,
+  );
   if (!summary.days.length) return null;
   return (
     <>

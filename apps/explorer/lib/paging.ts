@@ -100,6 +100,16 @@ export function queryHref(
   return search ? `${query.path}?${search}` : query.path;
 }
 
+export function canonicalPageHref(source: SearchSource): string | null {
+  const query = readQuery(source);
+  const dropped = PAGED_TABLES.some(
+    (table) =>
+      readParam(source, PAGING.params[table]) !== undefined &&
+      query.pages[table] === undefined,
+  );
+  return dropped ? queryHref(query) : null;
+}
+
 export function rangeSwitchHref(
   search: string,
   days: RangeDays,
@@ -140,8 +150,9 @@ export function pageRedirect(
   query: ExplorerQuery,
   table: PagedTable,
   page: Page<unknown>,
+  complete = true,
 ): string | null {
-  return page.requested === page.page
+  return !complete || page.requested === page.page
     ? null
     : queryHref(query, { pages: { [table]: page.page } });
 }

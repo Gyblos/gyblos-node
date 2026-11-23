@@ -16,9 +16,10 @@ export function pagedRows<T>(
   query: ExplorerQuery,
   table: PagedTable,
   rows: readonly T[],
+  complete = true,
 ) {
   const page = tablePage(query, table, rows);
-  const canonical = pageRedirect(query, table, page);
+  const canonical = pageRedirect(query, table, page, complete);
   if (canonical) redirect(canonical);
   return page;
 }

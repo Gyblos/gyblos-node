@@ -1,6 +1,7 @@
 // Owns the explorer's single page: the network, models, usage and payments sections, each streamed on its own
 // so a slow source never blocks the others. The `range` search parameter picks the days shown; a range
 // switch keeps the sections mounted so their figures roll to the new values.
+import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
 
 import { ChannelTxs } from '../components/channel-txs';
@@ -13,7 +14,7 @@ import { PaymentsSection } from '../components/payments-section';
 import { RangeControl } from '../components/range-control';
 import { Loading } from '../components/ui';
 import { UsageSection } from '../components/usage-section';
-import { readQuery } from '../lib/paging';
+import { canonicalPageHref, readQuery } from '../lib/paging';
 
 // Every request renders. The collector caches its answers at its own edge (5 minutes); the discovery
 // index is read into KV by the Worker's scheduled run, and renders read KV (lib/discovery-render.ts).
@@ -25,6 +26,8 @@ export default async function Home({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
+  const canonical = canonicalPageHref(params);
+  if (canonical) redirect(canonical);
   const query = readQuery(params);
   const { days } = query;
   return (
