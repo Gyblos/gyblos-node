@@ -3,6 +3,7 @@
 import { ArrowClockwise, Check, Copy, Info } from '@phosphor-icons/react';
 
 import { MESSAGE_STATE, type ChatMessage } from './chat-state';
+import { AssistantProgress } from './ChatMessageParts';
 import { MessageText } from './MessageText';
 import { TurnActivity } from './TurnActivity';
 import { IconButton } from './UI';
@@ -82,6 +83,11 @@ export function ChatAnswer(props: Props) {
           state={message.state}
           hasText={!!message.text}
         />
+      )}
+      {!message.activity && message.state === MESSAGE_STATE.PENDING && (
+        <AssistantProgress>
+          {message.text ? 'Writing…' : 'Preparing response'}
+        </AssistantProgress>
       )}
       {message.text ? (
         <MessageText text={message.text} />

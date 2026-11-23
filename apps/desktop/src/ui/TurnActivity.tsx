@@ -45,7 +45,7 @@ export function TurnActivity({
           Activity
         </summary>
         <ol>
-          <li>Request sent</li>
+          <li>Request started locally</li>
           {timing.first !== undefined && (
             <li>
               First text received{' '}

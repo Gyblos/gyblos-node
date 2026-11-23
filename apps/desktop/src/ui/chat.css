@@ -434,7 +434,7 @@
 }
 .turn-signal time {
   font-variant-numeric: tabular-nums;
-  font-family: 'Gyblos Digits', sans-serif;
+  font-family: var(--interface-font);
   margin-inline-start: 4px;
 }
 .turn-dots {
