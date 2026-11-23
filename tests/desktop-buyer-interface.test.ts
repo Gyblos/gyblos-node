@@ -54,10 +54,17 @@ void test('preview web services never claim to be connected', async () => {
   assert.match(source, /preview/i);
 });
 
-void test('chat selectors do not show downward chevrons', async () => {
+void test('the model picker alone shows the approved chat selector caret', async () => {
+  const picker = await readFile(
+    'apps/desktop/src/ui/ModelDropdown.tsx',
+    'utf8',
+  );
+  assert.match(
+    picker,
+    /<CaretDown\s+size=\{12\}\s+weight="bold"\s+className="preview-trigger-caret"/,
+  );
   for (const screen of [
     'apps/desktop/src/ui/ChatTools.tsx',
-    'apps/desktop/src/ui/ModelDropdown.tsx',
     'apps/desktop/src/ui/ChatPaymentSelector.tsx',
   ]) {
     const source = await readFile(screen, 'utf8');
