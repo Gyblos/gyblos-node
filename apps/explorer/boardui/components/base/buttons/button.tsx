@@ -1,5 +1,3 @@
-import { cx, sortCx } from '@/utils/cx';
-import { directionalIconClass } from '@/utils/directional-icon';
 import type {
   AnchorHTMLAttributes,
   ButtonHTMLAttributes,
@@ -8,6 +6,9 @@ import type {
   ReactNode,
   Ref,
 } from 'react';
+
+import { cx, sortCx } from '../../../utils/cx';
+import { directionalIconClass } from '../../../utils/directional-icon';
 
 type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 type ButtonSize = 'medium' | 'small' | 'xs';

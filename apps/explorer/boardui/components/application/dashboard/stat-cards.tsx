@@ -1,9 +1,5 @@
 'use client';
 
-import { Chip } from '@/components/base/badges/chip';
-import { Tooltip, TooltipTrigger } from '@/components/base/tooltip/tooltip';
-import { useTemplateCopy } from '@/components/foundations/template-copy/template-copy';
-import { cx } from '@/utils/cx';
 import {
   RiArrowDownCircleFill,
   RiArrowUpCircleFill,
@@ -20,6 +16,11 @@ import {
 } from '@remixicon/react';
 import { useState, type ComponentType } from 'react';
 import { Focusable } from 'react-aria-components';
+
+import { cx } from '../../../utils/cx';
+import { Chip } from '../../base/badges/chip';
+import { Tooltip, TooltipTrigger } from '../../base/tooltip/tooltip';
+import { useTemplateCopy } from '../../foundations/template-copy/template-copy';
 
 type IconComponent = ComponentType<{
   className?: string;

@@ -1,8 +1,8 @@
-import { Chip, type ChipColor } from '@/components/base/badges/chip';
 import { ArrowUpRight } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
+import { Chip, type ChipColor } from '../boardui/components/base/badges/chip';
 import { getChainTxs } from '../lib/chain-txs';
 import { sellerOwners, txRow, type ChainTxKind } from '../lib/chain-txs-shape';
 import {

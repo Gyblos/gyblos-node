@@ -1,6 +1,6 @@
-import { Pagination } from '@/components/base/pagination/pagination';
 import { redirect } from 'next/navigation';
 
+import { Pagination } from '../boardui/components/base/pagination/pagination';
 import {
   pageRedirect,
   sortedRows,

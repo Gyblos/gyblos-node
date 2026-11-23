@@ -1,7 +1,5 @@
 'use client';
 
-import { useDirection } from '@/components/foundations/direction/direction';
-import { cx, sortCx } from '@/utils/cx';
 import type { ComponentProps, ReactNode } from 'react';
 import {
   OverlayArrow as AriaOverlayArrow,
@@ -9,6 +7,9 @@ import {
   TooltipTrigger as AriaTooltipTrigger,
   type TooltipProps as AriaTooltipProps,
 } from 'react-aria-components';
+
+import { cx, sortCx } from '../../../utils/cx';
+import { useDirection } from '../../foundations/direction/direction';
 
 export type TooltipSize = 'sm' | 'md';
 const sizes = sortCx({

@@ -1,8 +1,9 @@
 'use client';
 
-import { cx } from '@/utils/cx';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { I18nProvider, useLocale } from 'react-aria-components';
+
+import { cx } from '../../../utils/cx';
 
 export type Direction = 'ltr' | 'rtl';
 export interface DirectionProviderProps extends Omit<

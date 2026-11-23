@@ -1,12 +1,12 @@
 // A headline figure, after BoardUI's stat cards (MIT, see ./LICENSE): a neutral card, a lighter icon tile,
 // the label, the value with its change against the previous period (a free · paid pair carries one
 // change per side, in the same order) and an optional line of context.
+import type { ComponentType, ReactNode } from 'react';
+
 import {
   DeltaPill,
   StatHint,
-} from '@/components/application/dashboard/stat-cards';
-import type { ComponentType, ReactNode } from 'react';
-
+} from '../../boardui/components/application/dashboard/stat-cards';
 import { cx } from './cx';
 import type { Delta } from './delta';
 

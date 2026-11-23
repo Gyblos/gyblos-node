@@ -1,11 +1,11 @@
 // Owns the Network section: sellers online and offline, the models offered and their cheapest prices,
 // each online seller's offers and uptime, and the registered sellers not online now, from the discovery
 // index. The per-model table lives in the Models section.
-import { Chip as CountChip } from '@/components/base/badges/chip';
 import { Activity, Boxes, Server, Tag } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
+import { Chip as CountChip } from '../boardui/components/base/badges/chip';
 import { HELP_URL } from '../lib/config';
 import { DISPLAY, PAGES, PAGING } from '../lib/constants';
 import type { DiscoverySnapshot, Seller } from '../lib/discovery';

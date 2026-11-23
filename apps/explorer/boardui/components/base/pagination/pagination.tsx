@@ -1,11 +1,12 @@
 'use client';
 
-import { Button, ButtonLink } from '@/components/base/buttons/button';
-import { useTemplateCopy } from '@/components/foundations/template-copy/template-copy';
-import { cx } from '@/utils/cx';
 import { RiArrowLeftLine, RiArrowRightLine } from '@remixicon/react';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
+
+import { cx } from '../../../utils/cx';
+import { useTemplateCopy } from '../../foundations/template-copy/template-copy';
+import { Button, ButtonLink } from '../buttons/button';
 
 export interface PaginationProps {
   page: number;

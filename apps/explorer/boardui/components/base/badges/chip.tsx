@@ -1,5 +1,6 @@
-import { cx, sortCx } from '@/utils/cx';
 import type { HTMLAttributes, Ref } from 'react';
+
+import { cx, sortCx } from '../../../utils/cx';
 
 type ChipVariant = 'bold' | 'subtle' | 'caption';
 export type ChipColor =

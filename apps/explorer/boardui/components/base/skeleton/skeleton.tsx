@@ -1,7 +1,8 @@
 'use client';
 
-import { cx, sortCx } from '@/utils/cx';
 import type { CSSProperties, ReactNode } from 'react';
+
+import { cx, sortCx } from '../../../utils/cx';
 
 export type SkeletonShape = 'rect' | 'text' | 'circle';
 const styles = sortCx({

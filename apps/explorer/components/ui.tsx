@@ -1,6 +1,5 @@
 // Owns the explorer's shared presentational pieces: section titles, tables, loading and
 // unavailable states, and linked addresses. No data access.
-import { Skeleton } from '@/components/base/skeleton/skeleton';
 import {
   ChevronDown,
   ChevronsUpDown,
@@ -10,6 +9,7 @@ import {
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
+import { Skeleton } from '../boardui/components/base/skeleton/skeleton';
 import { explorerAddressUrl } from '../lib/config';
 import { DISPLAY, PAGING } from '../lib/constants';
 import { short } from '../lib/format';
