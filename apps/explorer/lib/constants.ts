@@ -84,10 +84,12 @@ export const DISPLAY = {
   percentDigits: 1,
   // Unique buyer counts below this are withheld by the collector.
   minPublicBuyers: 5,
+  maxPublicModels: 100,
 } as const;
 
 export const CHAIN_TXS = {
   param: 'before',
+  recipientParam: 'recipient',
   pageRows: 25,
 } as const;
 
@@ -118,6 +120,27 @@ export const PAGING = {
 
 export const SELLER_PAGE = {
   path: '/sellers',
+} as const;
+
+export const HASH_SCROLL = {
+  maxWaitMs: 15 * 1000,
+} as const;
+
+export const TX_TEXT = {
+  batched: 'part of a payout of several channels; see the transaction',
+  batchTotal: 'batch total',
+  deposit: 'buyer deposit',
+  refund: 'back to buyer',
+} as const;
+
+export const NODE_STATE = {
+  online: 'online',
+  offline: 'offline',
+  unpublished: 'unpublished',
+} as const;
+
+export const SELLER_STATUS = {
+  unknown: 'unknown',
 } as const;
 
 // The date range control: preset spans of UTC days ending today. The collector answers at most 92 days

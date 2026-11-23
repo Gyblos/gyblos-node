@@ -39,16 +39,20 @@ import {
 import { literal } from './sql-primitives';
 import type { ChainTxCursor, ChainTxReader } from './stats-chain-txs';
 
+type ChainTxPageQuery = Parameters<ChainTxReader['transactions']>[0];
+
 const ins = chainInstructions;
 const DEPOSITING = [K.OPEN, K.TOP_UP];
+
+const firstRecipient = (owner: string) =>
+  sql`json_extract(${chainChannels.recipientsJson}, '$[0].owner') = ${owner}`;
 
 const earlierThan = (cursor: ChainTxCursor) =>
   sql`(${chainTxs.slot}, ${ins.signature}, ${ins.instructionIndex}) < (${cursor.slot}, ${cursor.signature}, ${cursor.instructionIndex})`;
 
 function pageKeys(
   orm: CollectorDatabase,
-  before: ChainTxCursor | null,
-  rows: number,
+  { before, rows, recipient }: ChainTxPageQuery,
 ) {
   return orm.$with('page').as(
     orm
@@ -75,6 +79,7 @@ function pageKeys(
           eq(chainChannels.gyblos, 1),
           eq(chainTxs.failed, 0),
           before ? earlierThan(before) : undefined,
+          recipient ? firstRecipient(recipient) : undefined,
         ),
       )
       .orderBy(
@@ -176,10 +181,14 @@ function payoutSplits(
 function payoutFields(
   page: ReturnType<typeof pageKeys>,
   splits: ReturnType<typeof payoutSplits>,
+  recipient: string | null,
 ) {
+  const sameRecipient = recipient
+    ? sql` and json_extract(${col('ec', chainChannels.recipientsJson)}, '$[0].owner') = ${recipient}`
+    : sql``;
   const firstPaying = sql`not exists (select 1 from ${from(ins, 'e')} ${channelJoin('e', 'ec')}
     where ${col('e', ins.signature)} = ${page.signature} and ${usdcMint('e', 'ec')}
-      and ${col('e', ins.kind)} in ${kinds(PAYING)} and ${col('e', ins.instructionIndex)} < ${page.instructionIndex})`;
+      and ${col('e', ins.kind)} in ${kinds(PAYING)} and ${col('e', ins.instructionIndex)} < ${page.instructionIndex}${sameRecipient})`;
   const balanced = payoutParts().balanced({
     g: sql`${splits.gyblosFees}`,
     pt: sql`${splits.programTreasury}`,
@@ -187,7 +196,8 @@ function payoutFields(
     o: sql`${splits.paidOut}`,
     outflow: sql`${splits.vault}`,
   });
-  const when = sql`${page.mint} is ${DEVNET_USDC} and ${page.kind} in ${kinds(PAYING)} and ${firstPaying} and ${balanced}`;
+  const paying = sql`${page.mint} is ${DEVNET_USDC} and ${page.kind} in ${kinds(PAYING)}`;
+  const when = sql`${paying} and ${firstPaying} and ${balanced}`;
   const shown = (value: SQL | SQL.Aliased) =>
     sql<
       string | null
@@ -200,6 +210,7 @@ function payoutFields(
     programTreasury: shown(splits.programTreasury),
     refunded: shown(splits.refunded),
     channels: sql<number | null>`case when ${when} then ${splits.channels} end`,
+    batched: sql<number>`case when ${paying} and not ${firstPaying} then 1 else 0 end`,
   };
 }
 
@@ -220,11 +231,11 @@ function amountOf(
 export function chainTxReader(database: D1Database): ChainTxReader {
   const orm = createD1Orm(database);
   return {
-    transactions: ({ before, rows }) => {
-      const page = pageKeys(orm, before, rows);
+    transactions: (query) => {
+      const page = pageKeys(orm, query);
       const settles = settleIncrements(orm, page);
       const splits = payoutSplits(orm, page);
-      const payout = payoutFields(page, splits);
+      const payout = payoutFields(page, splits, query.recipient);
       return orm
         .with(page)
         .select({
@@ -245,6 +256,7 @@ export function chainTxReader(database: D1Database): ChainTxReader {
           splitRefunded: payout.refunded.as('split_refunded'),
           splitChannels: payout.channels.as('split_channels'),
           splitUnclassified: payout.unclassified.as('split_unclassified'),
+          batched: payout.batched.as('batched'),
         })
         .from(page)
         .leftJoin(

@@ -2,6 +2,7 @@
 // seen seller and whether it is online now, offline (seen before, no live presence) or unpublished
 // (never seen, or its catalog withdrawn while the index keeps it). `truncated` means a source hit its cap:
 // nodes, counts or models may be incomplete. Checked at the boundary; exact keys, nothing private. Pure, no I/O.
+import { NODE_STATE } from './constants';
 import {
   flag,
   list,
@@ -12,7 +13,11 @@ import {
   text,
 } from './validate';
 
-export const NODE_STATES = ['online', 'offline', 'unpublished'] as const;
+export const NODE_STATES = [
+  NODE_STATE.online,
+  NODE_STATE.offline,
+  NODE_STATE.unpublished,
+] as const;
 export type NodeState = (typeof NODE_STATES)[number];
 
 export interface GithubAccount {

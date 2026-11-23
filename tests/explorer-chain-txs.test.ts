@@ -118,6 +118,7 @@ void test('channel transactions are checked at the boundary and amounts stay exa
       channels: 1,
       unclassified: 0n,
     },
+    batched: false,
   });
   assert.equal(page.transactions[1]!.amount, null);
   const withoutPayee = answer();
@@ -187,6 +188,7 @@ void test('a row is labeled plainly with a fixed six-decimal amount and a Solana
     seller: SELLER,
     amount: '1.500000',
     muted: false,
+    hint: null,
     detail: [],
     shared: false,
     signature: `${SIGNATURE.slice(0, 6)}…${SIGNATURE.slice(-6)}`,
@@ -236,14 +238,8 @@ void test('the seller is only the listed, unique owner of the channel payout rec
   assert.equal(credited(distribute(), sellerOwners([])), null);
 });
 
-const txPageHref = (days: number, before: string | null, verified = false) =>
-  queryHref(
-    readQuery({
-      range: String(days),
-      verified: verified ? '1' : undefined,
-    }),
-    { before },
-  );
+const txPageHref = (days: number, before: string | null, verified = '') =>
+  queryHref(readQuery({ range: String(days), verified }), { before });
 
 void test('pager links keep the range and carry the cursor', () => {
   assert.equal(txPageHref(RANGE.defaultDays, null), '/');
@@ -279,7 +275,7 @@ void test('the newest page URL has no empty query, so it shares the collector ca
 
 void test('transaction pages keep the verified seller filter', () => {
   assert.equal(
-    txPageHref(7, CURSOR, true),
+    txPageHref(7, CURSOR, '1'),
     `/?range=7&verified=1&before=${CURSOR}`,
   );
   assert.equal(

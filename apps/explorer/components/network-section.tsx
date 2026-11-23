@@ -12,7 +12,6 @@ import { count, percent, pricePerMtok, short, usdc, utc } from '../lib/format';
 import {
   notOnline,
   type GithubAccount,
-  type NetworkNode,
   type NetworkStatus,
 } from '../lib/network-status';
 import { summarizeOffers, uptimeRatio } from '../lib/offers';
@@ -23,8 +22,10 @@ import {
   notOnlineMeta,
   offersCaption,
   orderSellers,
+  sellerHref,
   verifiedOnly,
 } from '../lib/seller-identity';
+import { SELLER_STATUS_LABELS } from '../lib/seller-profile';
 import { Flow } from './board/animated-number';
 import { Chip } from './board/chip';
 import { StatCard } from './board/stat-card';
@@ -51,7 +52,13 @@ const priceText = (value: bigint | null) =>
 export async function NetworkSection({ query }: { query: ExplorerQuery }) {
   const { verified } = query;
   const snapshot = await getDiscovery();
-  if (snapshot.error) return <Unavailable title="Network" />;
+  if (snapshot.error)
+    return (
+      <Unavailable
+        title="Network"
+        anchors={[PAGING.anchors.sellers, PAGING.anchors.offline]}
+      />
+    );
   const summary = summarizeOffers(snapshot);
   const accounts = githubByNode(snapshot.network);
   const ordered = orderSellers(snapshot.sellers, snapshot.generatedAt);
@@ -258,6 +265,7 @@ function SellersTable({
               <SellerCell
                 nodeId={seller.nodeId}
                 github={accounts.get(seller.nodeId) ?? null}
+                href={sellerHref(seller.nodeId, query)}
               >
                 <Addr value={seller.owner} />
               </SellerCell>
@@ -333,11 +341,6 @@ function NotOnline({
   );
 }
 
-const STATE_LABELS: Record<Exclude<NetworkNode['state'], 'online'>, string> = {
-  offline: 'Offline',
-  unpublished: 'Not published',
-};
-
 // Registered or recently seen sellers without a live presence now. Offline ones were seen before;
 // unpublished ones were never seen or withdrew their catalog.
 function NotOnlineTable({
@@ -373,14 +376,16 @@ function NotOnlineTable({
         {page.rows.map((node) => (
           <tr key={node.nodeId} className="border-t border-line">
             <td className={`${td} font-mono`} title={`Node ${node.nodeId}`}>
-              <SellerCell nodeId={node.nodeId} github={node.github}>
+              <SellerCell
+                nodeId={node.nodeId}
+                github={node.github}
+                href={sellerHref(node.nodeId, query)}
+              >
                 {node.github ? short(node.nodeId) : null}
               </SellerCell>
             </td>
             <td className={td}>
-              <Chip>
-                {node.state === 'online' ? 'Online' : STATE_LABELS[node.state]}
-              </Chip>
+              <Chip>{SELLER_STATUS_LABELS[node.state]}</Chip>
             </td>
             <td className={timeCell}>{utc(node.lastSeenAt)}</td>
             <td className={timeCell}>{utc(node.firstSeenAt)}</td>

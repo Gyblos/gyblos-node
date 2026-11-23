@@ -69,6 +69,7 @@ void test('the query reads every table page and drops invalid values', () => {
     txPage: '3',
   });
   assert.deepEqual(query, {
+    path: '/',
     days: 7,
     verified: true,
     before: CURSOR,

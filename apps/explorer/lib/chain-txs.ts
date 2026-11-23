@@ -6,12 +6,15 @@ import {
 import { COLLECTOR_URL } from './config';
 import { fetchJson } from './fetch-json';
 
-export async function getChainTxs(before: string | null): Promise<ChainTxPage> {
+export async function getChainTxs(
+  before: string | null,
+  recipient: string | null = null,
+): Promise<ChainTxPage> {
   try {
     return {
       ...parseChainTxs(
         await fetchJson(
-          chainTxsUrl(COLLECTOR_URL, before),
+          chainTxsUrl(COLLECTOR_URL, before, recipient),
           'collector chain transactions',
         ),
       ),

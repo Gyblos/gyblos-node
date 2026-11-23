@@ -4,6 +4,11 @@ import { RANGE, UNITS } from './constants';
 
 export type RangeDays = (typeof RANGE.presets)[number];
 
+export const WIDEST_RANGE = RANGE.presets.reduce<RangeDays>(
+  (widest, days) => (days > widest ? days : widest),
+  RANGE.defaultDays,
+);
+
 // The preset the parameter names, or the default for anything else (missing, repeated, unknown).
 export function parseRange(value: unknown): RangeDays {
   const days = typeof value === 'string' ? Number(value) : Number.NaN;

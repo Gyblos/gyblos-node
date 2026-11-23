@@ -3,6 +3,7 @@ import type { Seller } from './discovery-shape';
 import { count } from './format';
 import type { GithubAccount, NetworkStatus } from './network-status';
 import { uptimeRatio } from './offers';
+import { queryHref, type ExplorerQuery } from './paging';
 
 export function githubByNode(
   network: NetworkStatus | null,
@@ -113,8 +114,9 @@ export function notOnlineMeta(
   return `${offline} offline · ${unpublished} not published`;
 }
 
-export function sellerHref(nodeId: string): string {
-  return `${SELLER_PAGE.path}/${encodeURIComponent(nodeId)}`;
+export function sellerHref(nodeId: string, query?: ExplorerQuery): string {
+  const path = `${SELLER_PAGE.path}/${encodeURIComponent(nodeId)}`;
+  return query ? queryHref({ ...query, path, before: null, pages: {} }) : path;
 }
 
 const plural = (value: number, word: string) =>

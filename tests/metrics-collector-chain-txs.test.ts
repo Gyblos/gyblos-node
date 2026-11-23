@@ -124,6 +124,7 @@ void test('GET /v1/stats/chain/txs lists Gyblos channel instructions newest firs
     recipients: [SELLER_OWNER, DEVNET_GYBLOS_TREASURY],
     amountAtomic: '1000',
     split: null,
+    batched: false,
   });
   assert.deepEqual(body.transactions[2]!.recipients, []);
   assert.ok(body.transactions.every((row) => row.channel !== 'N'));

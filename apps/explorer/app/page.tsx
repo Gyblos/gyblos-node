@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
 
 import { ChannelTxs } from '../components/channel-txs';
+import { HashScroll } from '../components/hash-scroll';
 import { LiveRefresh } from '../components/live-refresh';
 import { ModelsSection } from '../components/models-section';
 import { NetworkSection } from '../components/network-section';
@@ -32,6 +33,7 @@ export default async function Home({
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pb-16 sm:px-6">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line py-5">
+        <h1 className="sr-only">Gyblos Explorer</h1>
         <div className="flex items-baseline gap-3">
           <span className="text-xl font-medium tracking-tight">gyblos</span>
           <span className="text-muted">Explorer</span>
@@ -57,6 +59,7 @@ export default async function Home({
       <Suspense fallback={<Loading />}>
         <ChannelTxs query={query} />
       </Suspense>
+      <HashScroll />
     </div>
   );
 }

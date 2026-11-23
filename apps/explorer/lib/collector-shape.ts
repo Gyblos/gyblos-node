@@ -38,6 +38,12 @@ export type NetworkSide = Totals & {
   buyers: number | null;
   withheld: boolean;
 };
+export type SellerSide = Totals & Pick<NetworkSide, 'buyers' | 'withheld'>;
+export interface SellerDay {
+  day: string;
+  free: SellerSide | null;
+  paid: SellerSide | null;
+}
 export interface NetworkDay {
   day: string;
   free: NetworkSide | null;
@@ -140,16 +146,22 @@ function totals(source: JsonRecord, where: string): Totals {
     ),
   };
 }
-function networkSide(value: unknown, where: string): NetworkSide {
+function sellerSide(value: unknown, where: string): SellerSide {
   const source = record(value, where);
   return {
     ...totals(source, where),
-    activeSellers: num(source.activeSellers, `${where}.activeSellers`),
-    modelsServed: num(source.modelsServed, `${where}.modelsServed`),
     buyers: nullable(source.buyers, (present) =>
       num(present, `${where}.buyers`),
     ),
     withheld: flag(source.withheld, `${where}.withheld`),
+  };
+}
+function networkSide(value: unknown, where: string): NetworkSide {
+  const source = record(value, where);
+  return {
+    ...sellerSide(source, where),
+    activeSellers: num(source.activeSellers, `${where}.activeSellers`),
+    modelsServed: num(source.modelsServed, `${where}.modelsServed`),
   };
 }
 export function parseNetworkDay(value: unknown): NetworkDay {
@@ -215,3 +227,20 @@ export function parseModel(value: unknown): ModelStat {
 }
 export const aggregatedAt = (source: JsonRecord) =>
   nullable(source.aggregatedAt, (present) => num(present, 'aggregatedAt')) ?? 0;
+
+function sellerDay(value: unknown): SellerDay {
+  const source = record(value, 'seller.day');
+  return {
+    day: text(source.day, 'seller.day.day'),
+    free: nullable(source.free, (present) => sellerSide(present, 'free')),
+    paid: nullable(source.paid, (present) => sellerSide(present, 'paid')),
+  };
+}
+export function parseSellerStats(value: unknown) {
+  const source = record(value, 'seller');
+  return {
+    aggregatedAt: aggregatedAt(source) || null,
+    days: list(source.days, 'seller.days').map(sellerDay),
+    models: list(source.models, 'seller.models').map(parseModel),
+  };
+}

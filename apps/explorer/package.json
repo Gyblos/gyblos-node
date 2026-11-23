@@ -17,6 +17,7 @@
     "./discovery-snapshot": "./lib/discovery-snapshot.ts",
     "./fetch-json": "./lib/fetch-json.ts",
     "./format": "./lib/format.ts",
+    "./hash-target": "./lib/hash-target.ts",
     "./latency": "./lib/latency.ts",
     "./model-family": "./lib/model-family.ts",
     "./model-table": "./lib/model-table.ts",
@@ -25,6 +26,8 @@
     "./paging": "./lib/paging.ts",
     "./range": "./lib/range.ts",
     "./seller-identity": "./lib/seller-identity.ts",
+    "./seller-page": "./lib/seller-page.ts",
+    "./seller-profile": "./lib/seller-profile.ts",
     "./usage": "./lib/usage.ts"
   },
   "scripts": {

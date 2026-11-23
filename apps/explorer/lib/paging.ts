@@ -9,6 +9,7 @@ export type SearchSource =
   URLSearchParams | Record<string, string | string[] | undefined>;
 
 export interface ExplorerQuery {
+  path: string;
   days: RangeDays;
   verified: boolean;
   before: string | null;
@@ -60,7 +61,7 @@ function readParam(source: SearchSource, name: string): unknown {
   return values.length === 1 ? values[0] : undefined;
 }
 
-export function readQuery(source: SearchSource): ExplorerQuery {
+export function readQuery(source: SearchSource, path = '/'): ExplorerQuery {
   const before = txCursor(readParam(source, CHAIN_TXS.param));
   const pages: TablePages = {};
   for (const table of PAGED_TABLES) {
@@ -69,6 +70,7 @@ export function readQuery(source: SearchSource): ExplorerQuery {
       pages[table] = page;
   }
   return {
+    path,
     days: parseRange(readParam(source, RANGE.param)),
     verified:
       readParam(source, IDENTITY.verifiedParam) === IDENTITY.verifiedValue,
@@ -95,7 +97,7 @@ export function queryHref(
       params.set(PAGING.params[table], String(page));
   }
   const search = params.toString();
-  return search ? `/?${search}` : '/';
+  return search ? `${query.path}?${search}` : query.path;
 }
 
 export function canonicalPageHref(source: SearchSource): string | null {
@@ -108,8 +110,12 @@ export function canonicalPageHref(source: SearchSource): string | null {
   return dropped ? queryHref(query) : null;
 }
 
-export function rangeSwitchHref(search: string, days: RangeDays): string {
-  const query = readQuery(new URLSearchParams(search));
+export function rangeSwitchHref(
+  search: string,
+  days: RangeDays,
+  path = '/',
+): string {
+  const query = readQuery(new URLSearchParams(search), path);
   const pages = Object.fromEntries(
     PAGED_TABLES.filter(isRangeTable).map((table) => [table, 1]),
   );

@@ -10,15 +10,12 @@ import {
   Wallet,
 } from 'lucide-react';
 
-import {
-  getCollector,
-  type NetworkDay,
-  type NetworkSide,
-} from '../lib/collector';
+import { getCollector, type NetworkDay } from '../lib/collector';
 import { DISPLAY, PAGING } from '../lib/constants';
 import { count, usdcDecimal } from '../lib/format';
 import { tablePager, type ExplorerQuery } from '../lib/paging';
 import {
+  buyersText,
   countText,
   dailyRequests,
   latencyText,
@@ -37,12 +34,6 @@ import { StatCard } from './board/stat-card';
 import { pagedRows, Pager } from './pager';
 import { numberCell, SectionTitle, Table, td, Unavailable } from './ui';
 
-const buyersText = (side: NetworkSide | null) =>
-  !side
-    ? '—'
-    : side.withheld
-      ? `< ${DISPLAY.minPublicBuyers}`
-      : count(side.buyers ?? 0);
 // One row's "free · paid" figure cells.
 function FigureCells({
   free,
@@ -103,7 +94,13 @@ export async function UsageSection({ query }: { query: ExplorerQuery }) {
     getCollector(days),
     getCollector(days, 1),
   ]);
-  if (snapshot.error) return <Unavailable title="Usage" />;
+  if (snapshot.error)
+    return (
+      <Unavailable
+        title="Usage"
+        anchors={[PAGING.anchors.daily, PAGING.anchors.demand]}
+      />
+    );
   const usage = summarizeUsage(snapshot);
   const change = changes(usage, before.error ? null : summarizeUsage(before));
   const { free, paid } = usage;
