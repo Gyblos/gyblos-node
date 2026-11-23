@@ -18,31 +18,32 @@ import { X402Payments } from './X402Payments';
 
 const money = (atomic: bigint | null) =>
   atomic === null ? 'Unavailable' : atomicToUsdc(atomic) + ' USDC';
-type Segment = { id: string; label: string; amount: bigint; tone: Tone };
+type Segment = { id: string; label: string; amount: bigint | null; tone: Tone };
 
 function SpendingBar({
   segments,
   total,
 }: {
   segments: Segment[];
-  total: bigint;
+  total: bigint | null;
 }) {
   return (
     <div className="pk-segmented">
       <div className="pk-segmented-track" aria-hidden="true">
-        {segments.map((segment) => (
-          <span
-            key={segment.id}
-            data-tone={segment.tone}
-            style={{
-              width:
-                (total
-                  ? (Number(segment.amount) / Number(total)) *
-                    RESPONSE_METRICS.PERCENT_SCALE
-                  : 0) + '%',
-            }}
-          />
-        ))}
+        {total !== null &&
+          segments.map((segment) => (
+            <span
+              key={segment.id}
+              data-tone={segment.tone}
+              style={{
+                width:
+                  (total
+                    ? (Number(segment.amount) / Number(total)) *
+                      RESPONSE_METRICS.PERCENT_SCALE
+                    : 0) + '%',
+              }}
+            />
+          ))}
       </div>
       <ul className="pk-legend" aria-label="Spending by source">
         {segments.map((segment) => (
@@ -231,11 +232,7 @@ export function SpendingLimits({
             </span>
             <span className="ui-help-text">Separate limits</span>
           </div>
-          {total !== null ? (
-            <SpendingBar segments={segments} total={total} />
-          ) : (
-            <div className="pk-segmented-track" aria-hidden="true" />
-          )}
+          <SpendingBar segments={segments} total={total} />
         </section>
         <section className="preview-panel" aria-label="Spending breakdown">
           <h3>Spending</h3>
@@ -309,11 +306,17 @@ function spendingBySource(
     ? keys.keys.reduce((sum, entry) => sum + BigInt(entry.spentAtomic), 0n)
     : null;
   const total = chat !== null && keySpent !== null ? chat + keySpent : null;
-  const segments: Segment[] =
-    chat === null
-      ? []
-      : [{ id: 'chat', label: 'Chat', amount: chat, tone: TONE.INFO }];
+  const segments: Segment[] = [
+    { id: 'chat', label: 'Chat', amount: chat, tone: TONE.INFO },
+  ];
   const active = keys?.keys.filter((entry) => !entry.revoked) ?? [];
+  if (!keys || !keys.keys.length)
+    segments.push({
+      id: 'api-keys',
+      label: 'API keys',
+      amount: keySpent,
+      tone: TONE.SUCCESS,
+    });
   active.forEach((entry, i) =>
     segments.push({
       id: entry.id,

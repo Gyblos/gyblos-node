@@ -78,6 +78,7 @@ function PaymentNetworkLabel() {
         data-network="mainnet"
         title="Mainnet is unavailable"
       >
+        <span className="preview-network-dot" aria-hidden="true" />
         Mainnet
       </button>
     </div>

@@ -2439,7 +2439,7 @@ html .app.desktop-frame .preview-simple-table th .pk-tag {
   margin-left: 8px;
 }
 html .app.desktop-frame .preview-network-single .preview-network-dot {
-  background: var(--connected);
+  background: var(--pk-warning);
 }
 html .app.desktop-frame .preview-steppers {
   display: inline-flex;
