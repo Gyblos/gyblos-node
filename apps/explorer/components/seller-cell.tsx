@@ -3,19 +3,22 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 import { gistUrl } from '../lib/config';
+import { SELLER_NAME } from '../lib/constants';
 import { short } from '../lib/format';
 import type { GithubAccount } from '../lib/network-status';
-import { sellerHref } from '../lib/seller-identity';
+import { sellerHref, sellerNameHint } from '../lib/seller-identity';
 import { Identicon } from './identicon';
 
 export function SellerCell({
   nodeId,
   github,
+  name = null,
   children,
   href = sellerHref(nodeId),
 }: {
   nodeId: string;
   github: GithubAccount | null;
+  name?: string | null;
   children?: ReactNode;
   href?: string | null;
 }) {
@@ -52,6 +55,15 @@ export function SellerCell({
             </a>
           ) : null}
         </div>
+        {name ? (
+          <div
+            className="max-w-56 truncate font-sans text-xs text-dim"
+            title={sellerNameHint(name)}
+          >
+            <bdi>{name}</bdi>
+            <span className="sr-only">, {SELLER_NAME.hint}</span>
+          </div>
+        ) : null}
         {children ? <div className="text-xs text-dim">{children}</div> : null}
       </div>
     </div>
