@@ -13,6 +13,8 @@ is [apps/docs](../apps/docs/README.md).
 - [Public decisions](public-decisions.md): decided and proposed product and
   engineering directions.
 - [Architecture](architecture.md): packages, apps and the dependency rule.
+- [Target architecture](target-architecture.md): the decided shape for symmetric
+  seller and buyer roles, one local control contract and agent access.
 
 ## Run a node
 

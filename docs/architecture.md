@@ -8,6 +8,9 @@ local data lives.
 - The wire format is specified in
   [packages/protocol/SPEC.md](../packages/protocol/SPEC.md).
 - Technology choices are in [stack.md](stack.md).
+- Where the layout is going is in
+  [target-architecture.md](target-architecture.md), a decided direction that
+  changes nothing described here.
 - The repository rules (layers, imports, standalone packages) are in
   [AGENTS.md](../AGENTS.md#layers-and-ownership). Where a new module goes is in
   the [gyblos-code-map skill](../.agents/skills/gyblos-code-map/SKILL.md).
