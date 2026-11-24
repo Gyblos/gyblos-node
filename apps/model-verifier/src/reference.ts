@@ -14,7 +14,7 @@ import type { Candidate } from './scoring';
 export interface ReferenceModel {
   tag: string;
   digest: string;
-  candidates(prompt: string, topLogprobs: number): Promise<Candidate[]>;
+  candidates(prompt: string, topLogprobs: number): Promise<Candidate[] | null>;
 }
 
 const unavailable = () =>
@@ -67,8 +67,10 @@ async function call(
   }
 }
 
-function parseCandidates(body: Record<string, unknown>): Candidate[] {
+function parseCandidates(body: Record<string, unknown>): Candidate[] | null {
   const logprobs = body.logprobs;
+  if (logprobs === undefined && body.done === true && body.response === '')
+    return null;
   const first = Array.isArray(logprobs) ? record(logprobs[0]) : {};
   const top = first.top_logprobs;
   if (!Array.isArray(top)) throw unavailable();

@@ -69,10 +69,11 @@ async function scoreAnswer(
       rendered + text.slice(0, at),
       rule.topLogprobs,
     );
-    checks.push({
-      at,
-      deviation: isDeviation(text.slice(at), candidates, floor),
-    });
+    if (candidates)
+      checks.push({
+        at,
+        deviation: isDeviation(text.slice(at), candidates, floor),
+      });
   }
   return { prompt, text, digest, checks };
 }

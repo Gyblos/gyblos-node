@@ -260,7 +260,7 @@ void test('the reference retries a passing failure and gives up after a bounded 
     flakyOnce,
     0,
   );
-  assert.equal((await model.candidates('prompt', 20)).length, 1);
+  assert.equal((await model.candidates('prompt', 20))?.length, 1);
   assert.equal(generates, 2);
   let failures = 0;
   const down: typeof fetch = async (input) => {
@@ -282,6 +282,42 @@ void test('the reference retries a passing failure and gives up after a bounded 
     isCode(MODEL_VERIFIER_CODES.REFERENCE_UNAVAILABLE),
   );
   assert.equal(failures, 3);
+});
+
+void test('a point where the reference would end the answer is not counted', async () => {
+  const ends: typeof fetch = async (input) =>
+    String(input).endsWith('/api/tags')
+      ? Response.json({ models: [{ name: 'qwen3:1.7b', digest: DIGEST }] })
+      : Response.json({ response: '', done: true, done_reason: 'stop' });
+  const model = await openReference(
+    'http://127.0.0.1:11434',
+    'qwen3-1.7b',
+    ends,
+    0,
+  );
+  assert.equal(await model.candidates('prompt', 20), null);
+  await withHome(async (home) => {
+    const key = await loadVerifierKey(join(home, 'verifier.key'), true);
+    const fake = reference();
+    let calls = 0;
+    const outcome = await runVerification({
+      target: TARGET,
+      seller: { selection: SELECTION, ask: async () => answer('word') },
+      reference: {
+        ...fake,
+        async candidates(prompt: string) {
+          calls++;
+          return calls % 2 ? null : fake.candidates(prompt);
+        },
+      },
+      set: CHALLENGE_SET,
+      key,
+      now: () => 1_800_000_000_000,
+    });
+    const { evidence } = outcome.signed.result;
+    assert.equal(evidence.checks, calls / 2);
+    assert.equal(evidence.deviations, 0);
+  });
 });
 
 void test('a seller target is parsed strictly', () => {

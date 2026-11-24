@@ -50,7 +50,9 @@ its 20 most likely next tokens with their log probabilities. The point is a
 most probable candidate that is has a probability below 0.1 % (1,000 parts per
 million). An answer that contains a chat template marker such as `<|im_end|>` is
 not scored and counts as unanswered, because those markers could steer the
-reference.
+reference. A point where the declared model's most likely next token ends the
+answer is not counted: Ollama returns no probabilities there, so the point says
+nothing either way.
 
 This is the approach recorded in the internal model verification research: it
 needs no log probabilities from the seller and no protocol change, it tolerates
@@ -132,8 +134,8 @@ OpenAI-compatible engine):
 
 | Seller serves | Answers | Checks | Deviations | `failAt` | Verdict |
 | ------------- | ------- | ------ | ---------- | -------- | ------- |
-| `qwen3:1.7b`  | 30      | 665    | 0          | 13       | `pass`  |
-| `qwen3:0.6b`  | 30      | 646    | 65         | 13       | `fail`  |
+| `qwen3:1.7b`  | 30      | 666    | 0          | 13       | `pass`  |
+| `qwen3:0.6b`  | 30      | 670    | 79         | 13       | `fail`  |
 
 A run takes a few minutes on this machine, mostly the seller's generation.
 
