@@ -84,7 +84,7 @@ not store it.
 
 The network totals also count distinct buyers: free buyers by NodeId and paid buyers by wallet (or by
 NodeId when a paid receipt names no wallet), never added together. Each count is published for all
-time and for the buyers whose first confirmed or seller-reported receipt falls in the chosen days.
+time and for the buyers whose first receipt reported by the seller and not disputed by the buyer falls in the chosen days. A buyer stays counted even if that receipt is disputed later.
 Buyers new today are counted only once the UTC day ends. A count below 5, zero included, is withheld.
 These are counts only, never which buyers they are. Subtracting the counts of two ranges, or of all
 time and a range, can still give counts below 5, down to the new buyers of a single day, and anyone

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import test, { afterEach } from 'node:test';
 
+import { getCollector } from '@gyblos/explorer/collector';
 import {
   parseNetworkBuyers,
   type NetworkBuyers,
@@ -22,6 +23,11 @@ import {
   NOW,
 } from './support/metrics-collector-aggregates';
 import { createCollectorD1 } from './support/metrics-collector-d1';
+
+const realFetch = globalThis.fetch;
+afterEach(() => {
+  globalThis.fetch = realFetch;
+});
 
 const hidden = { buyers: null, withheld: true };
 const shown = (buyers: number) => ({ buyers, withheld: false });
@@ -96,4 +102,24 @@ void test('the explorer reads the buyers the collector publishes', async () => {
     },
     paid: { allTime: hidden, newInRange: hidden },
   });
+});
+
+void test('a malformed buyerTotals empties only the Buyers card, not the collector read', async () => {
+  const network = {
+    aggregatedAt: 1,
+    days: [{ day: DAY, free: null, paid: null, observed: null, demand: [] }],
+    buyerTotals: { free: { allTime: { buyers: '7' } } },
+  };
+  globalThis.fetch = ((input: string | URL) =>
+    Promise.resolve(
+      Response.json(
+        String(input).includes('/stats/network')
+          ? network
+          : { aggregatedAt: 1, models: [] },
+      ),
+    )) as typeof fetch;
+  const snapshot = await getCollector(7);
+  assert.equal(snapshot.error, null);
+  assert.equal(snapshot.days.length, 1);
+  assert.equal(snapshot.buyerTotals, null);
 });

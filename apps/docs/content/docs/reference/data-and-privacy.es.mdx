@@ -85,8 +85,7 @@ de solicitudes y no la guarda.
 
 Los totales de la red también cuentan compradores distintos: los gratuitos por NodeId y los de pago por
 billetera (o por NodeId cuando un recibo de pago no nombra billetera), sin sumarlos nunca. Cada conteo
-se publica para todo el historial y para los compradores cuyo primer recibo confirmado o informado por
-el vendedor cae en los días elegidos. Los compradores nuevos de hoy se cuentan solo cuando termina el
+se publica para todo el historial y para los compradores cuyo primer recibo informado por el vendedor y no disputado por el comprador cae en los días elegidos. Un comprador sigue contado aunque ese recibo se dispute después. Los compradores nuevos de hoy se cuentan solo cuando termina el
 día UTC. Un conteo menor que 5, incluido el cero, se oculta. Son solo conteos, nunca quiénes son esos
 compradores. Aun así, restar los conteos de dos rangos, o del historial y un rango, puede dar conteos
 menores que 5, hasta los compradores nuevos de un solo día, y quien cree sus propias llaves puede

@@ -5,8 +5,8 @@ import { cache } from 'react';
 
 import {
   aggregatedAt,
+  optionalNetworkBuyers,
   parseModel,
-  parseNetworkBuyers,
   parseNetworkDay,
   type CollectorSnapshot,
 } from './collector-shape';
@@ -56,7 +56,7 @@ async function loadCollector(query: string): Promise<CollectorSnapshot> {
     aggregatedAt: Math.max(aggregatedAt(network), aggregatedAt(models)) || null,
     days: list(network.days, 'network.days').map(parseNetworkDay),
     models: list(models.models, 'models.models').map(parseModel),
-    buyerTotals: parseNetworkBuyers(network.buyerTotals),
+    buyerTotals: optionalNetworkBuyers(network.buyerTotals),
     error: null,
   };
 }

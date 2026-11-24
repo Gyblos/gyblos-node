@@ -192,6 +192,14 @@ export function parseNetworkBuyers(value: unknown): NetworkBuyers | null {
     };
   });
 }
+export function optionalNetworkBuyers(value: unknown): NetworkBuyers | null {
+  try {
+    return parseNetworkBuyers(value);
+  } catch (error) {
+    if (error instanceof SourceShapeError) return null;
+    throw error;
+  }
+}
 function networkSide(value: unknown, where: string): NetworkSide {
   const source = record(value, where);
   return {

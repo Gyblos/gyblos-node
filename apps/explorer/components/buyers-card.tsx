@@ -26,7 +26,7 @@ export function BuyersCard({
         variant={variant}
         icon={Users}
         label="Buyers, all time"
-        hint={`Distinct buyers up to the end of yesterday, UTC: free buyers by NodeId, paid buyers by wallet (or by NodeId when the receipt names no wallet), never added together. New: buyers whose first receipt falls in the range. Counts below ${MIN} are shown as < ${MIN}.`}
+        hint={`Distinct buyers up to the end of yesterday, UTC: free buyers by NodeId, paid buyers by wallet (or by NodeId when the receipt names no wallet), never added together. A buyer counts from its first receipt reported by the seller and not disputed by the buyer, and stays counted if that receipt is disputed later. New: that first receipt falls in the range. Counts below ${MIN} are shown as < ${MIN}.`}
         sides={{ free: side('free'), paid: side('paid') }}
         caption={newBuyersText(buyers, days)}
       />
