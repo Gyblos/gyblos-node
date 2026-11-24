@@ -73,6 +73,31 @@ body {
   scroll-timeline: --table-scroll inline;
 }
 
+.explorer-table-edge {
+  position: absolute;
+  inset: 0 0 0 auto;
+  z-index: 2;
+  display: none;
+  width: 24px;
+  pointer-events: none;
+  background: linear-gradient(
+    to right,
+    transparent,
+    color-mix(in srgb, var(--ink) 14%, transparent)
+  );
+}
+
+.explorer-table-scroll[data-scrollable]:not([data-scroll-end])
+  + .explorer-table-edge {
+  display: block;
+}
+
+@media (forced-colors: active) {
+  .explorer-table-edge {
+    border-right: 3px double CanvasText;
+  }
+}
+
 .explorer-table thead,
 .explorer-table thead th {
   background: color-mix(in srgb, var(--raised) 50%, var(--panel));

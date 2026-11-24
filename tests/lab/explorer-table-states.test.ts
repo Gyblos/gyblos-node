@@ -145,14 +145,28 @@ async function pageHtml(dir: string, state: State) {
       });
     });
     let html = '';
+    let css = '';
+    const stylesheets = new Set<string>();
     for (const path of ['/?range=7', '/stats?range=7']) {
       const response = await fetch(url + path, {
         signal: AbortSignal.timeout(60_000),
       });
       assert.equal(response.status, 200, output);
-      html += await response.text();
+      const page = await response.text();
+      html += page;
+      for (const [, href] of page.matchAll(
+        /<link\b[^>]*href="([^"]+\.css[^"]*)"/g,
+      ))
+        if (href) stylesheets.add(href);
     }
-    return html;
+    for (const href of stylesheets) {
+      const response = await fetch(url + href, {
+        signal: AbortSignal.timeout(60_000),
+      });
+      assert.equal(response.status, 200);
+      css += await response.text();
+    }
+    return { html, css };
   } finally {
     app.kill();
     try {
@@ -206,7 +220,7 @@ after(async () => {
 });
 
 void test('Explorer gives offerless Sellers and inactive Daily one spanning row each', async () => {
-  const empty = await pageHtml(dir, 'empty');
+  const { html: empty } = await pageHtml(dir, 'empty');
   assert.match(
     bodyFor(empty, 'Online since'),
     /^<tr><td[^>]*\btext-muted\b[^>]*\bcolSpan="9"[^>]*>No offers from online sellers\.<\/td><\/tr>$/i,
@@ -218,17 +232,35 @@ void test('Explorer gives offerless Sellers and inactive Daily one spanning row 
 });
 
 void test('Explorer shows offer and active-day rows without empty rows', async () => {
-  const populated = await pageHtml(dir, 'populated');
+  const { html: populated, css } = await pageHtml(dir, 'populated');
   const sellers = bodyFor(populated, 'Online since');
   const daily = bodyFor(populated, 'Seller first token p50');
   assert.match(sellers, /fixture-model/);
   assert.ok(daily.includes(activeDay));
   assert.ok(!daily.includes(inactiveDay));
   assert.doesNotMatch(sellers + daily, /colSpan=/i);
+  const tables = [...populated.matchAll(/<table\b/g)];
+  const edges = [
+    ...populated.matchAll(
+      /<\/table><\/div><div aria-hidden="true" class="explorer-table-edge"><\/div><\/div>/g,
+    ),
+  ];
+  assert.ok(tables.length > 0);
+  assert.equal(edges.length, tables.length);
+  assert.doesNotMatch(populated, /Scroll horizontally|explorer-table-hint/);
+  assert.match(css, /\.explorer-table-edge\s*\{[^}]*display:\s*none;/);
+  assert.match(
+    css,
+    /\.explorer-table-scroll\[data-scrollable\]:not\(\[data-scroll-end\]\)\s*\+\s*\.explorer-table-edge\s*\{\s*display:\s*block;/,
+  );
+  assert.match(
+    css,
+    /@media\s*\(forced-colors:\s*active\)\s*\{\s*\.explorer-table-edge\s*\{\s*border-right:\s*3px double CanvasText;/,
+  );
 });
 
 void test('Explorer keeps the unavailable panels when the sources fail', async () => {
-  const unavailable = await pageHtml(dir, 'unavailable');
+  const { html: unavailable } = await pageHtml(dir, 'unavailable');
   assert.match(
     unavailable,
     />Network<\/h2><\/div><\/div><div[^>]*>Source unavailable\.<\/div>/,
