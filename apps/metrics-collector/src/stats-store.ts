@@ -49,6 +49,11 @@ export interface SellerBuyersRow {
   paid: number;
   buyers: number;
 }
+export interface BuyerTotalsRow {
+  kind: string;
+  allTime: number;
+  newInRange: number;
+}
 export type ObservedRow = typeof aggObservedDaily.$inferSelect;
 export type DemandRow = typeof aggDemandDaily.$inferSelect;
 export type ChainDayRow = typeof aggChainDaily.$inferSelect;
@@ -71,6 +76,7 @@ export interface StatsReader {
     demand: DemandRow[];
     origins: OriginRow[];
     failures: FailureRow[];
+    buyers: BuyerTotalsRow[];
   }>;
   // Rows per model and paid flag, at most AGGREGATES.maxPublicModels models, most completed first;
   // observation rows per model and paid flag.

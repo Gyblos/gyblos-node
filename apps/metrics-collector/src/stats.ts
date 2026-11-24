@@ -1,6 +1,7 @@
 // Owns the public stats use case: turns aggregate rows from the read port into the typed answers of
 // GET /v1/stats/network, /v1/stats/models and /v1/stats/sellers/:nodeId (docs/metrics-collector.md).
 // Aggregates only: never a receipt, a buyer identity or a raw observation.
+import { FIRST_SEEN_KINDS } from './constants';
 import { daysOf, type DayRange } from './days';
 import {
   failureEntry,
@@ -21,6 +22,7 @@ import {
   type Speed,
 } from './stats-shape';
 import type {
+  BuyerTotalsRow,
   ModelObservedRow,
   ModelRow,
   SellerModelRow,
@@ -65,8 +67,13 @@ export interface ModelEntry<F = object, P = object> extends Sides<F, P> {
   variant: string | null;
   quantization: string | null;
 }
+export interface BuyerTotals {
+  allTime: PublicBuyers;
+  newInRange: PublicBuyers;
+}
 export interface NetworkStats extends StatsEnvelope {
   days: NetworkDay[];
+  buyers: { free: BuyerTotals; paid: BuyerTotals };
 }
 // What buyers saw and how fast the engine generated, on one side of one model; null without any
 // observation joined to a receipt of that side.
@@ -146,8 +153,15 @@ export async function networkStats(
   reader: StatsReader,
   range: DayRange,
 ): Promise<NetworkStats> {
-  const { network, observed, demand, origins, failures } =
+  const { network, observed, demand, origins, failures, buyers } =
     await reader.network(range);
+  const buyerTotals = (kind: string): BuyerTotals => {
+    const row = buyers.find((found: BuyerTotalsRow) => found.kind === kind);
+    return {
+      allTime: publicBuyers(row?.allTime),
+      newInRange: publicBuyers(row?.newInRange),
+    };
+  };
   const originsByDay = groupBy(origins, (row) => row.day);
   const failuresByDay = groupBy(failures, (row) => row.day);
   const networkByDay = groupBy(network, (row) => row.day);
@@ -196,6 +210,10 @@ export async function networkStats(
       ...failures.map(fromRow),
     ]),
     days,
+    buyers: {
+      free: buyerTotals(FIRST_SEEN_KINDS.BUYER_FREE),
+      paid: buyerTotals(FIRST_SEEN_KINDS.BUYER_PAID),
+    },
   };
 }
 

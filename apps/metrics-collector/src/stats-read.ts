@@ -5,16 +5,18 @@ import {
   and,
   asc,
   between,
+  count,
   countDistinct,
   desc,
   eq,
+  inArray,
   lte,
   sql,
   type SQL,
 } from 'drizzle-orm';
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core';
 
-import { AGGREGATES } from './constants';
+import { AGGREGATES, FIRST_SEEN_KINDS } from './constants';
 import {
   createD1Orm,
   type CollectorDatabase,
@@ -32,6 +34,7 @@ import {
   aggSellerBuyersDaily,
   aggSellerDaily,
   chainCursor,
+  firstSeen,
 } from './schema';
 import {
   HISTOGRAM_KEYS,
@@ -148,6 +151,20 @@ function network(orm: CollectorDatabase, range: DayRange) {
         asc(aggFailuresDaily.event),
         asc(aggFailuresDaily.reason),
       ),
+    orm
+      .select({
+        kind: firstSeen.kind,
+        allTime: count(),
+        newInRange: total(sql<number>`${within(firstSeen.firstDay, range)}`),
+      })
+      .from(firstSeen)
+      .where(
+        inArray(firstSeen.kind, [
+          FIRST_SEEN_KINDS.BUYER_FREE,
+          FIRST_SEEN_KINDS.BUYER_PAID,
+        ]),
+      )
+      .groupBy(firstSeen.kind),
   ]);
 }
 
@@ -285,11 +302,16 @@ export function statsReader(database: D1Database): StatsReader {
   const orm = createD1Orm(database);
   return {
     async network(range) {
-      const [networkRows, observed, demand, origins, failures] = await network(
-        orm,
-        range,
-      );
-      return { network: networkRows, observed, demand, origins, failures };
+      const [networkRows, observed, demand, origins, failures, buyers] =
+        await network(orm, range);
+      return {
+        network: networkRows,
+        observed,
+        demand,
+        origins,
+        failures,
+        buyers,
+      };
     },
     async models(range) {
       const [rows, observed] = await models(orm, range);
