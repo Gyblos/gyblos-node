@@ -2,194 +2,147 @@
 
 import { RiArrowLeftLine, RiArrowRightLine } from '@remixicon/react';
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
 
 import { cx } from '../../../utils/cx';
-import { useTemplateCopy } from '../../foundations/template-copy/template-copy';
 import { Button, ButtonLink } from '../buttons/button';
 
 export interface PaginationProps {
   page: number;
   totalPages: number;
-  onChange?: (page: number) => void;
-  hrefs?: Partial<Record<number, string>>;
+  hrefs: Partial<Record<number, string>>;
   showPages?: boolean;
-  dense?: boolean;
-  siblingCount?: number;
   className?: string;
   previousLabel?: string;
   nextLabel?: string;
   'aria-label'?: string;
 }
-const DOTS = 'dots';
+const DOTS = 'dots' as const;
+const SLOTS = 5;
+const EDGE = 3;
 function range(start: number, end: number): number[] {
   return Array.from({ length: end - start + 1 }, (_, i) => start + i);
 }
 function paginationRange(
   current: number,
   total: number,
-  sibling: number,
 ): (number | typeof DOTS)[] {
-  const totalPageNumbers = sibling * 2 + 5;
-  if (totalPageNumbers >= total) return range(1, total);
-  const leftSibling = Math.max(current - sibling, 1);
-  const rightSibling = Math.min(current + sibling, total);
-  const showLeftDots = leftSibling > 2;
-  const showRightDots = rightSibling < total - 2;
-  if (!showLeftDots && showRightDots) {
-    return [...range(1, 3 + 2 * sibling), DOTS, total];
-  }
-  if (showLeftDots && !showRightDots) {
-    return [1, DOTS, ...range(total - (2 + 2 * sibling), total)];
-  }
-  return [1, DOTS, ...range(leftSibling, rightSibling), DOTS, total];
+  if (SLOTS >= total) return range(1, total);
+  if (current < EDGE) return [...range(1, EDGE), DOTS, total];
+  if (current > total - EDGE + 1)
+    return [1, DOTS, ...range(total - EDGE + 1, total)];
+  return [1, DOTS, current, DOTS, total];
 }
-const cell =
-  'flex size-8 shrink-0 items-center justify-center rounded-lg text-body-medium';
-const COMPACT_WIDTH = 420;
-function useIsCompact() {
-  const ref = useRef<HTMLElement>(null);
-  const [isCompact, setIsCompact] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const observer = new ResizeObserver(([entry]) => {
-      if (entry) setIsCompact(entry.contentRect.width < COMPACT_WIDTH);
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-  return [ref, isCompact] as const;
+const PAGE_CELL =
+  'flex size-6 shrink-0 items-center justify-center rounded-md text-caption-1-medium';
+
+function Step({
+  href,
+  label,
+  next,
+}: {
+  href: string | undefined;
+  label: string;
+  next: boolean;
+}) {
+  const Icon = next ? RiArrowRightLine : RiArrowLeftLine;
+  return href ? (
+    <ButtonLink
+      as={Link}
+      href={href}
+      variant="secondary"
+      size="xs"
+      iconOnly
+      aria-label={label}
+      leadingIcon={Icon}
+    />
+  ) : (
+    <Button
+      variant="secondary"
+      size="xs"
+      iconOnly
+      aria-label={label}
+      disabled
+      leadingIcon={Icon}
+    />
+  );
 }
+
 export function Pagination({
   page,
   totalPages,
-  onChange,
   hrefs,
   showPages = true,
-  dense = false,
-  siblingCount = 1,
   className,
   previousLabel = 'Previous',
   nextLabel = 'Next',
   'aria-label': ariaLabel = 'Pagination',
 }: PaginationProps) {
-  const localize = useTemplateCopy();
-  const [navRef, narrow] = useIsCompact();
-  const isCompact = dense || narrow;
-  const size = dense ? 'xs' : 'small';
-  const pageCell = dense
-    ? 'flex size-6 shrink-0 items-center justify-center rounded-md text-caption-1-medium'
-    : cell;
   if (totalPages <= 1) return null;
-  const pages = paginationRange(page, totalPages, isCompact ? 0 : siblingCount);
-  const hrefOf = (target: number) => hrefs?.[target];
-  const step = (
-    target: number,
-    available: boolean,
-    label: string,
-    icon: 'previous' | 'next',
-  ) => {
-    const href = hrefOf(target);
-    const icons =
-      icon === 'previous'
-        ? { leadingIcon: RiArrowLeftLine }
-        : isCompact
-          ? { leadingIcon: RiArrowRightLine }
-          : { trailingIcon: RiArrowRightLine };
-    return available && href ? (
-      <ButtonLink
-        as={Link}
-        href={href}
-        variant="secondary"
-        size={size}
-        iconOnly={isCompact}
-        aria-label={isCompact ? label : undefined}
-        {...icons}
-      >
-        {isCompact ? undefined : label}
-      </ButtonLink>
-    ) : (
-      <Button
-        variant="secondary"
-        size={size}
-        iconOnly={isCompact}
-        aria-label={isCompact ? label : undefined}
-        disabled={!available}
-        onClick={() => onChange?.(target)}
-        {...icons}
-      >
-        {isCompact ? undefined : label}
-      </Button>
-    );
-  };
-  return localize(
+  return (
     <nav
-      ref={navRef}
       aria-label={ariaLabel}
-      className={cx(
-        dense
-          ? 'inline-flex items-center gap-1'
-          : 'flex w-full items-center justify-between gap-2',
-        className,
-      )}
+      className={cx('inline-flex items-center gap-1', className)}
     >
-      {step(page - 1, page > 1, previousLabel, 'previous')}
-
+      <Step
+        href={page > 1 ? hrefs[page - 1] : undefined}
+        label={previousLabel}
+        next={false}
+      />
       {showPages ? (
         <ul className="flex min-w-0 items-center gap-0.5">
-          {pages.map((item, i) =>
+          {paginationRange(page, totalPages).map((item, i) =>
             item === DOTS ? (
               <li
                 key={`dots-${i}`}
                 aria-hidden
-                className={cx(pageCell, 'text-text-tertiary')}
+                className={cx(PAGE_CELL, 'text-text-tertiary')}
               >
                 …
               </li>
             ) : (
               <li key={item}>
                 <PageCell
-                  href={hrefOf(item)}
-                  aria-label={`Go to page ${item}`}
-                  aria-current={item === page ? 'page' : undefined}
-                  onClick={() => onChange?.(item)}
-                  className={cx(
-                    pageCell,
-                    'cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-border-focus-ring',
-                    item === page
-                      ? 'border border-border-button-default bg-background-primary-default text-text-primary shadow-xs'
-                      : 'text-text-secondary hover:bg-background-secondary-hover hover:text-text-primary',
-                  )}
-                >
-                  {item}
-                </PageCell>
+                  href={hrefs[item]}
+                  current={item === page}
+                  page={item}
+                />
               </li>
             ),
           )}
         </ul>
       ) : null}
-
-      {step(page + 1, page < totalPages, nextLabel, 'next')}
-    </nav>,
+      <Step
+        href={page < totalPages ? hrefs[page + 1] : undefined}
+        label={nextLabel}
+        next
+      />
+    </nav>
   );
 }
 
 function PageCell({
   href,
-  onClick,
-  ...props
+  current,
+  page,
 }: {
   href: string | undefined;
-  onClick: () => void;
-  className: string;
-  children: number;
-  'aria-label': string;
-  'aria-current': 'page' | undefined;
+  current: boolean;
+  page: number;
 }) {
-  return href ? (
-    <Link href={href} {...props} />
+  const className = cx(
+    PAGE_CELL,
+    'outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-border-focus-ring',
+    current
+      ? 'border border-border-button-default bg-background-primary-default text-text-primary shadow-xs'
+      : 'text-text-secondary hover:bg-background-secondary-hover hover:text-text-primary',
+  );
+  return href && !current ? (
+    <Link href={href} aria-label={`Go to page ${page}`} className={className}>
+      {page}
+    </Link>
   ) : (
-    <button type="button" onClick={onClick} {...props} />
+    <span aria-current={current ? 'page' : undefined} className={className}>
+      {page}
+    </span>
   );
 }

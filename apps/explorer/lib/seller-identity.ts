@@ -1,10 +1,4 @@
-import {
-  DISPLAY,
-  IDENTITY,
-  SELLER_NAME,
-  SELLER_PAGE,
-  UNITS,
-} from './constants';
+import { DISPLAY, IDENTITY, PAGES, SELLER_NAME, UNITS } from './constants';
 import type { Seller } from './discovery-shape';
 import { count } from './format';
 import type { GithubAccount, NetworkStatus } from './network-status';
@@ -133,8 +127,17 @@ export function notOnlineMeta(
 }
 
 export function sellerHref(nodeId: string, query?: ExplorerQuery): string {
-  const path = `${SELLER_PAGE.path}/${encodeURIComponent(nodeId)}`;
-  return query ? queryHref({ ...query, path, before: null, pages: {} }) : path;
+  const path = `${PAGES.sellers}/${encodeURIComponent(nodeId)}`;
+  return query
+    ? queryHref({
+        ...query,
+        path,
+        before: null,
+        pages: {},
+        ranges: {},
+        sorts: {},
+      })
+    : path;
 }
 
 const plural = (value: number, word: string) =>

@@ -65,7 +65,18 @@ void test('request bars keep visible integer ticks by default and explicitly', (
 void test('the range is a preset or the 30-day default', () => {
   assert.equal(parseRange('7'), 7);
   assert.equal(parseRange('90'), 90);
-  for (const value of [undefined, '', '8', '365', ['7'], '7d', 7])
+  for (const value of [
+    undefined,
+    '',
+    '8',
+    '365',
+    ['7'],
+    '7d',
+    7,
+    '7.0',
+    ' 7',
+    '7e0',
+  ])
     assert.equal(parseRange(value), 30);
 });
 

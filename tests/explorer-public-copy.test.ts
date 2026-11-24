@@ -8,12 +8,7 @@ import { resolve } from 'node:path';
 import test from 'node:test';
 
 import { INDEX_ROUTES } from '@gyblos/discovery-index/constants';
-import {
-  DISPLAY,
-  PAGING,
-  RANGE,
-  SELLER_PAGE,
-} from '@gyblos/explorer/constants';
+import { DISPLAY, PAGES, PAGING, RANGE } from '@gyblos/explorer/constants';
 import {
   AGGREGATES,
   COLLECTOR_ROUTES,
@@ -135,9 +130,14 @@ void test('llms.txt states the range presets, the buyer threshold, the longest r
 void test('llms.txt states the table paging parameters and the seller page', () => {
   const llms = read('public/llms.txt');
   assert.ok(llms.includes(`${PAGING.rowsPerPage} rows per page`));
-  for (const param of Object.values(PAGING.params))
+  for (const param of [
+    ...Object.values(PAGING.params),
+    ...Object.values(PAGING.sortParams),
+    ...Object.values(RANGE.sections).map((section) => section.param),
+    ...Object.values(PAGES),
+  ])
     assert.ok(llms.includes(`\`${param}\``), param);
-  assert.ok(llms.includes(`\`${SELLER_PAGE.path}/<NodeId>\``));
+  assert.ok(llms.includes(`\`${PAGES.sellers}/<NodeId>\``));
   assert.ok(
     llms.includes(
       "A section's range switch returns only that section's tables to page 1",

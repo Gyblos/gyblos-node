@@ -17,7 +17,7 @@ explorer links here.
 | `/transactions` | Every Gyblos channel transaction, newest first.                                     |
 | `/stats`        | Usage and payments over the range, with their daily tables and unserved demand.     |
 
-A seller counts as online when the discovery index lists it, so the overview count and the tables agree. Each section that covers a span of days (Overview, Models, Usage, Payments and a seller's Activity) has its own 7, 30 or 90 day control, kept in the page address. Columns with arrows sort the table: highest first, then lowest first, then the default order.
+A seller counts as online when the discovery index lists it, so the overview count and the tables agree. Each section that covers a span of days (Overview, Models, Usage, Payments and a seller's Activity) has its own 7, 30 or 90 day control, kept in the page address. Columns with arrows sort the table: highest first, then lowest first, then the default order. The day columns and Unserved demand already show newest or most requests first, so their first click shows oldest or fewest first.
 
 ## Check mark and names [#verified]
 
@@ -33,12 +33,12 @@ another seller can use the same name. The ✓ always belongs to the GitHub accou
 
 Each row is one change to a Gyblos payment channel. The amount depends on the type:
 
-| Type            | Amount                                                                    |
-| --------------- | ------------------------------------------------------------------------- |
-| Deposit, Top-up | What the buyer put into the channel.                                      |
-| Settle          | What was newly settled.                                                   |
-| Paid out        | What the seller side received (payee and payout recipients). It is green. |
-| Refunded        | What went back to the buyer.                                              |
+| Type            | Amount                                                                                                |
+| --------------- | ----------------------------------------------------------------------------------------------------- |
+| Deposit, Top-up | What the buyer put into the channel.                                                                  |
+| Settle          | What was newly settled.                                                                               |
+| Paid out        | What the seller side received (payee and payout recipients). It is green, unless it is a batch total. |
+| Refunded        | What went back to the buyer.                                                                          |
 
 Next to a payout, its own columns show the rest of its split:
 
@@ -46,7 +46,9 @@ Next to a payout, its own columns show the rest of its split:
 - **Program**: the payment program's own treasury, for rounding remainders or a share it could
   not deliver. It is not a Gyblos fee.
 - **To buyer**: what went back to the buyer.
-- **Unclassified**: USDC that left the channel to no party the channel names. It shows under the amount.
+
+USDC that left the channel to no party the channel names has no column: a note under the amount says
+how much is unclassified.
 
 One transaction can pay out several channels. Its batch total is shown on its first row, and the other
 rows point to that transaction. Don't add the amounts up: you would count the same USDC more than once.

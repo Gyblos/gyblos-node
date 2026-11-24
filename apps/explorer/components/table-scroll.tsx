@@ -50,6 +50,7 @@ export function TableScroll({
     table.addEventListener('pointerover', over);
     table.addEventListener('pointerleave', clear);
     return () => {
+      clear();
       table.removeEventListener('pointerover', over);
       table.removeEventListener('pointerleave', clear);
     };

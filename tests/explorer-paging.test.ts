@@ -4,6 +4,7 @@ import test from 'node:test';
 import { CHAIN_TXS, PAGING, RANGE } from '@gyblos/explorer/constants';
 import {
   canonicalPageHref,
+  movedHomeHref,
   pageOf,
   pageRedirect,
   parsePage,
@@ -302,6 +303,20 @@ void test('a sortable column cycles highest first, lowest first and unsorted, ba
   );
   const asc = readQuery({ sellersSort: 'output' });
   assert.equal(sortHref(asc, 'sellers', 'output'), `/${anchor}`);
+  const daily = `#${PAGING.anchors.daily}`;
+  assert.equal(
+    sortHref(readQuery({}), 'daily', 'day', true),
+    `/?dailySort=day${daily}`,
+  );
+  assert.equal(
+    sortHref(readQuery({ dailySort: 'day' }), 'daily', 'day', true),
+    `/?dailySort=-day${daily}`,
+  );
+  assert.equal(
+    sortHref(readQuery({ dailySort: '-day' }), 'daily', 'day', true),
+    `/${daily}`,
+  );
+  assert.equal(canonicalPageHref({ modelsRange: '7.0' }), '/');
   assert.equal(canonicalPageHref({ sellersSort: 'owner' }), '/');
   assert.equal(canonicalPageHref({ sellersSort: '-uptimeDay' }), null);
   const rows = [{ v: 2 }, { v: null }, { v: 9 }, { v: 4 }];
@@ -315,4 +330,21 @@ void test('a sortable column cycles highest first, lowest first and unsorted, ba
     [2, 4, 9, null],
   );
   assert.equal(sortedRows(rows, undefined, by), rows);
+});
+
+void test('a home link to a table that moved to its own page redirects there with its parameters', () => {
+  assert.equal(movedHomeHref({ modelsPage: '2' }), '/models?modelsPage=2');
+  assert.equal(
+    movedHomeHref({ before: CURSOR, txPage: '2', verified: '1' }),
+    `/transactions?before=${CURSOR}&txPage=2&verified=1`,
+  );
+  assert.equal(movedHomeHref({ usageRange: '7' }), '/stats?usageRange=7');
+  assert.equal(
+    movedHomeHref({ chainDailySort: 'day' }),
+    '/stats?chainDailySort=day',
+  );
+  assert.equal(movedHomeHref({ offlinePage: '3' }), '/sellers?offlinePage=3');
+  assert.equal(movedHomeHref({ overviewRange: '7', verified: '1' }), null);
+  assert.equal(movedHomeHref({}), null);
+  assert.deepEqual(PAGING.sortKeys.models, ['input', 'output', 'context']);
 });

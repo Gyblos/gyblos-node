@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 import { SITE_LINKS } from '../lib/config';
-import { PAGE_LINKS, PAGES, SELLER_PAGE } from '../lib/constants';
+import { PAGE_LINKS, PAGES } from '../lib/constants';
 import { cx } from './board/cx';
 
 const ITEM = 'block rounded-lg px-3 py-1.5 hover:bg-raised hover:text-ink';
@@ -14,7 +14,7 @@ const isCurrent = (pathname: string, href: string) =>
   href === PAGES.network
     ? pathname === href
     : pathname === href ||
-      (href === PAGES.sellers && pathname.startsWith(`${SELLER_PAGE.path}/`));
+      (href === PAGES.sellers && pathname.startsWith(`${PAGES.sellers}/`));
 
 export function NavLinks() {
   const pathname = usePathname();
@@ -26,7 +26,9 @@ export function NavLinks() {
           <li key={link.href}>
             <Link
               href={link.href}
-              aria-current={current ? 'page' : undefined}
+              aria-current={
+                pathname === link.href ? 'page' : current ? 'true' : undefined
+              }
               className={cx(
                 ITEM,
                 current ? 'bg-raised text-ink' : 'text-muted',

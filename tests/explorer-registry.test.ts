@@ -3,7 +3,7 @@
 // dependency on another item names an item of this registry, and npm dependencies are pinned.
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, relative, resolve } from 'node:path';
 import test from 'node:test';
 
 const ROOT = resolve(import.meta.dirname, '../apps/explorer');
@@ -57,5 +57,37 @@ void test('the explorer pins the same versions it publishes', () => {
       dependency.slice(at + 1),
       dependency,
     );
+  }
+});
+
+void test('every relative import of a published file ships in its item or the items it depends on', () => {
+  const items = new Map(registry.items.map((item) => [item.name, item]));
+  const closure = (item: Item, seen = new Set<string>()): Set<string> => {
+    if (seen.has(item.name)) return new Set();
+    seen.add(item.name);
+    const paths = new Set((item.files ?? []).map((file) => file.path));
+    for (const name of item.registryDependencies ?? []) {
+      const dependency = items.get(name);
+      if (dependency)
+        for (const path of closure(dependency, seen)) paths.add(path);
+    }
+    return paths;
+  };
+  for (const item of registry.items) {
+    const shipped = closure(item);
+    for (const file of item.files ?? []) {
+      if (!/\.tsx?$/.test(file.path)) continue;
+      const source = readFileSync(resolve(ROOT, file.path), 'utf8');
+      for (const [, specifier] of source.matchAll(/from '(\.[^']+)'/g)) {
+        const base = relative(
+          ROOT,
+          resolve(ROOT, dirname(file.path), specifier!),
+        );
+        assert.ok(
+          [`${base}.ts`, `${base}.tsx`].some((path) => shipped.has(path)),
+          `${item.name}: ${file.path} imports ${specifier}`,
+        );
+      }
+    }
   }
 });

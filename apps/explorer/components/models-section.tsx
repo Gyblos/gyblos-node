@@ -84,7 +84,6 @@ const MODELS_HEAD: Column[] = [
   ...sideColumns('Engine speed p50'),
 ];
 const MODEL_SORTS = {
-  sellers: (row: ModelRow) => row.now?.sellers,
   input: (row: ModelRow) => row.now?.minInput,
   output: (row: ModelRow) => row.now?.minOutput,
   context: (row: ModelRow) => row.now?.context,

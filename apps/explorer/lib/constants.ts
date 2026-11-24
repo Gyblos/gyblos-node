@@ -129,16 +129,12 @@ export const PAGING = {
   sortKeys: {
     sellers: ['context', 'input', 'output', 'uptimeDay', 'uptimeWeek', 'since'],
     offline: ['lastSeen', 'firstSeen'],
-    models: ['sellers', 'input', 'output', 'context'],
+    models: ['input', 'output', 'context'],
     daily: ['day'],
     demand: ['requests'],
     chainDaily: ['day', 'settled', 'paidOut'],
   },
   descendingPrefix: '-',
-} as const;
-
-export const SELLER_PAGE = {
-  path: '/sellers',
 } as const;
 
 export const PAGES = {

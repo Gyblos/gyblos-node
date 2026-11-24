@@ -225,7 +225,7 @@ function DailyTable({
         minWidth={DISPLAY.dailyTable}
         sorting={{ query, table: 'chainDaily' }}
         head={[
-          { label: 'Day (UTC)', sort: 'day' },
+          { label: 'Day (UTC)', sort: 'day', ascendingFirst: true },
           { label: 'Opens', right: true },
           { label: 'Settlements', right: true },
           { label: 'Settled', right: true, sort: 'settled' },

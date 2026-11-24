@@ -234,7 +234,7 @@ function DailyTable({
     day: (day) => day.day,
   });
   const head = [
-    { label: 'Day (UTC)', sort: 'day' },
+    { label: 'Day (UTC)', sort: 'day', ascendingFirst: true },
     ...figureHead('Seller first token'),
     ...sideColumns('Buyers'),
     { label: 'Relay', right: true },
@@ -291,7 +291,12 @@ function DemandTable({
         sorting={{ query, table: 'demand' }}
         head={[
           { label: 'Requested model' },
-          { label: 'Requests', right: true, sort: 'requests' },
+          {
+            label: 'Requests',
+            right: true,
+            sort: 'requests',
+            ascendingFirst: true,
+          },
         ]}
         footer={
           <Pager

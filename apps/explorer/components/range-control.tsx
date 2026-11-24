@@ -1,8 +1,5 @@
 'use client';
 
-// Owns the date range control in the header: a segmented control over the preset spans. A choice
-// navigates to the same page with `?range=<days>`, so the server renders that range and the link can
-// be shared.
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useTransition } from 'react';
 

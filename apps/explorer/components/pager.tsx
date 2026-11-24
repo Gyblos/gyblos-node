@@ -39,7 +39,6 @@ export function Pager({
     <div className="flex items-center justify-between gap-3 border-t border-separator-border px-4 py-1.5">
       <span className="font-mono text-xs text-dim">{view.rows}</span>
       <Pagination
-        dense
         aria-label={`${label} pages`}
         page={view.page}
         totalPages={view.pages}

@@ -84,8 +84,8 @@ export function SectionTitle({
       id={id}
       className="mt-10 mb-4 flex scroll-mt-4 flex-wrap items-baseline justify-between gap-2"
     >
-      <h2 className="flex items-center gap-2 text-xl font-medium">
-        {title}
+      <div className="flex items-center gap-2">
+        <h2 className="text-xl font-medium">{title}</h2>
         {help ? (
           <a
             className="text-dim hover:text-ink"
@@ -96,7 +96,7 @@ export function SectionTitle({
             <CircleHelp aria-hidden className="size-4" />
           </a>
         ) : null}
-      </h2>
+      </div>
       {meta || range ? (
         <div className="flex flex-wrap items-center gap-3">
           {meta ? (
@@ -135,6 +135,7 @@ export interface Column {
   right?: boolean;
   group?: string;
   sort?: string;
+  ascendingFirst?: boolean;
 }
 
 interface Sorting {
@@ -153,7 +154,12 @@ function HeadLabel({ column, sorting }: { column: Column; sorting?: Sorting }) {
       : ChevronUp;
   return (
     <Link
-      href={sortHref(sorting.query, sorting.table, column.sort)}
+      href={sortHref(
+        sorting.query,
+        sorting.table,
+        column.sort,
+        column.ascendingFirst,
+      )}
       scroll={false}
       className={`inline-flex items-center gap-1 hover:text-ink ${column.right ? 'flex-row-reverse' : ''} ${active ? 'text-ink' : ''}`}
     >

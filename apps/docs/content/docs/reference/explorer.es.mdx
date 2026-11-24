@@ -17,7 +17,7 @@ explorador lleva aquí.
 | `/transactions` | Cada transacción de canal de Gyblos, de la más nueva a la más vieja.                  |
 | `/stats`        | Uso y pagos en el rango, con sus tablas diarias y la demanda sin atender.             |
 
-Un vendedor cuenta como en línea cuando el índice de descubrimiento lo lista, así el resumen y las tablas coinciden. Cada sección que cubre un período (Overview, Models, Usage, Payments y la actividad de un vendedor) tiene su propio control de 7, 30 o 90 días, guardado en la dirección de la página. Las columnas con flechas ordenan la tabla: de mayor a menor, de menor a mayor y vuelta al orden por defecto.
+Un vendedor cuenta como en línea cuando el índice de descubrimiento lo lista, así el resumen y las tablas coinciden. Cada sección que cubre un período (Overview, Models, Usage, Payments y la actividad de un vendedor) tiene su propio control de 7, 30 o 90 días, guardado en la dirección de la página. Las columnas con flechas ordenan la tabla: de mayor a menor, de menor a mayor y vuelta al orden por defecto. Las columnas de día y Unserved demand ya muestran primero lo más reciente o lo más pedido, así que su primer clic muestra primero lo más antiguo o lo menos pedido.
 
 ## Marca de verificación y nombres [#verificado]
 
@@ -35,12 +35,12 @@ nombre.
 
 Cada fila es un cambio en un canal de pago de Gyblos. El monto depende del tipo:
 
-| Tipo            | Monto                                                                            |
-| --------------- | -------------------------------------------------------------------------------- |
-| Deposit, Top-up | Lo que el comprador puso en el canal.                                            |
-| Settle          | Lo que se liquidó por primera vez.                                               |
-| Paid out        | Lo que recibió el lado del vendedor (beneficiario y destinatarios). Va en verde. |
-| Refunded        | Lo que volvió al comprador.                                                      |
+| Tipo            | Monto                                                                                                           |
+| --------------- | --------------------------------------------------------------------------------------------------------------- |
+| Deposit, Top-up | Lo que el comprador puso en el canal.                                                                           |
+| Settle          | Lo nuevo que se liquidó.                                                                                        |
+| Paid out        | Lo que recibió el lado del vendedor (beneficiario y destinatarios). Va en verde, salvo si es un total del lote. |
+| Refunded        | Lo que volvió al comprador.                                                                                     |
 
 Junto a un pago, sus propias columnas muestran el resto del reparto:
 
@@ -48,7 +48,9 @@ Junto a un pago, sus propias columnas muestran el resto del reparto:
 - **Program**: la tesorería propia del programa de pagos, para restos de redondeo o una parte que
   no pudo entregar. No es una comisión de Gyblos.
 - **To buyer**: lo que volvió al comprador.
-- **Unclassified**: USDC que salió del canal hacia nadie que el canal nombre. Aparece bajo el monto.
+
+El USDC que salió del canal hacia nadie que el canal nombre no tiene columna: una nota bajo el monto dice
+cuánto quedó sin clasificar.
 
 Una transacción puede pagar varios canales. Su total del lote aparece en su primera fila, y las demás filas
 apuntan a esa transacción. No sumes los montos: contarías el mismo USDC más de una vez.

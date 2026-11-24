@@ -6,12 +6,13 @@ export const DISCOVERY_URL =
 export const COLLECTOR_URL =
   process.env.GYBLOS_COLLECTOR_URL ?? 'https://collector.gyblos.com/v1';
 
-// Networks the explorer can show; only a live one has data. Mainnet launches 2026-12-09.
 export const TOKEN_LOGOS = {
   USDC: '/tokens/usdc.svg',
   SOLANA: '/tokens/solana.svg',
 } as const;
 export type Token = keyof typeof TOKEN_LOGOS;
+
+// Networks the explorer can show; only a live one has data. Mainnet launches 2026-12-09.
 
 export const NETWORKS = [
   {

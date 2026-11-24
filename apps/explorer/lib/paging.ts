@@ -1,5 +1,5 @@
 import { txCursor } from './chain-txs-shape';
-import { CHAIN_TXS, IDENTITY, PAGING, RANGE } from './constants';
+import { CHAIN_TXS, IDENTITY, PAGES, PAGING, RANGE } from './constants';
 import { count } from './format';
 import {
   parseRange,
@@ -76,6 +76,38 @@ function parseSort(table: SortedTable, value: unknown): TableSort | undefined {
 }
 const sortText = (sort: TableSort) =>
   `${sort.desc ? PAGING.descendingPrefix : ''}${sort.key}`;
+
+const TABLE_PAGES: Record<PagedTable, string> = {
+  sellers: PAGES.sellers,
+  offline: PAGES.sellers,
+  models: PAGES.models,
+  daily: PAGES.stats,
+  demand: PAGES.stats,
+  chainDaily: PAGES.stats,
+  transactions: PAGES.transactions,
+};
+const MOVED_PARAMS: (readonly [string, string])[] = [
+  ...PAGED_TABLES.map(
+    (table) => [PAGING.params[table], TABLE_PAGES[table]] as const,
+  ),
+  ...SORTED_TABLES.map(
+    (table) => [PAGING.sortParams[table], TABLE_PAGES[table]] as const,
+  ),
+  [RANGE.sections.models.param, PAGES.models],
+  [RANGE.sections.usage.param, PAGES.stats],
+  [RANGE.sections.payments.param, PAGES.stats],
+  [CHAIN_TXS.param, PAGES.transactions],
+];
+
+export function movedHomeHref(source: SearchSource): string | null {
+  const search = new URLSearchParams();
+  const entries =
+    source instanceof URLSearchParams ? [...source] : Object.entries(source);
+  for (const [name, value] of entries)
+    for (const item of [value ?? []].flat()) search.append(name, item);
+  const moved = MOVED_PARAMS.find(([name]) => search.has(name));
+  return moved ? `${moved[1]}?${search.toString()}` : null;
+}
 const PAGE = new RegExp(`^[1-9]\\d{0,${PAGING.maxPageDigits - 1}}$`);
 
 export function parsePage(value: unknown): number {
@@ -179,13 +211,14 @@ export function sortHref(
   query: ExplorerQuery,
   table: SortedTable,
   key: string,
+  ascendingFirst = false,
 ): string {
   const current = query.sorts[table];
   const next =
     current?.key !== key
-      ? { key, desc: true }
-      : current.desc
-        ? { key, desc: false }
+      ? { key, desc: !ascendingFirst }
+      : current.desc !== ascendingFirst
+        ? { key, desc: ascendingFirst }
         : null;
   return `${queryHref(query, { sorts: { [table]: next }, pages: { [table]: 1 } })}#${PAGING.anchors[table]}`;
 }

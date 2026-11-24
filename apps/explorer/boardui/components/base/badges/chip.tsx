@@ -24,7 +24,7 @@ export const CHIP_COLORS: Record<ChipColor, string> = {
   purple: 'bg-status-purple-background text-status-purple-text',
   neutral: 'bg-background-tertiary-default text-text-secondary',
   gray: 'bg-background-secondary-default text-text-primary',
-  soft: 'bg-background-secondary-default text-text-secondary',
+  soft: 'bg-background-tertiary-default text-text-secondary',
 };
 export interface ChipProps extends HTMLAttributes<HTMLSpanElement> {
   variant?: ChipVariant;

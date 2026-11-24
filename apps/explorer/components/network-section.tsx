@@ -1,7 +1,4 @@
-// Owns the Network section: sellers online and offline, the models offered and their cheapest prices,
-// each online seller's offers and uptime, and the registered sellers not online now, from the discovery
-// index. The per-model table lives in the Models section.
-import { Activity, Boxes, Server, Tag } from 'lucide-react';
+import { Server } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
@@ -10,9 +7,9 @@ import { HELP_URL } from '../lib/config';
 import { DISPLAY, PAGES, PAGING } from '../lib/constants';
 import type { DiscoverySnapshot, Seller } from '../lib/discovery';
 import { getDiscovery } from '../lib/discovery-render';
-import { count, percent, pricePerMtok, usdc, utc } from '../lib/format';
+import { count, percent, pricePerMtok, utc } from '../lib/format';
 import type { GithubAccount } from '../lib/network-status';
-import { summarizeOffers, uptimeRatio } from '../lib/offers';
+import { uptimeRatio } from '../lib/offers';
 import { queryHref, tablePager, type ExplorerQuery } from '../lib/paging';
 import {
   emptySellersMessage,
@@ -45,8 +42,6 @@ import {
 
 const ratioText = (ratio: number | undefined | null) =>
   ratio === undefined || ratio === null ? '—' : percent(ratio);
-const priceText = (value: bigint | null) =>
-  value === null ? '—' : usdc(value);
 
 export async function NetworkSection({
   query,
@@ -64,7 +59,6 @@ export async function NetworkSection({
         anchors={[PAGING.anchors.sellers, PAGING.anchors.offline]}
       />
     );
-  const summary = summarizeOffers(snapshot);
   const accounts = githubByNode(snapshot.network);
   const names = namesByNode(snapshot.network);
   const ordered = orderSellers(snapshot.sellers, snapshot.generatedAt);
