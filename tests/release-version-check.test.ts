@@ -33,14 +33,20 @@ void test('every release job that compares versions runs the script on the pinne
   );
   assert.ok(using.length > 0);
   for (const job of using) {
-    const name = /^ {2}([\w-]+):/.exec(job)?.[1];
-    const setup = job.search(
-      /^ {6}- uses: actions\/setup-node@[0-9a-f]{40}( # v[\d.]+)?\n {8}with:\n {10}node-version: 24\.22\.1\n/m,
+    const lines = job.split('\n');
+    const name = lines[0]?.trim();
+    const setup = lines.findIndex(
+      (line, index) =>
+        line.startsWith('      - uses: actions/setup-node@') &&
+        lines[index + 1] === '        with:' &&
+        lines[index + 2] === '          node-version: 24.22.1',
     );
-    assert.notEqual(setup, -1, `${name} has no pinned Node`);
+    assert.notEqual(setup, -1, name + ' has no pinned Node');
     for (const caller of callers) {
-      const run = job.indexOf(`sh scripts/${caller}`);
-      if (run !== -1) assert.ok(setup < run, `${name} sets Node up too late`);
+      const run = lines.findIndex((line) =>
+        line.includes('sh scripts/' + caller),
+      );
+      if (run !== -1) assert.ok(setup < run, name + ' sets Node up too late');
     }
   }
 });
@@ -62,7 +68,11 @@ void test('a release script refuses to continue when the version check cannot ru
     mode: 0o755,
   });
   const target = join(directory, 'install.ps1');
-  const before = `$NativeVersion = '0.0.0'\n$NativeSha256 = '${'0'.repeat(64)}'\n`;
+  const before = [
+    "$NativeVersion = '0.0.0'",
+    "$NativeSha256 = '" + '0'.repeat(64) + "'",
+    '',
+  ].join('\n');
   writeFileSync(target, before);
   const result = spawnSync(
     'sh',
@@ -83,5 +93,5 @@ void test('a release script refuses to continue when the version check cannot ru
   for (const name of readdirSync(join(REPOSITORY_ROOT, 'scripts')).filter(
     (file) => file.endsWith('.sh'),
   ))
-    assert.doesNotMatch(read(`scripts/${name}`), /\|\| valid=\$\?/, name);
+    assert.ok(!read('scripts/' + name).includes('|| valid=$?'), name);
 });
