@@ -85,16 +85,22 @@ export async function checkMinimumLayout() {
       throw new Error('Text action ' + label);
   }
   function apart(cells: Element[]) {
-    const boxes = cells.map((cell) => cell.getBoundingClientRect());
-    for (const [index, box] of boxes.entries())
-      for (const other of boxes.slice(index + 1))
-        if (
-          box.left < other.right - 1 &&
-          other.left < box.right - 1 &&
-          box.top < other.bottom - 1 &&
-          other.top < box.bottom - 1
-        )
-          throw new Error('Overlapping cells');
+    const boxes = cells.map((cell) =>
+      [cell, ...Array.from(cell.querySelectorAll('*'))]
+        .filter((part) => part.checkVisibility({ visibilityProperty: true }))
+        .map((part) => part.getBoundingClientRect())
+        .filter((box) => box.width && box.height),
+    );
+    for (const [index, parts] of boxes.entries())
+      for (const box of parts)
+        for (const other of boxes.slice(index + 1).flat())
+          if (
+            box.left < other.right - 1 &&
+            other.left < box.right - 1 &&
+            box.top < other.bottom - 1 &&
+            other.top < box.bottom - 1
+          )
+            throw new Error('Overlapping cells');
   }
   await iconOnly('Manage keys');
   (await visible('#preview-tab-overview')).click();
