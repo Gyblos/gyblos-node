@@ -208,19 +208,19 @@ after(async () => {
 void test('Explorer gives offerless Sellers and inactive Daily one spanning row each', async () => {
   const empty = await pageHtml(dir, 'empty');
   assert.match(
-    bodyFor(empty, 'Seller'),
+    bodyFor(empty, 'Online since'),
     /^<tr><td[^>]*\btext-muted\b[^>]*\bcolSpan="9"[^>]*>No offers from online sellers\.<\/td><\/tr>$/i,
   );
   assert.match(
-    bodyFor(empty, 'Day (UTC)'),
+    bodyFor(empty, 'Seller first token p50'),
     /^<tr><td[^>]*\btext-muted\b[^>]*\bcolSpan="12"[^>]*>No daily activity in this range\.<\/td><\/tr>$/i,
   );
 });
 
 void test('Explorer shows offer and active-day rows without empty rows', async () => {
   const populated = await pageHtml(dir, 'populated');
-  const sellers = bodyFor(populated, 'Seller');
-  const daily = bodyFor(populated, 'Day (UTC)');
+  const sellers = bodyFor(populated, 'Online since');
+  const daily = bodyFor(populated, 'Seller first token p50');
   assert.match(sellers, /fixture-model/);
   assert.ok(daily.includes(activeDay));
   assert.ok(!daily.includes(inactiveDay));

@@ -48,7 +48,8 @@ Next to a payout, its own columns show the rest of its split:
 - **To buyer**: what went back to the buyer.
 
 USDC that left the channel to no party the channel names has no column: a note under the amount says
-how much is unclassified.
+how much is unclassified. When a refund row's transaction also paid sellers, a note under the refund says
+how much went to sellers.
 
 One transaction can pay out several channels. Its batch total is shown on its first row, and the other
 rows point to that transaction. Don't add the amounts up: you would count the same USDC more than once.
