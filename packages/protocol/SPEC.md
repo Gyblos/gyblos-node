@@ -106,7 +106,6 @@ The package adds `parsePublicRecord`, `signPublicRecord`, `verifyPublicRecord`
 and `catalogDigest`, available from the root or `./public-records`. Types also
 have an explicit `./public-types` entry. These pure functions do not publish,
 resolve identities, connect, load a wallet, track peers or authorize payments.
-The old offer, its domain, its Base64 encoding and its vector remain unchanged.
 
 Every public envelope is exactly `{ record, signature }`. Signatures are
 Ed25519, encoded as **128 lowercase hexadecimal characters**. The signer is the
@@ -324,7 +323,7 @@ and the requested output fit within it.
 
 Version mapping: the `gyblos/control/1` ALPN (control version 1) carries v2
 records and offers; `gyblos/http/2` is a reserved future identifier, not a
-supported paid ALPN. The current paid v1 validator rejects v2. The pure policy
+supported paid ALPN. The pure policy
 in `@gyblos/core/control-quotes` (`createControlQuote` for sellers,
 `acceptControlQuote` for buyers) verifies caller-trusted identities, catalog and
 request terms. It does not carry v1 payment checks (payTo distinct from
