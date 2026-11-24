@@ -7,6 +7,7 @@ import {
 import type {
   BuyerApiKeyOperation,
   BuyerApiKeys,
+  ConfirmUnchargedKey,
 } from '@gyblos/node/buyer-api-keys';
 import { withBuyerRuntime } from '@gyblos/node/buyer-runtime';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
@@ -61,8 +62,12 @@ export type BuyerExecutionFactory = (context: {
     permission?: BuyerApiKeyOperation,
   ): Promise<ChatResult>;
   sellerChoice?: boolean;
+  singlePaidChannel?: boolean;
+  preparePaidChat?: () => Promise<void>;
+  reconcilePool?: () => Promise<void>;
   token?: string;
   apiKeys?: BuyerApiKeys;
+  confirmUnchargedKey?: ConfirmUnchargedKey;
   requestMs?: number;
   classify?: ChatErrorClassifier;
   chat(url: string): ReturnType<typeof ownedChat> & { automatic?: boolean };
@@ -190,23 +195,22 @@ async function closeBuyerResources(
 
 function buyerHttp(
   run: Awaited<ReturnType<BuyerExecutionFactory>>['execute'],
-  {
-    request,
-    models,
-    session,
-  }: Awaited<ReturnType<typeof buyerSelection>>['config'],
+  config: Awaited<ReturnType<typeof buyerSelection>>['config'],
   port?: number,
   execution?: Awaited<ReturnType<BuyerExecutionFactory>>,
   role?: RoleConfig,
   diagnostics?: DiagnosticSink,
   contextTokens?: FreeBuyerDependencies['contextTokens'],
 ) {
+  const { request, models, session, discovery } = config;
   return listenOrRefuse(() =>
     startFreeBuyerHttp(
       (input, signal, _onDelta, model, permission) =>
         run(input, signal, undefined, model, permission),
       {
         sellerChoice: execution?.sellerChoice,
+        singlePaidChannel: execution?.singlePaidChannel,
+        paidAuto: discovery?.paidAuto,
         selection: request.selection,
         maxTokens: request.maxTokens,
         ...(models ? { models } : {}),
@@ -219,9 +223,17 @@ function buyerHttp(
         stream: run,
         apiKeys: execution?.apiKeys,
         diagnostics,
-        ...configuredBuyerAccess(request, role, execution?.token, session),
+        ...configuredBuyerAccess(
+          request,
+          role,
+          execution?.token,
+          session,
+          config,
+        ),
         requestMs: execution?.requestMs,
         classify: execution?.classify,
+        preparePaidChat: execution?.preparePaidChat,
+        reconcilePool: execution?.reconcilePool,
       },
     ),
   );

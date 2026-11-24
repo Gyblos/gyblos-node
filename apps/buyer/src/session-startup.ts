@@ -1,9 +1,11 @@
 // Activates the shared session manager for explicit buyer policy; free quotes never build financial services.
+import { AsyncLocalStorage } from 'node:async_hooks';
+
 import type { BuyerApiKeyOperation } from '@gyblos/node/buyer-api-keys';
-import { bounded } from '@gyblos/node/buyer-operation';
 import { executeBuyerQuote } from '@gyblos/node/buyer-quote-execution';
 import type { BuyerRoutePorts } from '@gyblos/node/buyer-routing';
 import { SESSION_VERDICTS } from '@gyblos/node/constants';
+import { withBatchOutputLimit } from '@gyblos/protocol/batch-channel';
 import type { BuyerSellerChoice } from '@gyblos/protocol/buyer-api';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 import { inferenceNeedsTools } from '@gyblos/protocol/inference';
@@ -26,10 +28,16 @@ import type { BuyerExecutionFactory } from './free-startup';
 import { onBuyerSelectionFailure } from './free-telemetry';
 import { requireBuyerIdentity } from './identity';
 import { routedRequest } from './model-routes';
-import { selectConfiguredThenOpen } from './quote-selection';
+import {
+  automaticPoolRoute,
+  openDiscoveryRequest,
+  selectAffordableAutoQuote,
+  selectConfiguredThenOpen,
+} from './quote-selection';
 import { classifyPaidError } from './session-errors';
 import { makeManager, type SessionState } from './session-manager';
 import {
+  checkDesktopPool,
   checkPaidSellerRequest,
   endpointToken,
   type BuyerStartupOptions,
@@ -39,9 +47,9 @@ import {
   prepareChosenSeller,
   verifyChosenOffer,
 } from './session-seller-choice';
+import { singleSessionExecutor } from './session-serial';
 
 type Context = Parameters<BuyerExecutionFactory>[0];
-type Options = BuyerStartupOptions;
 
 async function executePaidSession(
   manager: ReturnType<typeof makeManager>,
@@ -52,25 +60,31 @@ async function executePaidSession(
   onDelta?: (text: string, requestDigest?: string) => Promise<void>,
   sending?: () => void,
   permission?: BuyerApiKeyOperation,
+  openingIntent?: string,
 ): Promise<ChatResult> {
   current.throwIfAborted();
-  await bounded(manager.preflight(winner.quote, input), current);
+  await manager.preflight(winner.quote, input, current);
   current.throwIfAborted();
   await reserveApiKey(permission, winner.quote, current);
   const id = winner.quote.offer.requestId;
   if (state.selections.has(id)) return sessionFail(SESSION_CODES.BINDING);
+  const scope = (state.openingIntent ??= new AsyncLocalStorage<
+    string | undefined
+  >());
   state.selections.set(id, winner);
   if (sending) state.sending.set(id, sending);
   let result: Awaited<ReturnType<typeof manager.execute>>;
   try {
-    result = await executeApiKeySession(permission, winner.nodeId, () =>
-      manager.execute(
-        winner.quote,
-        input,
-        current,
-        onDelta
-          ? (text) => onDelta(text, winner.quote.offer.requestDigest)
-          : undefined,
+    result = await scope.run(openingIntent, () =>
+      executeApiKeySession(permission, winner.nodeId, () =>
+        manager.execute(
+          winner.quote,
+          input,
+          current,
+          onDelta
+            ? (text) => onDelta(text, winner.quote.offer.requestDigest)
+            : undefined,
+        ),
       ),
     );
   } finally {
@@ -91,24 +105,24 @@ async function executePaidSession(
   await recordApiKeyPayment(permission, payment);
   return { ...result.value, payment };
 }
-function freeExecutionGuard(
-  manager: ReturnType<typeof makeManager>,
-  sending?: () => void,
+async function preferChannel(
+  selectionRoute: SelectionRoute | undefined,
+  paidAuto: boolean | undefined,
+  previousSeller: () => Promise<string | undefined>,
 ) {
-  return () => {
-    if ('checkBeforeExternalExecution' in manager)
-      manager.checkBeforeExternalExecution();
-    sending?.();
-  };
+  return selectionRoute?.open && paidAuto && !selectionRoute.previousSeller
+    ? { ...selectionRoute, previousSeller: await previousSeller() }
+    : selectionRoute;
 }
 function sessionSelection(
   context: Context,
-  options: Options,
+  options: BuyerStartupOptions,
   buyer: string,
   request: Context['prepared']['config']['request'],
   input: Parameters<Awaited<ReturnType<BuyerExecutionFactory>>['execute']>[0],
   permission: Parameters<typeof reserveApiKey>[0],
   router: ReturnType<typeof sessionRouter> | undefined,
+  previousSeller: () => Promise<string | undefined>,
   choice?: BuyerSellerChoice,
 ): BuyerRoutePorts<ChatResult>['select'] {
   const { prepared, endpoint, relayOnly } = context;
@@ -120,10 +134,11 @@ function sessionSelection(
     const policy = {
       ...request,
       maxAtomic: permission?.ceiling(request.maxAtomic) ?? request.maxAtomic,
-      priceCeilings: route.priceCeilings,
+      priceCeilings:
+        request.maxAtomic === '0' ? request.priceCeilings : route.priceCeilings,
       ...(inferenceNeedsTools(input) ? { tools: true as const } : {}),
     };
-    const select = (
+    const select = async (
       candidate: typeof request,
       selectionRoute?: SelectionRoute,
     ) =>
@@ -139,7 +154,11 @@ function sessionSelection(
         excluded,
         current,
         candidate,
-        selectionRoute,
+        await preferChannel(
+          selectionRoute,
+          prepared.config.discovery?.paidAuto,
+          previousSeller,
+        ),
       );
     if (choice) {
       if (permission) return sessionFail(SESSION_CODES.BINDING);
@@ -149,14 +168,28 @@ function sessionSelection(
         { endpoint, buyer, relayOnly },
         excluded,
         current,
-        policy,
+        options.desktopChosenPrices
+          ? {
+              ...policy,
+              priceCeilings: {
+                inputAtomicPerMtok: choice.inputAtomicPerMtok,
+                outputAtomicPerMtok: choice.outputAtomicPerMtok,
+              },
+            }
+          : policy,
         { pinnedNodeId: choice.nodeId },
       ).then((winner) => {
         verifyChosenOffer(choice, winner);
         return { ...winner, seller: chosen.seller };
       });
     }
-    if (router || route.pinnedNodeId) return select(policy, route);
+    if (router || route.pinnedNodeId)
+      return select(
+        prepared.config.discovery?.paidAuto
+          ? openDiscoveryRequest(policy, true)
+          : policy,
+        automaticPoolRoute(prepared.config, route),
+      );
     return selectConfiguredThenOpen(prepared.config, policy, current, select);
   };
 }
@@ -175,13 +208,50 @@ function freeSessionExecution(
         winner,
         current,
         onDelta,
-        freeExecutionGuard(manager, sending),
+        () => {
+          if ('checkBeforeExternalExecution' in manager)
+            manager.checkBeforeExternalExecution();
+          sending?.();
+        },
       ),
     );
 }
+function executeSingleRoute(
+  ports: BuyerRoutePorts<ChatResult>,
+  dependencies: Context['dependencies'],
+  unresolved: ReturnType<typeof makeManager>['unresolved'],
+  request: Context['prepared']['config']['request'],
+  pinnedNodeId: string | undefined,
+  streaming: boolean,
+  selection: typeof request.selection | undefined,
+  signal: AbortSignal,
+) {
+  return executeBuyerQuote(
+    {
+      ...ports,
+      enter: dependencies.enter ?? (() => () => {}),
+      unresolved,
+      select: (excluded, current) =>
+        ports
+          .select(excluded, current, {
+            pinnedNodeId,
+            priceCeilings: request.priceCeilings,
+          })
+          .catch(
+            onBuyerSelectionFailure(
+              current,
+              dependencies,
+              streaming,
+              selection,
+            ),
+          ),
+    },
+    signal,
+  );
+}
 function sessionExecutor(
   context: Context,
-  options: Options,
+  options: BuyerStartupOptions,
   manager: ReturnType<typeof makeManager>,
   state: SessionState,
   buyer: string,
@@ -190,24 +260,38 @@ function sessionExecutor(
   return async (input, signal, onDelta, model, permission) => {
     const config = context.prepared.config;
     const request = routedRequest(config.request, model);
+    if (model?.sellerChoice && !permission && request.maxAtomic !== '0')
+      await manager.prepareChoice(model.sellerChoice.expiresAt, signal);
+    const select = sessionSelection(
+      context,
+      options,
+      buyer,
+      request,
+      input,
+      permission,
+      router,
+      manager.previousSeller,
+      model?.sellerChoice,
+    );
+    const paidInput = withBatchOutputLimit(input);
     const ports: BuyerRoutePorts<ChatResult> = {
-      select: sessionSelection(
-        context,
-        options,
-        buyer,
-        request,
-        input,
-        permission,
-        router,
-        model?.sellerChoice,
-      ),
+      select:
+        config.discovery?.paidAuto && !model?.sellerChoice
+          ? (excluded, current, route) =>
+              selectAffordableAutoQuote(
+                excluded,
+                current,
+                (skip) => select(skip, current, route),
+                (quote) => manager.preflight(quote, paidInput, current),
+              )
+          : select,
       free: freeSessionExecution(context, manager, input, permission, onDelta),
-
-      paid: (winner, current, sending) =>
-        observeBuyerExecution(
+      paid: (winner, current, sending) => {
+        if (model?.freeOnly) return sessionFail(SESSION_CODES.LIMIT);
+        return observeBuyerExecution(
           context.dependencies,
           winner,
-          input,
+          paidInput,
           current,
           onDelta,
           (emit) => {
@@ -216,38 +300,28 @@ function sessionExecutor(
               manager,
               state,
               winner,
-              input,
+              paidInput,
               current,
               emit,
               sending,
               permission,
+              model?.openingIntent,
             );
           },
-        ),
+        );
+      },
     };
     const routed =
       router && !model?.sellerChoice
         ? await router.execute(ports, signal, routeScope(request))
-        : await executeBuyerQuote(
-            {
-              ...ports,
-              enter: context.dependencies.enter ?? (() => () => {}),
-              unresolved: manager.unresolved,
-              select: (excluded, current) =>
-                ports
-                  .select(excluded, current, {
-                    pinnedNodeId: config.pinnedNodeId,
-                    priceCeilings: config.request.priceCeilings,
-                  })
-                  .catch(
-                    onBuyerSelectionFailure(
-                      current,
-                      context.dependencies,
-                      Boolean(onDelta),
-                      model?.selection,
-                    ),
-                  ),
-            },
+        : await executeSingleRoute(
+            ports,
+            context.dependencies,
+            manager.unresolved,
+            request,
+            config.pinnedNodeId,
+            Boolean(onDelta),
+            model?.selection,
             signal,
           );
     return { ...routed.result, execution: routed.kind };
@@ -255,7 +329,7 @@ function sessionExecutor(
 }
 export async function startSessionQuoteRuntime(
   context: Context,
-  options: Options,
+  options: BuyerStartupOptions,
 ): Promise<Awaited<ReturnType<BuyerExecutionFactory>>> {
   const { prepared, role } = context;
   const policy = prepared.config.session;
@@ -273,19 +347,30 @@ export async function startSessionQuoteRuntime(
     if (router?.activeRequests()) return sessionFail(SESSION_CODES.BUSY);
     return run();
   };
+  const buyer = role.buyer;
+  const execute = sessionExecutor(
+    context,
+    options,
+    manager,
+    state,
+    buyer,
+    router,
+  );
   return {
+    confirmUnchargedKey: manager.confirmUnchargedKey,
     sellerChoice: true,
+    singlePaidChannel: !router && prepared.config.request.maxAtomic !== '0',
+    reconcilePool: router
+      ? () => checkDesktopPool(manager, () => router.activeRequests() > 0)
+      : undefined,
+    preparePaidChat:
+      options.preparePaidTokenizer && prepared.config.request.maxAtomic !== '0'
+        ? manager.preparePaidChat
+        : undefined,
     token,
     requestMs: PAID_BUYER_HTTP_MS,
     classify: classifyPaidError,
-    execute: sessionExecutor(
-      context,
-      options,
-      manager,
-      state,
-      role.buyer,
-      router,
-    ),
+    execute: router ? execute : singleSessionExecutor(execute),
     chat: (url) => ({
       ...ownedChat(
         prepared.config.request.selection.modelId,

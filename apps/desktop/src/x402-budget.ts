@@ -2,14 +2,19 @@
 // This permission bounds only chat requests made by this desktop, never other clients of the buyer.
 import { randomUUID } from 'node:crypto';
 
+import {
+  isOpeningIntent,
+  type desktopOpening,
+  type DesktopRequestBinding,
+} from '@gyblos/node/desktop-opening';
 import { buyerAtomic, type BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 
 import {
   DESKTOP_X402,
   emptyX402,
   parseX402Summary,
+  spendingPolicy,
   x402Id,
-  x402Policy,
   type X402Summary,
 } from './x402-model';
 
@@ -21,12 +26,76 @@ interface State {
   version: typeof DESKTOP_X402.VERSION;
   summary: X402Summary;
   pending: string | null;
+  openingIntent?: string;
 }
+export class LegacyPaymentReview extends Error {}
 export class X402Budget {
   private state: State | null = null;
   private failed = false;
+  private liveIntent?: string;
   private queue: Promise<unknown> = Promise.resolve();
-  constructor(private readonly files: Files) {}
+  constructor(
+    private readonly files: Files,
+    readonly opening?: ReturnType<typeof desktopOpening>,
+  ) {}
+  private async recover(state: State) {
+    if (
+      state.pending &&
+      state.openingIntent &&
+      (await this.opening?.retire(state.openingIntent).catch(() => false))
+    ) {
+      await this.save({
+        ...state,
+        openingIntent: undefined,
+        pending: null,
+        summary: { ...state.summary, blocked: false },
+      });
+    }
+    return this.state!;
+  }
+  async review(
+    observe: (
+      ref: DesktopRequestBinding,
+      policy: BuyerApiPolicy,
+    ) => Promise<
+      { chargeAtomic: string; transaction: string | null } | undefined
+    >,
+  ) {
+    const state = await this.serial(async () =>
+      this.recoverIfIdle(await this.load()),
+    );
+    if (!state.pending) return true;
+    if (!state.openingIntent) throw new LegacyPaymentReview();
+    if (this.liveIntent === state.openingIntent || !state.summary.policy)
+      return false;
+    const ref = await this.opening?.reference(state.openingIntent);
+    if (!ref) throw new LegacyPaymentReview();
+    const result = await observe(ref, state.summary.policy);
+    if (!result) return false;
+    if (result.transaction === null) {
+      if (result.chargeAtomic !== '0') return false;
+      await this.cancelUnsent(state.pending, state.openingIntent);
+      return true;
+    }
+    await this.complete(
+      state.pending,
+      { ...result, free: false },
+      undefined,
+      state.openingIntent,
+    );
+    return true;
+  }
+  private recoverIfIdle(state: State) {
+    return state.openingIntent && state.openingIntent !== this.liveIntent
+      ? this.recover(state)
+      : state;
+  }
+  recoverOpening() {
+    return this.serial(async () => {
+      this.liveIntent = undefined;
+      await this.recover(await this.load());
+    });
+  }
   private serial<T>(work: () => Promise<T>) {
     const result = this.queue.then(work);
     this.queue = result.catch(() => {});
@@ -53,11 +122,18 @@ export class X402Budget {
     const summary = parseX402Summary(saved.summary);
     if (Boolean(saved.pending) !== summary.blocked)
       throw new Error('Spending record unavailable');
-    return (this.state = {
+    if (
+      saved.openingIntent !== undefined &&
+      !isOpeningIntent(saved.openingIntent)
+    )
+      throw new Error('Invalid payment reservation');
+    this.state = {
+      ...(saved.openingIntent && { openingIntent: saved.openingIntent }),
       version: DESKTOP_X402.VERSION,
       summary,
       pending: saved.pending,
-    });
+    };
+    return this.state;
   }
   private async save(next: State) {
     try {
@@ -72,7 +148,12 @@ export class X402Budget {
   }
   async summary() {
     return this.serial(async () => {
-      const current = (await this.load()).summary;
+      const state = await this.load();
+      const current = (
+        state.openingIntent && state.openingIntent !== this.liveIntent
+          ? await this.recover(state)
+          : state
+      ).summary;
       return structuredClone({
         ...current,
         blocked: current.blocked || this.failed,
@@ -84,7 +165,7 @@ export class X402Budget {
       const state = await this.load();
       if (this.failed || state.pending || state.summary.active)
         throw new Error('Finish or review the existing chat budget first');
-      const policy = x402Policy(input);
+      const policy = spendingPolicy(input);
       if (
         !buyerAtomic(limitAtomic) ||
         BigInt(limitAtomic) < BigInt(policy.maxAtomic)
@@ -106,7 +187,7 @@ export class X402Budget {
       return structuredClone(this.state!.summary);
     });
   }
-  reserve(id: string, confirmedPolicy?: BuyerApiPolicy) {
+  reserve(id: string, confirmedPolicy?: BuyerApiPolicy, intent?: string) {
     return this.serial(async () => {
       const state = await this.load();
       // A confirmed seller authorizes this response only. Persist its reservation
@@ -116,7 +197,7 @@ export class X402Budget {
         ? {
             ...state.summary,
             sessionId: randomUUID(),
-            policy: single,
+            policy: spendingPolicy(single),
             limitAtomic: single.maxAtomic,
             spentAtomic: '0',
           }
@@ -140,18 +221,47 @@ export class X402Budget {
         throw new Error(
           'Remaining budget cannot cover the maximum cost of another response',
         );
+      if (intent) {
+        await this.opening!.arm(intent);
+        this.liveIntent = intent;
+      }
       await this.save({
         ...state,
+        openingIntent: intent,
         pending: id,
         summary: { ...summary, blocked: true },
       });
       return structuredClone(summary.policy);
     });
   }
+  // A free-only turn cannot create a financial obligation. Record its completed answer independently of any paid budget.
+  recordFree(id: string, policy: BuyerApiPolicy) {
+    return this.serial(async () => {
+      const state = await this.load();
+      if (state.pending || this.failed || policy.maxAtomic !== '0')
+        throw new Error('Chat history is unavailable or needs review.');
+      const record = {
+        id,
+        policy,
+        sessionId: randomUUID(),
+        at: Date.now(),
+        chargeAtomic: '0',
+        transaction: null,
+        free: true,
+      };
+      const summary = parseX402Summary({
+        ...state.summary,
+        records: [...state.summary.records, record],
+      });
+      await this.save({ ...state, summary });
+      return structuredClone(summary);
+    });
+  }
   complete(
     id: string,
     result: { chargeAtomic: string; transaction: string | null; free: boolean },
     selectedModel?: string,
+    expectedIntent?: string,
   ) {
     return this.serial(async () => {
       const state = await this.load();
@@ -159,6 +269,8 @@ export class X402Budget {
       if (
         this.failed ||
         state.pending !== id ||
+        (expectedIntent !== undefined &&
+          expectedIntent !== state.openingIntent) ||
         !current.policy ||
         !current.sessionId ||
         !buyerAtomic(result.chargeAtomic) ||
@@ -183,18 +295,28 @@ export class X402Budget {
           },
         ],
       });
-      await this.save({ ...state, summary: next, pending: null });
+      await this.save({
+        ...state,
+        summary: next,
+        openingIntent: undefined,
+        pending: null,
+      });
       return structuredClone(next);
     });
   }
   // Only a trusted buyer response can prove non-transmission; never exposed as a renderer action.
-  cancelUnsent(id: string) {
+  cancelUnsent(id: string, expectedIntent?: string) {
     return this.serial(async () => {
       const state = await this.load();
-      if (this.failed || state.pending !== id)
+      if (
+        this.failed ||
+        state.pending !== id ||
+        (expectedIntent !== undefined && state.openingIntent !== expectedIntent)
+      )
         throw new Error('Payment needs review');
       await this.save({
         ...state,
+        openingIntent: undefined,
         pending: null,
         summary: { ...state.summary, blocked: false },
       });
@@ -212,6 +334,7 @@ export class X402Budget {
         throw new Error('Payment needs review');
       await this.save({
         ...state,
+        openingIntent: undefined,
         pending: null,
         summary: { ...state.summary, blocked: false },
       });

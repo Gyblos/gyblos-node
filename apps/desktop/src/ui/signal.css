@@ -1,5 +1,34 @@
-/* One deliberate exception to static control icons: the Gyblos task signature. */
 .signal-mark {
+  display: inline-block;
+  width: 64px;
+  height: 48px;
+  flex: 0 0 auto;
+}
+.signal-mark img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.signal-light {
+  display: none;
+}
+.light .signal-dark {
+  display: none;
+}
+.light .signal-light {
+  display: block;
+}
+.chat-start > .signal-mark {
+  width: 80px;
+  height: 64px;
+  margin-bottom: 16px;
+}
+
+.wallet-setup .signal-mark {
+  width: 32px;
+  height: 32px;
+}
+.signal-face {
   --signal-orbit-period: 2400ms;
   --signal-morph-period: 480ms;
   --signal-rail-fade: 160ms;
@@ -10,97 +39,40 @@
   overflow: visible;
   vertical-align: middle;
 }
-.signal-mark:is([data-expression='connecting'], [data-expression='working']) {
+.signal-face:is([data-expression='connecting'], [data-expression='working']) {
   --signal-orbit-period: 1400ms;
   --signal-morph-period: 460ms;
   --signal-rail-fade: 100ms;
 }
-.chat-start > .signal-mark {
-  width: 64px;
-  height: 48px;
-  margin-bottom: 4px;
-}
-.signal-mark path {
+.signal-face path {
   transition:
     d var(--signal-morph-period) cubic-bezier(0.22, 1, 0.36, 1),
     transform var(--signal-morph-period) cubic-bezier(0.22, 1, 0.36, 1);
   transform-box: fill-box;
   transform-origin: center;
 }
-.signal-mark[data-face='true'] .signal-eyes {
+.signal-face[data-face='true'] .signal-eyes {
   d: var(--signal-eyes);
 }
-.signal-mark[data-face='true'] .signal-mouth {
+.signal-face[data-face='true'] .signal-mouth {
   d: var(--signal-mouth);
 }
-.signal-foil-stop {
-  stop-color: var(--accent);
-}
-.signal-foil-stop:nth-child(2) {
-  stop-color: var(--blue);
-}
-.signal-foil-stop:nth-child(3) {
-  stop-color: var(--accent);
-}
-.signal-foil-stop:nth-child(4) {
-  stop-color: var(--blue);
-}
-.light .signal-foil-stop {
-  stop-color: var(--accent);
-}
-.light .signal-foil-stop:nth-child(2) {
-  stop-color: var(--blue);
-}
-.light .signal-foil-stop:nth-child(3) {
-  stop-color: var(--accent);
-}
-.light .signal-foil-stop:nth-child(4) {
-  stop-color: var(--blue);
-}
-.signal-mark[data-working='true'] .signal-foil-stop {
+.signal-face[data-working='true'] .signal-foil-stop {
   animation: signal-foil-color 3600ms ease-in-out infinite alternate;
 }
-.signal-mark[data-working='true'] .signal-foil-stop:nth-child(2) {
+.signal-face[data-working='true'] .signal-foil-stop:nth-child(2) {
   animation-delay: -1800ms;
 }
-.signal-mark[data-working='true'] .signal-foil-stop:nth-child(3) {
+.signal-face[data-working='true'] .signal-foil-stop:nth-child(3) {
   animation-delay: -900ms;
 }
-.signal-mark[data-working='true'] .signal-foil-stop:nth-child(4) {
+.signal-face[data-working='true'] .signal-foil-stop:nth-child(4) {
   animation-delay: -2700ms;
 }
-.light .signal-mark[data-working='true'] .signal-foil-stop {
-  animation-name: signal-foil-color-light;
-}
-/* Each traveler keeps its own hue through a crossing; the overlap blends light. */
-.signal-trail-stop--left {
-  stop-color: var(--accent);
-}
-.signal-trail-stop--left:nth-child(2) {
-  stop-color: var(--blue);
-}
-.signal-trail-stop--right {
-  stop-color: var(--blue);
-}
-.signal-trail-stop--right:nth-child(2) {
-  stop-color: var(--accent);
-}
-.light .signal-trail-stop--left {
-  stop-color: var(--accent);
-}
-.light .signal-trail-stop--left:nth-child(2) {
-  stop-color: var(--blue);
-}
-.light .signal-trail-stop--right {
-  stop-color: var(--blue);
-}
-.light .signal-trail-stop--right:nth-child(2) {
-  stop-color: var(--accent);
-}
-.signal-mark[data-working='true'] .signal-trail-stop {
+.signal-face[data-working='true'] .signal-trail-stop {
   animation: signal-foil-sheen 3600ms ease-in-out infinite alternate;
 }
-.signal-mark[data-working='true'] .signal-trail-stop:nth-child(2) {
+.signal-face[data-working='true'] .signal-trail-stop:nth-child(2) {
   animation-delay: -1800ms;
 }
 .signal-brackets {
@@ -120,10 +92,10 @@
     stop-opacity: 1;
   }
 }
-.signal-mark .signal-bracket {
+.signal-face .signal-bracket {
   transition: opacity var(--signal-rail-fade) ease;
 }
-.signal-mark .signal-orbit {
+.signal-face .signal-orbit {
   opacity: 0;
   stroke-dasharray: 34 66;
   transition: opacity var(--signal-rail-fade) ease;
@@ -134,53 +106,39 @@
 .signal-orbit-right {
   stroke-dashoffset: -8;
 }
-.signal-mark[data-working='true'] .signal-bracket {
+.signal-face[data-working='true'] .signal-bracket {
   opacity: 0;
 }
-.signal-mark[data-working='true'] .signal-orbit {
+.signal-face[data-working='true'] .signal-orbit {
   opacity: 1;
 }
-.signal-mark[data-working='true'] .signal-orbit-left {
+.signal-face[data-working='true'] .signal-orbit-left {
   animation: signal-square-counterclockwise var(--signal-orbit-period) linear
     infinite;
 }
-.signal-mark[data-working='true'] .signal-orbit-right {
+.signal-face[data-working='true'] .signal-orbit-right {
   animation: signal-square-clockwise var(--signal-orbit-period) linear infinite;
 }
-.signal-mark[data-expression='connecting'] .signal-eyes {
+.signal-face[data-expression='connecting'] .signal-eyes {
   animation: signal-look 1200ms ease-in-out infinite;
 }
-.signal-mark[data-expression='connecting'] .signal-mouth {
+.signal-face[data-expression='connecting'] .signal-mouth {
   d: var(--signal-mouthSoft);
 }
-.signal-mark[data-expression='working'] .signal-eyes {
+.signal-face[data-expression='working'] .signal-eyes {
   animation: signal-scan 1000ms ease-in-out infinite;
   animation-delay: var(--signal-morph-period);
 }
-.signal-mark[data-expression='working'] .signal-mouth {
+.signal-face[data-expression='working'] .signal-mouth {
   d: var(--signal-mouthFlat);
 }
-.signal-mark[data-expression='responding'] .signal-mouth {
+.signal-face[data-expression='responding'] .signal-mouth {
   animation: signal-speaking 1700ms ease-in-out infinite;
   animation-delay: var(--signal-morph-period);
 }
-.signal-mark[data-expression='responding'] .signal-eyes {
+.signal-face[data-expression='responding'] .signal-eyes {
   animation: signal-blink 2400ms ease-in-out infinite;
 }
-.signal-mark[data-expression='complete'] .signal-eyes {
-  d: var(--signal-happy);
-}
-.signal-mark[data-expression='complete'] .signal-mouth {
-  d: var(--signal-mouthHappy);
-}
-.signal-mark[data-expression='stopped'] .signal-mouth,
-.signal-mark[data-expression='paused'] .signal-mouth {
-  d: var(--signal-mouthFlat);
-}
-.signal-mark[data-expression='paused'] .signal-eyes {
-  d: var(--signal-paused);
-}
-/* Original shared square, with continuous travel and no turnaround at overlap. */
 @keyframes signal-square-counterclockwise {
   from {
     stroke-dashoffset: -58;
@@ -256,23 +214,9 @@
     stop-color: var(--blue);
   }
 }
-@keyframes signal-foil-color-light {
-  0% {
-    stop-color: var(--accent);
-  }
-  40% {
-    stop-color: var(--blue);
-  }
-  70% {
-    stop-color: var(--accent);
-  }
-  100% {
-    stop-color: var(--blue);
-  }
-}
 @media (prefers-reduced-motion: reduce) {
-  .signal-mark,
-  .signal-mark * {
+  .signal-face,
+  .signal-face * {
     animation: none !important;
     transition: none !important;
   }

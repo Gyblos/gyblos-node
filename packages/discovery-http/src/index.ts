@@ -2,9 +2,13 @@
 // Callers inject fetch and the clock; nothing here starts timers, reads files or uses global fetch on import.
 export {
   DISCOVERY_ERROR_CODES,
+  GITHUB_CLAIM_REASONS,
+  GITHUB_CLAIM_STATES,
   REGISTRATION_FORMAT,
   REGISTRATION_RESULTS,
   type DiscoveryErrorCode,
+  type GithubClaimReason,
+  type GithubClaimState,
   type RegistrationResult,
 } from './constants';
 export { DiscoveryError } from './errors';
@@ -16,6 +20,22 @@ export {
 } from './publish';
 export { registerSeller, type RegisterSellerInput } from './register';
 export {
+  fetchGithubClaim,
+  submitGithubClaim,
+  type FetchGithubClaimInput,
+  type GithubClaimAnswer,
+  type GithubClaimView,
+  type SubmitGithubClaimInput,
+} from './github-claims';
+export {
+  fetchSellerProfile,
+  submitSellerProfile,
+  type FetchSellerProfileInput,
+  type SellerProfileAnswer,
+  type SellerProfileView,
+  type SubmitSellerProfileInput,
+} from './profiles';
+export {
   fetchUptime,
   type FetchUptimeInput,
   type SellerUptime,
@@ -23,6 +43,7 @@ export {
 export {
   fetchModels,
   fetchSellers,
+  supersedes,
   type DiscoveredSeller,
   type FetchSellersInput,
   type FetchSellersResult,

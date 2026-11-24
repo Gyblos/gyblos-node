@@ -1,7 +1,7 @@
 // Reads consumption and payments without initiating financial work or showing stale totals.
 import { useState, useSyncExternalStore } from 'react';
 
-import type { ActivityEntry } from '../activity-model';
+import { showActivityEmptyState, type ActivityEntry } from '../activity-model';
 import type { PaypalPaymentReference } from '../payment-reference-model';
 import { ActivitySessionDetails } from './ActivitySessionDetails';
 import { ActivitySessions } from './ActivitySessions';
@@ -108,6 +108,7 @@ export function Activity({
         activity={activity}
         available={available}
         entries={entries}
+        hasX402Records={Boolean(x402?.state.summary.records.length)}
         visible={visible}
         references={references}
         method={method}
@@ -142,6 +143,7 @@ function ActivityResults({
   activity,
   available,
   entries,
+  hasX402Records,
   visible,
   references,
   method,
@@ -156,6 +158,7 @@ function ActivityResults({
   activity: ActivityView;
   available: boolean;
   entries: ActivityEntry[];
+  hasX402Records: boolean;
   visible: ActivityEntry[];
   references: PaypalPaymentReference[];
   method: HistoryMethod;
@@ -168,6 +171,11 @@ function ActivityResults({
   onPayments(): void;
 }) {
   if (!available) return <ActivityUnavailable activity={activity} />;
+  if (
+    !entries.length &&
+    !showActivityEmptyState(activity.state, hasX402Records)
+  )
+    return null;
   return visible.length ? (
     <>
       <ActivitySessions

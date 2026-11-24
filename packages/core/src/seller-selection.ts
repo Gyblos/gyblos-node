@@ -279,22 +279,37 @@ export function selectSellers(
   }
 }
 
-// The context each seller that could serve `request` lists for its model, cooldown aside: a seller resting
-// after a failure may still be chosen later.
+// The listing of `seller` that could serve `request`: every hard filter, price included, at an acceptable
+// reasoning level, cooldown aside (a seller resting after a failure may still be chosen later).
+function servingListing(
+  request: SellerRequest,
+  seller: KnownSeller,
+  now: number,
+) {
+  const entry = eligible({ request, stats: new Map(), now }, seller, false);
+  const levels = acceptableLevels(request);
+  return entry &&
+    levels.some((level) => entry.listing.reasoning.includes(level))
+    ? entry.listing
+    : undefined;
+}
+// Whether `seller` could serve `request` (servingListing): the buyer checks it before spending an
+// identity lookup on a seller found only in the index.
+export function servesRequest(
+  request: SellerRequest,
+  seller: KnownSeller,
+  now: number,
+) {
+  return servingListing(request, seller, now) !== undefined;
+}
+// The context each seller that could serve `request` lists for its model.
 export function listedContexts(
   input: Pick<SellerSelectionInput, 'request' | 'sellers' | 'now'>,
 ): number[] {
-  const levels = acceptableLevels(input.request);
-  const contexts: number[] = [];
-  for (const seller of input.sellers) {
-    const entry = eligible({ ...input, stats: new Map() }, seller, false);
-    if (
-      entry &&
-      levels.some((level) => entry.listing.reasoning.includes(level))
-    )
-      contexts.push(entry.listing.contextTokens);
-  }
-  return contexts;
+  return input.sellers.flatMap(
+    (seller) =>
+      servingListing(input.request, seller, input.now)?.contextTokens ?? [],
+  );
 }
 // The context to announce: the smallest listed, so a prompt sized to it fits whichever seller is chosen.
 // Undefined when none is listed.

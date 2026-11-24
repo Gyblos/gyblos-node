@@ -25,7 +25,6 @@ import {
 import { atomicToUsdc } from '@gyblos/node/node-config';
 import { setupRole } from '@gyblos/node/roles';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
-import { isMain } from '@gyblos/runtime';
 
 import { BUYER_INIT_FLAGS, BUYER_INIT_INPUT } from './constants';
 
@@ -190,7 +189,7 @@ export async function runBuyerInit(
   }
   const plan = buildBuyerInit(answers);
   terminal.write(
-    `\nModel: ${plan.request.selection.modelId}; reasoning: ${plan.request.reasoning}.\nVariant: ${answers.variant || `[${BUYER_INIT_INPUT.EMPTY_LABEL}]`}; Quantization: ${answers.quantization || `[${BUYER_INIT_INPUT.EMPTY_LABEL}]`}.\nMaximum output tokens: ${answers.maxTokens}.\nBudget ceiling: ${answers.maxUsdc} USDC per request. Prices: ${answers.inputUsdcPerMtok} input / ${answers.outputUsdcPerMtok} output USDC per million tokens.\nChannel deposit: ${atomicToUsdc(BigInt(plan.session.depositAtomic))} USDC. Channel lifetime: ${plan.session.lifetimeMs / MILLISECONDS_PER_MINUTE} minutes.\nSellers: ${plan.sellers.length ? plan.sellers[0]!.nodeId : 'any seller registered in the index, free answers only'}.\nFree signed quotes cause no payment transactions, including with a positive ceiling.\n8004 identity verification remains enabled. Existing settings will be refused.\n`,
+    `\nModel: ${plan.request.selection.modelId}; reasoning: ${plan.request.reasoning}.\nVariant: ${answers.variant || `[${BUYER_INIT_INPUT.EMPTY_LABEL}]`}; Quantization: ${answers.quantization || `[${BUYER_INIT_INPUT.EMPTY_LABEL}]`}.\nMaximum output tokens: ${answers.maxTokens}.\nBudget ceiling: ${answers.maxUsdc} USDC per request. Prices: ${answers.inputUsdcPerMtok} input / ${answers.outputUsdcPerMtok} output USDC per million tokens.\nChannel deposit: ${atomicToUsdc(BigInt(plan.session.depositAtomic))} USDC. Channel lifetime: ${plan.session.lifetimeMs / MILLISECONDS_PER_MINUTE} minutes.\nSellers: ${plan.sellers.length ? plan.sellers[0]!.nodeId : plan.discovery.paidAuto ? 'Auto: registered sellers within the displayed price and spending limits' : 'any seller registered in the index, free answers only'}.\nFree signed quotes cause no payment transactions, including with a positive ceiling.\n8004 identity verification remains enabled. Existing settings will be refused.\n`,
   );
   const confirmation = await terminal.read(
     'Save these settings and prepare the local buyer identity? [y/N]: ',
@@ -221,8 +220,7 @@ export function buyerInitMessage(error: unknown) {
     : INITIALIZATION_HINTS[error.code];
   return `${error.code}: ${hint}`;
 }
-export async function main() {
-  const args = process.argv.slice(2);
+export async function main(args: string[]) {
   if (
     args.some(
       (argument) =>
@@ -284,4 +282,3 @@ export async function main() {
     input.close();
   }
 }
-if (isMain(import.meta.url)) await main();

@@ -1,6 +1,5 @@
 // Static desktop explanations for validated buyer failures; remote text is never displayed.
 // Presentation does not change retry decisions, budget reservations or payment uncertainty.
-import { BUYER_DEPOSIT_MINIMUM_HINT } from '@gyblos/config/batch-session';
 import {
   BUYER_ROUTING_CODES,
   SELLER_SELECTION_CODES,
@@ -27,17 +26,23 @@ export class BuyerSessionRequired extends Error {
   ) {
     super(
       reason === BUYER_SIDECAR.DEPOSIT_MINIMUM
-        ? BUYER_DEPOSIT_MINIMUM_HINT
-        : 'Paid settings need a payment channel. Add session.depositAtomic and session.lifetimeMs to buyer/selection.json before starting the buyer.',
+        ? 'Select a paid seller and confirm its channel deposit to update the local buyer.'
+        : 'Select a paid seller and set a maximum per response to enable its channel.',
     );
   }
 }
 
 type BuyerCode =
+  | typeof BUYER_API.TOKENIZER_UNAVAILABLE
   | typeof BUYER_ROUTING_CODES.BUSY
+  | typeof PAID_EXECUTION_CODES.EXPIRED
   | typeof PAID_EXECUTION_CODES.PEER
   | FreeExecutionCode
   | SellerSelectionCode
+  | typeof SESSION_CODES.REQUEST_DECLINED
+  | typeof SESSION_CODES.OPENING_ABSENT
+  | typeof SESSION_CODES.OPENING_RETURNED
+  | typeof SESSION_CODES.OPENING_PENDING
   | typeof SESSION_CODES.BINDING
   | typeof SESSION_CODES.UNVERIFIED
   | typeof SESSION_CODES.LIMIT;
@@ -53,6 +58,14 @@ export class DesktopBuyerFailure extends Error {
 function explanation(code: BuyerCode, reason: unknown, free: boolean) {
   if (code === BUYER_ROUTING_CODES.BUSY)
     return 'The selected seller or channel is busy. If your buyer uses one channel, settle the existing channel before switching sellers.';
+  if (code === SESSION_CODES.REQUEST_DECLINED)
+    return 'The seller declined this request before charging you. You can send another message using this channel.';
+  if (code === SESSION_CODES.OPENING_RETURNED)
+    return 'The unused channel deposit was returned. You can send your message again.';
+  if (code === SESSION_CODES.OPENING_PENDING)
+    return 'The network has not confirmed the channel deposit yet. Wait a moment and try again with the same seller. Your message has not been sent.';
+  if (code === SESSION_CODES.OPENING_ABSENT)
+    return 'The deposit did not reach the chain. You can send your message again.';
   if (code === SESSION_CODES.BINDING)
     return 'The selected seller or terms changed. Refresh the listing before sending.';
   if (code === SESSION_CODES.UNVERIFIED)
@@ -105,6 +118,22 @@ export function desktopBuyerFailure(
       ? (value as Record<string, unknown>)
       : {};
   if (
+    row.code === PAID_EXECUTION_CODES.EXPIRED &&
+    row[BUYER_API.NEVER_SENT_FIELD] === true
+  )
+    return new DesktopBuyerFailure(
+      PAID_EXECUTION_CODES.EXPIRED,
+      'The seller quote expired before payment. Refresh the listing and send your message again.',
+    );
+  if (
+    row.code === BUYER_API.TOKENIZER_UNAVAILABLE &&
+    row[BUYER_API.NEVER_SENT_FIELD] === true
+  )
+    return new DesktopBuyerFailure(
+      BUYER_API.TOKENIZER_UNAVAILABLE,
+      'The app could not download or verify the files it needs to count tokens. Check your internet connection and try again. No payment was made.',
+    );
+  if (
     row.code === PAID_EXECUTION_CODES.PEER &&
     row[BUYER_API.NEVER_SENT_FIELD] === true
   )
@@ -114,6 +143,10 @@ export function desktopBuyerFailure(
     );
   const code = [
     BUYER_ROUTING_CODES.BUSY,
+    SESSION_CODES.REQUEST_DECLINED,
+    SESSION_CODES.OPENING_ABSENT,
+    SESSION_CODES.OPENING_RETURNED,
+    SESSION_CODES.OPENING_PENDING,
     SESSION_CODES.BINDING,
     SESSION_CODES.UNVERIFIED,
     SESSION_CODES.LIMIT,

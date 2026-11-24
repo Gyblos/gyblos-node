@@ -180,3 +180,10 @@ export function dailySettled(snapshot: ChainSnapshot) {
     settles: day.gyblos?.settles ?? 0,
   }));
 }
+
+export const chainHistoryNote = (backfillDone: boolean | null) =>
+  backfillDone === null
+    ? 'chain index starting'
+    : backfillDone
+      ? null
+      : 'reading chain history';

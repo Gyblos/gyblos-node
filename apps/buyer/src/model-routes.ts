@@ -32,6 +32,8 @@ export interface ModelRoute {
 
 // What a request needs to find and quote a seller for one model.
 export type RoutedModel = Pick<ModelRoute, 'selection' | 'maxTokens'> & {
+  openingIntent?: string;
+  freeOnly?: boolean;
   sellerChoice?: import('@gyblos/protocol/buyer-api').BuyerSellerChoice;
 };
 
@@ -93,7 +95,15 @@ export function routedRequest<Request extends SellerRequest>(
   model: RoutedModel | undefined,
 ): Request {
   return model
-    ? { ...request, selection: model.selection, maxTokens: model.maxTokens }
+    ? {
+        ...request,
+        selection: model.selection,
+        maxTokens: model.maxTokens,
+        ...(model.freeOnly && {
+          maxAtomic: '0',
+          priceCeilings: { inputAtomicPerMtok: '0', outputAtomicPerMtok: '0' },
+        }),
+      }
     : request;
 }
 

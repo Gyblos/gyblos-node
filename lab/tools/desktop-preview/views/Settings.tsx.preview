@@ -1,13 +1,135 @@
-// Flat appearance and product information use the shared compact design primitives.
-import { Info } from '@phosphor-icons/react';
+// Appearance, account-wide buyer preferences (seller mode, free-model fallback, Testnet) with the
+// proposed buyer config.toml, and product information, built from the shared compact primitives.
+import { Check, Code, FileText, Info, Palette, Storefront, Wallet } from '@phosphor-icons/react';
 import { useState } from 'react';
 
 import { Appearance } from './Appearance';
 import { BUTTON_VARIANT } from './constants';
+import { Dropdown } from './Dropdown';
 import { FormField, FormInput } from './Form';
-import { Section } from './Management';
+import { ChoiceMenu, Section } from './Management';
 import { Modal } from './Modal';
-import { Button, IconButton, PagePanel } from './UI';
+import { MotionPresence } from './Motion';
+import { Button, IconButton, MenuItem, PagePanel } from './UI';
+import {
+  CODE_LANGUAGE,
+  CodeBlock,
+  PREVIEW_COPY,
+  PREVIEW_EVENT,
+  PreviewKitShowcase,
+  previewCompact,
+  PreviewSectionIcon,
+  READY_SELLER_MODES,
+  SELLER_MODES,
+  setPreviewSetting,
+  Switch,
+  Tag,
+  usePreviewSetting,
+  type SellerMode,
+} from './PreviewKit';
+
+const FONTS = ['Instrument Sans', 'Inter'] as const;
+function chooseFont(font: (typeof FONTS)[number]) {
+  const params = new URLSearchParams(location.search);
+  if (font === 'Inter') params.set('font', 'inter');
+  else if (previewCompact()) params.set('font', 'instrument-sans');
+  else params.delete('font');
+  location.search = params.toString();
+}
+
+const BUYER_CONFIG_PATH = '~/.gyblos/buyer/config.toml';
+function buyerConfig(mode: SellerMode, freeFallback: boolean, showTestnet: boolean) {
+  const key = (value: SellerMode) => value.toLowerCase().replaceAll(' ', '_');
+  return [
+    '[network]',
+    'show_testnet = ' + showTestnet,
+    '',
+    '[funds]',
+    'free_fallback = ' + freeFallback,
+    '',
+    '[routing]',
+    'mode = "' + key(mode) + '"',
+  ].join('\n');
+}
+function chooseShowTestnet(show: boolean) {
+  setPreviewSetting('showTestnet', show);
+  if (show) return;
+  const params = new URLSearchParams(location.search);
+  params.set('network', 'mainnet');
+  history.replaceState(null, '', '?' + params.toString());
+  window.dispatchEvent(new Event(PREVIEW_EVENT.NETWORK));
+}
+function BuyerPreferences() {
+  const mode = usePreviewSetting('sellerMode');
+  const freeFallback = usePreviewSetting('freeFallback');
+  const showTestnet = usePreviewSetting('showTestnet');
+  return (
+    <>
+      <Section title="Sellers" icon={<PreviewSectionIcon icon={Storefront} />}>
+        <div className="preview-settings-rows">
+          <div>
+            <span>
+              Seller selection
+              <small className="ui-help-text">Used when a model has more than one seller. A pinned seller always comes first.</small>
+            </span>
+            <Dropdown label={'Seller selection: ' + mode} className="ui-select-trigger" trigger={mode}>
+              {(close) =>
+                SELLER_MODES.map((option) => {
+                  const ready = READY_SELLER_MODES.includes(option);
+                  return (
+                    <MenuItem
+                      key={option}
+                      role="menuitemradio"
+                      checked={option === mode}
+                      disabled={!ready}
+                      label={option}
+                      badge={ready ? undefined : <Tag>Soon</Tag>}
+                      trailing={option === mode ? <Check size={16} /> : undefined}
+                      onClick={() => {
+                        setPreviewSetting('sellerMode', option);
+                        close();
+                      }}
+                    />
+                  );
+                })
+              }
+            </Dropdown>
+          </div>
+        </div>
+      </Section>
+      <Section title="Funds" icon={<PreviewSectionIcon icon={Wallet} />}>
+        <div className="preview-settings-rows">
+          <div>
+            <span>
+              {PREVIEW_COPY.freeFallbackLabel}
+              <small className="ui-help-text">Chat and every API key. Answers come from a similar free model and always say so.</small>
+            </span>
+            <Switch label={PREVIEW_COPY.freeFallbackLabel} checked={freeFallback} onChange={(value) => setPreviewSetting('freeFallback', value)} />
+          </div>
+        </div>
+      </Section>
+      <Section title="Developer" icon={<PreviewSectionIcon icon={Code} />}>
+        <div className="preview-settings-rows">
+          <div>
+            <span>
+              Show Testnet
+              <small className="ui-help-text">Adds Testnet to the network menu. Test funds and keys never move to Mainnet.</small>
+            </span>
+            <Switch label="Show Testnet" checked={showTestnet} onChange={chooseShowTestnet} />
+          </div>
+        </div>
+      </Section>
+      <Section title="Configuration file" icon={<PreviewSectionIcon icon={FileText} />}>
+        <p className="ui-help-text">These settings live in the buyer configuration file. Proposed file and path; the app does not read it yet.</p>
+        <CodeBlock
+          code={buyerConfig(mode, freeFallback, showTestnet)}
+          language={CODE_LANGUAGE.TOML}
+          title={BUYER_CONFIG_PATH}
+        />
+      </Section>
+    </>
+  );
+}
 
 export function Settings({
   light,
@@ -22,32 +144,59 @@ export function Settings({
     () => new URLSearchParams(location.search).get('review') === 'buttons',
   );
   const [aboutOpen, setAboutOpen] = useState(false);
+  if (new URLSearchParams(location.search).get('screen') === 'design-system')
+    return (
+      <PagePanel>
+        <PreviewKitShowcase />
+      </PagePanel>
+    );
   return (
     <PagePanel>
-      <Section title="Appearance">
-        <Appearance label="Theme" light={light} onLightChange={onLightChange} />
+      <Section title="Appearance" icon={<PreviewSectionIcon icon={Palette} />}>
+        <div className="preview-settings-rows preview-settings-appearance">
+          <Appearance label="Theme" light={light} onLightChange={onLightChange} />
+          <div>
+            <span>
+              Interface font
+              <small className="ui-help-text">Preview only: compares the brand font with Inter.</small>
+            </span>
+            <ChoiceMenu
+              label="Interface font"
+              value={document.documentElement.dataset.font === 'inter' ? 'Inter' : 'Instrument Sans'}
+              options={FONTS}
+              onChange={chooseFont}
+            />
+          </div>
+        </div>
       </Section>
+      <BuyerPreferences />
+      <Section title="About" icon={<PreviewSectionIcon icon={Info} />}>
       <section className="preview-settings-rows">
         <div>
           <span>Design system</span>
           <Button onClick={() => setDesignOpen(true)}>View controls</Button>
         </div>
         <div>
+          <span>Preview components</span>
+          <Button onClick={() => { location.search = '?screen=design-system'; }}>Open</Button>
+        </div>
+        <div>
           <span>About Gyblos</span>
           <Button onClick={() => setAboutOpen(true)}>View details</Button>
         </div>
       </section>
-      {aboutOpen && (
-        <Modal title="About Gyblos" close={() => setAboutOpen(false)}>
+      </Section>
+      <MotionPresence>{aboutOpen && (
+        <Modal title="About Gyblos" size="sm" close={() => setAboutOpen(false)}>
           <div className="ui-section">
             <p>Gyblos desktop</p>
             <p className="ui-help-text">Version {version}</p>
             <p className="ui-help-text">Local desktop application</p>
           </div>
         </Modal>
-      )}
-      {designOpen && (
-        <Modal title="Design system" close={() => setDesignOpen(false)}>
+      )}</MotionPresence>
+      <MotionPresence>{designOpen && (
+        <Modal title="Design system" size="lg" close={() => setDesignOpen(false)}>
           <div className="ui-section">
             <Section title="Buttons">
               <div className="preview-settings-rows">
@@ -94,7 +243,7 @@ export function Settings({
             </Section>
           </div>
         </Modal>
-      )}
+      )}</MotionPresence>
     </PagePanel>
   );
 }

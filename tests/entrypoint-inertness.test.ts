@@ -90,6 +90,7 @@ void test('all executable modules are inert when imported', async (context) => {
     await import('@gyblos/telemetry-otel');
     await import('@gyblos/buyer/setup');
     await import('@gyblos/buyer/init');
+    await import('@gyblos/buyer/entry');
     await import('@gyblos/node-app/cli');
     await import('@gyblos/desktop/wallet-restore');
     await import('@gyblos/discovery-index/worker');

@@ -1,7 +1,7 @@
 // Builds the buyer's payment client on the real chain: the durable journal (one buyer process at a
 // time), blockhash hints proven to come from the policy's network, and settlement checks read from the
 // claim transaction. The payer key is the caller's; nothing here reads key files.
-import { createSolanaRpc, type TransactionSigner } from '@solana/kit';
+import { type TransactionSigner } from '@solana/kit';
 import {
   createUptoHintReader,
   type UptoHintRpc,
@@ -27,6 +27,7 @@ import {
 } from './client';
 import type { UptoLedgerPaths } from './file-ledger';
 import { assertPaymentNetworkEnabled } from './mainnet';
+import { rateLimitedSolanaRpc } from './rpc-rate-limit';
 import type { UptoChannelSettings } from './terms';
 
 export interface UptoBuyerPaymentsOptions {
@@ -70,7 +71,7 @@ export async function openUptoBuyerPayments(
     throw new PaymentError(PAYMENT_ERROR_CODES.UNTRUSTED_TERMS);
   const journal = await openUptoBuyerJournal({ paths: options.paths, now });
   const useConfiguredRpc = options.rpc === undefined;
-  const rpc = options.rpc ?? createSolanaRpc(rpcUrl);
+  const rpc = options.rpc ?? rateLimitedSolanaRpc(rpcUrl);
   const hints = createUptoHintReader(rpc, network);
   try {
     const client = createUptoPaymentClient({

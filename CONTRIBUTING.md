@@ -99,8 +99,9 @@ belongs.
    pnpm check
    ```
 
-   `pnpm check` runs typecheck, lint (including the tooling tests, skill check
-   and import boundaries) and every product, standalone package and lab test.
+   `pnpm check` runs typecheck, lint (including the tooling tests, skill check,
+   import boundaries and drizzle-kit's migration check) and every product,
+   standalone package and lab test.
    It needs no funded wallet, engine, Docker, Semgrep account or AI tool. It
    exits with status 0 when everything passes.
 

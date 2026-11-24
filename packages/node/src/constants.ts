@@ -1,6 +1,7 @@
 // Seller node lifecycle states and the local role-config schema version. Values only; no wallet,
 // network or process actions.
 import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
+import { BUYER_API } from '@gyblos/protocol/buyer-api';
 import { PAYMENT_ERROR_CODES } from '@gyblos/protocol/constants';
 
 export const NODE_STATES = {
@@ -48,8 +49,6 @@ export const NODE_ERROR_CODES = {
   SELLER_OFFER_API_KEY_UNSAFE: 'SELLER_OFFER_API_KEY_UNSAFE',
   SELLER_OFFERS_MISSING: 'SELLER_OFFERS_MISSING',
   SELLER_PAID_EXECUTION_UNAVAILABLE: 'SELLER_PAID_EXECUTION_UNAVAILABLE',
-  // A paid offer whose usage cannot be recounted with the model's pinned public tokenizer.
-  SELLER_PAID_METERING_UNRECOUNTED: 'SELLER_PAID_METERING_UNRECOUNTED',
   // The payment server pays to its own fee payer, charges another fee or uses another network.
   SELLER_PAYMENT_DESCRIPTION_INVALID: 'SELLER_PAYMENT_DESCRIPTION_INVALID',
   // A paid offer on a seller role set up without a payout and payment keys.
@@ -104,6 +103,8 @@ export const DOCTOR_CODES = {
   PAYMENT_ACCOUNTS_UNCHECKED: 'PAYMENT_ACCOUNTS_UNCHECKED',
   // One of those token accounts can never receive a payout (frozen, say); startup refuses it.
   PAYMENT_ACCOUNTS_UNUSABLE: 'PAYMENT_ACCOUNTS_UNUSABLE',
+  // The fee payer holds less than the recommended balance for startup and channel transactions.
+  FEE_PAYER_UNFUNDED: 'FEE_PAYER_UNFUNDED',
   // Every offer's usage is declared by its provider, so no tokenizer is loaded.
   NOT_NEEDED: 'NOT_NEEDED',
   // A remote engine is called only with --online.
@@ -113,6 +114,13 @@ export const DOCTOR_CODES = {
   // The discovery index did not answer with its time, or answered too slowly to measure it.
   CLOCK_UNCHECKED: 'CLOCK_UNCHECKED',
   CHECK_FAILED: 'DOCTOR_CHECK_FAILED',
+} as const;
+// Devnet SOL the fee payer should hold for token accounts and channel transactions. The minimum is a
+// warning threshold, not the cost of creating the token accounts.
+export const FEE_PAYER_FUNDING = {
+  minimumLamports: 10_000_000n,
+  minimumSol: '0.01',
+  suggestedSol: '0.05',
 } as const;
 // Buyers and the index accept a record issued at most CONTROL_LIMITS.clockSkewMs ahead of their clock;
 // doctor warns well before that. With the header's 1 s resolution and at most 1 s of round trip, a
@@ -262,7 +270,6 @@ export const NODE_CONFIG_ISSUE_CODES = {
   DUPLICATE_VALUE: 'DUPLICATE_VALUE',
   TOO_MANY: 'TOO_MANY',
   UNKNOWN_MODEL: 'UNKNOWN_MODEL',
-  CUSTOM_MODEL_IN_CATALOG: 'CUSTOM_MODEL_IN_CATALOG',
   NON_CANONICAL_DECIMAL: 'NON_CANONICAL_DECIMAL',
   PRICE_OUT_OF_RANGE: 'PRICE_OUT_OF_RANGE',
   PRICE_ZERO: 'PRICE_ZERO',
@@ -283,6 +290,8 @@ export const NODE_CONFIG_WARNING_CODES = {
   ENV_SWITCH_NOT_STRICT: 'ENV_SWITCH_NOT_STRICT',
   // An offer's reasoning levels cannot be checked: a custom model or a catalog model without verified levels.
   REASONING_UNVERIFIED: 'REASONING_UNVERIFIED',
+  // An offer still marks as custom a model the catalog now lists; it is served as the catalog model.
+  CUSTOM_MODEL_NOW_IN_CATALOG: 'CUSTOM_MODEL_NOW_IN_CATALOG',
 } as const;
 export type NodeConfigWarningCode =
   (typeof NODE_CONFIG_WARNING_CODES)[keyof typeof NODE_CONFIG_WARNING_CODES];
@@ -417,6 +426,7 @@ export const BUYER_PAID_TIMEOUTS = {
 } as const;
 // The paid buyer's own refusals, before any payment.
 export const PAID_BUYER_CODES = {
+  TOKENIZER: BUYER_API.TOKENIZER_UNAVAILABLE,
   // An earlier channel still needs recovery.
   UNRESOLVED: 'PAID_BUYER_UNRESOLVED_PAYMENT',
   UNAVAILABLE: 'PAID_BUYER_NO_OFFER',
@@ -462,3 +472,15 @@ export const SELLER_REGISTRATION_STATE = {
 
 // Bounded private delegated-key ledger; it never contains inference content or signed payments.
 export const BUYER_API_KEY_STORAGE = { MAX_BYTES: 262144 } as const;
+
+// Local diagnostics for failed seller payment-channel operations (`gyblos logs`). Codes come only from
+// these catalogs, never from error text.
+export const SELLER_CHANNEL_DIAGNOSTICS = {
+  component: 'seller-channel',
+  resumeBlock: 'resume-block',
+  phase: 'exchange',
+  // No catalog code was found: the cause stays unknown rather than guessed.
+  unknownCode: 'SELLER_CHANNEL_FAILED',
+  // A failed opening could not release its never-funded channel, so the buyer stays blocked.
+  releaseFailedCode: 'SELLER_OPENING_RELEASE_FAILED',
+} as const;

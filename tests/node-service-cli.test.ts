@@ -16,7 +16,6 @@ import test from 'node:test';
 
 import { DIAGNOSTICS } from '@gyblos/config';
 import { runCli } from '@gyblos/node-app/cli';
-import { type ServiceSystem } from '@gyblos/node-app/cli-service';
 import {
   SERVICE_ERRORS,
   SERVICE_KINDS,
@@ -31,15 +30,14 @@ import {
 } from '@gyblos/node-app/service';
 import { parseEnvironmentFile } from '@gyblos/node-app/service-environment';
 
+import { freeToml, scenario, withOllama } from './support/doctor-fixture';
 import {
-  freeToml,
-  scenario,
-  withOllama,
-  type Fixture,
-} from './support/doctor-fixture';
-import { FAKE_SECRET } from './support/node-config-fixtures';
+  fakeSystem,
+  readySeller,
+  RELAY_SECRET,
+  service,
+} from './support/service-cli';
 
-const RELAY_SECRET = `${FAKE_SECRET}-relay-token-value`;
 const INPUT: ServiceInput = {
   kind: SERVICE_KINDS.SYSTEMD_USER,
   nodePath: '/opt/node24/bin/node',
@@ -175,59 +173,6 @@ void test('the environment file accepts only lines systemd and sh read alike, an
   ])
     refused(`${name}=x`, SERVICE_ERRORS.ENVIRONMENT_RESERVED);
 });
-
-function fakeSystem(run: Fixture, platform: NodeJS.Platform = 'linux') {
-  const commands: string[][] = [];
-  const system: ServiceSystem = {
-    platform,
-    uid: process.getuid?.() ?? 1000,
-    accountHome: join(run.root, 'account'),
-    nodePath: '/opt/node24/bin/node',
-    repository: join(run.root, 'repo'),
-    run: async (argv) => {
-      commands.push([...argv]);
-      return 0;
-    },
-    windowsUser: async () => 'S-1-5-21-1-2-3-1001',
-    stopWindowsService: async () => {
-      commands.push(['stop-windows-service']);
-      return true;
-    },
-  };
-  return { system, commands };
-}
-
-async function service(
-  run: Fixture,
-  args: string[],
-  system: ServiceSystem,
-  env: Record<string, string> = {},
-) {
-  let output = '';
-  const code = await runCli(['seller', 'service', ...args], {
-    env: { GYBLOS_HOME: run.home, ...env },
-    cwd: run.root,
-    stdout: (text) => {
-      output += text;
-    },
-    stderr: (text) => {
-      output += text;
-    },
-    doctor: { tokenizer: async () => undefined },
-    service: system,
-  });
-  assert.equal(output.includes(RELAY_SECRET), false, output);
-  return { code, output };
-}
-
-async function readySeller(run: Fixture) {
-  await withOllama(run);
-  await writeFile(join(run.root, 'config.toml'), freeToml(run));
-  const environment = join(run.home, 'seller.env');
-  await writeFile(environment, `GYBLOS_RELAY_TOKEN=${RELAY_SECRET}\n`);
-  await chmod(environment, 0o600);
-  return environment;
-}
 
 void test('install refuses when the service environment would fail doctor, writing and running nothing', () =>
   scenario({ free: true }, async (run) => {

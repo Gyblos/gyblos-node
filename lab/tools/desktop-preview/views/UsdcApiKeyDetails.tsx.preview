@@ -8,14 +8,28 @@ import type {
 
 import { usdcApiAmount as amount, USDC_API_ACTION } from '../usdc-api-model';
 import { BuyerAgentSetup } from './BuyerAgentSetup';
-import { BUTTON_VARIANT } from './constants';
+import { BUTTON_VARIANT, UI_VIEW } from './constants';
 import { CopyField, FormActions } from './Form';
 import { Facts, Pair } from './Management';
 import { Modal } from './Modal';
+import { PREVIEW_COPY, showPreviewToast, usePreviewSetting } from './PreviewKit';
 import { Badge, Button } from './UI';
 import type { useUsdcApiKeys } from './useUsdcApiKeys';
 
 type Controller = ReturnType<typeof useUsdcApiKeys>;
+// Preview-only: keys follow the account-wide free-model fallback in Settings; there is no per-key choice.
+export function KeyFallback() {
+  const fallback = usePreviewSetting('freeFallback');
+  return (
+    <div className="preview-key-fallback">
+      <span>
+        <strong>Out of funds or at its limit</strong>
+        <small>{fallback ? 'Answers with a similar free model and says so.' : PREVIEW_COPY.keyOutOfFunds + ' ' + PREVIEW_COPY.keyAtLimit}</small>
+      </span>
+      <Button onClick={() => window.previewNavigate?.(UI_VIEW.SETTINGS)}>Open Settings</Button>
+    </div>
+  );
+}
 function KeyUsage({
   keyStatus: key,
   scope,
@@ -61,7 +75,7 @@ export function RevokeConfirmation({
   run: Controller['run'];
 }) {
   return (
-    <Modal title="Revoke API key?" close={close}>
+    <Modal title="Revoke API key?" size="sm" close={close}>
       <p>
         Stops new requests from every tool using this key. An inference already
         sent can still count. Its consumption and pending reservations stay
@@ -73,7 +87,9 @@ export function RevokeConfirmation({
           className="preview-destructive"
           onClick={() => {
             close();
-            void run({ action: USDC_API_ACTION.REVOKE, id });
+            void run({ action: USDC_API_ACTION.REVOKE, id }).then((result) => {
+              if (result && !result.error) showPreviewToast('API key revoked');
+            });
           }}
         >
           Revoke key

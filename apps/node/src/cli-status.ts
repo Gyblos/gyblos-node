@@ -1,9 +1,9 @@
 // `gyblos seller status`: whether this home's seller is running, what it serves and how much it answered,
 // read from the background service, the daemon's status.json and its signed receipts. Read-only; with
 // --online it also looks the NodeId up in the discovery index, paging sellers by model only, then asks
-// for this NodeId's public uptime (the NodeId the daemon already publishes to that index). Prints counts,
-// codes, public identifiers and URL origins; never a prompt, a buyer, a key, the home location or a value
-// from the environment.
+// for this NodeId's public uptime (the NodeId the daemon already publishes to that index) and GitHub claim.
+// Prints counts, codes, public identifiers and URL origins; never a prompt, a buyer, a key, the home
+// location or a value from the environment.
 import { runMode } from '@gyblos/config';
 import { DISCOVERY_ERROR_CODES, fetchSellers } from '@gyblos/discovery-http';
 import { RECEIPT_STORAGE, SELLER_DAEMON_STATES } from '@gyblos/node/constants';
@@ -13,6 +13,7 @@ import { P2P_ROLES } from '@gyblos/protocol/constants';
 import { urlOrigin } from './cli-format';
 import { codeHint } from './cli-hints';
 import { commandsFor, LISTING, nextStep, sellerCommand } from './cli-next';
+import { githubLine } from './cli-status-github';
 import { uptimeLine } from './cli-status-uptime';
 import { updateNotice } from './cli-update';
 import {
@@ -159,6 +160,7 @@ async function discoveryLine(
     // Nothing serving, nothing looked up: the index is not asked about this NodeId either.
     ...(models.size
       ? {
+          github: await githubLine(system, discovery.url, nodeId),
           uptime: await uptimeLine(
             system,
             discovery.url,
@@ -170,6 +172,14 @@ async function discoveryLine(
         }
       : {}),
   };
+}
+
+// The index's view of this NodeId with --online: its uptime and its GitHub claim.
+function indexLines(listing: Awaited<ReturnType<typeof discoveryLine>>) {
+  return [
+    'uptime' in listing && listing.uptime ? line('uptime', listing.uptime) : '',
+    'github' in listing && listing.github ? line('github', listing.github) : '',
+  ].join('');
 }
 
 function windowLine(window: ActivityWindow) {
@@ -328,8 +338,7 @@ export async function statusCommand(
   output.stdout(
     line('discovery', commandsFor(runMode(output.env), listing.text)),
   );
-  if ('uptime' in listing && listing.uptime)
-    output.stdout(line('uptime', listing.uptime));
+  output.stdout(indexLines(listing));
   output.stdout(await usageLines(homeEnvironment, identity.nodeId, now));
   const verdict = result(service, status);
   output.stdout(`Result: ${verdict}\n`);

@@ -7,10 +7,11 @@ import {
   SESSION_CODES,
   SESSION_STATES,
   sessionFail,
+  UnsentChannelLimitError,
   type PaymentSessionTerms,
 } from '@gyblos/protocol/payment-session';
 
-import { batchOpeningAbsent } from './batch-opening-proof';
+import { batchOpeningAbsent, replaceableOpening } from './batch-opening-proof';
 import {
   openPoolStore,
   poolChild,
@@ -19,12 +20,15 @@ import {
 } from './batch-pool-store';
 import type {
   BatchBuyerPool,
+  BatchPoolEntry,
   BatchPoolOptions,
   PoolRow,
 } from './batch-pool-types';
 import { termsFor } from './batch-session-checks';
+import { sameBatchParties } from './batch-session-history';
 import { inspectBatchSession, storedBatchSession } from './batch-session-state';
 import { serial } from './batch-session-store';
+import { BATCH_BUYER_CHECKPOINTS } from './constants';
 
 function budget(
   entries: PoolRow[],
@@ -61,6 +65,42 @@ export async function inspectBatchPool(
     }),
   );
 }
+export function poolFundingPending(row: BatchPoolEntry) {
+  return (
+    !row.stored ||
+    row.uncertain ||
+    row.requestId !== null ||
+    row.stored.pending ||
+    (row.stored.recoverable &&
+      row.stored.snapshot.state !== SESSION_STATES.CLOSED)
+  );
+}
+export async function poolAllowsSellerDeposit(
+  paths: BatchPoolOptions['paths'],
+  sellerNodeId: string,
+  total: string,
+  deposit: string,
+) {
+  const entries = await inspectBatchPool(paths);
+  if (entries.some(poolFundingPending)) return false;
+  const unfunded = new Set(
+    entries
+      .filter((row) => row.stored?.notCreated)
+      .map((row) => row.terms.sellerNodeId),
+  );
+  const funds = budget(entries, total, unfunded);
+  if (BigInt(funds.committedAtomic) > BigInt(total)) return false;
+  const existing = entries.find(
+    (row) => row.terms.sellerNodeId === sellerNodeId,
+  );
+  if (
+    existing &&
+    !existing.stored?.notCreated &&
+    !existing.stored?.openingReturned
+  )
+    return existing.stored?.empty === true;
+  return BigInt(funds.availableAtomic) >= BigInt(deposit);
+}
 interface PoolContext {
   options: BatchPoolOptions;
   total: string;
@@ -68,14 +108,61 @@ interface PoolContext {
   store: Awaited<ReturnType<typeof openPoolStore>>;
   rowFor(id: string): PoolRow;
 }
+async function replacePoolEntry(
+  context: PoolContext,
+  row: PoolRow,
+  checked: PaymentSessionTerms,
+) {
+  const { options, store, total, rowFor } = context;
+  const old = await poolChild(options.paths, row);
+  if (row.requestId || row.uncertain || !replaceableOpening(old))
+    return sessionFail(SESSION_CODES.BINDING);
+  if (
+    BigInt(
+      budget(store.read().entries, total, context.unfunded).availableAtomic,
+    ) < BigInt(checked.depositAtomic)
+  )
+    throw new UnsentChannelLimitError(checked.sellerNodeId);
+  if (
+    !sameBatchParties(row.terms, checked) ||
+    checked.expiresAt <= row.terms.expiresAt
+  )
+    return sessionFail(SESSION_CODES.BINDING);
+  await store.update((next) => {
+    const replacing = next.entries.find(
+      (entry) => entry.terms.sellerNodeId === checked.sellerNodeId,
+    )!;
+    replacing.terms = checked;
+    replacing.ready = false;
+    replacing.replacing = old.channelId;
+    replacing.refundedAtomic = '0';
+  });
+  context.unfunded.delete(checked.sellerNodeId);
+  row = rowFor(checked.sellerNodeId);
+  try {
+    const backend = await options.backend(poolPaths(options.paths, row));
+    if (!backend.renew) return sessionFail(SESSION_CODES.UNAVAILABLE);
+    await backend.renew(old.channelId, checked, checked.depositAtomic);
+  } finally {
+    await store.prepare(row);
+    if (
+      batchOpeningAbsent(
+        await poolChild(options.paths, rowFor(checked.sellerNodeId)),
+      )
+    )
+      context.unfunded.add(checked.sellerNodeId);
+  }
+  return rowFor(checked.sellerNodeId);
+}
 async function allocate(context: PoolContext, terms: PaymentSessionTerms) {
   const { options, store, total, rowFor } = context;
   const checked = termsFor(terms);
   let row = store
     .read()
     .entries.find((entry) => entry.terms.sellerNodeId === checked.sellerNodeId);
-  if (row && canonicalJson(row.terms) !== canonicalJson(checked))
-    return sessionFail(SESSION_CODES.BINDING);
+  if (row && canonicalJson(row.terms) !== canonicalJson(checked)) {
+    row = await replacePoolEntry(context, row, checked);
+  }
   if (!row) {
     const first = store.read().entries[0]?.terms;
     if (
@@ -92,7 +179,7 @@ async function allocate(context: PoolContext, terms: PaymentSessionTerms) {
         budget(store.read().entries, total, context.unfunded).availableAtomic,
       ) < BigInt(checked.depositAtomic)
     )
-      return sessionFail(SESSION_CODES.LIMIT);
+      throw new UnsentChannelLimitError(checked.sellerNodeId);
     row = {
       terms: checked,
       legacy: false,
@@ -129,17 +216,35 @@ async function resolve(
     record.hints === null &&
     record.opening === null &&
     Object.keys(record.requests).length === 0;
+  // The marker precedes begin(), which persists this request before any prompt write.
+  const checking =
+    unsentRequestId ??
+    (record.pending[BATCH_BUYER_CHECKPOINTS.OPENING_SENT] === record.channelId
+      ? row.requestId
+      : undefined);
+  const declined =
+    row.requestId !== null &&
+    record.pending[BATCH_BUYER_CHECKPOINTS.DECLINED_REQUEST] ===
+      row.requestId &&
+    !Object.hasOwn(record.requests, row.requestId);
   const unsent =
-    unsentRequestId === row.requestId &&
-    unsentRequestId !== undefined &&
-    !Object.hasOwn(record.requests, unsentRequestId) &&
-    Object.keys(record.pending).length === 0 &&
+    checking === row.requestId &&
+    typeof checking === 'string' &&
+    !Object.hasOwn(record.requests, checking) &&
+    Object.keys(record.pending).every(
+      (key) =>
+        key === BATCH_BUYER_CHECKPOINTS.OPENING_SENT ||
+        (unsentRequestId !== undefined &&
+          key === BATCH_BUYER_CHECKPOINTS.DECLINED_REQUEST &&
+          record.pending[key] !== unsentRequestId),
+    ) &&
     (pristine ||
       (record.state === SESSION_STATES.OPEN &&
         Object.values(record.requests).every((request) => request.accepted)));
   if (
     !closed &&
     !notCreated &&
+    !declined &&
     !unsent &&
     (row.uncertain || row.requestId !== null) &&
     !accepted &&
@@ -217,7 +322,12 @@ export async function openBatchBuyerPool(
         const record = await poolChild(options.paths, row);
         if (batchOpeningAbsent(record))
           return sessionFail(SESSION_CODES.CLOSED);
-        if (row.requestId !== null || Object.hasOwn(record.requests, requestId))
+        if (
+          row.requestId !== null ||
+          record.pending[BATCH_BUYER_CHECKPOINTS.DECLINED_REQUEST] ===
+            requestId ||
+          Object.hasOwn(record.requests, requestId)
+        )
           return sessionFail(SESSION_CODES.UNVERIFIED);
         await store.update((next) => {
           const row = next.entries.find(

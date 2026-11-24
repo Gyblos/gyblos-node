@@ -1,6 +1,6 @@
 // Owns the Cloudflare Worker entry for discovery.gyblos.com: maps bindings, the publish allowlist and
-// Solana RPC secrets and the Cache API (caches.default, when present) to the app, fails closed.
-// Development relaxations are never enabled here; nothing runs on import.
+// Solana RPC secrets and the Cache API (caches.default, when present) to the app, fails closed, and runs
+// the scheduled GitHub claim recheck. Development relaxations are never enabled here; nothing runs on import.
 import type { ExecutionContext } from 'hono';
 
 import { readRegistryIdentity } from '@gyblos/identity/resolution';
@@ -16,8 +16,12 @@ import {
   DISCOVERY_LIMITERS,
   DISCOVERY_PUBLISH_ALLOWLIST_BINDING,
   DISCOVERY_SOLANA_RPC_BINDING,
+  GITHUB_RECHECK_FAILED,
 } from './constants';
+import { createD1GithubClaimStore } from './github-claim-store-d1';
+import { recheckGithubClaims } from './github-claims';
 import type { DiscoveryLimiters, RateLimiter } from './limits';
+import { createD1SellerProfileStore } from './profile-store-d1';
 import { parsePublishAllowlist } from './publishers';
 import { createD1RegistrationStore } from './registration-store-d1';
 import type { RegistryReader } from './registrations';
@@ -107,6 +111,13 @@ function appFor(bindings: unknown, cache: WeakMap<object, DiscoveryIndex>) {
         ? createD1RegistrationStore(database)
         : undefined,
       registry: registryOf(bindings),
+      claims: isDatabase(database)
+        ? createD1GithubClaimStore(database)
+        : undefined,
+      gistFetch: edgeFetch(),
+      profiles: isDatabase(database)
+        ? createD1SellerProfileStore(database)
+        : undefined,
       limiters: limitersOf(bindings),
       publishers: parsePublishAllowlist(
         binding(bindings, DISCOVERY_PUBLISH_ALLOWLIST_BINDING),
@@ -136,11 +147,42 @@ export function createWorker() {
   };
 }
 
+// The scheduled run rechecks one bounded batch of GitHub claims. Without a database it does nothing.
+// A storage failure (for example before migration 0007 is applied) ends the run quietly: every write
+// is conditional, so nothing already stored is lost, and the next run tries again. The failure is
+// logged as one static code, so a stalled recheck is visible in the Worker logs.
+export async function scheduledRecheck(
+  bindings: unknown,
+  now: number,
+  fetcher: typeof fetch = fetch,
+) {
+  const database = binding(bindings, DISCOVERY_DB_BINDING);
+  if (!isDatabase(database)) return 0;
+  try {
+    return await recheckGithubClaims(
+      createD1GithubClaimStore(database),
+      edgeFetch(fetcher),
+      now,
+    );
+  } catch {
+    // A static code only: no request, IP or claim data.
+    console.warn(GITHUB_RECHECK_FAILED);
+    return 0;
+  }
+}
+
 // The default worker creates its app cache on the first request, not on import.
 let worker: ReturnType<typeof createWorker> | undefined;
 export default {
   fetch(request: Request, bindings: unknown, context?: unknown) {
     worker ??= createWorker();
     return worker.fetch(request, bindings, context);
+  },
+  scheduled(
+    controller: { scheduledTime: number },
+    bindings: unknown,
+    context: ExecutionContext,
+  ) {
+    context.waitUntil(scheduledRecheck(bindings, controller.scheduledTime));
   },
 };

@@ -16,7 +16,8 @@
     "apps/**/*.ts",
     "packages/**/*.ts",
     "tooling/**/*.ts",
-    "lab/**/*.ts"
+    "lab/**/*.ts",
+    "scripts/**/*.ts"
   ],
   "exclude": ["tooling/code-standards.test.ts", "apps/docs", "apps/explorer"]
 }

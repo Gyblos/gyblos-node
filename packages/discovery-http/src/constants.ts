@@ -23,6 +23,12 @@ export const DISCOVERY_ERROR_CODES = {
   NODE_REVOKED: 'DISCOVERY_NODE_REVOKED',
   REGISTRATION_REJECTED: 'DISCOVERY_REGISTRATION_REJECTED',
   RECORD_REJECTED: 'DISCOVERY_RECORD_REJECTED',
+  // GitHub claims (POST /identity/github): the claim's shape or time was refused; it is not newer than
+  // the one the index holds; the index does not know this NodeId as a seller.
+  CLAIM_REJECTED: 'DISCOVERY_CLAIM_REJECTED',
+  STALE_CLAIM: 'DISCOVERY_STALE_CLAIM',
+  UNKNOWN_NODE: 'DISCOVERY_UNKNOWN_NODE',
+  PROFILE_HELD: 'DISCOVERY_PROFILE_HELD',
   PAYLOAD_TOO_LARGE: 'DISCOVERY_PAYLOAD_TOO_LARGE',
   RATE_LIMITED: 'DISCOVERY_RATE_LIMITED',
   UNAVAILABLE: 'DISCOVERY_UNAVAILABLE',
@@ -45,6 +51,10 @@ export const INDEX_WIRE_ERRORS = {
   INVITE_INVALID: 'INVITE_INVALID',
   IDENTITY_NOT_REGISTERED: 'IDENTITY_NOT_REGISTERED',
   NODE_REVOKED: 'NODE_REVOKED',
+  INVALID_CLAIM: 'INVALID_CLAIM',
+  UNKNOWN_NODE: 'UNKNOWN_NODE',
+  PROFILE_HELD: 'PROFILE_HELD',
+  NO_PROFILE: 'NO_PROFILE',
 } as const;
 
 export const INDEX_ERROR_MAP: ReadonlyMap<string, DiscoveryErrorCode> = new Map(
@@ -77,12 +87,46 @@ export const REGISTRATION_ERROR_MAP: ReadonlyMap<string, DiscoveryErrorCode> =
     [INDEX_WIRE_ERRORS.HTTPS_REQUIRED, DISCOVERY_ERROR_CODES.INSECURE_URL],
   ]);
 
+// The index's answers to a GitHub claim's 400 and 403; any other body is CLAIM_REJECTED.
+export const CLAIM_ERROR_MAP: ReadonlyMap<string, DiscoveryErrorCode> = new Map(
+  [
+    [INDEX_WIRE_ERRORS.INVALID_CLAIM, DISCOVERY_ERROR_CODES.CLAIM_REJECTED],
+    [
+      INDEX_WIRE_ERRORS.INVALID_SIGNATURE,
+      DISCOVERY_ERROR_CODES.INVALID_SIGNATURE,
+    ],
+    [INDEX_WIRE_ERRORS.UNKNOWN_NODE, DISCOVERY_ERROR_CODES.UNKNOWN_NODE],
+    [INDEX_WIRE_ERRORS.PROFILE_HELD, DISCOVERY_ERROR_CODES.PROFILE_HELD],
+    [INDEX_WIRE_ERRORS.HTTPS_REQUIRED, DISCOVERY_ERROR_CODES.INSECURE_URL],
+  ],
+);
+
+// A GitHub claim's states and reasons as the index reports them (apps/discovery-index GITHUB_CLAIM_*);
+// external wire identifiers.
+export const GITHUB_CLAIM_STATES = {
+  PENDING: 'pending',
+  VERIFIED: 'verified',
+  LOST: 'lost',
+} as const;
+export type GithubClaimState =
+  (typeof GITHUB_CLAIM_STATES)[keyof typeof GITHUB_CLAIM_STATES];
+export const GITHUB_CLAIM_REASONS = {
+  GIST_NOT_FOUND: 'GIST_NOT_FOUND',
+  NODE_ID_MISSING: 'NODE_ID_MISSING',
+  GITHUB_UNAVAILABLE: 'GITHUB_UNAVAILABLE',
+  CHECK_DEFERRED: 'CHECK_DEFERRED',
+} as const;
+export type GithubClaimReason =
+  (typeof GITHUB_CLAIM_REASONS)[keyof typeof GITHUB_CLAIM_REASONS];
+
 export const DISCOVERY_PATHS = {
   records: '/records',
   sellers: '/sellers',
   models: '/models',
   registrations: '/registrations',
   uptime: '/uptime',
+  githubIdentity: '/identity/github',
+  profile: '/profile',
 } as const;
 
 // A beta invite as `gyblos index:invite` prints it, and a NodeId (lowercase hex of its Ed25519 key);
@@ -148,6 +192,11 @@ export const DISCOVERY_LIMITS = {
   maxUptimeResponseBytes: 4_096,
   // Uptime windows the index reports (1, 7 and 30 days today); more is malformed.
   maxUptimeWindows: 8,
+  // A GitHub claim answer or view: a few short fields.
+  maxClaimResponseBytes: 4_096,
+  // The longest CHECK_DEFERRED wait the index can ask for (its per-NodeId fetch interval).
+  maxRetryAfterSeconds: 3_600,
+  maxTimeMs: 8.64e15,
   // A canonical public v2 record may reach 32 KiB; 2 KiB more covers the envelope (same cap as the index).
   maxPublishBodyBytes: 34_816,
   defaultSellers: 50,

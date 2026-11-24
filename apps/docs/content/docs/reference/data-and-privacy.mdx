@@ -9,15 +9,17 @@ what is optional.
 
 ## At a glance [#at-a-glance]
 
-| What                                    | Goes to                                                     | When                                                           | Turn it off                                            |
-| --------------------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------ |
-| Your prompts and the answers            | The seller that serves the request, and its engine provider | Every request                                                  | No. A seller has to read a prompt to answer it         |
-| [Signed receipts](#receipts)            | The metrics collector, `collector.gyblos.com`               | Release builds, about once a minute                            | No                                                     |
-| [Telemetry observations](#observations) | The metrics collector                                       | Release builds, with the receipts                              | Yes: `GYBLOS_OBSERVATIONS=off`                         |
-| [Public seller records](#discovery)     | The discovery index, `discovery.gyblos.com`                 | While a seller is listed; the network list longer              | Partly: set `publish = false`                          |
-| [Registration](#discovery)              | The discovery index and Solana devnet                       | Once, when you run `gyblos seller register`                    | You choose whether to register                         |
-| [Update checks](#update-checks)         | The GitHub API                                              | Desktop app: at start and every 5 minutes. Seller: on `status` | Yes: `GYBLOS_UPDATE_CHECK=0`                           |
-| [Network metadata](#network)            | Relays, peers, the index, the collector and the Solana RPC  | Every connection                                               | Partly: [relay-only mode](/en/reference/configuration) |
+| What                                    | Goes to                                                     | When                                                                                    | Turn it off                                            |
+| --------------------------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| Your prompts and the answers            | The seller that serves the request, and its engine provider | Every request                                                                           | No. A seller has to read a prompt to answer it         |
+| [Signed receipts](#receipts)            | The metrics collector, `collector.gyblos.com`               | Release builds, about once a minute                                                     | No                                                     |
+| [Telemetry observations](#observations) | The metrics collector                                       | Release builds, with the receipts                                                       | Yes: `GYBLOS_OBSERVATIONS=off`                         |
+| [Public seller records](#discovery)     | The discovery index, `discovery.gyblos.com`                 | While a seller is listed; the network list longer                                       | Partly: set `publish = false`                          |
+| [Registration](#discovery)              | The discovery index and Solana devnet                       | Once, when you run `gyblos seller register`                                             | You choose whether to register                         |
+| [GitHub verification](#github)          | The discovery index, which then reads your gist on GitHub   | Only when you run `gyblos seller verify github`; the index rechecks about every 6 hours | You choose whether to verify; `--cancel` removes it    |
+| [Seller name](#seller-name)             | The discovery index                                         | Only when you run `gyblos seller name`                                                  | You choose whether to set one; `--clear` removes it    |
+| [Update checks](#update-checks)         | The GitHub API                                              | Desktop app: at start and every 5 minutes. Seller: on `status`                          | Yes: `GYBLOS_UPDATE_CHECK=0`                           |
+| [Network metadata](#network)            | Relays, peers, the index, the collector and the Solana RPC  | Every connection                                                                        | Partly: [relay-only mode](/en/reference/configuration) |
 
 A development build from a source checkout uploads no receipts or observations unless you set
 `GYBLOS_COLLECTOR_URL`.
@@ -31,6 +33,10 @@ A development build from a source checkout uploads no receipts or observations u
 - **Prompts and answers, to Gyblos.** Receipts, observations, local telemetry files and diagnostic logs
   carry no message text. The metrics collector refuses any upload with a field it does not expect, such
   as a prompt.
+
+## Desktop tokenizer download [#desktop-tokenizer]
+
+A desktop profile with paid chat enabled checks its local tokenizer when the buyer starts. If either public file is missing or fails its integrity check, the app downloads the two pinned files from Hugging Face. The provider receives the model revision and filenames in the request URL and ordinary connection information such as your IP address. The request includes no chat text, credentials or wallet details. The buyer verifies both SHA-256 hashes before installing the files. It reuses a verified local copy offline. Free-only profiles do not start the download.
 
 ## Who can read your messages [#who-reads-messages]
 
@@ -159,12 +165,100 @@ Buyers and the desktop app read the index to find sellers. `gyblos seller status
 for the seller's own uptime by NodeId, which the seller already publishes there. The index uses IP
 addresses for rate limiting and stores none.
 
+## GitHub verification [#github]
+
+Linking a GitHub account to your seller is optional. Nothing is sent unless you run
+`gyblos seller verify github` (see [Verify your GitHub account](/en/sellers/identity#verify-github)).
+
+**What becomes public.** The index publishes your claim at `GET /v1/identity/github/<NodeId>`: your
+NodeId, your GitHub account name, the gist id, the state (`pending`, `verified` or `lost`), the reason for
+the last result, when the index last tried to check (even if GitHub didn't answer) and since when it was last verified (still shown after it turns `lost`), and the time your node signed the claim with its signature, so anyone can check the claim without trusting the index. Anyone can read it,
+whatever the state. While the state is `verified`, the network list (`/v1/network`) also shows the account
+and the gist next to your seller. The gist itself is public on GitHub. A secret gist works too, but its id
+is published, so treat it as public.
+
+**What the index sends to GitHub.** The index reads one file,
+`https://gist.githubusercontent.com/<account>/<gist>/raw/gyblos-proof.txt`, with no GitHub token or API
+call. It reads it when you send the claim, at most once a minute per seller, and then about every 6 hours
+(it looks for due checks every 10 minutes). A claim that is still `pending` 7 days after you sent it is no
+longer checked until you run the command again. GitHub sees these requests come from the index, not from
+your machine.
+
+**What your machine sends.** The command signs the claim with the node key and sends it to the index:
+your NodeId, the account, the gist id and the time. It also reads the same gist file from your machine (and,
+when that file is missing, the gist's bare raw URL, to tell a wrong file name from a missing gist), so
+GitHub sees your IP address. If the GitHub CLI (`gh`) is installed, the command asks GitHub through `gh`
+which account `gh` is signed in as, but only when it has no gist to reuse for that account: no `--gist`,
+none saved for that account and none at the index (a saved gist that was found deleted doesn't count). It asks even if it then
+doesn't use `gh`. When that is the account you named, it uses your signed-in GitHub session to list your
+public gists and create the proof gist. `gyblos seller status --online`
+and `--status` ask the index for your claim by NodeId.
+
+**On your machine.** The command saves its progress (a format version, your NodeId, the account, the gist id and the last step) in
+`github-verification.json` in the seller home's `seller/` folder, readable only by you.
+
+**Remove it.** Run `gyblos seller verify github --cancel`. The index stops showing the account, the GET
+route answers `404`, and the command deletes the progress file. The index keeps only three things, and never
+serves them: your NodeId, the signed time of the cancel, and the last time a claim reserved a read of your
+gist. That reservation is written before the index contacts GitHub, even if the read then fails, and
+scheduled checks don't change it. The cancel's time makes the index refuse any older claim, so an old claim
+can't be sent again; the reservation time keeps a new claim from making the index read GitHub more than once
+a minute. The gist stays on GitHub: delete it yourself, or, if other sellers share it, remove only this
+seller's line.
+Copies that others made while it was public are outside Gyblos's control.
+
+## Seller name [#seller-name]
+
+A public name for your seller is optional. Nothing is sent unless you run `gyblos seller name` (see
+[`seller name`](/en/reference/cli#seller-name)).
+
+**What becomes public.** The index publishes the name at `GET /v1/profile/<NodeId>`, with your NodeId, the
+time your node signed it and the signature, and shows it next to your seller in the network list
+(`/v1/network`). Anyone can read it. The name is not verified and not unique: anyone who sees it should
+treat it as a label you chose, not as proof of who runs the seller. Don't put your legal name, email or
+location in it. The name is linked to your NodeId, and through it to your seller's public uptime, models and
+owner wallet, so anyone can connect them.
+
+**What your machine sends.** The command signs the name with the node key and sends it to the index: your
+NodeId, the name and the time. `--status` asks the index for the name by NodeId. Nothing is saved on your
+machine.
+
+**Remove it.** Run `gyblos seller name --clear`. The index stops showing the name, the GET route answers
+`404`, and the index keeps only your NodeId and the signed time of the clear, so an older name can't be sent
+again. Copies that others made while it was public are outside Gyblos's control.
+
+**Removal by the operator.** The index operator may remove a name, for example one that impersonates
+someone, and keep it from being set again until the operator allows it; the command then ends with
+`DISCOVERY_PROFILE_HELD`. The index also stops showing a name once it no longer knows your seller.
+
 ## Solana devnet [#solana]
 
 Registration and payments are public devnet transactions: anyone can see the addresses and amounts on
 a Solana explorer. Buyers and the desktop app also read the 8004 agent registry through a Solana RPC
 (by default `https://api.devnet.solana.com`) to check each seller's identity. The RPC provider sees
 those requests and your IP address.
+
+The Gyblos explorer (`explorer.gyblos.com`) lists the latest on-chain transactions of Gyblos channels
+(those whose open carries a Gyblos memo, or whose distribute pays the Gyblos treasury), newest first:
+time, instruction type, USDC amount (for a payout, how it split between the seller, the Gyblos fee, the
+program treasury and the refund to the buyer), signature, seller and channel, from the metrics
+collector's public `GET /v1/stats/chain/txs`. The seller column shows a listed seller when the channel's
+payout recipient (its first split recipient) equals the owner address that one, and only one, listed
+seller publishes in the discovery index, and links to that seller's page; a payout shared by several
+channels says "Several channels", and otherwise it says "Unlisted seller". That owner address is
+self-declared, so the column is a display hint, not proof of who was paid. It does link a listed
+seller's owner address to the channels that paid it and to the amounts.
+
+Each seller also has a page in the explorer, `explorer.gyblos.com/sellers/<NodeId>`, that gathers what is
+already public about it: its self-chosen name and verified GitHub account when it set them, its NodeId and
+owner address, its online state and uptime from the discovery index, its daily and per-model totals from
+the metrics collector's public `GET /v1/stats/sellers/<NodeId>` (buyer counts below 5 withheld, as above),
+and the Gyblos channel transactions whose payout recipient is its owner address, from
+`GET /v1/stats/chain/txs?recipient=<owner address>`. The owner address is shown only while the seller is
+online, and other sellers may publish the same one, so the listed transactions may belong to any of them.
+Going offline only hides the transactions from that page: anyone can ask the collector for the channels
+of any recipient address, and the transactions stay public on chain. A buyer's channels with a seller,
+with their deposits, payouts and refunds, are listed on that seller's page.
 
 ## Update checks [#update-checks]
 
@@ -191,6 +285,9 @@ index, the metrics collector and the Solana RPC see the IP address you connect f
 | Docker seller | `~/gyblos-seller` and the Docker volume `gyblos` (mounted at `/data`)        | `config.toml` and `seller.env` in the folder. Keys, registration state, receipts and payment records in the volume                |
 | Native seller | `~/.gyblos` (Windows: `%USERPROFILE%\.gyblos`)                               | `config.toml`, `seller.env`, `service.log` (macOS and Windows), and `seller/` with keys, registration, receipts and payments      |
 | Desktop app   | `gyblos-desktop` and `gyblos-wallet` in the system's application-data folder | Conversations, activity, the Chat budget and the local buyer; the wallet, once you set it up, protected by the system's key store |
+
+If you ran `gyblos seller verify github`, the seller's `seller/` folder (in the volume or in `~/.gyblos`)
+also holds `github-verification.json` until you cancel.
 
 The application-data folder is `~/Library/Application Support` on macOS, `%APPDATA%` on Windows and
 `~/.config` on Linux.

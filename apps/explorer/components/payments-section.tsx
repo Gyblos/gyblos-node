@@ -13,21 +13,23 @@ import {
 } from 'lucide-react';
 
 import {
+  chainHistoryNote,
   dailySettled,
   summarizeChain,
   type ChainSnapshot,
   type ChainSummary,
 } from '../lib/chain-shape';
 import { getChainStats } from '../lib/chain-stats';
-import { DISPLAY, UNITS } from '../lib/constants';
-import { count, usdc, usdcDecimal, utc } from '../lib/format';
-import type { RangeDays } from '../lib/range';
+import { DISPLAY, PAGING, UNITS } from '../lib/constants';
+import { count, settlementCount, usdc, usdcDecimal, utc } from '../lib/format';
+import { rangeOf, tablePager, type ExplorerQuery } from '../lib/paging';
 import { Flow } from './board/animated-number';
 import { BarChartCard } from './board/bar-chart-card';
 import { delta, type Delta } from './board/delta';
 import { StatCard } from './board/stat-card';
+import { pagedRows, Pager } from './pager';
 import {
-  moneyCell,
+  amountCell,
   numberCell,
   SectionTitle,
   Table,
@@ -39,11 +41,8 @@ const money = (atomic: bigint) => (
   <Flow value={usdcDecimal(atomic)} kind="usdc" />
 );
 
-function meta(backfillDone: boolean | null, aggregatedAt: number | null) {
-  if (backfillDone === null) return 'chain index starting';
-  if (!backfillDone) return 'reading chain history';
-  return `updated ${utc(aggregatedAt)}`;
-}
+const meta = (backfillDone: boolean | null, aggregatedAt: number | null) =>
+  chainHistoryNote(backfillDone) ?? `updated ${utc(aggregatedAt)}`;
 
 // Each figure's change against the span just before the range; none when it cannot be read or the
 // chain history is still being read (an incomplete earlier span would overstate every change).
@@ -60,22 +59,27 @@ function changes(current: ChainSummary['totals'], before: ChainSnapshot) {
   };
 }
 
-export async function PaymentsSection({ days }: { days: RangeDays }) {
+export async function PaymentsSection({ query }: { query: ExplorerQuery }) {
+  const days = rangeOf(query, 'payments');
   const [chain, before] = await Promise.all([
     getChainStats(days),
     getChainStats(days, 1),
   ]);
-  if (chain.error) return <Unavailable title="Payments" />;
+  if (chain.error)
+    return (
+      <Unavailable title="Payments" anchors={[PAGING.anchors.chainDaily]} />
+    );
   const summary = summarizeChain(chain);
   const { totals } = summary;
   const change = changes(totals, before);
   return (
     <>
       <SectionTitle
-        title={`Payments · ${days} days`}
+        title={`Payments, last ${days} days`}
+        range={{ section: 'payments', days }}
         meta={
           change
-            ? `vs previous ${days} days · ${meta(chain.backfillDone, chain.aggregatedAt)}`
+            ? `vs previous ${days} days, ${meta(chain.backfillDone, chain.aggregatedAt)}`
             : meta(chain.backfillDone, chain.aggregatedAt)
         }
       />
@@ -85,7 +89,11 @@ export async function PaymentsSection({ days }: { days: RangeDays }) {
         total={totals.settled}
         change={change?.settled[0]}
       />
-      <DailyTable summary={summary} />
+      <DailyTable
+        query={query}
+        summary={summary}
+        complete={chain.backfillDone === true}
+      />
     </>
   );
 }
@@ -124,6 +132,7 @@ function PaymentStats({
       <StatCard
         icon={Percent}
         label="Effective fee"
+        hint="Gyblos fees as a share of what buyers paid out: fees divided by fees plus what sellers received."
         value={<Flow value={summary.feeShare} kind="percent" />}
       />
       <StatCard
@@ -144,12 +153,12 @@ function PaymentStats({
         label="Refunded"
         value={money(totals.refunded)}
         deltas={change?.refunded}
-        money
       />
       <StatCard
         icon={ListOrdered}
-        label="Gyblos · program txs"
-        value={`${count(totals.transactions)} · ${count(summary.programTransactions)}`}
+        label="Gyblos transactions"
+        value={count(totals.transactions)}
+        caption={`of ${count(summary.programTransactions)} in the payments program`}
       />
     </div>
   );
@@ -163,13 +172,13 @@ function SettledChart({
 }: {
   chain: ChainSnapshot;
   total: bigint;
-  change?: Delta;
+  change?: Delta | null;
 }) {
   const points = dailySettled(chain).map((day) => ({
     day: day.day,
     value: Number(day.settled) / UNITS.atomicPerUsdc,
     amount: usdcDecimal(day.settled),
-    detail: `${count(day.settles)} settlements`,
+    detail: settlementCount(day.settles),
   }));
   if (!points.length) return null;
   return (
@@ -186,32 +195,64 @@ function SettledChart({
   );
 }
 
-function DailyTable({ summary }: { summary: ChainSummary }) {
+function DailyTable({
+  query,
+  summary,
+  complete,
+}: {
+  query: ExplorerQuery;
+  summary: ChainSummary;
+  complete: boolean;
+}) {
+  const page = pagedRows(
+    query,
+    'chainDaily',
+    [...summary.days].reverse(),
+    complete,
+    {
+      day: (row) => row.day,
+      settled: (row) => row.gyblos.settled,
+      paidOut: (row) => row.gyblos.paidOut,
+    },
+  );
   if (!summary.days.length) return null;
   return (
     <>
-      <SectionTitle title="Daily on chain" />
+      <SectionTitle id={PAGING.anchors.chainDaily} title="Daily on chain" />
       <Table
         minWidth={DISPLAY.dailyTable}
+        sorting={{ query, table: 'chainDaily' }}
         head={[
-          { label: 'Day (UTC)' },
+          { label: 'Day (UTC)', sort: 'day', ascendingFirst: true },
           { label: 'Opens', right: true },
           { label: 'Settlements', right: true },
-          { label: 'Settled', right: true },
-          { label: 'To sellers', right: true },
+          { label: 'Settled', right: true, sort: 'settled' },
+          { label: 'To sellers', right: true, sort: 'paidOut' },
           { label: 'Fees', right: true },
           { label: 'Refunded', right: true },
           { label: 'All program txs', right: true },
         ]}
+        footer={
+          <Pager
+            label="Daily on chain"
+            view={tablePager(query, 'chainDaily', page)}
+          />
+        }
       >
-        {[...summary.days].reverse().map(({ day, gyblos, program }) => (
+        {page.rows.map(({ day, gyblos, program }) => (
           <tr key={day} className="border-t border-line">
             <td className={`${td} font-mono`}>{day}</td>
             <td className={numberCell}>{count(gyblos.opens)}</td>
             <td className={numberCell}>{count(gyblos.settles)}</td>
-            <td className={moneyCell}>{usdc(gyblos.settled)}</td>
-            <td className={moneyCell}>{usdc(gyblos.paidOut)}</td>
-            <td className={moneyCell}>{usdc(gyblos.gyblosFees)}</td>
+            <td className={amountCell(gyblos.settled)}>
+              {usdc(gyblos.settled)}
+            </td>
+            <td className={amountCell(gyblos.paidOut)}>
+              {usdc(gyblos.paidOut)}
+            </td>
+            <td className={amountCell(gyblos.gyblosFees)}>
+              {usdc(gyblos.gyblosFees)}
+            </td>
             <td className={`${numberCell} text-muted`}>
               {usdc(gyblos.refunded)}
             </td>

@@ -12,6 +12,8 @@ import {
 } from 'electron';
 
 import { desktopX402Paths } from '@gyblos/config/home';
+import { reviewDesktopCharge } from '@gyblos/node/buyer-funding';
+import { desktopOpening } from '@gyblos/node/desktop-opening';
 import {
   acquireProcessLock,
   readPrivateFile,
@@ -19,6 +21,7 @@ import {
   type ProcessLock,
 } from '@gyblos/runtime/private-file';
 
+import { registerFunding } from './funding/host';
 import { createUsdcApiHandlers } from './usdc-api-handlers';
 import { USDC_API } from './usdc-api-model';
 import { X402Budget } from './x402-budget';
@@ -42,17 +45,27 @@ function managedBuyer(
     app.isPackaged ? app.getVersion() : undefined,
   );
   const service = new ManagedBuyer(
-    () =>
-      utilityProcess.fork(join(directory, DESKTOP_X402.SERVICE_FILE), [], {
-        cwd: profile,
-        stdio: 'ignore',
-        env: environment,
-      }),
+    (_home, _token, maxAtomic, autoPrices) =>
+      utilityProcess.fork(
+        join(directory, DESKTOP_X402.SERVICE_FILE),
+        maxAtomic === undefined
+          ? []
+          : [
+              maxAtomic,
+              ...(autoPrices === undefined ? [] : [JSON.stringify(autoPrices)]),
+            ],
+        {
+          cwd: profile,
+          stdio: 'ignore',
+          env: environment,
+        },
+      ),
     () => client.disconnect(),
   );
   const managed = automaticBuyer(
     {
-      start: () => service.start(profile),
+      start: (maxAtomic, autoPrices) =>
+        service.start(profile, undefined, maxAtomic, autoPrices),
       stop: () => service.stop(),
       close: () => service.close(),
     },
@@ -60,6 +73,37 @@ function managedBuyer(
     budget,
   );
   return { environment, managed };
+}
+function frameOwner(window: BrowserWindow) {
+  return {
+    contents: window.webContents,
+    mainFrame: () => window.webContents.mainFrame,
+    destroyed: () => window.isDestroyed(),
+  };
+}
+function ownedBudget(profile: string) {
+  const paths = desktopX402Paths(profile);
+  let ownership: Promise<ProcessLock> | null = null;
+  const budget = new X402Budget(
+    {
+      async read() {
+        ownership ??= acquireProcessLock(paths.lock);
+        await ownership;
+        return readPrivateFile(paths.state, DESKTOP_X402.MAX_BYTES);
+      },
+      async write(text) {
+        const lock = await ownership;
+        if (!lock) throw new Error('Storage unavailable');
+        await lock.verify();
+        await writePrivateFile(paths.state, text, DESKTOP_X402.MAX_BYTES);
+      },
+    },
+    desktopOpening({ GYBLOS_HOME: profile }),
+  );
+  return {
+    budget,
+    release: async () => (await ownership?.catch(() => null))?.release(),
+  };
 }
 export function registerDesktopX402(
   window: BrowserWindow,
@@ -69,21 +113,7 @@ export function registerDesktopX402(
     typeof import('./catalog/host').registerNetworkCatalog
   >,
 ) {
-  const paths = desktopX402Paths(profile);
-  let ownership: Promise<ProcessLock> | null = null;
-  const budget = new X402Budget({
-    async read() {
-      ownership ??= acquireProcessLock(paths.lock);
-      await ownership;
-      return readPrivateFile(paths.state, DESKTOP_X402.MAX_BYTES);
-    },
-    async write(text) {
-      const lock = await ownership;
-      if (!lock) throw new Error('Storage unavailable');
-      await lock.verify();
-      await writePrivateFile(paths.state, text, DESKTOP_X402.MAX_BYTES);
-    },
-  });
+  const { budget, release } = ownedBudget(profile);
   const client = new X402Client(budget);
   const { environment, managed } = managedBuyer(
     profile,
@@ -91,31 +121,34 @@ export function registerDesktopX402(
     client,
     budget,
   );
+  const closeFunding = registerFunding(
+    window,
+    environment,
+    () => client.policy(),
+    () => client.managed(),
+    resolveOffer.resolve,
+  );
+  const owner = frameOwner(window);
   const handle = createX402Handlers(
     client,
     budget,
-    {
-      contents: window.webContents,
-      mainFrame: () => window.webContents.mainFrame,
-      destroyed: () => window.isDestroyed(),
-    },
+    owner,
     (url) => shell.openExternal(url),
-    managed,
+    {
+      ...managed,
+      review: (ref, policy) => reviewDesktopCharge(environment, ref, policy),
+    },
     (value) => clipboard.writeText(value),
     (progress) =>
       window.webContents.mainFrame.send(
         DESKTOP_X402.PROGRESS_CHANNEL,
         progress,
       ),
-    resolveOffer,
+    resolveOffer.current,
   );
   const apiKeys = createUsdcApiHandlers(
     client,
-    {
-      contents: window.webContents,
-      mainFrame: () => window.webContents.mainFrame,
-      destroyed: () => window.isDestroyed(),
-    },
+    owner,
     (text) => clipboard.writeText(text),
     { home: homedir(), environment },
   );
@@ -130,13 +163,14 @@ export function registerDesktopX402(
   );
   return {
     async close() {
+      closeFunding();
       apiKeys.close();
       ipcMain.removeHandler(USDC_API.CHANNEL);
       ipcMain.removeHandler(USDC_API.REVEAL_CHANNEL);
       await client.close();
       await managed.close();
       ipcMain.removeHandler(DESKTOP_X402.CHANNEL);
-      await (await ownership?.catch(() => null))?.release();
+      await release();
     },
   };
 }

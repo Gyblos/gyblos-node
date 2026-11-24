@@ -38,6 +38,48 @@ To make the check mandatory, run `GYBLOS_REQUIRE_SIGNATURE=1 sh install.sh`; it 
 signature verifies. To verify the image yourself or write each file by hand, see
 [Install without the script](/en/sellers/manual-install).
 
+### Your own devnet RPC, if you will charge [#own-rpc]
+
+A seller that charges sends channel transactions through its Solana RPC. The default, the public
+`https://api.devnet.solana.com`, needs no account and works for most sellers. It limits requests per IP
+address, though, so several services on one address can make channel openings fail (`gyblos logs` then
+shows `invalid_batch_settlement_svm_channel_state` or `PAYMENT_UNAVAILABLE`). Then use a dedicated devnet
+endpoint: set it on an [installed seller](#change-rpc), or set `GYBLOS_RPC_URL` before the **first** run of
+the installer (replace `DEVNET_RPC_URL` with your endpoint's URL):
+
+- **Docker:** create the folder and a private `seller.env` with the URL, then run the installer in Docker
+  mode, which keeps both and stops if Docker cannot run (with `GYBLOS_DIR`, use that folder):
+
+  ```sh
+  mkdir -m 700 ~/gyblos-seller
+  (umask 077 && printf 'GYBLOS_RPC_URL=%s\n' 'DEVNET_RPC_URL' > ~/gyblos-seller/seller.env)
+  GYBLOS_MODE=docker sh install.sh
+  ```
+
+- **Native on macOS or Linux:** `GYBLOS_RPC_URL='DEVNET_RPC_URL' GYBLOS_MODE=native sh install.sh`
+  (without `GYBLOS_MODE=native`, a running Docker is chosen and the variable is not used).
+- **Windows:** in PowerShell, `$env:GYBLOS_RPC_URL='DEVNET_RPC_URL'` before running `install.ps1`.
+
+The seller keeps the URL in its private role file. A URL with an API key is a secret: never put it in
+`config.toml`.
+
+#### Change the RPC of an installed seller [#change-rpc]
+
+`gyblos seller rpc set` asks for the URL on the terminal, checks that it answers as Solana devnet and saves
+it; your keys, NodeId and registration stay. It never takes the URL as an argument, so it stays out of your
+shell history, and afterwards it shows only the address, never the path or key. Use a provider you trust:
+the seller's fee payer signs what this RPC asks it to. Then restart the seller:
+
+- **Docker:** in the seller folder, `docker compose exec seller gyblos seller rpc set`, then
+  `docker compose restart seller`.
+- **Native on macOS, Linux or Windows:** `gyblos seller rpc set`, then `gyblos seller service restart`,
+  which keeps the background service's settings. If you run `gyblos start` yourself, stop it and run it
+  again.
+
+On a terminal the command always asks for the URL. A script without one sets `GYBLOS_RPC_URL` instead.
+
+`gyblos seller rpc` shows the RPC in use, and `gyblos seller rpc reset` goes back to the public one.
+
 ### Native seller on macOS or Linux
 
 Without a usable Docker, the same installer sets up the **native seller**: it checks the download against
@@ -78,11 +120,22 @@ The output is similar to the following:
 Seller identity (public; `docker compose exec seller gyblos seller register` enrolls it in discovery):
   nodeId  NODE_ID
   owner   OWNER_ADDRESS
-  fee payer  FEE_PAYER_ADDRESS  (pays priced offers' transactions; needs devnet SOL only to charge)
+  fee payer  FEE_PAYER_ADDRESS  (pays channel transactions once an offer has a price; send it about 0.05 devnet SOL first)
 ```
 
 These values are public and safe to share. Your seller starts **unlisted**: buyers cannot find it until you
 register and publish it. What each key does is in [Identity and backups](/en/sellers/identity#keys).
+
+Two of these addresses need devnet SOL, which is free test money from
+[faucet.solana.com](https://faucet.solana.com) (choose **devnet**):
+
+| Address     | When                               | How much                                                                    |
+| ----------- | ---------------------------------- | --------------------------------------------------------------------------- |
+| `owner`     | Before registering, every seller   | About 0.02 SOL; registration costs about 0.01 once                          |
+| `fee payer` | Before you set a price on an offer | About 0.05 SOL; it pays the payment token accounts and channel transactions |
+
+A free seller funds only the owner. The installer ends with the fee payer note, and `gyblos doctor --online`
+flags a low fee payer balance ([Get paid](/en/sellers/get-paid#fund-the-fee-payer)).
 
 ## 2. Register and publish [#finish-onboarding]
 

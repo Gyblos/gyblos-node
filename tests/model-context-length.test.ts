@@ -57,6 +57,17 @@ void test('a paid buyer announces the context of its paid sellers, with open fre
   const openPaid = seller(3, { contextTokens: 4096 });
   const sellers = [paid, openFree, openPaid];
   const configured = new Set([nodeId(1)]);
+  assert.equal(
+    routeContextTokens({
+      request: request(),
+      sellers,
+      configured,
+      open: true,
+      paidAuto: true,
+      now: NOW,
+    }),
+    4096,
+  );
   // Paid sellers only: their context, not left out because a free request would not reach them.
   assert.equal(
     routeContextTokens({

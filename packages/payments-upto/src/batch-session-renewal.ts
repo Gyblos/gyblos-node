@@ -17,9 +17,13 @@ import {
   writePrivateFile,
 } from '@gyblos/runtime/private-file';
 
+import { batchOpeningAbsent } from './batch-opening-proof';
 import { parseRecord, termsFor } from './batch-session-checks';
 import { initialRecord } from './batch-session-common';
-import { sameBatchParties } from './batch-session-history';
+import {
+  compatibleBuyerGeneration,
+  sameBatchParties,
+} from './batch-session-history';
 import { withBatchState } from './batch-session-io';
 import { priorBatchSpent, readBatchRecord } from './batch-session-state';
 import type {
@@ -36,6 +40,7 @@ export interface BatchRenewalOptions {
   now: () => number;
   observe(channelId: string): Promise<SessionSettlement | undefined>;
   totalBudgetAtomic?: string;
+  switchSeller?: boolean;
 }
 
 export async function renewBatchSession(
@@ -63,11 +68,14 @@ export async function renewBatchSession(
     }
     if (
       previous.channelId !== options.expectedChannelId ||
-      !sameBatchParties(previous.terms, terms)
+      !canRenew(previous, terms, options)
     )
       return sessionFail(SESSION_CODES.BINDING);
+    const absent =
+      options.totalBudgetAtomic !== undefined && !!batchOpeningAbsent(previous);
     if (
       !unsigned &&
+      !absent &&
       (previous.state !== SESSION_STATES.CLOSED || !previous.settlement)
     )
       return sessionFail(SESSION_CODES.UNVERIFIED);
@@ -78,11 +86,13 @@ export async function renewBatchSession(
         (previous.history?.length ?? 0) >= BATCH_RENEWAL_STATE.maxHistory)
     )
       return sessionFail(SESSION_CODES.LIMIT);
-    const observed = unsigned
-      ? undefined
-      : await options.observe(previous.channelId);
+    const observed =
+      unsigned || absent
+        ? undefined
+        : await options.observe(previous.channelId);
     if (
       !unsigned &&
+      !absent &&
       (!observed ||
         canonicalJson(observed) !== canonicalJson(previous.settlement))
     )
@@ -169,5 +179,21 @@ function unsignedPreparation(record: BatchRecord) {
     record.closing === null &&
     record.settlement === null &&
     record.blocks === undefined
+  );
+}
+
+function canRenew(
+  previous: BatchRecord,
+  terms: PaymentSessionTerms,
+  options: BatchRenewalOptions,
+) {
+  return (
+    sameBatchParties(previous.terms, terms) ||
+    (options.switchSeller &&
+      options.totalBudgetAtomic !== undefined &&
+      (previous.settlement ||
+        batchOpeningAbsent(previous) ||
+        unsignedPreparation(previous)) &&
+      compatibleBuyerGeneration(previous.terms, terms))
   );
 }

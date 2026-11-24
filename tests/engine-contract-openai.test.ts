@@ -36,7 +36,11 @@ const CONTEXT = 32_768;
 
 function engineAt(
   base: string,
-  options: { apiKey?: string; generationTimeoutMs?: number } = {},
+  options: {
+    apiKey?: string;
+    generationTimeoutMs?: number;
+    disableThinking?: boolean;
+  } = {},
 ): Engine {
   return createOpenAiEngine(
     {
@@ -44,6 +48,7 @@ function engineAt(
       model: FAKE_OPENAI_MODEL,
       contextTokens: CONTEXT,
       recountable: false,
+      ...(options.disableThinking ? { disableThinking: true } : {}),
       ...(options.apiKey ? { apiKey: options.apiKey } : {}),
     },
     fetch,
@@ -109,6 +114,33 @@ void test('engine-openai streams one user message with the upstream model, max_t
       stream: true,
       stream_options: { include_usage: true },
     });
+  }));
+
+void test('engine-openai asks a local Qwen3 server to keep thinking off, as the recount renders it', () =>
+  withServer(stream(COMPLETE), async (server) => {
+    await engineAt(server.base, { disableThinking: true }).generate({
+      prompt: 'synthetic',
+      maxTokens: 8,
+    });
+    const request = server.seen.find((seen) =>
+      seen.url.endsWith('/chat/completions'),
+    )!;
+    const body = JSON.parse(request.body);
+    assert.deepEqual(body.chat_template_kwargs, { enable_thinking: false });
+    // Ollama's /v1 (0.40.0, compose.yaml) ignores the template switch and maps this to think=false; vLLM,
+    // SGLang and llama.cpp ignore the unknown field.
+    assert.deepEqual(body.reasoning, { effort: 'none' });
+  }));
+
+void test('engine-openai leaves reasoning untouched when thinking is not disabled', () =>
+  withServer(stream(COMPLETE), async (server) => {
+    await engineAt(server.base).generate({ prompt: 'synthetic', maxTokens: 8 });
+    const request = server.seen.find((seen) =>
+      seen.url.endsWith('/chat/completions'),
+    )!;
+    const body = JSON.parse(request.body);
+    assert.equal('reasoning' in body, false);
+    assert.equal('chat_template_kwargs' in body, false);
   }));
 
 void test('engine-openai sends no authorization without a key', () =>

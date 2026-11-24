@@ -1,6 +1,4 @@
 // Binds the seller’s devnet payment identity to its reusable channel registry.
-import { createSolanaRpc } from '@solana/kit';
-
 import {
   DEVNET,
   DEVNET_GENESIS,
@@ -12,6 +10,7 @@ import {
   createUptoRecipientAccounts,
   type UptoRecipientAccountsRpc,
 } from '@gyblos/payments-upto';
+import { rateLimitedSolanaRpc } from '@gyblos/payments-upto/rpc-rate-limit';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 import type { PaymentDescription } from '@gyblos/protocol/payment';
 
@@ -25,7 +24,7 @@ import type { SellerSessionComposition } from './seller-session-directory';
 export type GenesisReader = (rpcUrl: string) => Promise<string>;
 export const readGenesis: GenesisReader = async (rpcUrl) =>
   String(
-    await createSolanaRpc(rpcUrl)
+    await rateLimitedSolanaRpc(rpcUrl)
       .getGenesisHash()
       .send({ abortSignal: AbortSignal.timeout(GENESIS_READ_MS) }),
   );
@@ -65,7 +64,7 @@ export function sellerChainPayments(
     )
       throw new NodeError(NODE_ERROR_CODES.SELLER_PAYMENT_DESCRIPTION_INVALID);
     const recipients = createUptoRecipientAccounts(
-      rpc ?? createSolanaRpc(role.rpcUrl),
+      rpc ?? rateLimitedSolanaRpc(role.rpcUrl),
       {
         feePayer,
         mint: role.mint,

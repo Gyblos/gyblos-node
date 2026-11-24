@@ -19,20 +19,25 @@ Reemplaza `COMMAND` por un comando de la tabla siguiente. Los ejemplos de esta p
 
 ## Comandos [#índice-de-comandos]
 
-| Comando                           | Opciones                                                            | Códigos de salida                                            |
-| --------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------ |
-| `gyblos start`                    | Ninguna                                                             | Corre hasta que lo detienes                                  |
-| `gyblos setup`                    | `--role seller --mint MINT`                                         | 0 llaves listas; distinto de 0 si falla                      |
-| `gyblos tokenizer`                | Ninguna                                                             | 0 verificado; distinto de 0 si falla                         |
-| `gyblos --version`                | Ninguna                                                             | 0                                                            |
-| `gyblos config validate`          | `--config PATH`                                                     | 0 válido; 1 inválido o error de uso                          |
-| `gyblos doctor`                   | `--online`                                                          | 0 ninguna comprobación falló, aunque haya avisos; 1 un fallo |
-| `gyblos seller status`            | `--online`                                                          | 0 solo con `RUNNING`; 1 con cualquier otro estado o error    |
-| `gyblos seller register`          | Ninguna                                                             | 0 registrado o ya registrado; 1 fallo                        |
-| `gyblos seller init`              | Consulta [`seller init`](#opciones-de-init-para-un-checkout-nativo) | 0 escrito; 1 fallo; 130 pregunta cancelada                   |
-| `gyblos seller service install`   | `--memory SIZE`, `--cpu PERCENT`, `--dry-run`                       | 0 éxito; 1 fallo                                             |
-| `gyblos seller service uninstall` | `--dry-run`                                                         | 0 éxito; 1 fallo                                             |
-| `gyblos logs`                     | Consulta [`logs`](#logs-operativos-locales)                         | 0 lectura completa; 1 error de uso o datos ilegibles         |
+| Comando                                     | Opciones                                                            | Códigos de salida                                            |
+| ------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `gyblos start`                              | Ninguna                                                             | Corre hasta que lo detienes                                  |
+| `gyblos setup`                              | `--role seller --mint MINT`                                         | 0 llaves listas; distinto de 0 si falla                      |
+| `gyblos tokenizer`                          | Ninguna                                                             | 0 verificado; distinto de 0 si falla                         |
+| `gyblos --version`                          | Ninguna                                                             | 0                                                            |
+| `gyblos --help` / `gyblos -h`               | Ninguna                                                             | 0 imprime el uso en la salida estándar                       |
+| `gyblos config validate`                    | `--config PATH`                                                     | 0 válido; 1 inválido o error de uso                          |
+| `gyblos doctor`                             | `--online`                                                          | 0 ninguna comprobación falló, aunque haya avisos; 1 un fallo |
+| `gyblos seller status`                      | `--online`                                                          | 0 solo con `RUNNING`; 1 con cualquier otro estado o error    |
+| `gyblos seller register`                    | Ninguna                                                             | 0 registrado o ya registrado; 1 fallo                        |
+| `gyblos seller rpc`, `rpc set`, `rpc reset` | Ninguna                                                             | 0 mostrado o guardado; 1 fallo, sin cambios                  |
+| `gyblos seller verify github USER`          | `--gist URL`; o `--status`, `--cancel` sin `USER`                   | 0 verificado, mostrado o cancelado; 1 sin verificar o fallo  |
+| `gyblos seller name NAME`                   | O `--clear`, `--status` sin `NAME`                                  | 0 puesto, quitado o mostrado; 1 rechazado o fallo            |
+| `gyblos seller init`                        | Consulta [`seller init`](#opciones-de-init-para-un-checkout-nativo) | 0 escrito; 1 fallo; 130 pregunta cancelada                   |
+| `gyblos seller service install`             | `--memory SIZE`, `--cpu PERCENT`, `--dry-run`                       | 0 éxito; 1 fallo                                             |
+| `gyblos seller service uninstall`           | `--dry-run`                                                         | 0 éxito; 1 fallo                                             |
+| `gyblos seller service restart`             | `--dry-run`                                                         | 0 éxito; 1 fallo o no instalado                              |
+| `gyblos logs`                               | Consulta [`logs`](#logs-operativos-locales)                         | 0 lectura completa; 1 error de uso o datos ilegibles         |
 
 No existe `gyblos stop`, ni flags generales `--home`, `--relay`, `--rpc-url` o `--discovery-url`. Detén un
 vendedor Docker con Compose y un vendedor nativo mediante su servicio (consulta
@@ -100,13 +105,16 @@ cd ~/gyblos-seller
 docker compose exec seller gyblos seller status
 docker compose exec seller gyblos seller status --online
 docker compose exec seller gyblos seller register
+docker compose exec seller gyblos seller verify github USER
+docker compose exec seller gyblos seller name "NAME"
 ```
 
 `seller status` solo lee. `--online` además busca el NodeId del vendedor en el índice de descubrimiento.
 Mientras el índice rechace o falle la publicación de este vendedor, la línea de descubrimiento agrega
 `publishing refused:` y un código estático. Mientras sirva algún modelo, una línea `uptime` muestra qué
 tan seguido el índice aceptó la presencia de este vendedor en las últimas 24 horas, 7 días y 30 días, y
-`online, last presence … ago` u `offline since …`; esa consulta envía al índice el NodeId, que es público. El
+`online, last presence … ago` u `offline since …`, y una línea `github` muestra la cuenta de GitHub que el
+índice vincula a este vendedor y su estado; esas consultas envían al índice el NodeId, que es público. El
 resumen de actividad sale de los recibos firmados guardados en el equipo; no es un saldo de cuota. La línea
 `receipt queue` muestra los recibos que esperan subirse al recolector de métricas, los bytes reservados
 para ellos y las escrituras rechazadas. `FULL` significa que no se pueden guardar recibos nuevos hasta que
@@ -117,6 +125,51 @@ se suban algunos. En una versión publicada, status también avisa cuando hay un
 desde un argumento de la línea de comandos. Pregunta antes de firmar y enviar un registro en devnet que
 cuesta SOL, y no cambia `config.toml` ni publica. Lee [Registra y publica](/es/sellers/register-publish)
 antes de ejecutarlo.
+
+`seller rpc` muestra el origen del RPC de Solana que usa el vendedor. `seller rpc set` pide la URL en una
+terminal interactiva (un script sin terminal usa `GYBLOS_RPC_URL`), nunca la recibe como argumento, la guarda solo después de que
+responde como devnet y no cambia nada más; `seller rpc reset` vuelve al RPC público de devnet. El vendedor
+la lee al arrancar, así que reinícialo después con `gyblos seller service restart` (mira
+[Cambiar el RPC de un vendedor instalado](/es/sellers/beta-guide#cambiar-rpc)).
+
+## seller verify github [#verificar-github]
+
+`seller verify github USER` muestra a los compradores qué cuenta de GitHub opera este vendedor. El
+índice ya debe conocer el vendedor: registrado, o con un catálogo que el índice aún guarda porque publicó sus modelos. Hace falta un gist de `USER` con un archivo llamado `gyblos-proof.txt` que contenga la línea `gyblos-node=NODEID` (también sirve un gist no listado; su id se publica igual); luego la clave del nodo firma una declaración con la cuenta y el gist, y el
+índice revisa el gist por su cuenta. Si la CLI de GitHub (`gh`) tiene la sesión iniciada como `USER`, el
+comando crea el gist. Si no, imprime el texto para poner en un archivo llamado `gyblos-proof.txt` en un gist nuevo en gist.github.com y pide
+la dirección del gist, o la toma de `--gist`. Rechaza un gist de otra cuenta.
+
+Guarda su avance en el directorio del vendedor y en cada ejecución revisa primero el índice y el gist, así
+que puedes detenerlo en cualquier momento y volver a ejecutarlo. `Verified` sale con 0; `pending` o `lost`
+salen con 1 y dicen por qué, por ejemplo que falta la línea de prueba o que el índice no pudo llegar a
+GitHub (vuelve a ejecutarlo más tarde). `--status` muestra lo que tiene el índice; `--cancel` quita el
+vínculo y deja el gist para que lo borres tú. Solo `verified` significa que el índice encontró la prueba.
+
+## seller name [#nombre-del-vendedor]
+
+`seller name "NAME"` pone un nombre público opcional que el índice de descubrimiento muestra junto al
+NodeId de este vendedor. Lo eliges tú: el índice no lo verifica y dos vendedores pueden usar el mismo nombre,
+así que nunca lleva una marca de verificación. Solo [`seller verify github`](#verificar-github) prueba quién
+opera un vendedor. Para poner un nombre, el índice ya debe conocer el vendedor, igual que para `seller verify github`; `--clear` funciona en cualquier caso.
+
+Un nombre tiene de 1 a 32 caracteres: letras y números, espacios y `-` `_` `.` `'`, con al menos una letra o
+un número. Se permiten tildes y otros signos después de una letra, así que se pueden escribir nombres en
+hindi, tailandés, árabe, hebreo, yoruba y muchos otros idiomas, pero todas las letras deben ser de un mismo
+sistema de escritura de uso amplio. El latín se puede mezclar con caracteres chinos y kana japonés, hangul coreano o bopomofo. Los apóstrofos tipográficos como ’ se convierten en un apóstrofo recto; usa un apóstrofo recto `'`. No se aceptan los unificadores (ZWNJ, ZWJ) ni los puntos medios `·` y `・`.
+Se rechazan los emoji, los símbolos como las marcas de verificación, las letras modificadoras y versalitas, y
+los caracteres invisibles, y también cualquier nombre que contenga `gyblos`, `verified`, `verificado`,
+`official` u `oficial`, aunque se escriba con dígitos, espacios o puntuación. Los espacios de más se quitan.
+Un nombre rechazado se detiene con `NAME_INVALID` o `NAME_RESERVED` y dice qué parte falló, antes de enviar
+nada. Para un nombre que empieza con `-`, pon `--` delante: `gyblos seller name -- "-Lab"`. La clave del nodo
+firma el nombre y el comando lo envía al índice, que puede tardar hasta 10 segundos en mostrarlo.
+
+`--clear` quita el nombre; `--status` muestra el nombre que tiene el índice, o dice que un operador del índice lo quitó. Los rechazos del índice
+terminan con un código estático entre corchetes, como `DISCOVERY_UNKNOWN_NODE` (primero registra o publica el
+vendedor), `DISCOVERY_STALE_CLAIM` (activa la hora automática del equipo; el mensaje muestra cuánto se
+desvía el reloj cuando el índice informa su hora) o `DISCOVERY_PROFILE_HELD` (un operador del índice quitó
+el nombre). Consulta [Datos y privacidad](/es/reference/data-and-privacy#nombre-del-vendedor) para saber qué
+se vuelve público.
 
 ## seller init [#opciones-de-init-para-un-checkout-nativo]
 
@@ -170,8 +223,14 @@ gyblos logs --role buyer --json --component buyer-http --operation chat
 ```
 
 `gyblos logs` lee el log de diagnóstico local, sin contenido, de un rol. Nunca arranca un nodo ni contacta
-un servicio. El comprador local escribe este log; el nodo vendedor escribe su salida en el log de su
-servicio (`docker compose logs seller`, `service.log` en el home o `journalctl --user -u gyblos-seller`).
+un servicio. El comprador local escribe este registro. El vendedor registra un código fijo por intento
+fallido después de comprobar la identidad del comprador y la concurrencia. Esto incluye la preparación,
+la primera apertura y la renovación del canal. Un fallo de simulación describe solo ese intento.
+Comprueba el estado confirmado en la cadena y la recuperación local antes de reintentar.
+
+En Docker, consulta los diagnósticos del canal con `docker compose exec seller gyblos logs`.
+El resto de la salida va al registro del servicio (`docker compose logs seller`, `service.log` en el
+directorio local o `journalctl --user -u gyblos-seller`).
 
 | Opción                                                        | Significado                                                           |
 | ------------------------------------------------------------- | --------------------------------------------------------------------- |

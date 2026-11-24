@@ -18,6 +18,11 @@ import {
   type StatsEnvelope,
 } from './stats';
 import { chainStats } from './stats-chain';
+import {
+  chainTransactions,
+  parseChainTxQuery,
+  type ChainTxReader,
+} from './stats-chain-txs';
 import type { StatsReader } from './stats-store';
 
 const NODE_ID = /^[0-9a-f]{64}$/;
@@ -26,6 +31,7 @@ export function statsRoutes(
   app: Hono,
   reader: StatsReader | undefined,
   now: () => number,
+  chainTxs?: ChainTxReader,
 ) {
   const handle =
     <Answer extends StatsEnvelope>(
@@ -53,6 +59,19 @@ export function statsRoutes(
   app.get(COLLECTOR_ROUTES.STATS_NETWORK, handle(networkStats));
   app.get(COLLECTOR_ROUTES.STATS_MODELS, handle(modelStats));
   app.get(COLLECTOR_ROUTES.STATS_CHAIN, handle(chainStats));
+  app.get(COLLECTOR_ROUTES.STATS_CHAIN_TXS, async (context) => {
+    if (!chainTxs) return rejection(context, COLLECTOR_ERRORS.UNAVAILABLE);
+    const url = new URL(context.req.url);
+    const query = parseChainTxQuery(url.searchParams);
+    if (!query || url.search.slice(1) !== url.searchParams.toString())
+      return rejection(context, COLLECTOR_ERRORS.INVALID_QUERY);
+    const body = await chainTransactions(chainTxs, query);
+    context.header(
+      COLLECTOR_HEADERS.CACHE_CONTROL,
+      COLLECTOR_HEADER_VALUES.PUBLIC_STATS,
+    );
+    return context.json(body, COLLECTOR_STATUS.OK);
+  });
   app.get(
     COLLECTOR_ROUTES.STATS_SELLER,
     handle((stats, range, context) => {

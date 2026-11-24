@@ -3,7 +3,7 @@ import { FREE_OUTPUT_TOKENS, PORTS } from '@gyblos/config';
 import { BUYER_DEPOSIT_MINIMUM_HINT } from '@gyblos/config/batch-session';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
 import { NodeError } from '@gyblos/node/errors';
-import { isMain, shutdownSignal } from '@gyblos/runtime';
+import { shutdownSignal } from '@gyblos/runtime';
 import type { RelayConfigurationCode } from '@gyblos/transport-iroh/constants';
 import { RelayConfigurationError } from '@gyblos/transport-iroh/relays';
 
@@ -48,7 +48,7 @@ const HINTS: Readonly<Record<FreeBuyerStartupReason, string>> = {
   [FREE_BUYER_STARTUP.PAID_NETWORK]:
     'paid mode is devnet only: role.json rpcUrl must serve devnet, and request.network and asset must match the role',
   [FREE_BUYER_STARTUP.PAID_MODEL]:
-    'paid mode recounts with the pinned public tokenizer; request.selection.modelId must be qwen3-0.6b',
+    'a Qwen3 model is bought recounted with its pinned tokenizer, never on declared usage; other models are bought only on declared usage',
   [FREE_BUYER_STARTUP.PAID_MODELS]:
     'this explicit paid entry serves only request.selection; remove models or use the automatic buyer',
   [FREE_BUYER_STARTUP.PAID_KEY]:
@@ -134,4 +134,3 @@ export async function main(start: BuyerStarter = startFreeBuyer) {
     }
   }
 }
-if (isMain(import.meta.url)) await main();

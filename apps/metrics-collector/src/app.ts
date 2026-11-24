@@ -3,6 +3,8 @@
 import { Hono, type Context, type Next } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 
+import { ipKey } from '@gyblos/runtime/ip-key';
+
 import {
   COLLECTOR_ERRORS,
   COLLECTOR_HEADER_VALUES,
@@ -22,7 +24,7 @@ import { CollectorError, statusOf } from './errors';
 import { rejection } from './http';
 import { ingestUpload, StaleUploadError } from './ingest';
 import { ingestObservations } from './ingest-observations';
-import { ipKey } from './ip-key';
+import type { ChainTxReader } from './stats-chain-txs';
 import { statsRoutes } from './stats-routes';
 import type { StatsReader } from './stats-store';
 import type { CollectorStorage } from './storage';
@@ -41,9 +43,12 @@ export interface MetricsCollectorOptions {
   limiters?: CollectorLimiters;
   // Public aggregate reads; missing answers 503 COLLECTOR_UNAVAILABLE on the stats routes only.
   stats?: StatsReader;
+  chainTransactions?: ChainTxReader;
   now?: () => number;
   // Loopback hosts only: plain http is accepted. Storage and limiters are never relaxed.
   development?: boolean;
+  // The operator's RPC probe (rpc-probe.ts): its answer, or undefined for the usual 404.
+  probe?: (request: Request) => Promise<Response | undefined>;
 }
 
 const JSON_CONTENT_TYPE = /^application\/json(?:\s*;\s*charset=utf-8)?$/i;
@@ -92,6 +97,17 @@ function resolve(options: MetricsCollectorOptions) {
   const read = limiters[COLLECTOR_LIMITERS.READ];
   if (!options.storage || !ip || !node || !global || !read) return null;
   return { storage: options.storage, ip, node, global, read };
+}
+
+// The operator's RPC probe, behind the same https check, limits and headers as every other route; the
+// usual 404 when it answers nothing.
+function probeRoute(app: Hono, probe: MetricsCollectorOptions['probe']) {
+  app.get(
+    COLLECTOR_ROUTES.RPC_PROBE,
+    async (context) =>
+      (await probe?.(context.req.raw)) ??
+      rejection(context, COLLECTOR_ERRORS.NOT_FOUND),
+  );
 }
 
 export function createMetricsCollector(options: MetricsCollectorOptions) {
@@ -167,7 +183,8 @@ export function createMetricsCollector(options: MetricsCollectorOptions) {
     ] as const;
   app.post(COLLECTOR_ROUTES.RECEIPTS, ...upload(ingestUpload));
   app.post(COLLECTOR_ROUTES.OBSERVATIONS, ...upload(ingestObservations));
-  statsRoutes(app, options.stats, now);
+  statsRoutes(app, options.stats, now, options.chainTransactions);
+  probeRoute(app, options.probe);
 
   app.notFound((context) => rejection(context, COLLECTOR_ERRORS.NOT_FOUND));
   // Unexpected failures answer one static code and log nothing about the request.

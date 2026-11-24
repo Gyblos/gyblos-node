@@ -188,7 +188,7 @@ void test('GET /v1/sellers is served from the response cache under a normalized 
   assert.deepEqual(calls, ['list']);
   assert.deepEqual(edge.puts, [key]);
   // The effective limit and the cursor are part of the key; parameter order is not.
-  const cursor = `${T0}-${'a'.repeat(64)}`;
+  const cursor = 'a'.repeat(64);
   await app.fetch(
     new Request(
       `${INDEX_ORIGIN}/v1/sellers?limit=5000&cursor=${cursor}&model=${MODEL}`,

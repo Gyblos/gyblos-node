@@ -129,6 +129,11 @@ export const MODEL_IDS = {
   LLAMA_3_3_70B: 'llama-3.3-70b',
   GEMMA_4_26B: 'gemma-4-26b',
   QWEN3_0_6B: 'qwen3-0.6b',
+  QWEN3_1_7B: 'qwen3-1.7b',
+  QWEN3_4B: 'qwen3-4b',
+  QWEN3_8B: 'qwen3-8b',
+  QWEN3_14B: 'qwen3-14b',
+  QWEN3_32B: 'qwen3-32b',
 } as const;
 
 export type CatalogModelId = (typeof MODEL_IDS)[keyof typeof MODEL_IDS];
@@ -172,6 +177,11 @@ export type ControlCode = (typeof CONTROL_CODES)[keyof typeof CONTROL_CODES];
 export const CONTROL_DOMAINS = {
   REQUEST: 'gyblos/control-request/v1\n',
   OFFER: 'gyblos/signed-inference-offer/v2\n',
+} as const;
+export const SELLER_VERSION = {
+  header: 'Gyblos-Seller-Version',
+  domain: 'gyblos/seller-version/v1\n',
+  maxCharacters: 64,
 } as const;
 export const PUBLIC_V2_DOMAINS = {
   [PUBLIC_RECORD_KINDS.CATALOG]: 'gyblos/catalog/v2\n',

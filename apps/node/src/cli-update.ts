@@ -3,12 +3,14 @@
 // GYBLOS_UPDATE_CHECK=0, checks nothing. The check is one bounded HTTPS request for the latest release of
 // the public repository, sending nothing about the seller; any failure is silent.
 import {
+  HOME_ENVIRONMENT,
   INSTALLERS,
   NODE_ENVIRONMENT,
   RUN_MODES,
   type RunMode,
 } from '@gyblos/config';
 import type { DiscoveryFetch } from '@gyblos/discovery-http';
+import { SELLER_RELEASE_PATTERN } from '@gyblos/protocol/seller-version';
 
 export const UPDATE = {
   latestUrl: 'https://api.github.com/repos/Gyblos/gyblos-node/releases/latest',
@@ -18,13 +20,10 @@ export const UPDATE = {
   switchEnv: 'GYBLOS_UPDATE_CHECK',
 } as const;
 
-// The same grammar as scripts/semver-newer.mjs (semver.org §2 and §9), without build metadata.
-const VERSION =
-  /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*))?$/;
 const NUMERIC = /^\d+$/;
 
 function parse(text: string) {
-  const match = VERSION.exec(text);
+  const match = SELLER_RELEASE_PATTERN.exec(text);
   if (!match) return undefined;
   return {
     core: [match[1], match[2], match[3]].map((part) => BigInt(part!)),
@@ -96,14 +95,18 @@ export async function updateNotice(
   const latest = await latestRelease(fetch);
   if (!latest || !newerVersion(latest, current)) return undefined;
   // The image and the packaged release are installed and updated by install.sh (install.ps1 on Windows),
-  // or npm's package by npm.
-  let how = 'run `sh install.sh update` where you installed the seller';
+  // or npm's package by npm. The installers default to one directory, so a seller installed elsewhere is
+  // updated only when the same GYBLOS_DIR (Docker) or GYBLOS_HOME (packaged) is given again.
+  const sameDirectoryHint = (variable: string) =>
+    `, with the same \`${variable}\` if you installed with one`;
+  const installDirectory =
+    mode === RUN_MODES.CONTAINER ? 'GYBLOS_DIR' : HOME_ENVIRONMENT.product;
+  let how = `run \`sh install.sh update\` where you installed the seller${sameDirectoryHint(installDirectory)}`;
   if (mode === RUN_MODES.SOURCE) how = 'install the new release';
   else if (environment[NODE_ENVIRONMENT.installedBy] === INSTALLERS.npm)
     how =
       'run `npm install -g gyblos@latest`, then restart the seller (`gyblos seller service uninstall`, then `gyblos seller service install`)';
   else if (platform === 'win32')
-    how =
-      'run `powershell -ExecutionPolicy Bypass -File install.ps1 update` where you saved install.ps1';
+    how = `run \`powershell -ExecutionPolicy Bypass -File install.ps1 update\` where you saved install.ps1${sameDirectoryHint(HOME_ENVIRONMENT.product)}`;
   return `v${latest} is available (this seller runs v${current}); ${how}.`;
 }

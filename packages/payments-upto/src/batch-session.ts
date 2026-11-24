@@ -11,6 +11,10 @@ export {
   openBatchBuyerBackend,
   openBatchSellerBackend,
 } from './batch-session-backend';
+export {
+  finalizedRequestCharge,
+  finalizedUnchargedRequest,
+} from './batch-request-review';
 export { batchSessionObserver } from './batch-session-observer';
 export {
   openBatchSellerRegistry,
@@ -31,9 +35,20 @@ export type {
   BatchSellerOptions,
 } from './batch-session-types';
 
-export { openBatchBuyerPool, inspectBatchPool } from './batch-pool';
+export {
+  openBatchBuyerPool,
+  inspectBatchPool,
+  poolAllowsSellerDeposit,
+  poolFundingPending,
+} from './batch-pool';
 export type {
   BatchBuyerPool,
   BatchPoolEntry,
   BatchPoolOptions,
 } from './batch-pool-types';
+
+export { batchSdkDiagnosticCode } from './batch-sdk-diagnostics';
+export {
+  BATCH_SDK_DIAGNOSTIC_CODES,
+  OPENING_RELEASE_FAILED,
+} from './constants';

@@ -3,10 +3,11 @@
 import { Check, CheckCircle, X } from '@phosphor-icons/react';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 
-import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
+import { MODEL_IDS } from '@gyblos/protocol/constants';
 
 import manifest from '../package.json';
 import { WINDOW_CHROME } from './constants';
+import { autoFundingAvailable, FUNDING } from './funding/model';
 import {
   canSelectPreviewModel,
   canSwitchPaymentMethod,
@@ -17,9 +18,9 @@ import {
 } from './paypal-model';
 import { prefersLightTheme, themeStyle } from './theme';
 import { Activity } from './ui/Activity';
-import { AddFunds } from './ui/AddFunds';
 import { announcedModels } from './ui/announced-models';
 import { Applications } from './ui/Applications';
+import { AddBuyerFunds } from './ui/BuyerFunding';
 import { BuyerSidebar } from './ui/BuyerSidebar';
 import { Chat, type ChatHandle } from './ui/Chat';
 import { ChatController } from './ui/chat-controller';
@@ -60,6 +61,7 @@ import {
 import { useNetworkCatalog } from './ui/NetworkCatalog';
 import { useLocalNode } from './ui/NetworkStatus';
 import { PageBody } from './ui/PageBody';
+import { PaidSellerDialog } from './ui/PaidSellerDialog';
 import { Payments } from './ui/Payments';
 import { PaypalAgentConnection } from './ui/PaypalAgentConnection';
 import { Settings } from './ui/Settings';
@@ -75,7 +77,6 @@ import { useX402 } from './ui/useX402';
 import { WalletBackup } from './ui/WalletBackup';
 import { useDesktopWallet } from './ui/WalletState';
 import { WindowTitlebar } from './ui/WindowTitlebar';
-import { paidSellerLimitNotice, x402Amount, x402Asset } from './x402-model';
 
 const money = (value: number) => '$' + value.toFixed(2);
 export function DesktopApp() {
@@ -203,13 +204,6 @@ export function DesktopApp() {
   >(null);
   const [confirmedPolicy, setConfirmedPolicy] = useState<string>();
   const [paidModel, setPaidModel] = useState<Model | null>(null);
-  const sellerLimit = paidModel?.offerId
-    ? paidSellerLimitNotice(
-        x402.state.policy,
-        x402.state.summary,
-        paidModel.name,
-      )
-    : undefined;
   const [toast, setToast] = useState('');
   const chatRef = useRef<ChatHandle>(null);
   const [chatController] = useState(() => new ChatController('first-chat'));
@@ -271,7 +265,74 @@ export function DesktopApp() {
     const timer = setTimeout(() => setToast(''), DEMO_ACCOUNT.TOAST_MS);
     return () => clearTimeout(timer);
   }, [toast]);
+  const autoAttempt = useRef(0);
+  useEffect(() => {
+    autoAttempt.current++;
+  }, [x402.state.policy?.policyId, view, paymentMethod]);
+  async function chooseAuto(name: string) {
+    const policy = x402.state.policy;
+    if (!policy?.autoRoutes?.some((route) => route.modelId === name)) return;
+    const offers = networkModels.filter((item) => item.name === name);
+    const listing = offers[0];
+    if (!listing) return;
+    const attempt = ++autoAttempt.current;
+    const paid =
+      name === MODEL_IDS.QWEN3_0_6B &&
+      policy.paidAuto &&
+      policy.maxAtomic !== '0';
+    if (!offers.some((item) => item.free)) {
+      if (!paid) {
+        setToast(
+          name === MODEL_IDS.QWEN3_0_6B
+            ? 'Only paid offers are listed. Enable paid Auto in Payments.'
+            : 'No free offers are listed for this model.',
+        );
+        if (name === MODEL_IDS.QWEN3_0_6B) navigate(UI_VIEW.PAYMENTS);
+        return;
+      }
+      setToast('Checking channel funds…');
+      const funding = await Promise.all(
+        offers.map(async (item) =>
+          item.offerId
+            ? ((await window.desktopFunding
+                ?.balance(item.offerId)
+                .catch(() => null)) ?? null)
+            : null,
+        ),
+      );
+      if (attempt !== autoAttempt.current) return;
+      const available = autoFundingAvailable(policy, funding);
+      if (available !== true) {
+        setToast(
+          available === false
+            ? 'Add devnet USDC to open a channel.'
+            : available === FUNDING.channelLimit
+              ? 'Channel capacity cannot cover this response. Review Payments.'
+              : 'Could not confirm channel funds. Check Payments and try again.',
+        );
+        navigate(UI_VIEW.PAYMENTS);
+        if (available === false) setModal(UI_DIALOG.ADD_FUNDS);
+        return;
+      }
+    }
+    setModel({
+      id: 'auto/' + name,
+      automatic: true,
+      name,
+      image: listing.image,
+      family: 'Auto',
+      context: listing.context,
+      category: listing.category,
+      providers: listing.providers,
+      input: 0,
+      output: 0,
+      free: !paid,
+    });
+    setConfirmedPolicy(policy.policyId);
+    setToast(name + ' · Auto selected');
+  }
   function choose(next: Model) {
+    autoAttempt.current++;
     if (paymentMethod === PAYMENT_METHOD.PAYPAL) return;
     if (
       next.id === model.id &&
@@ -423,6 +484,7 @@ export function DesktopApp() {
               models={chatModels}
               confirmedPolicy={confirmedPolicy}
               onDefaultModel={() => setModel(MODELS[0])}
+              onAutoModel={(name) => void chooseAuto(name)}
               onSelectModel={(id) => {
                 const next = chatModels.find((item) => item.id === id);
                 if (next) choose(next);
@@ -439,6 +501,18 @@ export function DesktopApp() {
               canSelect={canSelectPreviewModel(paymentMethod)}
               onSelect={choose}
               catalog={announcements}
+              networkModels={networkModels}
+              auto={
+                x402.state.policy && {
+                  buyerModels:
+                    x402.state.policy.autoRoutes?.map(
+                      (route) => route.modelId,
+                    ) ?? [],
+                  paid: !!x402.state.policy.paidAuto,
+                  selected: !!model.automatic,
+                  choose: (name) => void chooseAuto(name),
+                }
+              }
             />
           )}
           {view === UI_VIEW.CONNECT &&
@@ -522,17 +596,8 @@ export function DesktopApp() {
       </MotionPresence>
       <MotionPresence>
         {modal === UI_DIALOG.ADD_FUNDS && (
-          <Modal
-            title="Add funds"
-            description="Choose how much to add to your wallet."
-            close={() => setModal(null)}
-          >
-            <AddFunds
-              onBackup={() => {
-                setModal(null);
-                navigate(UI_VIEW.PAYMENTS);
-              }}
-            />
+          <Modal title="Add funds" close={() => setModal(null)}>
+            <AddBuyerFunds payer={x402.state.policy?.payer} />
           </Modal>
         )}
       </MotionPresence>
@@ -580,80 +645,62 @@ export function DesktopApp() {
         )}
       </MotionPresence>
       <MotionPresence>
-        {paidModel && (
-          <Modal title="Use a paid model?" close={() => setPaidModel(null)}>
-            <div className="paid-model-summary">
-              <ModelImage name={paidModel.name} artwork={paidModel.image} />
-              <strong>{paidModel.name}</strong>
-              {paidModel.offerId && <span>{paidModel.family}</span>}
-            </div>
-            <div className="paid-terms">
-              <div>
-                <span>Input / 1M tokens</span>
-                <strong>{usdPerMtok(paidModel.input)}</strong>
+        {paidModel?.offerId ? (
+          <PaidSellerDialog
+            key={paidModel.id}
+            model={paidModel}
+            buyer={x402}
+            addFunds={() => {
+              setPaidModel(null);
+              navigate(UI_VIEW.PAYMENTS);
+              setModal(UI_DIALOG.ADD_FUNDS);
+            }}
+            close={() => setPaidModel(null)}
+            confirm={(policyId) => {
+              setConfirmedPolicy(policyId);
+              setModel(paidModel);
+              setPaidModel(null);
+              setToast('Model selected');
+            }}
+          />
+        ) : (
+          paidModel && (
+            <Modal title="Use a paid model?" close={() => setPaidModel(null)}>
+              <div className="paid-model-summary">
+                <ModelImage name={paidModel.name} artwork={paidModel.image} />
+                <strong>{paidModel.name}</strong>
               </div>
-              <div>
-                <span>Output / 1M tokens</span>
-                <strong>{usdPerMtok(paidModel.output)}</strong>
-              </div>
-              {paidModel.offerId && x402.state.policy && (
+              <div className="paid-terms">
                 <div>
-                  <span>Maximum per response</span>
-                  <strong>
-                    {x402Amount(x402.state.policy.maxAtomic, x402.state.policy)}{' '}
-                    {x402Asset(x402.state.policy)}
-                  </strong>
+                  <span>Input / 1M tokens</span>
+                  <strong>{usdPerMtok(paidModel.input)}</strong>
                 </div>
-              )}
-              <div>
-                <span>
-                  {paidModel.offerId
-                    ? 'Channel deposit'
-                    : 'Your device daily limit'}
-                </span>
-                <strong>
-                  {paidModel.offerId
-                    ? x402.state.policy?.depositAtomic
-                      ? x402Amount(
-                          x402.state.policy.depositAtomic,
-                          x402.state.policy,
-                        ) + ' USDC'
-                      : 'Unavailable'
-                    : money(budget)}
-                </strong>
-              </div>
-              {paidModel.offerId && x402.state.policy?.lifetimeMs && (
                 <div>
-                  <span>Channel duration</span>
-                  <strong>
-                    {x402.state.policy.lifetimeMs /
-                      BATCH_SESSION_DEFAULTS.millisecondsPerSecond}{' '}
-                    seconds
-                  </strong>
+                  <span>Output / 1M tokens</span>
+                  <strong>{usdPerMtok(paidModel.output)}</strong>
                 </div>
-              )}
-            </div>
-            <p className="modal-note" role="status">
-              {sellerLimit ||
-                (paidModel.offerId
-                  ? 'The first paid message opens a channel with this seller. Later messages use the same channel.'
-                  : 'Your model stays selected. Gyblos won’t silently switch from a free to a paid offer.')}
-            </p>
-            <Button
-              variant={BUTTON_VARIANT.PRIMARY}
-              className="wide"
-              disabled={!!sellerLimit}
-              onClick={() => {
-                setConfirmedPolicy(x402.state.policy?.policyId);
-                setModel(paidModel);
-                setPaidModel(null);
-                setToast('Model selected');
-              }}
-            >
-              Use this model
-              <Check size={16} />
-            </Button>
-          </Modal>
+                <div>
+                  <span>Your device daily limit</span>
+                  <strong>{money(budget)}</strong>
+                </div>
+              </div>
+              <p className="modal-note">
+                Your model stays selected. Gyblos won’t silently switch from a
+                free to a paid offer.
+              </p>
+              <Button
+                variant={BUTTON_VARIANT.PRIMARY}
+                className="wide"
+                onClick={() => {
+                  setModel(paidModel);
+                  setPaidModel(null);
+                  setToast('Model selected');
+                }}
+              >
+                Use this model <Check size={16} />
+              </Button>
+            </Modal>
+          )
         )}
       </MotionPresence>
       <MotionPresence>

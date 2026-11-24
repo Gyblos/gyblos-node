@@ -34,6 +34,7 @@ export interface PoolRow {
   terms: PaymentSessionTerms;
   legacy: boolean;
   ready: boolean;
+  replacing?: string;
   requestId: string | null;
   uncertain: boolean;
   refundedAtomic: string;

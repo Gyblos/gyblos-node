@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1795358869951,
+      "tag": "0007_github_claims",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1795379697701,
+      "tag": "0008_claim_signature",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1795388794433,
+      "tag": "0009_seller_profiles",
+      "breakpoints": true
+    }
+  ]
+}

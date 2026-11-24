@@ -1,4 +1,5 @@
 // Parse free, settled and channel-approved responses from the authenticated buyer.
+import { DEVNET_USDC } from '@gyblos/config/network';
 import { SESSION_VERDICTS } from '@gyblos/node/constants';
 import { sessionApproval } from '@gyblos/node/session-accounting';
 import {
@@ -12,8 +13,9 @@ import {
   OFFER_PRICING_KINDS,
 } from '@gyblos/protocol/constants';
 
-import { reportedUsage } from './response-metrics';
-import { DESKTOP_X402 } from './x402-model';
+import { RESPONSE_COST_KIND, RESPONSE_COST_UNIT } from './constants';
+import { observedResponse, reportedUsage } from './response-metrics';
+import { DESKTOP_X402, x402Amount } from './x402-model';
 
 export function buyerResponseObject(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value))
@@ -93,4 +95,25 @@ function approvedSession(
   )
     throw new Error('Invalid channel approval');
   return approval;
+}
+
+export function buyerReplyMetrics(
+  reply: ReturnType<typeof parseBuyerReply>,
+  policy: BuyerApiPolicy,
+  responseMs: number,
+) {
+  return observedResponse(
+    responseMs,
+    {
+      amount: x402Amount(reply.chargeAtomic, policy),
+      unit:
+        policy.mint === DEVNET_USDC
+          ? RESPONSE_COST_UNIT.USDC
+          : RESPONSE_COST_UNIT.ATOMIC,
+      kind: reply.sessionApproval
+        ? RESPONSE_COST_KIND.RECORDED
+        : RESPONSE_COST_KIND.SETTLED,
+    },
+    reply.usage,
+  );
 }

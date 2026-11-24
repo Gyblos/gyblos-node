@@ -5,8 +5,7 @@ import { discoverBuyerSellers, type DiscoverOptions } from './discovery';
 import type { PreparedSelection } from './free-selection';
 import type { BuyerSelectionConfig } from './selection-config';
 
-// The sellers discovery confirms, configured and (open discovery, free path only, where `excluded` is
-// passed) found only in the index; paid and session execution look sellers up in their configured list.
+// Resolve configured sellers and opt-in index candidates through the verified discovery path.
 export async function withDiscovered(
   prepared: PreparedSelection,
   base: ReturnType<typeof routedPolicy>,
@@ -46,6 +45,6 @@ export interface SelectionRoute {
   waitingFor?: string;
   previousSeller?: string;
   warmSeller?: string;
-  // Free execution only: sellers found only in the index may be used.
+  // Admit identity-verified sellers from the index.
   open?: true;
 }

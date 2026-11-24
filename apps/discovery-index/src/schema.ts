@@ -1,6 +1,15 @@
 // Owns discovery's typed tables, keys, indexes and checks. Historical D1 migrations retain
 // physical WITHOUT ROWID layout; these declarations perform no client initialization or I/O.
-import { between, eq, gte, inArray } from 'drizzle-orm';
+import {
+  between,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  or,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
 import {
   check,
   index,
@@ -14,11 +23,16 @@ import { PUBLIC_RECORD_LIMITS } from '@gyblos/protocol/constants';
 
 import {
   DISCOVERY_LISTING_INDEXES,
+  GITHUB_CLAIM_STATES,
   REGISTRATION,
   REGISTRATION_STATUS,
+  SELLER_PROFILE,
   UPTIME,
 } from './constants';
 import { nullableTextLength, textLength } from './sqlite-expressions';
+
+const literalCheck = (name: string, value: SQL) =>
+  check(name, value.inlineParams());
 
 const nodeIdCharacters =
   PUBLIC_RECORD_LIMITS.publicKeyBytes *
@@ -36,11 +50,11 @@ export const nodes = sqliteTable(
   },
   (table) => [
     index('discovery_nodes_by_retain').on(table.retainUntil),
-    check(
+    literalCheck(
       'discovery_nodes_node_id',
       eq(textLength(table.nodeId), nodeIdCharacters),
     ),
-    check('discovery_nodes_sequence', gte(table.lastSequence, 1)),
+    literalCheck('discovery_nodes_sequence', gte(table.lastSequence, 1)),
   ],
 );
 export const catalogs = sqliteTable(
@@ -84,6 +98,8 @@ export const presence = sqliteTable(
     expiresAt: integer('expires_at').notNull(),
     digest: text('catalog_digest').notNull(),
     json: text('signed_json').notNull(),
+    releaseVersion: text('release_version'),
+    versionSequence: integer('version_sequence'),
   },
   (table) => [
     index('discovery_presence_by_expiry').on(table.expiresAt),
@@ -122,15 +138,15 @@ export const invites = sqliteTable(
     nodeId: text('node_id'),
   },
   (table) => [
-    check(
+    literalCheck(
       'discovery_invites_hash',
       eq(textLength(table.inviteHash), REGISTRATION.inviteHashCharacters),
     ),
-    check(
+    literalCheck(
       'discovery_invites_contact',
       between(textLength(table.contact), 1, REGISTRATION.maxContactCharacters),
     ),
-    check(
+    literalCheck(
       'discovery_invites_node_id',
       nullableTextLength(table.nodeId, nodeIdCharacters),
     ),
@@ -150,15 +166,15 @@ export const registrations = sqliteTable(
     registeredAt: integer('registered_at').notNull(),
   },
   (table) => [
-    check(
+    literalCheck(
       'discovery_registrations_node_id',
       eq(textLength(table.nodeId), nodeIdCharacters),
     ),
-    check(
+    literalCheck(
       'discovery_registrations_status',
       inArray(table.status, Object.values(REGISTRATION_STATUS)),
     ),
-    check(
+    literalCheck(
       'discovery_registrations_country',
       nullableTextLength(table.country, REGISTRATION.countryCharacters),
     ),
@@ -172,7 +188,7 @@ export const uptimeNodes = sqliteTable(
     firstAt: integer('first_at').notNull(),
   },
   (table) => [
-    check(
+    literalCheck(
       'discovery_uptime_nodes_node_id',
       eq(textLength(table.nodeId), nodeIdCharacters),
     ),
@@ -190,13 +206,79 @@ export const uptimeSlots = sqliteTable(
   (table) => [
     primaryKey({ columns: [table.nodeId, table.hour] }),
     index('discovery_uptime_by_hour').on(table.hour),
-    check(
+    literalCheck(
       'discovery_uptime_node_id',
       eq(textLength(table.nodeId), nodeIdCharacters),
     ),
-    check(
+    literalCheck(
       'discovery_uptime_slots',
       between(table.slots, 1, 2 ** UPTIME.slotsPerHour - 1),
+    ),
+  ],
+);
+
+export const githubClaims = sqliteTable(
+  'discovery_github_claims',
+  {
+    nodeId: text('node_id').primaryKey(),
+    account: text('account'),
+    gist: text('gist'),
+    issuedAt: integer('issued_at').notNull(),
+    state: text('state', {
+      enum: [
+        GITHUB_CLAIM_STATES.PENDING,
+        GITHUB_CLAIM_STATES.VERIFIED,
+        GITHUB_CLAIM_STATES.LOST,
+      ],
+    }),
+    reason: text('reason'),
+    checkedAt: integer('checked_at'),
+    verdictAt: integer('verdict_at'),
+    verifiedAt: integer('verified_at'),
+    lastFetchAt: integer('last_fetch_at'),
+    nextCheckAt: integer('next_check_at'),
+    signature: text('signature'),
+  },
+  (table) => [
+    index('discovery_github_claims_by_next_check').on(table.nextCheckAt),
+    literalCheck(
+      'discovery_github_claims_node_id',
+      eq(textLength(table.nodeId), nodeIdCharacters),
+    ),
+    literalCheck(
+      'discovery_github_claims_state',
+      sql`${or(
+        isNull(table.state),
+        inArray(table.state, Object.values(GITHUB_CLAIM_STATES)),
+      )}`,
+    ),
+  ],
+);
+export const sellerProfiles = sqliteTable(
+  'discovery_seller_profiles',
+  {
+    nodeId: text('node_id').primaryKey(),
+    name: text('name'),
+    issuedAt: integer('issued_at').notNull(),
+    signature: text('signature'),
+    held: integer('held').notNull().default(SELLER_PROFILE.open),
+  },
+  (table) => [
+    literalCheck(
+      'discovery_seller_profiles_node_id',
+      eq(textLength(table.nodeId), nodeIdCharacters),
+    ),
+    literalCheck(
+      'discovery_seller_profiles_tombstone',
+      sql`(${isNull(table.name)}) = (${isNull(table.signature)})`,
+    ),
+    literalCheck(
+      'discovery_seller_profiles_held',
+      inArray(table.held, [SELLER_PROFILE.open, SELLER_PROFILE.held]),
+    ),
+    literalCheck(
+      'discovery_seller_profiles_held_empty',
+      sql`${or(eq(table.held, SELLER_PROFILE.open), isNull(table.name))}`,
     ),
   ],
 );

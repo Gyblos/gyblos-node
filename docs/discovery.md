@@ -45,23 +45,30 @@ accepts an optional `timeoutMs` and `signal`.
 | `fetchSellers({ baseUrl, model, fetch, now, limit?, cursor?, lastSequence? })` | Returns `{ sellers, dropped, next, generatedAt }`. Each seller is `{ catalog, presence, withdrawal: null }` (`DiscoveredSeller`). `limit` (default 50, at most 200) is always sent. A NodeId repeated within a page keeps its highest catalog sequence. `next` is the opaque cursor. |
 | `publishRecord({ baseUrl, record, fetch })`                                    | Posts one signed record (body at most 34,816 bytes). Resolves `{ ok: true }` on `201`.                                                                                                                                                                                               |
 | `registerSeller({ baseUrl, invite, nodeId, fetch })`                           | Trades a one-use invite code for permission to publish (`POST /registrations`). Resolves `registered` (`201`) or `already-active` (`200`). The invite code never appears in an error.                                                                                                |
+| `submitGithubClaim({ baseUrl, signed, fetch })`                                | Posts a node-signed GitHub claim (`POST /identity/github`). Resolves `{ state, reason, retryAfter? }`; `retryAfter` (seconds) comes only with `CHECK_DEFERRED`.                                                                                                                      |
+| `fetchGithubClaim({ baseUrl, nodeId, fetch })`                                 | Reads one NodeId's GitHub claim (`GET /identity/github/<nodeId>`), with its `issuedAt` and node `signature` (`signature` is null when the index has none that verifies for the served claim; both are null from an index that predates them), or `null` when the index has none.     |
+| `submitSellerProfile({ baseUrl, signed, fetch })`                              | Posts a node-signed seller display name or clear (`POST /profile`). Resolves `{ name }`.                                                                                                                                                                                             |
+| `fetchSellerProfile({ baseUrl, nodeId, fetch })`                               | Reads one NodeId's display name (`GET /profile/<nodeId>`) with its `issuedAt` and node `signature`, or `null` on `404 NO_PROFILE`; any other `404` (an index without the route) is `DISCOVERY_HTTP_STATUS`.                                                                          |
 | `validateDiscoveryBaseUrl(url)`                                                | Applies the client's URL policy to operator configuration: `https`, or `http` on loopback; no credentials, query string or fragment.                                                                                                                                                 |
 
 Failures throw `DiscoveryError` with a static code from `DISCOVERY_ERROR_CODES`
 and, when a response arrived, its `status`. Messages never echo input or
 response text.
 
-| Index answer                                                                      | Client code                                                                            |
-| --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `400` `INVALID_RECORD`, `INVALID_SIGNATURE`, `EXPIRED_RECORD`, `UNKNOWN_CATALOG`  | `DISCOVERY_` plus the same name                                                        |
-| `400` with an unreadable body or another code on publish                          | `DISCOVERY_RECORD_REJECTED`                                                            |
-| `400 HTTPS_REQUIRED`                                                              | `DISCOVERY_INSECURE_URL`                                                               |
-| `409` on publish or read                                                          | `DISCOVERY_STALE_RECORD`                                                               |
-| `403` on publish                                                                  | `DISCOVERY_PUBLISH_NOT_ALLOWED` (the index does not accept this NodeId as a publisher) |
-| `403` `INVITE_INVALID`, `IDENTITY_NOT_REGISTERED`, `NODE_REVOKED` on registration | `DISCOVERY_` plus the same name                                                        |
-| `400 INVALID_REGISTRATION`, or another `400`/`403` body on registration           | `DISCOVERY_REGISTRATION_REJECTED`                                                      |
-| `413`, `429`, `503`                                                               | `DISCOVERY_PAYLOAD_TOO_LARGE`, `DISCOVERY_RATE_LIMITED`, `DISCOVERY_UNAVAILABLE`       |
-| Any other status                                                                  | `DISCOVERY_HTTP_STATUS`                                                                |
+| Index answer                                                                         | Client code                                                                            |
+| ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| `400` `INVALID_RECORD`, `INVALID_SIGNATURE`, `EXPIRED_RECORD`, `UNKNOWN_CATALOG`     | `DISCOVERY_` plus the same name                                                        |
+| `400` with an unreadable body or another code on publish                             | `DISCOVERY_RECORD_REJECTED`                                                            |
+| `400 HTTPS_REQUIRED`                                                                 | `DISCOVERY_INSECURE_URL`                                                               |
+| `409` on publish or read                                                             | `DISCOVERY_STALE_RECORD`                                                               |
+| `403` on publish                                                                     | `DISCOVERY_PUBLISH_NOT_ALLOWED` (the index does not accept this NodeId as a publisher) |
+| `403` `INVITE_INVALID`, `IDENTITY_NOT_REGISTERED`, `NODE_REVOKED` on registration    | `DISCOVERY_` plus the same name                                                        |
+| `400 INVALID_REGISTRATION`, or another `400`/`403` body on registration              | `DISCOVERY_REGISTRATION_REJECTED`                                                      |
+| `400 INVALID_CLAIM` or another `400`/`403` body on a GitHub claim or `POST /profile` | `DISCOVERY_CLAIM_REJECTED` (`INVALID_SIGNATURE` stays `DISCOVERY_INVALID_SIGNATURE`)   |
+| `403 UNKNOWN_NODE` and `409` on a GitHub claim or `POST /profile`                    | `DISCOVERY_UNKNOWN_NODE`, `DISCOVERY_STALE_CLAIM`                                      |
+| `403 PROFILE_HELD` on `POST /profile` or `GET /profile/<nodeId>`                     | `DISCOVERY_PROFILE_HELD`                                                               |
+| `413`, `429`, `503`                                                                  | `DISCOVERY_PAYLOAD_TOO_LARGE`, `DISCOVERY_RATE_LIMITED`, `DISCOVERY_UNAVAILABLE`       |
+| Any other status                                                                     | `DISCOVERY_HTTP_STATUS`                                                                |
 
 A deadline is always `DISCOVERY_TIMEOUT`, including one that ends while reading
 a rejection body. A caller `signal` cancels header and body reads with
@@ -102,11 +109,12 @@ To use the default index, add `discovery` to the buyer's `selection.json`:
 ```
 
 Inside `discovery` you can set `baseUrl` (same URL policy as the client) and
-`maxPages` (1 to 8, default 3). Each page holds at most 50 entries, and the
-whole discovery step has a 10-second deadline. A cursor cycle, or a non-final
-page at the page cap, fails with `BUYER_DISCOVERY_LIMIT`, and no quotes are
-requested. An index error stops selection; it never switches the buyer to a
-different payment path. The rest of `selection.json` is described in
+`maxPages` (1 to 8, default 3). Each page asks for 200 entries, the index's
+largest page, and the whole discovery step has a 10-second deadline. A cursor
+cycle, or a non-final page at the page cap, fails with `BUYER_DISCOVERY_LIMIT`,
+and no quotes are requested. An index error stops selection; it never switches
+the buyer to a different payment path. The rest of `selection.json` is described
+in
 [running-a-node.md](running-a-node.md#optional-buyer-selection-and-discovery).
 
 The index only supplies candidate NodeIds. The `sellers` list in
@@ -162,24 +170,43 @@ credentials or a query string; the other `identity` settings are in
 - For each catalog the index lists for the model, the catalog's owner must hold
   that NodeId in the 8004 agent registry. The buyer checks this before it
   remembers anything, exactly as for a configured seller.
-- The buyer dials such a seller by NodeId through the first configured relay
-  (`relays.urls` in `config.toml`, or `GYBLOS_RELAYS`). The index supplies no
-  address.
+- The buyer dials such a seller by NodeId through the first relay in
+  `GYBLOS_RELAYS`, or the built-in default relay when it is unset. The index
+  supplies no address.
+- A configured seller whose identity check fails is not looked up again as an
+  open seller under the owner the index lists.
 - Configured sellers come first, and the candidate list stays within 16. With
   open discovery, `sellers` may be empty.
 - `buyer:free` uses open sellers directly. The automatic buyer (`pnpm buyer`,
   `buyer:chat`, the desktop app) asks its configured sellers first at the
   request's own ceilings. When none can serve, or none is configured, it asks
-  the open network at zero price ceilings. A request never goes back to a seller
-  it already tried.
-- Paid requests and payment sessions use configured sellers only.
+  the open network at zero price ceilings by default. With paid Auto enabled, it
+  uses the configured unit price ceilings and request budget. A seller that
+  already won and failed this request is not asked again; configured sellers
+  that only declined in the first pass can be asked again in the open pass.
+- Paid Auto allows automatic payment sessions with identity-verified sellers
+  from the index. Older profiles keep free-only open discovery until the
+  operator enables paid Auto. With open discovery, a payment session for a
+  seller the user chose in the desktop app may use an unconfigured seller; it
+  still passes the identity and discovery checks.
 - Stats for open sellers live in memory only; `selection-stats.json` keeps the
   configured sellers alone.
 
 Open discovery has its own bounds:
 
-- Each selection makes at most 16 new identity lookups. An identity the registry
-  refused is not looked up again for five minutes.
+- The buyer reads every page first. It then drops the sellers that could not
+  serve the request (model, reasoning level, network, asset, a context of at
+  least the request's `maxTokens`, price ceilings and budget, data policy, the
+  `declared-usage` badge, live records). It looks up the seller that served the
+  conversation before and the one still holding it warm first, then the rest in
+  a random order, so which sellers get a lookup never depends on the index's
+  order. With more than 64 such sellers, lookups can reach sellers the
+  64-candidate bound below then refuses until earlier ones expire.
+- Each selection makes at most 16 identity lookups of index-only sellers.
+  Configured sellers are checked on every selection besides. A failed check of
+  an index-only seller (a registry refusal, an RPC failure, or a full identity
+  history) skips that NodeId and owner for five minutes in this process, for at
+  most 1,024 pairs.
 - At most 64 live unconfigured candidates are eligible at once, counted under
   the discovery lock from signed expiry and withdrawal or conflict state.
   Expiry, withdrawal or conflict frees a slot without deleting any replay floor.
@@ -390,8 +417,9 @@ nothing else.
   Envelopes are returned byte-for-byte as published.
 - A seller is included when its current catalog lists `model`, is live and not
   withdrawn, and its current presence is live and references that catalog. Order
-  is deterministic (reference index: presence `issuedAt` descending, then
-  NodeId). Ranking is the buyer's job.
+  is deterministic (reference index: NodeId ascending, so a seller keeps its
+  place when it republishes its presence and paging never skips one that stays
+  listed). Ranking is the buyer's job.
 - Cursors are opaque: pass `next` back verbatim, and never parse or build one.
   The client accepts 1 to 512 characters of `[A-Za-z0-9._~-]`. `next` is `null`
   on the last page.
@@ -421,4 +449,8 @@ its publish mode; clients must not rely on it.
 
 The reference index also serves `GET /uptime?node=<NodeId>`, a public uptime
 report built from the presences it accepted. It is not part of the contract a
-client relies on; see [discovery-index.md](discovery-index.md#uptime).
+client relies on; see [discovery-index.md](discovery-index.md#uptime). It also
+accepts and serves seller GitHub claims under `/identity/github`, outside the
+client contract; see [discovery-index.md](discovery-index.md#github-claims). It
+also accepts and serves seller display names under `/profile`, outside the
+client contract; see [discovery-index.md](discovery-index.md#seller-names).

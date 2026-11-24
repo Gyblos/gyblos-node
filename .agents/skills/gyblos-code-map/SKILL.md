@@ -79,8 +79,7 @@ Splitting by concern inside a package uses a filename prefix, as in
 3. Add `"@gyblos/<name>": "workspace:*"` to the root `package.json`, run
    `pnpm install` and commit the lockfile. `packages/*` and `apps/*` are already
    in `pnpm-workspace.yaml`; a new `lab/*` package is not.
-4. Every module starts with a 1-3 line header (responsibility + boundary it must
-   not cross); codes in `constants.ts` (`as const`), typed errors in
+4. Keep codes in `constants.ts` (`as const`), typed errors in
    `errors.ts`.
 5. Tests in `tests/<name>*.test.ts` via public exports; fixtures in
    `tests/support/`. Write the failing case first.

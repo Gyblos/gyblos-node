@@ -28,6 +28,7 @@ import {
   COLLECTOR_STATUS,
 } from './constants';
 import { rpcProbe } from './rpc-probe';
+import { chainTxReader } from './stats-chain-txs-read';
 import { statsReader } from './stats-read';
 import { createD1Storage, type D1Database } from './storage-d1';
 
@@ -60,8 +61,12 @@ function appFor(bindings: unknown) {
   return createMetricsCollector({
     storage: isDatabase(database) ? createD1Storage(database) : undefined,
     stats: isDatabase(database) ? statsReader(database) : undefined,
+    chainTransactions: isDatabase(database)
+      ? chainTxReader(database)
+      : undefined,
     limiters,
     development: false,
+    probe: (request) => rpcProbe(request, bindings),
   });
 }
 
@@ -236,9 +241,6 @@ const edgeCache = () =>
 let worker: ReturnType<typeof createWorker> | undefined;
 export default {
   async fetch(request: Request, bindings: unknown, context: ExecutionContext) {
-    // The operator's probe is answered before the cache and the public app (rpc-probe.ts).
-    const probe = await rpcProbe(request, bindings);
-    if (probe) return probe;
     worker ??= createWorker();
     const app = worker;
     return cachedFetch(request, edgeCache(), context, (incoming) =>

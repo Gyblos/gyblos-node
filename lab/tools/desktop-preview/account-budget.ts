@@ -1,10 +1,11 @@
-// Optional spending limit for manual chat in the preview.
+// Optional buyer-wide spending limit in the preview; unset until the buyer sets one (GYB-DOC-045).
 import { DEVNET_USDC } from '@gyblos/config/network';
 import { buyerAtomic } from '@gyblos/protocol/buyer-api';
 
 export function accountBudgetSnapshot(
   limitAtomic: string,
   replies: ReadonlyArray<{ chargeAtomic: string }>,
+  limited: boolean,
 ) {
   const chatSpend = replies.reduce(
     (sum, reply) => sum + BigInt(reply.chargeAtomic),
@@ -13,6 +14,7 @@ export function accountBudgetSnapshot(
   return {
     mint: DEVNET_USDC,
     limitAtomic,
+    limited,
     spentAtomic: String(chatSpend),
   };
 }

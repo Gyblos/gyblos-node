@@ -6,6 +6,16 @@ import { BUYER_PAID_TIMEOUTS } from '@gyblos/node/constants';
 import { BUYER_API, BUYER_SIDECAR } from '@gyblos/protocol/buyer-api';
 import type { ProtocolErrorCode } from '@gyblos/protocol/constants';
 
+export const BUYER_COMMANDS = {
+  START: 'start',
+  FREE: 'free',
+  CHAT: 'chat',
+  INIT: 'init',
+  SETUP: 'setup',
+  AUTO: 'auto',
+  AGENT: 'agent',
+  WITHDRAW: 'withdraw',
+} as const;
 export const CHAT_COMMANDS = {
   NEW: '/new',
   EXIT: '/exit',
@@ -97,7 +107,7 @@ export const BUYER_DISCOVERY = {
   schemaVersion: 1,
   defaultPages: 3,
   maxPages: 8,
-  pageSize: 50,
+  pageSize: 200,
   timeoutMs: 10000,
   maxStateBytes: 1048576,
   maxStateRows: 1024,
@@ -178,6 +188,7 @@ export const PAID_WITHDRAW_CODES = {
 // A deposit ceiling of zero: a free quote, or a selection.json that buys nothing.
 export const isFreeAtomic = (maxAtomic: string) => maxAtomic === '0';
 export const PAID_BUYER = {
+  singleChannelApiRequests: 4,
   // The whole request, from selection to the seller's terminal.
   requestMs: BUYER_PAID_TIMEOUTS.requestMs,
   // Checking the settlement on chain and recording the outcome, once the terminal arrived.
@@ -238,12 +249,12 @@ export const FREE_BUYER_STARTUP = {
   PORT_IN_USE: 'BUYER_PORT_IN_USE',
   // Paid mode: the role's RPC, or the request's network or asset, is not the devnet test token.
   PAID_NETWORK: 'BUYER_PAYMENT_NETWORK_MISMATCH',
-  // Paid mode recounts with the pinned public tokenizer, so only its model can be bought.
+  // A recounted quote for a model without the pinned tokenizer, or a declared quote for one with it.
   PAID_MODEL: 'BUYER_PAID_MODEL_UNSUPPORTED',
   // The explicit paid entry serves only `request.selection`; a `models` list needs the automatic buyer.
   PAID_MODELS: 'BUYER_PAID_MODELS_UNSUPPORTED',
   PAID_KEY: 'BUYER_WALLET_KEY_INVALID',
-  TOKENIZER: 'BUYER_TOKENIZER_UNAVAILABLE',
+  TOKENIZER: BUYER_API.TOKENIZER_UNAVAILABLE,
   // Unreadable, or held by another buyer process.
   JOURNAL: 'BUYER_PAYMENT_JOURNAL_UNAVAILABLE',
   // The paid endpoint's token file is not a private regular file holding a token.
@@ -262,6 +273,10 @@ export const BUYER_INIT_FLAGS = {
   ADVANCED: '--advanced',
   HELP: '--help',
 } as const;
+export const BUYER_HELP_FLAGS: readonly string[] = [
+  BUYER_INIT_FLAGS.HELP,
+  '-h',
+];
 
 // Operational HTTP diagnostics, separate from inference observations and receipts.
 export const BUYER_HTTP_DIAGNOSTICS = {

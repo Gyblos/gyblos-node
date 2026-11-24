@@ -1,11 +1,32 @@
 // Content-free observations of the compatibility boundary. Logging never decides retry or admission.
 import type { ServerResponse } from 'node:http';
 
+import { BuyerRoutingError } from '@gyblos/core/buyer-routing';
+import { BUYER_ROUTING_CODES } from '@gyblos/core/constants';
+import { PaidBuyerError } from '@gyblos/node/buyer-paid-error';
+import { UnsentSellerBusyError } from '@gyblos/node/buyer-routing';
+import { UnsentChannelRequestError } from '@gyblos/node/buyer-session';
+import {
+  BATCH_SDK_DIAGNOSTIC_CODES,
+  batchSdkDiagnosticCode,
+} from '@gyblos/payments-upto/batch-session';
+import { BatchChannelError } from '@gyblos/protocol/batch-channel';
+import {
+  BUYER_KEY_CODES,
+  BuyerApiKeyError,
+} from '@gyblos/protocol/buyer-api-keys';
 import {
   FREE_EXECUTION_CODES,
+  PAYMENT_ERROR_CODES,
   PROTOCOL_ERROR_CODES,
 } from '@gyblos/protocol/constants';
 import { FreeExecutionError } from '@gyblos/protocol/free-execution';
+import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
+import { PaymentError } from '@gyblos/protocol/payment';
+import {
+  PaymentSessionError,
+  SESSION_CODES,
+} from '@gyblos/protocol/payment-session';
 import {
   DIAGNOSTIC_CAUSES,
   DIAGNOSTIC_LEVELS,
@@ -34,13 +55,31 @@ const CODES = [
   ...Object.values(FREE_BUYER_CODES),
   ...Object.values(PAID_BUYER_CODES),
   ...Object.values(BUYER_HTTP_DIAGNOSTICS.codes),
+  ...Object.values(SESSION_CODES),
+  ...Object.values(PAYMENT_ERROR_CODES),
+  ...Object.values(PAID_EXECUTION_CODES),
+  ...Object.values(BUYER_ROUTING_CODES),
+  ...Object.values(BUYER_KEY_CODES),
+  ...BATCH_SDK_DIAGNOSTIC_CODES,
 ];
 function failureCode(error: unknown) {
   try {
+    // A paid failure's payment SDK name, even behind a generic session code, says where the channel
+    // failed; only catalog names are read, never the text.
+    const sdk = batchSdkDiagnosticCode(error);
+    if (sdk) return sdk;
     if (
       error instanceof FreeBuyerError ||
       error instanceof FreeClientError ||
-      error instanceof FreeExecutionError
+      error instanceof FreeExecutionError ||
+      error instanceof PaymentSessionError ||
+      error instanceof PaymentError ||
+      error instanceof BatchChannelError ||
+      error instanceof PaidBuyerError ||
+      error instanceof BuyerRoutingError ||
+      error instanceof UnsentSellerBusyError ||
+      error instanceof UnsentChannelRequestError ||
+      error instanceof BuyerApiKeyError
     ) {
       const code: unknown = error.code;
       const known = CODES.find((item) => item === code);

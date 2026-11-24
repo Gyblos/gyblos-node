@@ -1,0 +1,4 @@
+usdc.svg: spothq/cryptocurrency-icons (https://github.com/spothq/cryptocurrency-icons), CC0-1.0.
+https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/svg/color/usdc.svg
+solana.svg: the Solana gradient mark, as published for Solana in the Chainlink CCIP directory (https://docs.chain.link/ccip/directory/mainnet), framed to the mark without its dark tile.
+USDC is a trademark of Circle Internet Financial. Solana is a trademark of the Solana Foundation. Used to name the token and the network; the marks themselves are not altered. Solana brand guidelines: https://solana.com/branding

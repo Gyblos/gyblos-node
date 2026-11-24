@@ -1,4 +1,5 @@
 // Browser-only example data for the unchanged desktop renderer. No network, keys or filesystem APIs.
+import { BUYER_SESSION_DEFAULT_POLICY } from '@gyblos/config/batch-session';
 import { DEVNET, DEVNET_USDC } from '@gyblos/config/network';
 import { modelArtwork } from '@gyblos/desktop/announced-models';
 import {
@@ -6,13 +7,13 @@ import {
   type ChatArchiveSave,
 } from '@gyblos/desktop/chat-archive-model';
 import { ChatController } from '@gyblos/desktop/chat-controller';
-import { CATALOG_STATE } from '@gyblos/desktop/network-catalog';
 import { LOCAL_NODE_STATE } from '@gyblos/desktop/node-status';
 import { PAYMENT_METHOD } from '@gyblos/desktop/paypal-model';
 import {
   RESPONSE_COST_KIND,
   RESPONSE_COST_UNIT,
 } from '@gyblos/desktop/response-metrics';
+import type { DesktopUpdate } from '@gyblos/desktop/update-check';
 import {
   emptyUsdcApi,
   parseUsdcApiState,
@@ -37,11 +38,13 @@ import { BUYER_API, type BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 import { BUYER_API_KEYS } from '@gyblos/protocol/buyer-api-keys';
 
 import { accountBudgetSnapshot, accountLimitError } from './account-budget';
+import { previewChatSeed } from './chat-seed';
 import { PREVIEW } from './constants';
 import { exampleKeys } from './example-keys';
+import { previewFunding } from './funding';
 import { requestObject as read, type AgentExamples } from './input';
 import { createPaypalPreview } from './paypal';
-import { previewCatalog } from './seller-listings';
+import { previewDesktopCatalog } from './seller-listings';
 
 export function createPreviewHost(
   search: string,
@@ -65,8 +68,7 @@ export function createPreviewHost(
     policyId: example,
     model,
     maxTokens: 256,
-    depositAtomic: '1000000',
-    lifetimeMs: PREVIEW.halfHourMs * 2,
+    ...BUYER_SESSION_DEFAULT_POLICY,
     maxAtomic: query.get('seller-budget') === 'ready' ? '10000' : '0',
     ...scope,
   };
@@ -74,14 +76,16 @@ export function createPreviewHost(
   let connected = ready;
   let active = ready && query.get('seller-budget') !== 'ready';
   let authorized = ready;
-  let limitAtomic = '1000000';
+  const limitQuery = query.get('limit');
+  let limitAtomic = limitQuery === '0' ? '0' : '1000000';
+  let limited = limitQuery === 'set' || limitQuery === '0';
   let generation = 0;
   let selectedHome = ready;
   let keys = exampleKeys(query.get('keys') === 'empty');
   let setup: UsdcApiState['setup'];
   const clone = <T>(value: T) => structuredClone(value);
   const answer =
-    'This is the desktop interface with example data.\n\nYour **API key** and **Base URL** are in Connections. The key’s spend limit is shared across its tools and models.\n\n- Open your preferred coding tool.\n- Follow its configuration guide.\n- Review usage in Activity and payment details in Payments.';
+    'This is the desktop interface with example data.\n\nYour **API key** and **Base URL** are in Connections. The key’s spend limit is shared across its tools and models.\n\n- Open your preferred coding tool.\n- Follow its configuration guide.\n- Review usage and payments in Usage & payments.';
 
   const conversations = new ChatController('preview-first-chat');
   const records: X402Record[] = [];
@@ -111,8 +115,10 @@ export function createPreviewHost(
       'Explore search ranking',
       'Outline a release checklist',
     );
+  const seeded: string[] = [];
   function exampleChat(title: string, receiptId: string) {
     const conversationId = conversations.getSnapshot().activeId;
+    seeded.push(conversationId);
     conversations.startPaypal(
       title,
       chatModel,
@@ -142,10 +148,10 @@ export function createPreviewHost(
     );
   }
   for (const title of titles) {
-    if (tenChats) exampleChat(title, crypto.randomUUID());
-    else conversations.setDraft(title);
+    exampleChat(title, crypto.randomUUID());
     conversations.newChat(crypto.randomUUID());
   }
+  Object.assign(window, { previewChatSeed: previewChatSeed(seeded) });
   exampleChat('How can I use Gyblos in my coding tools?', 'preview-free-reply');
   let archive = projectChatArchive(conversations.getSnapshot());
 
@@ -211,22 +217,14 @@ export function createPreviewHost(
       return nodeState;
     },
   };
-  let catalogQuery = '';
-  const catalogResult = () => {
-    const result = previewCatalog(model, now, catalogQuery);
-    return !catalogQuery || catalogQuery === model
-      ? result
-      : { ...result, state: CATALOG_STATE.EMPTY, models: [] };
+  const update: Pick<DesktopUpdate, 'available'> = {
+    available: query.get('update') === 'available' ? PREVIEW.nextVersion : null,
   };
-  const desktopCatalog = {
-    summary: async () => previewCatalog(model, now, ''),
-    lookup: async (value: unknown) => {
-      catalogQuery = typeof value === 'string' ? value.trim() : '';
-      return catalogResult();
-    },
-  };
+  const desktopUpdate = { run: async () => update };
+  const desktopCatalog = previewDesktopCatalog(model, now);
 
-  const accountBudget = () => accountBudgetSnapshot(limitAtomic, records);
+  const accountBudget = () =>
+    accountBudgetSnapshot(limitAtomic, records, limited);
   function buyerState() {
     return parseX402Result({
       summary: {
@@ -252,6 +250,15 @@ export function createPreviewHost(
         connected = true;
         selectedHome = true;
       }
+      if (
+        request.action === X402_ACTION.CONFIGURE_PAID &&
+        typeof request.maxAtomic === 'string'
+      ) {
+        policy.maxAtomic = request.maxAtomic;
+        policy.policyId = crypto.randomUUID();
+        active = false;
+        connected = true;
+      }
       if (request.action === X402_ACTION.AUTHORIZE) {
         if (!connected || typeof request.limitAtomic !== 'string')
           return { ...buyerState(), error: 'Chat budget unavailable.' };
@@ -261,10 +268,14 @@ export function createPreviewHost(
         );
         if (error) return { ...buyerState(), error };
         limitAtomic = request.limitAtomic;
+        limited = true;
         active = true;
         authorized = true;
       }
-      if (request.action === X402_ACTION.FINISH) active = false;
+      if (request.action === X402_ACTION.FINISH) {
+        active = false;
+        limited = false;
+      }
       if (request.action === X402_ACTION.COPY_PAYER)
         await navigator.clipboard.writeText(payer);
       if (request.action === X402_ACTION.COPY_MINT)
@@ -371,10 +382,12 @@ export function createPreviewHost(
   };
 
   return {
+    desktopFunding: previewFunding(payer),
     desktopWindow,
     desktopConversations,
     desktopWallet,
     desktopNode,
+    desktopUpdate,
     desktopCatalog,
     desktopX402,
     previewAccountBudget: { current: accountBudget, baseline: accountBudget() },

@@ -15,6 +15,15 @@ import type {
 import type { BuyerReceiptEvidence } from './receipt-buyer';
 
 export interface BuyerBatchSessionOptions<Remote extends BatchDestination> {
+  // The first quote declares usage: blocks need the model's tokenizer, so a channel it opens runs without
+  // them. A channel that already checkpoints keeps doing so.
+  declared?: boolean;
+  financialPermission?<T>(run: () => Promise<T>): Promise<T>;
+  onDeclined?(): Promise<void>;
+  beforeInference?(
+    requestId: string,
+    ref: import('./desktop-opening').DesktopRequestBinding,
+  ): Promise<void>;
   preparation?: import('./buyer-channel-prepare').PreparedChannel;
   receipt?: (
     evidence: BuyerReceiptEvidence,
@@ -44,6 +53,10 @@ export interface BuyerBatchContext<Remote extends BatchDestination> {
   >;
   active: boolean;
   lifetime: AbortController;
+  // Every client this channel opened, to close and settle together.
+  clients: () => BuyerBatchContext<Remote>['client'][];
+  // The same channel over the whole-response protocol: itself unless it checkpoints.
+  wholeResponse: () => BuyerBatchContext<Remote>;
   rpc: (
     method: import('@gyblos/protocol/batch-channel').BatchMethod,
     params: unknown,

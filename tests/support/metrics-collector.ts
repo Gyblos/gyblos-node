@@ -35,6 +35,7 @@ export function testCollector(
     global?: boolean;
     read?: boolean;
     now?: () => number;
+    probe?: (request: Request) => Promise<Response | undefined>;
   } = {},
 ) {
   const ip = fakeLimiter(options.ip ?? true);
@@ -50,6 +51,7 @@ export function testCollector(
       [COLLECTOR_LIMITERS.READ]: read,
     },
     now: options.now ?? (() => T0),
+    ...(options.probe ? { probe: options.probe } : {}),
   });
   const post = (
     body: unknown,

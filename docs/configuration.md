@@ -234,8 +234,8 @@ destination, and a programmatically injected sink takes precedence. See
 | `enabled` | boolean | `true`  | Write operational diagnostics under `<home>/<role>/diagnostics/` |
 | `level`   | string  | `warn`  | Minimum level: `debug`, `info`, `warn` or `error`                |
 
-File-only; no environment variable overrides it. The local buyer applies these
-settings; the seller accepts the section. See
+The buyer and seller apply these settings from the configuration file. The
+seller records failed payment-channel attempts. See
 [Operational diagnostics](diagnostics.md#configuration).
 
 ### `[limits]`
@@ -246,27 +246,27 @@ Seller capacity. See [Seller limits](#seller-limits).
 
 At most 32 entries. Each model may appear once; aliases count as the same model.
 
-| Key         | Required | Meaning                                                                                                                                                         |
-| ----------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `model`     | yes      | A catalog id or alias from `packages/protocol/src/models.ts` (for example `gpt-oss-20b`, `qwen3-30b-a3b`, `qwen3:0.6b`), or any identifier with `custom = true` |
-| `custom`    | no       | `true` for a model outside the catalog. A catalog model with `custom = true` is `CUSTOM_MODEL_IN_CATALOG`; an unknown model without it is `UNKNOWN_MODEL`       |
-| `engine`    | yes      | Engine table, below                                                                                                                                             |
-| `reasoning` | no       | Non-empty list of distinct levels from `off`, `low`, `medium`, `high`; see [Reasoning levels](#reasoning-levels-per-model)                                      |
-| `price`     | one of   | Paid offer, below                                                                                                                                               |
-| `free`      | one of   | Free offer, below                                                                                                                                               |
+| Key         | Required | Meaning                                                                                                                                                                                                |
+| ----------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `model`     | yes      | A catalog id or alias from `packages/protocol/src/models.ts` (for example `gpt-oss-20b`, `qwen3-30b-a3b`, `qwen3:0.6b`), or any identifier with `custom = true`                                        |
+| `custom`    | no       | `true` for a model outside the catalog. A catalog model with `custom = true` loads as the catalog model with the warning `CUSTOM_MODEL_NOW_IN_CATALOG`; an unknown model without it is `UNKNOWN_MODEL` |
+| `engine`    | yes      | Engine table, below                                                                                                                                                                                    |
+| `reasoning` | no       | Non-empty list of distinct levels from `off`, `low`, `medium`, `high`; see [Reasoning levels](#reasoning-levels-per-model)                                                                             |
+| `price`     | one of   | Paid offer, below                                                                                                                                                                                      |
+| `free`      | one of   | Free offer, below                                                                                                                                                                                      |
 
 An offer needs exactly one of `price` and `free` (`PRICING_MISSING`,
 `PRICING_CONFLICT`).
 
 #### `engine`
 
-| Key              | Required                   | Meaning                                                                                                                                                                          |
-| ---------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `kind`           | yes                        | `ollama`, `openai` or `anthropic`                                                                                                                                                |
-| `url`            | yes                        | `https`; plain `http` only for `127.0.0.1`, `localhost`, `[::1]` or `host.docker.internal`. Each engine narrows this at startup ([Engine compatibility](#engine-compatibility))  |
-| `api_key_env`    | no (`anthropic`: yes)      | Name of the variable holding the provider key, at most 128 characters                                                                                                            |
-| `upstream_model` | no                         | The model name the engine expects, at most 256 characters; defaults to the offer's model. The validator does not check it                                                        |
-| `context_tokens` | `openai`, `anthropic`: yes | Context size, 1,024 to 2,000,000, because remote APIs do not report it. On `ollama` it is optional and sets `num_ctx`, 1,024 to 32,768; the seller uses 8,192 when it is omitted |
+| Key              | Required                   | Meaning                                                                                                                                                                            |
+| ---------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `kind`           | yes                        | `ollama`, `openai` or `anthropic`                                                                                                                                                  |
+| `url`            | yes                        | `https`; plain `http` only for `127.0.0.1`, `localhost`, `[::1]` or `host.docker.internal`. Each engine narrows this at startup ([Engine compatibility](#engine-compatibility))    |
+| `api_key_env`    | no (`anthropic`: yes)      | Name of the variable holding the provider key, at most 128 characters                                                                                                              |
+| `upstream_model` | no                         | The model name the engine expects, at most 256 characters; defaults to the offer's model as written (an alias such as `qwen3:8b` stays the alias). The validator does not check it |
+| `context_tokens` | `openai`, `anthropic`: yes | Context size, 1,024 to 2,000,000, because remote APIs do not report it. On `ollama` it is optional and sets `num_ctx`, 1,024 to 32,768; the seller uses 8,192 when it is omitted   |
 
 A larger Ollama context uses more memory.
 
@@ -314,6 +314,11 @@ model with only a thinking on/off switch uses `off` and `high`.
 | `qwen3-30b-a3b`       | `off`, `high`           | `off`   | [Qwen3-30B-A3B model card](https://huggingface.co/Qwen/Qwen3-30B-A3B): `enable_thinking` switch                                                                                                      |
 | `qwen3-235b-a22b`     | `off`, `high`           | `off`   | [Qwen3-235B-A22B model card](https://huggingface.co/Qwen/Qwen3-235B-A22B): same switch                                                                                                               |
 | `qwen3-0.6b`          | `off`, `high`           | `off`   | [Qwen3-0.6B model card](https://huggingface.co/Qwen/Qwen3-0.6B): same switch                                                                                                                         |
+| `qwen3-1.7b`          | `off`, `high`           | `off`   | [Qwen3-1.7B model card](https://huggingface.co/Qwen/Qwen3-1.7B): same switch                                                                                                                         |
+| `qwen3-4b`            | `off`, `high`           | `off`   | [Qwen3-4B model card](https://huggingface.co/Qwen/Qwen3-4B): same switch                                                                                                                             |
+| `qwen3-8b`            | `off`, `high`           | `off`   | [Qwen3-8B model card](https://huggingface.co/Qwen/Qwen3-8B): same switch                                                                                                                             |
+| `qwen3-14b`           | `off`, `high`           | `off`   | [Qwen3-14B model card](https://huggingface.co/Qwen/Qwen3-14B): same switch                                                                                                                           |
+| `qwen3-32b`           | `off`, `high`           | `off`   | [Qwen3-32B model card](https://huggingface.co/Qwen/Qwen3-32B): same switch                                                                                                                           |
 | `gpt-oss-120b`        | `low`, `medium`, `high` | `low`   | [gpt-oss model card](https://cdn.openai.com/pdf/419b6906-9da6-406c-a19d-1bb078ac7637/oai_gpt-oss_model_card.pdf) and [harmony guide](https://developers.openai.com/cookbook/articles/openai-harmony) |
 | `gpt-oss-20b`         | `low`, `medium`, `high` | `low`   | Same, and the [gpt-oss-20b model card](https://huggingface.co/openai/gpt-oss-20b)                                                                                                                    |
 | `llama-3.3-70b`       | `off`                   | `off`   | [Llama-3.3-70B-Instruct model card](https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct): no reasoning mode                                                                                     |
@@ -339,7 +344,8 @@ thinking off, so it is not an alias: `model = "qwen3:30b-a3b"` fails with
 `UNKNOWN_MODEL`. Use `model = "qwen3-30b-a3b"` and set
 `upstream_model = "qwen3:30b-a3b-q4_K_M"`. Because the validator does not check
 `upstream_model`, pointing it at the thinking-only tag would serve a model that
-ignores `off`.
+ignores `off`. For the same reason there is no `qwen3:4b` alias: use
+`model = "qwen3-4b"` and set `upstream_model` to the hybrid tag.
 
 The JSON Schema checks only the closed set; the validator enforces the per-model
 rule.
@@ -380,11 +386,11 @@ start succeeds.
 
 ### Engine compatibility
 
-| Engine      | Allowed `url`                                                                                                     | Required keys                   | Usage counted by                                                   | Readiness check                                            |
-| ----------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------- |
-| `ollama`    | `http://127.0.0.1:PORT/` or `http://[::1]:PORT/`, no path                                                         | none; no `api_key_env`          | The pinned public tokenizer                                        | Warmup generation and memory check                         |
-| `openai`    | API base ending in its version: `https://...` on any host, or `http://127.0.0.1:PORT/v1` / `http://[::1]:PORT/v1` | `context_tokens`                | The pinned tokenizer for Qwen3 0.6B; the provider for other models | Loopback: warmup and memory check. Remote: lists the model |
-| `anthropic` | API root without `/v1` (`https://api.anthropic.com`), or a literal loopback proxy                                 | `api_key_env`, `context_tokens` | The provider, input including cached prompt tokens                 | `GET /v1/models/{model}`, even on loopback                 |
+| Engine      | Allowed `url`                                                                                                     | Required keys                   | Usage counted by                                                                                                                      | Readiness check                                            |
+| ----------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `ollama`    | `http://127.0.0.1:PORT/` or `http://[::1]:PORT/`, no path                                                         | none; no `api_key_env`          | The pinned public tokenizer                                                                                                           | Warmup generation and memory check                         |
+| `openai`    | API base ending in its version: `https://...` on any host, or `http://127.0.0.1:PORT/v1` / `http://[::1]:PORT/v1` | `context_tokens`                | The pinned Qwen3 tokenizer for the catalog's Qwen3 hybrid models; the provider for other models                                       | Loopback: warmup and memory check. Remote: lists the model |
+| `anthropic` | API root without `/v1` (`https://api.anthropic.com`), or a literal loopback proxy                                 | `api_key_env`, `context_tokens` | The pinned Qwen3 tokenizer for the catalog's Qwen3 hybrid models; the provider for other models, input including cached prompt tokens | `GET /v1/models/{model}`, even on loopback                 |
 
 Every engine refuses plain `http` to `localhost`, `host.docker.internal` or any
 host other than a literal loopback address, and a URL with a query or fragment,
@@ -411,8 +417,12 @@ OpenAI-compatible APIs):
 - A remote API is ready once it lists the model, so readiness never spends the
   seller's credit.
 - Turn reasoning off on the server, for example with a non-thinking chat
-  template. An answer whose whole budget went to hidden reasoning is refused as
-  invalid.
+  template. For the catalog's Qwen3 hybrid models on a loopback server the
+  seller also sends `chat_template_kwargs: { enable_thinking: false }`, which
+  vLLM, SGLang and llama.cpp honor, and `reasoning: { effort: "none" }`, which
+  Ollama's `/v1` honors. LM Studio honors neither, so turn thinking off on the
+  server there. An answer whose whole budget went to hidden reasoning is refused
+  as invalid.
 - OpenAI's own API (`api.openai.com` and its regional hosts) gets
   `max_completion_tokens`; other servers get `max_tokens`.
 
@@ -442,9 +452,9 @@ Buyers pay the seller's price plus the protocol fee (`PROTOCOL_FEE` in
 `@gyblos/config`, 4% on devnet), rounded up. Startup accepts a paid offer only
 when:
 
-- Usage is recounted with the model's pinned public tokenizer
-  (`SELLER_PAID_METERING_UNRECOUNTED` otherwise). Only the catalog model
-  `qwen3-0.6b` has one.
+- Its engine meters it: recounted with the model's pinned public tokenizer (only
+  the catalog's Qwen3 hybrid models have one), or the provider's declared usage,
+  which the buyer accepts only within the request's byte bounds.
 - The seller role was set up with a payout and payment keys
   (`SELLER_PAYMENT_ROLE_MISSING` otherwise), and the payout is neither the fee
   payer nor the authorizer key (`SELLER_PAYMENT_DESCRIPTION_INVALID`).
@@ -468,7 +478,6 @@ transaction fees. See [payment sessions](payment-sessions.md).
 | `SELLER_OFFER_API_KEY_MISSING`        | `api_key_env` is required, or names an unset or empty variable                                                                        |
 | `SELLER_OFFER_API_KEY_UNSAFE`         | `api_key_env` names a `GYBLOS_*` variable or the relay token's variable                                                               |
 | `SELLER_PAID_EXECUTION_UNAVAILABLE`   | A paid offer, but the caller wired no payment server (a library caller of `@gyblos/node`)                                             |
-| `SELLER_PAID_METERING_UNRECOUNTED`    | A paid offer whose usage cannot be recounted with the pinned tokenizer                                                                |
 | `SELLER_PAYMENT_ROLE_MISSING`         | A paid offer on a role without a payout and payment keys                                                                              |
 | `SELLER_PAYMENT_DESCRIPTION_INVALID`  | The payout is the fee payer or authorizer key                                                                                         |
 | `SELLER_PAYMENT_NETWORK_MISMATCH`     | The role's RPC is not devnet                                                                                                          |
@@ -524,7 +533,9 @@ Fixed values, not configurable:
 - The seller runs one generation at a time. Each buyer has one request in
   flight, and the seller at most two (one running, one queued; one for a free
   offer).
-- Each buyer keeps one control and one data connection.
+- Each buyer keeps one control and one data connection. A buyer that switches a
+  channel between checkpointed and whole-response requests closes one data
+  connection before it opens the other.
 - Wire sizes and deadlines protect the protocol, not capacity.
 
 `[limits]` is file-only: no `GYBLOS_*` variable sets it, and the buyer ignores
@@ -556,9 +567,15 @@ runs, read-only, the checks startup would fail on, and prints one line per check
 | `payments`  | Only with a paid offer: the payout and payment keys, as startup checks them. With `--online`, also that the role's RPC serves devnet and the token accounts: warns `PAYMENT_ACCOUNTS_MISSING` (startup creates them) or `PAYMENT_ACCOUNTS_UNCHECKED` (no answer), fails `PAYMENT_ACCOUNTS_UNUSABLE` (frozen or not a token account)                                |
 | `clock`     | Only with `--online` and publication on: this clock against the discovery index's HTTP `Date` header. `CLOCK_SKEWED` warns when it is over 2 s off; buyers and the index refuse records issued over 5 s ahead, so turn on automatic time sync (NTP). `CLOCK_UNCHECKED` when the index gives no time or answers in over 1 s                                         |
 
-It then prints the seller's public **NodeId and owner** address from
-`role.json`, and the effective [seller limits](#seller-limits). The exit code is
-0 when no check fails (warnings do not fail) and 1 otherwise.
+For paid offers, `doctor --online` warns with `FEE_PAYER_UNFUNDED` below 0.01
+devnet SOL if the token accounts are ready or missing. That code fails the check
+only when the balance is zero and startup must create token accounts. This
+warning threshold is not a cost estimate. If the balance read fails, the
+token-account verdict is unchanged.
+
+It then prints the seller's public **NodeId, owner and fee payer** addresses
+from `role.json`, and the effective [seller limits](#seller-limits). The exit
+code is 0 when no check fails (warnings do not fail) and 1 otherwise.
 
 `doctor` starts, spawns, sends and writes nothing. It never prints the home
 location, the RPC URL, the relay token, an API key or key material. It reaches
@@ -574,13 +591,15 @@ Errors (`NODE_CONFIG_ISSUE_CODES` in `packages/node/src/constants.ts`):
 `UNKNOWN_KEY`, `MISSING_KEY`, `WRONG_TYPE`, `INVALID_VALUE`,
 `UNSUPPORTED_VERSION`, `MAINNET_UNSUPPORTED`, `INVALID_ADDRESS`, `INVALID_URL`,
 `INSECURE_URL`, `INVALID_ENV_NAME`, `INLINE_SECRET`, `DUPLICATE_VALUE`,
-`TOO_MANY`, `UNKNOWN_MODEL`, `CUSTOM_MODEL_IN_CATALOG`, `NON_CANONICAL_DECIMAL`,
-`PRICE_OUT_OF_RANGE`, `PRICE_ZERO`, `PRICING_CONFLICT`, `PRICING_MISSING`,
-`INVALID_CAP`, `RELAY_ONLY_CONFLICT`, `INVALID_LIMIT`, `REASONING_UNSUPPORTED`.
+`TOO_MANY`, `UNKNOWN_MODEL`, `NON_CANONICAL_DECIMAL`, `PRICE_OUT_OF_RANGE`,
+`PRICE_ZERO`, `PRICING_CONFLICT`, `PRICING_MISSING`, `INVALID_CAP`,
+`RELAY_ONLY_CONFLICT`, `INVALID_LIMIT`, `REASONING_UNSUPPORTED`.
 
 Warnings (`NODE_CONFIG_WARNING_CODES`): `ENV_SWITCH_NOT_STRICT` (a switch
-variable other than `1` or `0`) and `REASONING_UNVERIFIED` (an offer whose
-levels cannot be checked against the catalog).
+variable other than `1` or `0`), `REASONING_UNVERIFIED` (an offer whose levels
+cannot be checked against the catalog) and `CUSTOM_MODEL_NOW_IN_CATALOG` (an
+offer still marked `custom = true` for a model the catalog now lists; it is
+served as the catalog model, so remove the flag).
 
 ## Editor support and examples
 

@@ -66,6 +66,7 @@ export interface BatchClientOptions {
   now?: () => number;
   requestMs?: number;
   operationMs?: number;
+  openMs?: number;
   relayOnly?: boolean;
   relayAllowed?: (origin: string) => boolean;
 }
@@ -278,6 +279,13 @@ async function runOperation<T, Remote extends BatchDestination>(
     state.active = false;
   }
 }
+function deadlineMs(options: BatchClientOptions, method: string) {
+  if (method === BATCH_METHODS.EXECUTE)
+    return options.requestMs ?? TRANSPORT_TIMEOUTS.requestMs;
+  if (method === BATCH_METHODS.OPEN)
+    return options.openMs ?? BATCH_SESSION_DEFAULTS.openMs;
+  return options.operationMs ?? BATCH_SESSION_DEFAULTS.operationMs;
+}
 function exchange<Remote extends BatchDestination>(
   state: Context<Remote>,
   value: unknown,
@@ -304,9 +312,7 @@ function exchange<Remote extends BatchDestination>(
               blocks,
             ),
           ),
-        request.method === BATCH_METHODS.EXECUTE
-          ? (state.options.requestMs ?? TRANSPORT_TIMEOUTS.requestMs)
-          : (state.options.operationMs ?? BATCH_SESSION_DEFAULTS.operationMs),
+        deadlineMs(state.options, request.method),
         () => drop(state),
         source,
       );
@@ -371,6 +377,13 @@ export function createBatchChannelClient<Remote extends BatchDestination>(
       onDelta?: (text: string) => Promise<void>,
       blocks?: BatchBlockClient,
     ) => exchange(state, value, signal, onDelta, blocks),
+    // Lets the seller admit another connection from this buyer (one data connection per peer); the
+    // next exchange reconnects. Refused while an operation is in flight: the buyer channel releases
+    // only between operations, which its exclusive() serializes.
+    release() {
+      if (state.pending.size) throw new BatchChannelError(SESSION_CODES.BUSY);
+      drop(state);
+    },
     async close() {
       state.lifetime.abort();
       drop(state);

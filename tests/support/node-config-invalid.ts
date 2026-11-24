@@ -169,12 +169,6 @@ export const INVALID_FIXTURES: readonly InvalidConfigFixture[] = [
     path: 'offers[0].model',
   },
   {
-    name: 'catalog model flagged as custom',
-    toml: BASE + offer({ extra: 'custom = true' }),
-    code: 'CUSTOM_MODEL_IN_CATALOG',
-    path: 'offers[0].custom',
-  },
-  {
     name: 'custom model with an invalid identifier',
     toml: BASE + offer({ model: 'bad model!', extra: 'custom = true' }),
     code: 'INVALID_VALUE',

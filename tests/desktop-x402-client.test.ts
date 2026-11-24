@@ -4,8 +4,6 @@ import test from 'node:test';
 
 import { getBase58Decoder, isSignature } from '@solana/kit';
 
-import { DEVNET, DEVNET_USDC } from '@gyblos/config';
-import { X402Budget } from '@gyblos/desktop/x402-budget';
 import {
   buyerEndpoint,
   parseBuyerReply,
@@ -13,55 +11,10 @@ import {
 } from '@gyblos/desktop/x402-client';
 import { parseX402Result, x402Explorer } from '@gyblos/desktop/x402-model';
 import { SESSION_VERDICTS } from '@gyblos/node/constants';
-import { BUYER_API, type BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
+import { BUYER_API } from '@gyblos/protocol/buyer-api';
 
-const policy: BuyerApiPolicy = {
-  version: 1,
-  policyId: '00000000-0000-4000-8000-000000000001',
-  model: 'qwen3-0.6b',
-  maxTokens: 128,
-  maxAtomic: '100',
-  network: DEVNET,
-  mint: DEVNET_USDC,
-  payer: '11111111111111111111111111111111',
-};
-const token = 'synthetic-ephemeral-local-token';
-function budget() {
-  let saved: string | undefined;
-  return new X402Budget({
-    read: async () => saved,
-    write: async (text) => {
-      saved = text;
-    },
-  });
-}
-function reply() {
-  return {
-    model: policy.model,
-    choices: [
-      {
-        message: { role: 'assistant', content: 'Hello from the model' },
-        finish_reason: 'stop',
-      },
-    ],
-    [BUYER_API.EXECUTION_FIELD]: 'paid',
-    [BUYER_API.PAYMENT_FIELD]: {
-      verdict: 'approved',
-      maxAtomic: '100',
-      expectedAtomic: '30',
-      chargedAtomic: null,
-      refundedAtomic: null,
-      sellerAtomic: null,
-      feeAtomic: null,
-      recorded: true,
-      session: {
-        approvedAtomic: '30',
-        cumulativeAtomic: '30',
-        depositAtomic: '100',
-      },
-    },
-  };
-}
+import { budget, policy, reply, token } from './support/desktop-paid-chat';
+
 void test('x402 refuses non-loopback and credential-bearing endpoints before fetching', () => {
   for (const url of [
     'https://127.0.0.1:8090/v1/chat/completions',
@@ -361,7 +314,7 @@ void test('a paid seller cannot receive a request while either chat spending lim
       await assert.rejects(
         client.send('paid-seller', 'test', undefined, choice),
         maxAtomic === '0'
-          ? /raise the per-request maximum/i
+          ? /set (?:a|the) maximum per response in the app/i
           : /increase the budget in Payments/i,
       );
       assert.equal(posts, previousPosts);
@@ -370,4 +323,30 @@ void test('a paid seller cannot receive a request while either chat spending lim
       await client.close();
     }
   }
+});
+
+void test('an explicit free chat under a paid policy cannot spend or change API spending settings', async () => {
+  const ledger = budget();
+  let claimPaid = true;
+  let posts = 0;
+  const client = new X402Client(ledger, async (url, options) => {
+    if (options?.method !== 'POST') return Response.json(policy);
+    assert.equal(new URL(String(url)).pathname, BUYER_API.CHANNEL_CHAT_PATH);
+    const request = JSON.parse(String(options.body));
+    assert.equal(request[BUYER_API.FREE_ONLY_FIELD], true);
+    posts++;
+    if (claimPaid) return Response.json(reply());
+    const { [BUYER_API.PAYMENT_FIELD]: _payment, ...free } = reply();
+    return Response.json({ ...free, [BUYER_API.EXECUTION_FIELD]: 'free' });
+  });
+  await client.connect('http://127.0.0.1:8090/v1/chat/completions', token);
+  await assert.rejects(client.send('wrong-kind', 'test', undefined, 'free'));
+  assert.equal(posts, 1);
+  claimPaid = false;
+  await client.send('free-turn', 'test', undefined, 'free');
+  assert.deepEqual(client.policy(), policy);
+  assert.equal((await ledger.summary()).spentAtomic, '0');
+  assert.equal((await ledger.summary()).active, false);
+  assert.equal((await ledger.summary()).records.at(-1)?.free, true);
+  await client.close();
 });

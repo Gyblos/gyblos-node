@@ -39,6 +39,7 @@ export interface CrashProof {
   refundedAtomic: string | null;
 }
 export interface CrashReply {
+  unavailable?: boolean;
   runtimeBlockedBefore: boolean;
   entry: CrashState | null;
   financial: CrashProof | null;
@@ -131,6 +132,7 @@ export function parseCrashReply(raw: unknown): CrashReply {
           typeof proof.refundedAtomic === 'string')),
   );
   return {
+    ...(value.unavailable === true ? { unavailable: true } : {}),
     runtimeBlockedBefore: value.runtimeBlockedBefore,
     entry: parseCrashState(value.entry),
     financial: proof

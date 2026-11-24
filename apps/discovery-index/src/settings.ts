@@ -1,11 +1,14 @@
 // Resolved app settings: options with their defaults, plus the per-instance throttles and caches.
 import { recordCounter, type RecordCounter, type ResponseCache } from './cache';
 import { DISCOVERY_INDEX_LIMITS } from './constants';
+import type { GithubClaimStore } from './github-claim-store';
+import type { GistFetch } from './github-gist';
 import {
   limiterResolver,
   type DiscoveryLimiters,
   type ResolvedLimiters,
 } from './limits';
+import type { SellerProfileStore } from './profile-store';
 import type { DiscoveryPublishers } from './publishers';
 import type { RegistrationStore } from './registration-store';
 import type { RegistryReader } from './registrations';
@@ -24,6 +27,11 @@ export interface DiscoveryIndexOptions {
   registrations?: RegistrationStore;
   // The 8004 registry reader /v1/registrations verifies against. Missing, that route answers 503.
   registry?: RegistryReader;
+  // Seller GitHub claims and the fetcher their gists are read with. Missing either, POST
+  // /v1/identity/github answers 503; a missing store also makes its GET 503 and /v1/network list no claims.
+  claims?: GithubClaimStore;
+  gistFetch?: GistFetch;
+  profiles?: SellerProfileStore;
   // Response cache for GET /v1/sellers (the Worker passes caches.default). Missing means none.
   cache?: ResponseCache;
   now?: () => number;
@@ -55,6 +63,9 @@ export interface IndexSettings {
   publishers: DiscoveryPublishers | undefined;
   registrations: RegistrationStore | undefined;
   registry: RegistryReader | undefined;
+  claims: GithubClaimStore | undefined;
+  gistFetch: GistFetch | undefined;
+  profiles: SellerProfileStore | undefined;
   cache: ResponseCache | undefined;
   records: RecordCounter;
   resolve: (url: string) => ResolvedLimiters | null;
@@ -75,6 +86,9 @@ export function settingsOf(options: DiscoveryIndexOptions): IndexSettings {
     publishers: options.publishers,
     registrations: options.registrations,
     registry: options.registry,
+    claims: options.claims,
+    gistFetch: options.gistFetch,
+    profiles: options.profiles,
     cache: options.cache,
     records: recordCounter(),
     resolve: limiterResolver(options.limiters ?? {}, development, now),

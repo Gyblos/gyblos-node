@@ -25,9 +25,8 @@ gyblos logs --role lab --correlation-id CORRELATION_ID --limit 100
 From a checkout, use `pnpm gyblos` instead of `gyblos`. Replace `CORRELATION_ID`
 with the `correlationId` of a record you already found.
 
-- `--role` is `buyer`, `seller` or `lab`; the default is `seller`. Only the
-  buyer writes product diagnostics (see [Coverage](#coverage)), so use
-  `--role buyer`; the seller role usually prints nothing.
+- `--role` is `buyer`, `seller` or `lab`; the default is `seller`. The seller
+  records only failed payment-channel operations (see [Coverage](#coverage)).
 - `--level` is `debug`, `info`, `warn` or `error`.
 - `--limit` accepts 1 to 1000 records (default 100). With `--follow`, it bounds
   the initial tail; new matching records then print until you cancel.
@@ -50,8 +49,9 @@ level = "warn"
 
 Diagnostics are on by default at level `warn`. Levels, in order, are `debug`,
 `info`, `warn` and `error`; `debug` adds metadata only, never content. There is
-no environment override. Seller startup accepts the `[diagnostics]` table, but
-writes no records. [configuration.md](configuration.md) has the key reference.
+no environment override. The seller uses the same validated `[diagnostics]`
+settings for its local payment-channel records.
+[configuration.md](configuration.md) has the key reference.
 
 `packages/config/src/home.ts` owns the paths:
 
@@ -70,13 +70,32 @@ writes no records. [configuration.md](configuration.md) has the key reference.
   stderr. The duration runs from when the parent began spawning the child. If
   the child never starts, the last phase is `startup`. A phase is the last
   observed boundary, not proof of a cause.
+- **Seller payment channels.** Component `seller-channel`, phase `exchange`: one
+  record per failed operation attempt from the authenticated, bound buyer
+  (`prepare`, `open`, `execute`, `approve`, `snapshot`, `close`,
+  `resume-block`). The peer check and concurrent-request guard precede
+  recording. Admission and backend failures during preparation, first opening
+  and renewal are covered. Codes come only from catalogs:
+  - the payment SDK's error name when the failure carries one, even when a
+    session layer replaced it with a generic code (for example
+    `invalid_batch_settlement_svm_settlement_simulation`: the SDK reported a
+    simulation failure for this attempt);
+  - otherwise the typed session, payment or channel code;
+  - otherwise `SELLER_CHANNEL_FAILED`.
+
+  Refusals a buyer can cause (`PAYMENT_SESSION_INVALID`, `_BINDING`, `_BUSY`,
+  `_CLOSED`, `_LIMIT`) are `warn`; the rest are `error`. The error text is never
+  kept: it can hold transactions, addresses or RPC URLs. A failed attempt does
+  not establish the outcome of earlier attempts. Check confirmed chain state and
+  local recovery status before considering a retry.
+
 - **Cleanup.** `withDiagnosticCleanup` records cleanup failures separately and
   preserves the original thrown value, including `undefined`. A cleanup failure
   after successful work still fails the operation. Nested receipt-startup
   cleanup is not instrumented, so a cleanup failure there can hide its original
   startup error.
 
-Seller, transport, discovery and payment paths write no diagnostics. Other
+Other seller, transport, discovery and payment paths write no diagnostics. Other
 service output does not pass through this channel.
 
 ## Record contract

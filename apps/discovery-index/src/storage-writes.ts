@@ -161,15 +161,45 @@ function catalogModelQueries(database: DiscoveryDatabase, entry: StoredEntry) {
     database.with(admitted).insert(models).select(source).onConflictDoNothing(),
   ];
 }
-export function recordQueries(database: DiscoveryDatabase, entry: StoredEntry) {
-  const won = writeGuard(database, entry);
-  const fields = {
+function recordFields(entry: StoredEntry) {
+  return {
     sequence: entry.sequence,
     issuedAt: entry.issuedAt,
     expiresAt: entry.expiresAt,
     digest: entry.digest,
     json: entry.json,
   };
+}
+function presenceQuery(database: DiscoveryDatabase, entry: StoredEntry) {
+  const won = writeGuard(database, entry);
+  return database
+    .insert(presence)
+    .select(
+      database
+        .select({
+          nodeId: valueField(entry.nodeId, 'nodeId'),
+          ...selectedRecord(entry),
+          releaseVersion: valueField(entry.version ?? null, 'releaseVersion'),
+          versionSequence: valueField(entry.sequence, 'versionSequence'),
+        })
+        .from(nodes)
+        .where(and(eq(nodes.nodeId, entry.nodeId), won)),
+    )
+    .onConflictDoUpdate({
+      target: presence.nodeId,
+      setWhere: lt(presence.sequence, entry.sequence),
+      set: {
+        ...recordFields(entry),
+        releaseVersion: entry.version ?? null,
+        versionSequence: entry.sequence,
+      },
+    });
+}
+export function recordQueries(database: DiscoveryDatabase, entry: StoredEntry) {
+  if (entry.kind === PUBLIC_RECORD_KINDS.PRESENCE)
+    return [presenceQuery(database, entry)];
+  const won = writeGuard(database, entry);
+  const fields = recordFields(entry);
   const source = database
     .select({
       nodeId: valueField(entry.nodeId, 'nodeId'),
@@ -180,13 +210,6 @@ export function recordQueries(database: DiscoveryDatabase, entry: StoredEntry) {
   const clearPresence = database
     .delete(presence)
     .where(and(eq(presence.nodeId, entry.nodeId), won));
-  if (entry.kind === PUBLIC_RECORD_KINDS.PRESENCE)
-    return [
-      database
-        .insert(presence)
-        .select(source)
-        .onConflictDoUpdate({ target: presence.nodeId, set: fields }),
-    ];
   if (entry.kind === PUBLIC_RECORD_KINDS.WITHDRAWAL)
     return [
       database

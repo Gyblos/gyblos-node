@@ -8,7 +8,12 @@ import { batchOfferFixture } from './batch-iroh-offer';
 import { batchLoopback } from './batch-loopback';
 import { sessionRig } from './batch-session';
 
-export async function batchPrepareFixture() {
+export async function batchPrepareFixture(
+  openingStatus?: (
+    signal: AbortSignal,
+  ) => Promise<'present' | 'absent' | 'unknown'>,
+  financialPermission?: <T>(run: () => Promise<T>) => Promise<T>,
+) {
   const rig = await sessionRig();
   const offers = await batchOfferFixture(rig.terms, rig.owner, rig.now);
   const session = rig.seller();
@@ -33,10 +38,25 @@ export async function batchPrepareFixture() {
   );
   let verified = 0;
   let verification: (() => Promise<void>) | undefined;
+  let pending = false;
   const buyer = createBuyerBatchSession({
     ...wire,
+    financialPermission,
     terms: rig.terms,
-    buyer: rig.buyer,
+    buyer: {
+      ...rig.buyer,
+      ...(openingStatus && {
+        openingRecovery: {
+          pending: () => pending,
+          claim: async () => {
+            const first = !pending;
+            pending = true;
+            return first;
+          },
+          status: openingStatus,
+        },
+      }),
+    },
     meter: offers.meter,
     now: rig.now,
     unresolved: async () => false,
@@ -53,6 +73,7 @@ export async function batchPrepareFixture() {
     service,
     buyer,
     verified: () => verified,
+    pendingOpening: () => pending,
     verification: (next: typeof verification) => {
       verification = next;
     },

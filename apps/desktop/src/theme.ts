@@ -1,5 +1,3 @@
-// Owns the approved buyer palette, shared by the desktop host and renderer.
-// Component styles consume semantic tokens; they do not choose route-specific colors.
 import type { CSSProperties } from 'react';
 
 export const BRAND_COLORS = {
@@ -46,7 +44,6 @@ export function themeStyle(light: boolean): ThemeStyle {
     '--editor': light ? colors.paper : colors.charcoal,
     '--canvas': light ? colors.panelLight : colors.panel,
     '--composer-surface': light ? colors.paper : colors.raised,
-    // The user's turn is a distinct material, not the canvas with a text offset.
     '--bubble-user': light
       ? `color-mix(in srgb, ${colors.blue} 12%, ${colors.raisedLight})`
       : `color-mix(in srgb, ${colors.blue} 12%, ${colors.raised})`,
@@ -56,8 +53,6 @@ export function themeStyle(light: boolean): ThemeStyle {
     '--subtle-line': light ? colors.lineLight : colors.line,
     '--ink': light ? colors.inkLight : colors.inkDark,
     '--muted': light ? colors.mutedLight : colors.mutedDark,
-    // Small desktop labels also sit on raised/selected surfaces: use the landing's
-    // stronger secondary gray instead of its dim gray on those surfaces.
     '--dim': light ? colors.dimLight : colors.mutedDark,
     '--accent': colors.blue,
     '--accent-hover': 'color-mix(in srgb, var(--accent), black 8%)',

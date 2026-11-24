@@ -49,6 +49,9 @@
     },
   ],
   "routes": [{ "pattern": "discovery.gyblos.com", "custom_domain": true }],
+  // Rechecks a bounded batch of seller GitHub claims (docs/discovery-index.md, GitHub claims).
+  // Migration 0007 must be applied before deploying this.
+  "triggers": { "crons": ["*/10 * * * *"] },
   // /v1/registrations needs the DISCOVERY_SOLANA_RPC_URL secret: a devnet RPC URL with any provider key
   // in its path (no query string), set with `secret put`, never here; without it that route answers 503.
   // Registered NodeIds publish without the allowlist once migration 0003 is applied.

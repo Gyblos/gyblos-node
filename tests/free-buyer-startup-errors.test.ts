@@ -54,7 +54,7 @@ function run(
   });
 }
 const start = (home: string, extra?: Record<string, string>) =>
-  run('apps/buyer/src/free-main.ts', home, [], extra);
+  run('apps/buyer/src/bin.ts', home, ['free'], extra);
 
 void test('buyer:free explains each startup failure without printing the home path', async () => {
   const home = await mkdtemp(join(tmpdir(), 'gyblos-free-start-'));

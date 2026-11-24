@@ -1,7 +1,18 @@
 // Visual-fixture settings only; never operator configuration, credentials or payment permission.
+export const PREVIEW_DENSITY = {
+  COMPACT: 'compact',
+  COMFORTABLE: 'comfortable',
+} as const;
+export const CHAT_FILTER = {
+  ALL: 'All chats',
+  UNREAD: 'Unread',
+  PINNED: 'Pinned',
+} as const;
+export const CHAT_STATE = { RUNNING: 'running', UNREAD: 'unread' } as const;
 export const PREVIEW = {
   platform: 'darwin',
   nodeStartupMs: 3000,
+  nextVersion: '0.2.0',
   apiOnlyEvery: 3,
   chatBaseTokens: 182,
   chatTokenStep: 11,
@@ -13,7 +24,9 @@ export const PREVIEW = {
   dayMs: 86400000,
   minuteMs: 60000,
   halfHourMs: 1800000,
-  replyDelayMs: 450,
+  replyDelayMs: 1400,
+  priceScale: 1_000_000,
+  medianMinOffers: 3,
   replyCents: 10,
   paymentIdCharacters: 64,
   recordedCents: 20,

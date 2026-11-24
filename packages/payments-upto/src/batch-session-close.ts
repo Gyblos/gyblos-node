@@ -8,6 +8,7 @@ import {
   sessionFail,
 } from '@gyblos/protocol/payment-session';
 
+import { requireSettlementResponse } from './batch-sdk-diagnostics';
 import type { BatchSellerContext } from './batch-session-types';
 import { waitBatch } from './batch-session-wait';
 
@@ -89,12 +90,7 @@ export async function closeBatch(context: BatchSellerContext) {
     options.operationMs,
   );
   if (observed) return acceptSettlement(context, observed);
-  if (
-    !response.success ||
-    response.network !== requirements.network ||
-    !response.transaction
-  )
-    sessionFail(SESSION_CODES.UNAVAILABLE);
+  requireSettlementResponse(response, requirements.network);
   return sessionFail(SESSION_CODES.UNVERIFIED);
 }
 export async function tickBatch(context: BatchSellerContext) {

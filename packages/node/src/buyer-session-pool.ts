@@ -6,12 +6,16 @@ import {
   type BatchBuyerPool,
   type BatchPoolEntry,
 } from '@gyblos/payments-upto/batch-session';
-import { verifyBatchQuote } from '@gyblos/protocol/batch-channel';
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
 import { controlInteger } from '@gyblos/protocol/control-validation';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
-import { SESSION_CODES, sessionFail } from '@gyblos/protocol/payment-session';
+import {
+  PaymentSessionError,
+  SESSION_CODES,
+  sessionFail,
+  UnsentChannelLimitError,
+} from '@gyblos/protocol/payment-session';
 import {
   BatchClientError,
   type BatchDestination,
@@ -19,8 +23,11 @@ import {
 
 import {
   prepareNewChannel,
+  UnsentChannelRequestError,
+  verifyUnsentPoolQuote,
   type PreparedChannel,
 } from './buyer-channel-prepare';
+import { UnsentOpeningError } from './buyer-opening-retry';
 import { bounded } from './buyer-operation';
 import { createPoolAdmissions, type PoolLease } from './buyer-pool-admission';
 import { UnsentSellerBusyError } from './buyer-routing';
@@ -144,6 +151,34 @@ async function unresolved<Remote extends BatchDestination>(
   }
   return state.admission.block(pending, revision);
 }
+async function checkExpiredOpening<Remote extends BatchDestination>(
+  state: State<Remote>,
+  existing: BatchPoolEntry | undefined,
+  signal: AbortSignal,
+) {
+  if (
+    existing?.stored?.openingPending &&
+    !existing.stored.notCreated &&
+    !existing.stored.openingReturned &&
+    state.options.now() >= existing.terms.expiresAt
+  ) {
+    await manager(state, existing).checkOpening(signal);
+  }
+}
+async function checkPoolBudget<Remote extends BatchDestination>(
+  state: State<Remote>,
+  pool: BatchBuyerPool,
+  existing: BatchPoolEntry | undefined,
+  terms: BatchPoolEntry['terms'],
+) {
+  const { totalDepositAtomic, depositAtomic } = state.options.policy;
+  const { committedAtomic, availableAtomic } = await pool.budget();
+  if (
+    BigInt(committedAtomic) > BigInt(totalDepositAtomic ?? depositAtomic) ||
+    (!existing && BigInt(availableAtomic) < BigInt(terms.depositAtomic))
+  )
+    throw new UnsentChannelLimitError(terms.sellerNodeId);
+}
 async function execute<Remote extends BatchDestination>(
   state: State<Remote>,
   quote: SignedOfferV2,
@@ -161,35 +196,36 @@ async function execute<Remote extends BatchDestination>(
     const existing = (await pool.list()).find(
       (entry) => entry.terms.sellerNodeId === quote.offer.nodeId,
     );
+    await checkExpiredOpening(state, existing, signal);
     const terms =
-      existing?.terms ??
+      (existing?.stored?.notCreated || existing?.stored?.openingReturned
+        ? undefined
+        : existing?.terms) ??
       newSessionTerms(quote, state.options.policy, state.options.now());
-    await verifyBatchQuote(
+    await verifyUnsentPoolQuote(
       quote,
       terms,
       state.options.endpoint.id().toString(),
       state.options.now(),
     );
     if (
-      batchSessionTerminal(existing?.stored) ||
-      state.options.now() >= terms.expiresAt
-    )
-      return sessionFail(SESSION_CODES.CLOSED);
-    const budget = await pool.budget();
-    if (
-      BigInt(budget.committedAtomic) >
-      BigInt(
-        state.options.policy.totalDepositAtomic ??
-          state.options.policy.depositAtomic,
-      )
-    )
-      return sessionFail(SESSION_CODES.LIMIT);
-    if (
-      !existing &&
-      BigInt(budget.availableAtomic) < BigInt(terms.depositAtomic)
-    )
-      return sessionFail(SESSION_CODES.LIMIT);
-    return { terms, fresh: !existing };
+      (batchSessionTerminal(existing?.stored) &&
+        !existing?.stored?.notCreated &&
+        !existing?.stored?.openingReturned) ||
+      (state.options.now() >= terms.expiresAt &&
+        !existing?.stored?.openingPending)
+    ) {
+      const cause = new PaymentSessionError(SESSION_CODES.CLOSED);
+      throw new UnsentChannelRequestError(terms.sellerNodeId, cause);
+    }
+    await checkPoolBudget(state, pool, existing, terms);
+    return {
+      terms,
+      fresh:
+        !existing ||
+        !!existing.stored?.notCreated ||
+        !!existing.stored?.openingReturned,
+    };
   });
   const preparation =
     fresh && state.options.openingSupportsBlocks !== undefined
@@ -198,7 +234,7 @@ async function execute<Remote extends BatchDestination>(
   const entry = await state.admission.serial(async () => {
     if (await unresolved(state)) return sessionFail(SESSION_CODES.UNVERIFIED);
     signal.throwIfAborted();
-    await verifyBatchQuote(
+    await verifyUnsentPoolQuote(
       quote,
       terms,
       state.options.endpoint.id().toString(),
@@ -290,6 +326,14 @@ async function run<Remote extends BatchDestination>(
       } catch (error) {
         lease.running = false;
         if (lease.registered) {
+          if (
+            error instanceof UnsentOpeningError &&
+            !lease.sent &&
+            (await state.admission.serial(async () =>
+              (await catalog(state)).resolve(id, lease.requestId),
+            ))
+          )
+            throw error;
           if (
             !lease.sent &&
             error instanceof BatchClientError &&

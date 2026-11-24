@@ -39,6 +39,7 @@ export interface BatchBuyerBackend {
     expectedChannelId: string,
     terms: PaymentSessionTerms,
     totalBudgetAtomic: string,
+    switchSeller?: boolean,
   ): Promise<void>;
 }
 export interface BatchSellerBackend {
@@ -89,6 +90,8 @@ interface BatchFinancialRecord {
   settlement: SessionSettlement | null;
   pending: Record<string, string>;
   blocks?: Record<string, BatchRequestBlocks>;
+  // A seller opening whose deposit was never funded was released: no channel, no obligation, no slot.
+  released?: true;
 }
 export interface BatchGeneration extends BatchFinancialRecord {
   version: typeof PAYMENT_SESSION.version | typeof BATCH_BLOCK_STATE.version;
@@ -104,6 +107,10 @@ export interface BatchCommonOptions {
 }
 export interface BatchBuyerOptions extends BatchCommonOptions {
   payer: TransactionPartialSigner & MessagePartialSigner;
+  openingStatus?: (
+    store: import('./batch-session-store').BatchStore,
+    signal: AbortSignal,
+  ) => ReturnType<NonNullable<SessionBuyer['openingRecovery']>['status']>;
   hints: () => Promise<BatchHint>;
 }
 export interface BatchFacilitator {
@@ -137,10 +144,13 @@ export interface BatchSellerOptions extends BatchCommonOptions {
     terms: Readonly<PaymentSessionTerms>,
   ) => Promise<boolean>;
   closing: (channelId: string) => Promise<boolean>;
+  // Created for an opening: a released session takes its slot back now, before the opening is stored.
+  reclaimReleasedSlot?: boolean;
   idleMs?: number;
   minSettlementAtomic?: string;
   pollMs?: number;
   operationMs?: number;
+  openingConfirmMs?: number;
 }
 
 export interface BatchSellerContext {

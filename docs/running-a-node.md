@@ -417,9 +417,11 @@ seller's publication, the discovery line adds `publishing refused:` and the
 static code the daemon keeps in `status.json`. While a model is served, an
 `uptime` line then asks the index for this NodeId's public uptime (the share of
 five-minute slots with an accepted presence over 24 hours, 7 and 30 days) and
-says `online, last presence … ago` or `offline since …`; this is the only
-request that carries the NodeId, which the daemon already publishes to the same
-index. The output is described in the
+says `online, last presence … ago` or `offline since …`, and a `github` line
+shows the GitHub account the index links to this seller and its state (see
+[GitHub verification](#github-verification)); these two are the only requests
+that carry the NodeId, which the daemon already publishes to the same index. The
+output is described in the
 [CLI reference](https://docs.gyblos.com/en/reference/cli#status-and-registration).
 
 `Result: RUNNING` (exit 0) needs an active service and a ready daemon.
@@ -440,6 +442,133 @@ Read local operational logs with `pnpm gyblos logs --role seller` (`--follow`,
 `--json` and filters); see
 [the CLI reference](https://docs.gyblos.com/en/reference/cli#local-operational-logs)
 and [diagnostics.md](diagnostics.md).
+
+### GitHub verification
+
+```sh
+pnpm gyblos seller verify github <user>
+pnpm gyblos seller verify github <user> --gist <gist URL or id>
+pnpm gyblos seller verify github --status
+pnpm gyblos seller verify github --cancel
+```
+
+`seller verify github` shows buyers which GitHub account runs this seller. It
+needs a seller the index already knows: registered (`seller register`) or with a
+catalog the index still stores. A seller leaves the listing soon after it stops
+publishing (its presence lasts 90 seconds, its catalog 10 minutes), but the
+index deletes expired catalogs only when it prunes, which happens only when a
+NodeId it has never stored publishes (at most once a minute per Worker
+instance), so an unregistered seller may stay eligible for a while; only
+registration or ongoing publishing is reliable. The binding has two halves: a
+gist owned by `<user>` with a file named `gyblos-proof.txt` that contains the
+line `gyblos-node=<NodeId>` (an unlisted gist works too: the index publishes its
+id, so the proof is public either way), and a claim signed by the node key
+naming the account and the gist, which the discovery index checks
+([discovery-index.md](discovery-index.md#github-claims)). Anyone can re-check
+the gist; the index does not keep or serve the signature. One `gyblos-proof.txt`
+may hold several sellers' proof lines, one per line; only its first 16 KiB
+(about 200 lines) is read. The command reads the same part before it sends a
+claim, so a line beyond it stops the command with `VERIFY_PROOF_MISSING` and no
+claim is sent; a line that moves there after verification turns the seller
+`lost` at the next check.
+
+1. The account is lowercased and checked (letters, digits and single hyphens, at
+   most 39 characters).
+2. The gist: `--gist` if given; otherwise the one this home saved earlier, or
+   the one the index already holds for this account. Failing that, if the GitHub
+   CLI (`gh`) is installed and signed in as `<user>`, it reuses the proof gist
+   an earlier, interrupted run made (found by its description, which names the
+   NodeId) or creates one; a failing `gh` ends with `VERIFY_GH_FAILED` and never
+   prints its error text. If `gh` is signed in as another account the command
+   says so. Otherwise it prints the text to put in a file named
+   `gyblos-proof.txt` in a new gist at gist.github.com and asks for its URL on a
+   terminal (or, without a terminal, tells you to run it again with `--gist`). A
+   gist URL naming another owner is refused (`VERIFY_GIST_OWNER_MISMATCH`).
+3. It reads that file's raw text at `<user>`'s own URL, by the same rule as the
+   index and stops with `VERIFY_PROOF_MISSING` or `VERIFY_GIST_NOT_FOUND` when
+   the proof line is not there yet.
+4. It signs the claim with the node key and sends it to the index, which checks
+   the gist itself. `Verified` exits 0. Anything else exits 1 with the state and
+   what to do: `GIST_NOT_FOUND`, `NODE_ID_MISSING`, or `GITHUB_UNAVAILABLE` (the
+   claim stays pending; run it again later). When the index checked this seller
+   less than a minute ago (`CHECK_DEFERRED`), a wait of up to 2 minutes is
+   waited out once and the claim sent again; a longer wait, or a second
+   `CHECK_DEFERRED` after that wait, is reported. A `DISCOVERY_STALE_CLAIM`
+   answer is re-signed once with a newer time. A `DISCOVERY_UNKNOWN_NODE`
+   refusal means the index does not know the seller yet: register it, or publish
+   its models, first.
+
+Progress (account, gist id and last step) is saved in
+`<GYBLOS_HOME>/seller/github-verification.json`, owner-only and written
+atomically. Each run first asks the index and reads the gist, so stopping it
+with Ctrl+C at any point is safe: nothing is signed or sent after Ctrl+C (exit
+130), and the next run skips what is done. A saved gist that is no longer on
+GitHub is dropped, so a plain rerun makes a new one. Failures lead with a
+sentence saying what to do and end with the static code in brackets. A finished
+verification run again just says `Already verified`.
+
+`--status` prints the index's view: account, gist URL, state, reason, the last
+check attempt (which may be one GitHub did not answer) and, while verified,
+since when. `--cancel` signs a cancel claim, so the index stops linking the
+seller to the account, and removes the progress file. The gist stays on GitHub;
+delete it yourself, or, when other sellers share it, remove only this seller's
+line, since deleting it turns their verified links `lost` at their next check.
+Only `verified` means the index found the proof; the explorer
+(https://explorer.gyblos.com) then shows `@<user>` with a ✓ next to the seller,
+and its `Verified only` filter (`?verified=1`) lists only such sellers. The
+command prints public identifiers only (NodeId, account, gist URL and the index
+origin), never a key or the home location.
+
+### Seller display name
+
+```sh
+pnpm gyblos seller name "<name>"
+pnpm gyblos seller name --clear
+pnpm gyblos seller name --status
+```
+
+`seller name` sets an optional public name for this seller, which the discovery
+index lists beside its NodeId (`name` in `GET /v1/network`). The name is chosen
+by the seller: it is not verified and not unique, so it never proves who runs a
+seller; only [GitHub verification](#github-verification) does. Unquoted words
+are joined with one space; put `--` before a name that starts with `-`
+(`pnpm gyblos seller name -- "-Lab"`). The command checks the name locally with
+the shared rule (`parseSellerName` in `@gyblos/protocol/profile-claim`, see
+[the profile claim](../packages/protocol/SPEC.md#profile-claim-v1)): 1 to 32
+letters, numbers, spaces and `-`, `_`, `.`, `'` after NFKC (typographic
+apostrophes become `'`), with accents and other marks only after a letter,
+letters from one widely used writing system (Latin may join Han with kana,
+Hangul or Bopomofo), no emoji, symbols, joiners, middle dots, modifier letters,
+small capitals or invisible characters, and no `gyblos`, `verified`,
+`verificado`, `official` or `oficial` even spelled with look-alike letters,
+digits or separators. A refused name stops with `NAME_INVALID` or
+`NAME_RESERVED` and a sentence saying which part failed, before the key or the
+index is used. If the name holds `?` or U+FFFD, the message adds that the
+terminal probably did not send UTF-8 (on Windows, use Windows Terminal or
+PowerShell 7); if it holds another quote mark such as `‘`, it asks for a
+straight apostrophe.
+
+It then signs the name with the node key and sends it to `discovery.url`
+([discovery-index.md](discovery-index.md#seller-names)) and says the index may
+take up to 10 seconds to show it (or, after `--clear`, to stop showing it).
+Success lines name the index by its host, such as
+`the index at discovery.gyblos.com`. Setting a name needs a seller the index
+already knows, as for GitHub verification (`DISCOVERY_UNKNOWN_NODE` otherwise);
+clearing does not. `--clear` signs an empty name, so the index stops showing
+one. `--status` prints the name the index holds and when it was set, that there
+is none, or that an index operator removed it (on an index without seller names
+it ends with `DISCOVERY_HTTP_STATUS`). Index refusals end with the static code
+in brackets. `DISCOVERY_STALE_CLAIM` means this computer's clock may be behind
+(or wrong, when it is ahead) or a newer name was already sent;
+`DISCOVERY_CLAIM_REJECTED` mentions the clock only when it is at least 3 seconds
+ahead of the index. When the index's answer has a `Date` header, clock messages
+add a gap of 2 seconds or more, in seconds up to 120, then in minutes, then in
+hours. `DISCOVERY_PROFILE_HELD` means an index operator removed the name;
+`DISCOVERY_HTTP_STATUS` on an index without the route says it does not take
+seller names yet. Nothing is stored locally. The command prints public
+identifiers only (NodeId, the name and the index host), never a key or the home
+location. With Docker, run it as
+`docker compose exec seller gyblos seller name "<name>"`.
 
 ### Docker
 
@@ -708,7 +837,7 @@ nothing is committed to the repository:
    the Windows seller, signs both keyless with the same identity, and creates
    the GitHub release with the installers, their SHA-256 files and Sigstore
    bundles, and the packaged sellers. Only a version newer than the latest
-   release by semantic-version precedence (`scripts/semver-newer.mjs`) becomes
+   release by semantic-version precedence (`scripts/semver-newer.ts`) becomes
    latest, which is what `https://gyblos.com/install.sh` serves, and moves the
    `:beta` tag. An older line's patch never replaces either. Releases are never
    marked pre-release, because GitHub's latest download skips those.
@@ -786,8 +915,12 @@ endpoints on `127.0.0.1:4031`:
 | `pnpm buyer`      | Free or paid, chosen from each verified signed quote within the ceilings | `api-token` required | One request at a time (`PAID_BUYER_BUSY`)     |
 | `pnpm buyer:free` | Free quotes only; loads no wallet signer, tokenizer or RPC               | none                 | Up to two at once, each on a different seller |
 
-Both use the same `selection.json`. Client setup, formats, tools, coding agents
-and errors are in
+Both use the same `selection.json`. Every `pnpm buyer*` script runs the one
+buyer executable, `apps/buyer/src/bin.ts`, with a subcommand: `start`, `free`,
+`chat`, `init`, `setup`, `auto`, `agent` or `withdraw`.
+`node --import tsx apps/buyer/src/bin.ts --help` lists them; `pnpm buyer --help`
+does not, because that script already passes `start`. Client setup, formats,
+tools, coding agents and errors are in
 [Connect your coding tools](https://docs.gyblos.com/en/buyers/use-from-code).
 `pnpm buyer:agent <opencode|pi|codex|claude>` prints (or with `--write` updates)
 a coding agent's configuration for every model the buyer serves;
@@ -1029,13 +1162,15 @@ With an OpenAI SDK, set `baseURL` (`base_url` in Python) to
 > `api-token` and start it again; `pnpm buyer:free` needs no token.
 
 Startup reasons beyond the free ones: `BUYER_PAYMENT_NETWORK_MISMATCH` (RPC,
-network or asset not devnet USDC), `BUYER_PAID_MODEL_UNSUPPORTED`,
-`BUYER_PAID_MODELS_UNSUPPORTED` (the explicit paid entry `startPaidBuyer` serves
-only `request.selection`; the automatic buyer serves the `models` list),
-`BUYER_WALLET_KEY_INVALID`, `BUYER_TOKENIZER_UNAVAILABLE`,
-`BUYER_PAYMENT_JOURNAL_UNAVAILABLE` and `BUYER_API_TOKEN_INVALID` (`api-token`
-is not a private 0600 regular file with one link, owned by you and holding a
-token; it is never repaired, since its token may already have been read).
+network or asset not devnet USDC), `BUYER_PAID_MODEL_UNSUPPORTED` (a recounted
+quote for a model outside the Qwen3 family, or a declared quote for one;
+declared quotes buy any other model), `BUYER_PAID_MODELS_UNSUPPORTED` (the
+explicit paid entry `startPaidBuyer` serves only `request.selection`; the
+automatic buyer serves the `models` list), `BUYER_WALLET_KEY_INVALID`,
+`BUYER_TOKENIZER_UNAVAILABLE`, `BUYER_PAYMENT_JOURNAL_UNAVAILABLE` and
+`BUYER_API_TOKEN_INVALID` (`api-token` is not a private 0600 regular file with
+one link, owned by you and holding a token; it is never repaired, since its
+token may already have been read).
 
 ## Control queries
 
@@ -1156,8 +1291,9 @@ sent, and nothing on this channel authorizes payment.
 
 Every quote carries the offer's metering mode:
 
-- **Recounted**: the model's public tokenizer is pinned (Qwen3 0.6B). The seller
-  counts the prompt and output with it, as the buyer can.
+- **Recounted**: the model's public tokenizer is pinned (the catalog's Qwen3
+  hybrid models). The seller counts the prompt and output with it, as the buyer
+  can.
 - **Declared**: any other model, served through the `openai` or `anthropic`
   engine. The usage is the provider's, which the buyer cannot check. The seller
   therefore:

@@ -3,8 +3,6 @@
   // Workers through OpenNext. Deploying is a founder-approved manual step; Wrangler is not a workspace
   // dependency: from this directory, `pnpm build:cloudflare` then `npx wrangler@4.151.1 deploy`.
   "name": "gyblos-explorer",
-  // Written by `pnpm build:cloudflare` (scripts/write-worker-entry.mjs): OpenNext's handler and the
-  // scheduled discovery read (scheduled.ts).
   "main": ".open-next/explorer-worker.js",
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],

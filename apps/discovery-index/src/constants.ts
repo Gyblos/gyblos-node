@@ -1,5 +1,6 @@
 // Owns the discovery index's canonical values: wire error codes, statuses, routes, limits and binding names.
 // It must not hold record formats or signing domains (protocol owns those) or operator URLs (config).
+import { LOOPBACK_HOST_NAMES } from '@gyblos/config/hosts';
 import { PUBLIC_RECORD_LIMITS } from '@gyblos/protocol/constants';
 
 // Static `error` values on the wire (docs/discovery.md, "Running an index").
@@ -24,6 +25,14 @@ export const INDEX_ERRORS = {
   IDENTITY_NOT_REGISTERED: 'IDENTITY_NOT_REGISTERED',
   // An operator revoked this NodeId; only the operator can readmit it (`pnpm index:restore`).
   NODE_REVOKED: 'NODE_REVOKED',
+  // POST /v1/identity/github: a malformed body or claim, or one issued too far ahead of the index's
+  // clock; a claim not newer than the stored one or older than GITHUB_CLAIM.maxAgeMs; a NodeId with
+  // neither an active registration nor a stored catalog.
+  INVALID_CLAIM: 'INVALID_CLAIM',
+  STALE_CLAIM: 'STALE_CLAIM',
+  UNKNOWN_NODE: 'UNKNOWN_NODE',
+  PROFILE_HELD: 'PROFILE_HELD',
+  NO_PROFILE: 'NO_PROFILE',
   UNAVAILABLE: 'DISCOVERY_UNAVAILABLE',
 } as const;
 export type IndexErrorCode = (typeof INDEX_ERRORS)[keyof typeof INDEX_ERRORS];
@@ -49,7 +58,11 @@ export const INDEX_ROUTES = {
   HEALTH: '/v1/health',
   REGISTRATIONS: '/v1/registrations',
   UPTIME: '/v1/uptime',
+  VERSIONS: '/v1/versions',
   NETWORK: '/v1/network',
+  // POST a signed GitHub claim here; GET `${GITHUB_IDENTITY}/<nodeId>` reads one.
+  GITHUB_IDENTITY: '/v1/identity/github',
+  PROFILE: '/v1/profile',
 } as const;
 // Public reads are CORS-readable on every status, errors included.
 export const PUBLIC_READ_ROUTES: ReadonlySet<string> = new Set([
@@ -57,8 +70,14 @@ export const PUBLIC_READ_ROUTES: ReadonlySet<string> = new Set([
   INDEX_ROUTES.MODELS,
   INDEX_ROUTES.HEALTH,
   INDEX_ROUTES.UPTIME,
+  INDEX_ROUTES.VERSIONS,
   INDEX_ROUTES.NETWORK,
 ]);
+// Public reads below a prefix (GET /v1/identity/github/<nodeId>), CORS-readable like the routes above.
+export const PUBLIC_READ_PREFIXES: readonly string[] = [
+  `${INDEX_ROUTES.GITHUB_IDENTITY}/`,
+  `${INDEX_ROUTES.PROFILE}/`,
+];
 
 export const INDEX_HEADERS = {
   CACHE_CONTROL: 'Cache-Control',
@@ -103,7 +122,6 @@ export const DISCOVERY_INDEX_LIMITS = {
   retentionMs: PUBLIC_RECORD_LIMITS.catalogLifetimeMs,
   maxJsonDepth: 16,
   maxLimitDigits: 6,
-  maxCursorIssuedDigits: 16,
 } as const;
 
 // Cloudflare rate-limit binding names (wrangler.jsonc); keyed by IP(/64), never stored,
@@ -207,8 +225,7 @@ export const REDEEM_RESULTS = {
 export type RedeemResult = (typeof REDEEM_RESULTS)[keyof typeof REDEEM_RESULTS];
 export type PublishMode = (typeof PUBLISH_MODES)[keyof typeof PUBLISH_MODES];
 
-// Loopback-only development counters (never used by the Worker entry). The host list is local
-// because the @gyblos/config root also exports Node path helpers that a Worker bundle cannot load.
+// Loopback-only development counters (never used by the Worker entry).
 export const DEVELOPMENT_LIMITS = {
   perMinute: 120,
   windowMs: 60_000,
@@ -219,20 +236,7 @@ export const INDEX_PROTOCOLS = {
   SECURE: 'https:',
   LOOPBACK: 'http:',
 } as const;
-export const LOOPBACK_HOSTS: ReadonlySet<string> = new Set([
-  'localhost',
-  '127.0.0.1',
-  '[::1]',
-]);
-// Rate-limit key used when no client address header is present.
-export const LOCAL_CLIENT_KEY = 'local';
-
-export const IPV6 = {
-  groups: 8,
-  prefixGroups: 4,
-  hexRadix: 16,
-} as const;
-
+export const LOOPBACK_HOSTS: ReadonlySet<string> = new Set(LOOPBACK_HOST_NAMES);
 // Public seller uptime (uptime.ts): five-minute slots, kept for the longest reported window.
 export const UPTIME = {
   // Five minutes.
@@ -267,3 +271,74 @@ export const NETWORK_STATES = {
   UNPUBLISHED: 'unpublished',
 } as const;
 export type NetworkState = (typeof NETWORK_STATES)[keyof typeof NETWORK_STATES];
+
+// Seller GitHub claims (github-claims.ts): a node-signed claim names an account and a public gist; the
+// index reads the gist's raw text at the account's own URL, which answers only when that account owns
+// the gist, and looks for the NodeId's proof line. No GitHub API, token or redirect is used.
+export const GITHUB_CLAIM_STATES = {
+  // Not proven yet: the last check found no proof, or none has finished.
+  PENDING: 'pending',
+  VERIFIED: 'verified',
+  // Proven before; the last conclusive check found the proof gone.
+  LOST: 'lost',
+} as const;
+export type GithubClaimState =
+  (typeof GITHUB_CLAIM_STATES)[keyof typeof GITHUB_CLAIM_STATES];
+// Static outcome codes of a gist check. Only the first two are ever stored; an outage keeps the state.
+export const GITHUB_CLAIM_REASONS = {
+  // Any status but 200, 403, 429, 451 or 5xx, redirects included (a renamed account redirects): no
+  // such gist, or the account does not own it.
+  GIST_NOT_FOUND: 'GIST_NOT_FOUND',
+  // The gist exists but its first IDENTITY_CLAIM.maxProofBytes hold no proof line for the NodeId.
+  NODE_ID_MISSING: 'NODE_ID_MISSING',
+  // 403, 429, 451, 5xx, a timeout or a network error: inconclusive. 403 and 429 are GitHub limiting
+  // the index; 451 is a legal block that may apply only where the request ran. Stored only on a
+  // pending claim; a verified or lost claim keeps its own reason.
+  GITHUB_UNAVAILABLE: 'GITHUB_UNAVAILABLE',
+  // POST answer only: the NodeId's gist was fetched less than GITHUB_CLAIM.minFetchIntervalMs ago, so
+  // the claim was stored unchecked and is due for the next scheduled run; see `retryAfter`.
+  CHECK_DEFERRED: 'CHECK_DEFERRED',
+} as const;
+export type GithubClaimReason =
+  (typeof GITHUB_CLAIM_REASONS)[keyof typeof GITHUB_CLAIM_REASONS];
+// Log code of a scheduled GitHub claim recheck that failed; logged alone, with no request or claim data.
+export const GITHUB_RECHECK_FAILED = 'DISCOVERY_GITHUB_RECHECK_FAILED';
+// The reasons a stored claim can carry.
+export const STORED_GITHUB_CLAIM_REASONS = [
+  GITHUB_CLAIM_REASONS.GIST_NOT_FOUND,
+  GITHUB_CLAIM_REASONS.NODE_ID_MISSING,
+  GITHUB_CLAIM_REASONS.GITHUB_UNAVAILABLE,
+] as const;
+export type StoredGithubClaimReason =
+  (typeof STORED_GITHUB_CLAIM_REASONS)[number];
+export const GITHUB_CLAIM = {
+  // A signed claim is a few hundred bytes.
+  maxBodyBytes: 1024,
+  // How old a claim may be when it arrives. A cancel keeps the NodeId's newest issuedAt, so an older
+  // signed claim is never replayed; this also bounds a claim's delivery delay.
+  maxAgeMs: 60_000,
+  gistOrigin: 'https://gist.githubusercontent.com',
+  fetchTimeoutMs: 3000,
+  // At most one gist fetch per NodeId per interval from POSTs, reserved atomically in storage.
+  minFetchIntervalMs: 60_000,
+  // The scheduled run checks claims whose next check is due, at most `recheckBatch` per run, and
+  // schedules the next one this long after a check.
+  recheckAfterMs: 6 * 60 * 60 * 1000,
+  recheckBatch: 25,
+  // A claim still pending this long after it was issued, never verified, is no longer rechecked by the
+  // scheduled run; it stays readable and a new POST checks it again.
+  abandonPendingAfterMs: 7 * 24 * 60 * 60 * 1000,
+  // Statuses of the raw gist URL: 200 is read; these and 5xx are inconclusive; any other is not found.
+  found: 200,
+  inconclusive: [403, 429, 451],
+  serverError: 500,
+  msPerSecond: 1000,
+} as const;
+
+export const SELLER_PROFILE = {
+  maxBodyBytes: 1024,
+  maxAgeMs: 60_000,
+  held: 1,
+  open: 0,
+  maxListedRows: 1000,
+} as const;

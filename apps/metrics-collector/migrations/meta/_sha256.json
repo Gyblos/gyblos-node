@@ -1,0 +1,9 @@
+{
+  "0001_metrics_collector.sql": "ecad550458f54c51812b149f4ec4663152507a367b1aed69cdce705d51d15ec2",
+  "0002_metrics_aggregates.sql": "b7cc4a403f28d4901b6def2b850d26d2f8b81b75d87354aeb4c350c8712990d1",
+  "0003_chain_index.sql": "629ceac2c09b56c12e8aa666864368e3947eddde915f7253aa9474800ebdfff8",
+  "0004_chain_aggregates.sql": "43f90bb5c0205647c9670dc8aa6dcd6b605415b8e9ef627e6449c34826b46a62",
+  "0005_breakdowns.sql": "b403ddebdf9908b289092b4c5123bdb19cb48cbaf76ce317876a605e9c699299",
+  "0006_chain_gyblos_only.sql": "71b8fb5c053d555cc0b371c79c9046d8556077d4259f477e3b3efe240de861d4",
+  "0007_model_observed.sql": "fb1c02e8843424bb339e84da8e1260c7251e8f75f3d7cc2c3086faab934b7ff4"
+}

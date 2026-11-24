@@ -97,7 +97,7 @@ export async function startSellerSessionHost(
   }
   return {
     service: {
-      exchange: (request, peer, signal, onDelta, blocks, blockMode) =>
+      exchange: (request, peer, signal, onDelta, blocks, blockMode, route) =>
         run(state, signal, async () => {
           signal.throwIfAborted();
           const current = await host(state, peer);
@@ -109,6 +109,7 @@ export async function startSellerSessionHost(
               onDelta,
               blocks,
               blockMode,
+              route,
             );
             return reply;
           } finally {

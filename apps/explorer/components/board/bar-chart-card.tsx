@@ -16,6 +16,7 @@ import {
 } from 'recharts';
 
 import { Flow, type FlowKind, type FlowValue } from './animated-number';
+import { barAxis } from './bar-axis';
 import { CHART } from './constants';
 import { cx } from './cx';
 import type { Delta } from './delta';
@@ -49,7 +50,7 @@ export function BarChartCard({
   kind: FlowKind;
   total: FlowValue;
   // The total's change against the previous period; hidden while a day is hovered.
-  change?: Delta;
+  change?: Delta | null;
   points: BarPoint[];
   // A count axis (whole numbers); amounts hide it and read from the headline instead.
   countAxis?: boolean;
@@ -66,7 +67,7 @@ export function BarChartCard({
         {change && !active ? <DeltaChip delta={change} /> : null}
         <span className="font-mono text-xs text-dim">
           {active
-            ? [active.day, active.detail].filter(Boolean).join(' · ')
+            ? [active.day, active.detail].filter(Boolean).join(', ')
             : `${points.length} days`}
         </span>
       </div>
@@ -95,9 +96,8 @@ export function BarChartCard({
               minTickGap={CHART.minTickGap}
             />
             <YAxis
-              hide={!countAxis}
+              {...barAxis(countAxis)}
               width={CHART.axisWidth}
-              allowDecimals={false}
               tickLine={false}
               axisLine={false}
               tick={TICK}

@@ -10,7 +10,6 @@ import {
   NODE_PUBLISH_QUOTA,
   PUBLISH_MODES,
 } from '@gyblos/discovery-index/constants';
-import { ipKey } from '@gyblos/discovery-index/ip-key';
 import type { DiscoveryPublishers } from '@gyblos/discovery-index/publishers';
 import {
   createMemoryStorage,
@@ -18,6 +17,7 @@ import {
 } from '@gyblos/discovery-index/storage';
 import { createD1Storage } from '@gyblos/discovery-index/storage-d1';
 import { createWorker } from '@gyblos/discovery-index/worker';
+import { ipKey } from '@gyblos/runtime/ip-key';
 
 import {
   createSqliteD1,
@@ -218,7 +218,18 @@ void test('response size is capped and paging continues from the last included s
   const body = JSON.parse(text);
   assert.ok(new TextEncoder().encode(text).byteLength <= 2500);
   assert.ok(body.sellers.length >= 1 && body.sellers.length < 3);
-  assert.match(body.next, /^\d+-[0-9a-f]{64}$/);
+  const nodeIdOf = (entry: { presence: { record: { nodeId: string } } }) =>
+    entry.presence.record.nodeId;
+  const seen: string[] = body.sellers.map(nodeIdOf);
+  assert.equal(body.next, seen.at(-1));
+  for (let next = body.next; next;) {
+    const url = `${INDEX_ORIGIN}/v1/sellers?model=qwen3-0.6b&cursor=${next}`;
+    const page = await (await app.fetch(new Request(url))).json();
+    seen.push(...page.sellers.map(nodeIdOf));
+    next = page.next;
+  }
+  assert.equal(new Set(seen).size, 3);
+  assert.deepEqual(seen, [...seen].sort());
 });
 
 void test('publish body cap fits a maximal 32 KiB record plus envelope headroom', async () => {

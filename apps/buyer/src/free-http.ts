@@ -17,6 +17,7 @@ import type {
   BuyerApiKeyOperation,
   BuyerApiKeys,
 } from '@gyblos/node/buyer-api-keys';
+import { desktopOpening } from '@gyblos/node/desktop-opening';
 import { BUYER_API, type BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 import { FREE_EXECUTION } from '@gyblos/protocol/constants';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
@@ -80,13 +81,23 @@ function declaredTooLarge(request: IncomingMessage) {
   const length = Number(request.headers['content-length']);
   return Number.isFinite(length) && length > FREE_EXECUTION.requestBytes;
 }
+function atCapacity(
+  settings: ChatSettings,
+  keyId: string | undefined,
+  active: number,
+) {
+  const limit =
+    settings.singlePaidChannel && keyId
+      ? PAID_BUYER.singleChannelApiRequests
+      : TRANSPORT_LIMITS.maxConcurrent;
+  return active >= limit;
+}
 // The route's format for a request this endpoint can take now; anything else is answered here: the model
 // list, or a refusal before the body is read, so a stalled oversize body holds no slot.
 function admit(
   request: IncomingMessage,
   response: ServerResponse,
-  settings: ChatSettings,
-  active: number,
+  full: boolean,
   desktopApi?: ChatApi,
 ): ChatApi | undefined {
   const local = request.headers.origin === undefined;
@@ -96,7 +107,7 @@ function admit(
       ? FREE_BUYER_CODES.INVALID
       : declaredTooLarge(request)
         ? FREE_BUYER_CODES.TOO_LARGE
-        : active >= TRANSPORT_LIMITS.maxConcurrent
+        : full
           ? FREE_BUYER_CODES.BUSY
           : undefined;
   if (code === undefined) return api;
@@ -199,6 +210,11 @@ async function serveChat(
       scoped.stream !== undefined,
       selectedSellerAllowed,
     );
+    if (
+      route.openingIntent &&
+      !(await desktopOpening(process.env).armed(route.openingIntent))
+    )
+      throw new FreeBuyerError(FREE_BUYER_CODES.INVALID);
     const run = stopping(scoped, input.stop);
     diagnostic.executing();
     if (input.stream && run.stream) {
@@ -243,8 +259,15 @@ export function freeBuyerHandler(
   desktopPolicy?: BuyerApiPolicy,
   apiKeys?: BuyerApiKeys,
   diagnostics?: DiagnosticSink,
+  preparePaidChat?: () => Promise<void>,
+  reconcilePool?: () => Promise<void>,
 ) {
-  const desktop = createDesktopApi(desktopPolicy, authorize !== undefined);
+  const desktop = createDesktopApi(
+    desktopPolicy,
+    authorize !== undefined,
+    preparePaidChat,
+    reconcilePool,
+  );
   const accept = buyerApiCaller(authorize, apiKeys, desktopPolicy);
   const observe = httpDiagnostics(diagnostics);
   let active = 0;
@@ -255,8 +278,7 @@ export function freeBuyerHandler(
       diagnostic.refused();
       return;
     }
-    const scoped = buyerApiKeyExecutors(apiKeys, caller.keyId, execute, stream);
-    if (desktop.handled(request, response)) {
+    if (await desktop.handled(request, response, caller.owner)) {
       if (response.statusCode >= HTTP_STATUS.badRequest) diagnostic.refused();
       return;
     }
@@ -275,7 +297,8 @@ export function freeBuyerHandler(
       replyError(response, new FreeBuyerError(FREE_BUYER_CODES.INVALID));
       return;
     }
-    const api = admit(request, response, settings, active, localApi);
+    const full = atCapacity(settings, caller.keyId, active);
+    const api = admit(request, response, full, localApi);
     if (!api) {
       if (response.statusCode >= HTTP_STATUS.badRequest) diagnostic.refused();
       return;
@@ -287,7 +310,7 @@ export function freeBuyerHandler(
         request,
         response,
         settings,
-        scoped,
+        buyerApiKeyExecutors(apiKeys, caller.keyId, execute, stream),
         api,
         requestMs,
         diagnostic,
@@ -333,6 +356,8 @@ export async function startFreeBuyerHttp(
       desktopApiPolicy(options, settings),
       options.apiKeys,
       options.diagnostics,
+      options.preparePaidChat,
+      options.reconcilePool,
     ),
   );
   await new Promise<void>((resolve, reject) => {

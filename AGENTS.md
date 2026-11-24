@@ -17,11 +17,13 @@ Dependency direction is protocol → core → inference/adapters → node → ap
 - `packages/inference`: shared SDK-free inference orchestration over protocol ports and core policy. It imports no concrete adapters, node or apps; core and adapters do not import it. Node supplies the engine, economic policy and observation ports.
 - `packages/node`: local-node library for both roles; composes adapters, including seller control, free channels and reusable payment channels for priced offers.
 - `apps/node` (seller daemon and the `gyblos` CLI), `apps/buyer`, `apps/desktop` (the desktop app: Electron, the provisional desktop host), `apps/discovery-index` (the discovery index Cloudflare Worker; deploy needs founder approval), `apps/metrics-collector` (the metrics collector: the public receipt Cloudflare Worker at collector.gyblos.com, with scheduled aggregates and a public stats API; migrations and deploys need founder approval), `apps/docs` (the public docs site, docs.gyblos.com: a Fumadocs static export; publishing needs founder approval), `apps/explorer` (the public metrics explorer at explorer.gyblos.com: a server-rendered Next.js app over the discovery index, the metrics collector's stats API and Solana; deploys need founder approval. Its reusable components live in `components/board` and are published as a shadcn registry, `registry.json` built into `/r/<name>.json`, so other Gyblos apps install them with `npx shadcn add https://explorer.gyblos.com/r/<name>.json`) and `apps/receipt-collector` (the local receipt receiver: a standalone loopback-only process) are independent executables; apps never import each other. Every docs page has an English and a Spanish file, updated together; a change to output the seller guide quotes updates the guide in the same PR (`tests/docs-content.test.ts`).
+- A change to how the product is used (seller or buyer commands and flags, public routes, public data, privacy, seller or buyer steps) updates the repository `docs/` and the docs site, English and Spanish, in the same PR; when new data becomes public, that includes `reference/data-and-privacy`. Contributor and operator procedures (migrations, deploys, admin scripts, repository tooling) go in `docs/` only, never on the docs site.
 - Buyers use the desktop app, and the API keys it issues to connect their coding tools. Public buyer-facing text (the docs site, the landing in `web-gyblos`, desktop copy) never tells a buyer to clone this repository, install Node or pnpm, or run `pnpm buyer` / `buyer:*` scripts. Running the buyer from a checkout is contributor material and belongs only in `docs/`.
 - `packages/config`: operator values; `config/src/home.ts` is the only owner of local paths. `packages/runtime`: platform helpers.
 - `lab/`: validation outside product (`harness`, `tools`; `evidence` is historical). "Gate" is a lab word only: no product code, route, variable, message or product script uses it.
 - Product never imports `lab/`, `tests/` or `tooling/`. Import other workspaces by name through explicit `exports`; relative imports stay inside one package.
 - Dependency patches are a last resort: each lives in `patches/` (pnpm `patchedDependencies`), changes nothing unless explicitly used, is justified next to its entry in `pnpm-workspace.yaml` with its upstream status, and is removed when the dependency supports the change.
+- D1 migrations (`apps/discovery-index`, `apps/metrics-collector`) are generated with drizzle-kit from `schema.ts` (`pnpm index:db:generate` / `pnpm collector:db:generate`); never write migration SQL by hand, never edit an applied migration, and apply remotely only with founder approval. The single exception is a reviewed data-only change (UPDATE/DELETE/backfill), created with `--custom --name <change>` and holding only data statements. Never run drizzle-kit `push`, `pull` or `introspect` against D1. Details: [docs/code-standards.md](docs/code-standards.md#d1-migrations).
 - No import-time initialization: handlers, timers and state start in lifecycle/entry functions (`tests/entrypoint-inertness.test.ts`).
 
 ## Commands
@@ -32,7 +34,7 @@ Node 24.22.1+ and the pnpm version pinned in `package.json`.
 pnpm install --frozen-lockfile
 pnpm check          # typecheck + lint + test:all; run before every PR
 pnpm typecheck      # includes tests and the desktop renderer
-pnpm lint           # eslint + prettier --check + tooling:test + skills:check + boundaries
+pnpm lint           # eslint + comments:check + typescript:check + prettier --check + tooling:test + skills:check + boundaries + db:check
 pnpm test           # product suites tests/*.test.ts and packages/*/test (required checks)
 pnpm test:lab       # lab suites tests/lab/
 pnpm tooling:test   # boundary checker and lint rule tests
@@ -57,7 +59,9 @@ None of these needs a funded wallet, engine or Docker. `gate:*`, funding, identi
 ## Hard rules
 
 - Boundaries and lint errors are enforcing; never suppress, baseline or cast around them. Lint warnings must not grow.
+- Source comment budgets are exact per file; a changed file may not gain a comment whose text is not in the base.
 - One canonical definition per owned discrete value (`as const` in the owning `constants.ts`, type derived from it); for example use `INFERENCE_EVIDENCE_CODES.ASSERTION_FAILED`, never a second `'ASSERTION_FAILED'` literal. Details: [docs/code-standards.md](docs/code-standards.md).
+- Never add a `.mjs`, `.cjs` or `.js` file: JavaScript-family code is always TypeScript, including scripts, tooling and configuration. Rust sidecars follow [docs/stack.md](docs/stack.md#when-to-use-rust).
 - No `any`, no widening closed types to `string`, no object-literal `as`, no floating promises, one declaration per `const`/`let`. Parse external input as `unknown` and validate at the boundary.
 - Delete code no product path uses: when a replacement is ready, remove the old path with its tests, scripts, docs and workspace entries instead of keeping it "for compatibility". Reachability from product entry points (seller daemon and `gyblos` CLI, buyer commands, desktop, Workers) decides; a test, lab gate or doc that is its only user does not keep it alive. This applies to every app and package.
 - Paid inference uses payment channels (payment sessions) only. Never add a new per-request payment path.
@@ -85,6 +89,7 @@ None of these needs a funded wallet, engine or Docker. `gate:*`, funding, identi
 - Open the web preview and visually review all seven screens at wide and narrow widths, including both themes, interactions and relevant states. Show the result to the founder and wait for explicit approval of that visual proposal before porting it to the desktop app.
 - A request to change, preview, save, push or open a PR for the mockup does not authorize desktop implementation. Approval to implement an earlier proposal does not carry over to later visual changes.
 - After explicit approval, port the accepted shared design to the desktop app and compare it against the approved web preview at the same viewport size. Do not consider a successful build a visual review. Record remaining differences and validation limits in the PR.
+- In the web mockup (`lab/tools/desktop-preview`), reuse the shared components listed in the Components table of its `DESIGN.md` instead of writing raw markup; a new reusable component is added to that table in the same change. Shipped desktop code follows `apps/desktop/DESIGN.md` until a port is approved. Procedure: [gyblos-desktop-ui](.agents/skills/gyblos-desktop-ui/SKILL.md).
 - Keep the workflow and component rules aligned with `apps/desktop/DESIGN.md`. This root file remains the single public agent-instruction source; do not add a conflicting desktop-specific agent file.
 
 ## Workflow and merges

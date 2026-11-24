@@ -16,6 +16,49 @@ Identity establishes a binding between an owner and a NodeId. It does not
 establish model quality, capacity, reputation, payment authority or the
 correctness of an answer.
 
+## GitHub account claim
+
+Separately from the registry, a seller can show which GitHub account runs it.
+The node key signs an identity claim (`@gyblos/protocol/identity-claim`,
+specified in
+[packages/protocol/SPEC.md](../packages/protocol/SPEC.md#identity-claim-v1)):
+
+```json
+{
+  "claim": {
+    "schemaVersion": 1,
+    "kind": "github",
+    "nodeId": "<64 lowercase hex>",
+    "account": "octo-cat",
+    "gist": "0123456789abcdef0123456789abcdef",
+    "issuedAt": 1763078400000
+  },
+  "signature": "<128 hex>"
+}
+```
+
+`account` is the lowercase GitHub login (at most 39 characters) and `gist` the
+id of a gist that account owns (public, or unlisted: its id is published
+anyway). Its file `gyblos-proof.txt` must contain, on a line of its own, the
+proof line `gyblos-node=<nodeId>` (`githubProofLine(nodeId)`). Both fields
+`null` cancels the claim. The signing domain is `gyblos/identity-claim/v1\n`.
+
+The binding can be re-checked: verify the signature with the NodeId, then fetch
+`https://gist.githubusercontent.com/<account>/<gist>/raw/gyblos-proof.txt`,
+which answers only when the account owns the gist (the account name is matched
+case-insensitively), and look for the proof line. The discovery index does this
+for sellers it knows and publishes the result
+([discovery-index.md](discovery-index.md#github-claims)). The index checks the
+signature on submission but neither keeps nor serves it, so a third party can
+re-check only the gist half from what the index publishes. Clients must treat an
+account as proven only when the index reports `state` `verified`.
+
+A seller creates and sends its claim with `gyblos seller verify github <user>`
+([running-a-node.md](running-a-node.md#github-verification)).
+
+A GitHub claim is a public label, not buyer trust: it is not the 8004 binding
+and no buyer admission policy reads it.
+
 ## Seller registration
 
 `gyblos seller register` registers the seller on the 8004 registry when the

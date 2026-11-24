@@ -1,7 +1,11 @@
 // Reusable-session RPC boundary and request correlation; no SDK, engine, storage or network.
 export type * from './batch-channel-types';
 export type { BatchMethod } from './batch/constants';
-export { BATCH_CHANNEL, BATCH_METHODS } from './batch/constants';
+export {
+  BATCH_CHANNEL,
+  BATCH_METHODS,
+  withBatchOutputLimit,
+} from './batch/constants';
 export {
   BatchChannelError,
   batchError,

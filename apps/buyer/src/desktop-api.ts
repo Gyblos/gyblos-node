@@ -16,9 +16,20 @@ import type { BuyerSelectionConfig } from './selection-config';
 
 export interface BuyerDesktopOptions {
   token?: string;
+  reconcilePool?: () => Promise<void>;
+  preparePaidChat?: () => Promise<void>;
   desktopPolicy?: Pick<
     BuyerApiPolicy,
-    'network' | 'mint' | 'payer' | 'maxAtomic' | 'depositAtomic' | 'lifetimeMs'
+    | 'network'
+    | 'mint'
+    | 'payer'
+    | 'maxAtomic'
+    | 'depositAtomic'
+    | 'lifetimeMs'
+    | 'totalDepositAtomic'
+    | 'paidAuto'
+    | 'autoPrices'
+    | 'autoRoutes'
   >;
 }
 export function configuredBuyerAccess(
@@ -26,6 +37,10 @@ export function configuredBuyerAccess(
   role: RoleConfig | undefined,
   token: string | undefined,
   session?: BuyerSelectionConfig['session'],
+  config?: Pick<
+    BuyerSelectionConfig,
+    'discovery' | 'identity' | 'models' | 'sellers' | 'pinnedNodeId'
+  >,
 ): BuyerDesktopOptions {
   return {
     token,
@@ -35,7 +50,30 @@ export function configuredBuyerAccess(
             ...(session && {
               depositAtomic: session.depositAtomic,
               lifetimeMs: session.lifetimeMs,
+              ...(session.totalDepositAtomic !== undefined && {
+                totalDepositAtomic: session.totalDepositAtomic,
+              }),
             }),
+            ...(config?.discovery?.open &&
+              config.identity &&
+              !config.pinnedNodeId &&
+              !config.sellers.length && {
+                autoPrices: request.priceCeilings,
+                autoRoutes: config.models?.map(
+                  ({ id, selection, maxTokens }) => ({
+                    id,
+                    modelId: selection.modelId,
+                    maxTokens,
+                  }),
+                ) ?? [
+                  {
+                    id: request.selection.modelId,
+                    modelId: request.selection.modelId,
+                    maxTokens: request.maxTokens,
+                  },
+                ],
+                ...(config.discovery.paidAuto && { paidAuto: true }),
+              }),
             network: request.network,
             mint: request.asset,
             payer: role.buyer,
@@ -63,6 +101,8 @@ function metadataRequest(
   response: ServerResponse,
   policy: BuyerApiPolicy | undefined,
   authenticated: boolean,
+  preparePaidChat: boolean,
+  reconcilePool: boolean,
 ) {
   if (!authenticated || request.headers.origin !== undefined) return false;
   const path = request.url?.split('?')[0];
@@ -71,6 +111,12 @@ function metadataRequest(
       .writeHead(HTTP_STATUS.ok, {
         'content-type': 'application/json',
         'cache-control': 'no-store',
+        ...(reconcilePool && {
+          [BUYER_API.RECONCILE_POOL_HEADER]: BUYER_API.RECONCILE_POOL_PATH,
+        }),
+        ...(preparePaidChat && {
+          [BUYER_API.PAID_PREPARATION_HEADER]: BUYER_API.PAID_PREPARATION_PATH,
+        }),
       })
       .end(JSON.stringify(policy));
     return true;
@@ -102,13 +148,79 @@ function metadataRequest(
   }
   return false;
 }
+// This route accepts no prompt or seller and cannot select an offer, open a channel or run inference.
+async function prepareRequest(
+  request: IncomingMessage,
+  response: ServerResponse,
+  policy: BuyerApiPolicy | undefined,
+  owner: boolean,
+  prepare: (() => Promise<void>) | undefined,
+) {
+  response.setHeader('cache-control', 'no-store');
+  if (
+    !owner ||
+    request.headers.origin !== undefined ||
+    !policy ||
+    (policy.maxAtomic === '0' &&
+      request.url !== BUYER_API.RECONCILE_POOL_PATH) ||
+    !prepare
+  ) {
+    response.writeHead(HTTP_STATUS.forbidden).end();
+    return;
+  }
+  if (
+    request.method !== 'POST' ||
+    request.headers['transfer-encoding'] !== undefined ||
+    Number(request.headers['content-length'] ?? 0) !== 0
+  ) {
+    response.shouldKeepAlive = false;
+    response.writeHead(HTTP_STATUS.badRequest).end();
+    return;
+  }
+  if (request.headers['if-match'] !== '"' + policy.policyId + '"') {
+    response.writeHead(BUYER_API.POLICY_CHANGED_STATUS).end();
+    return;
+  }
+  try {
+    await prepare();
+    if (!response.destroyed) response.writeHead(HTTP_STATUS.noContent).end();
+  } catch {
+    if (!response.destroyed)
+      response.writeHead(HTTP_STATUS.serviceUnavailable).end();
+  }
+}
 export function createDesktopApi(
   policy: BuyerApiPolicy | undefined,
   authenticated: boolean,
+  preparePaidChat?: () => Promise<void>,
+  reconcilePool?: () => Promise<void>,
 ) {
   return {
-    handled: (request: IncomingMessage, response: ServerResponse) =>
-      metadataRequest(request, response, policy, authenticated),
+    async handled(
+      request: IncomingMessage,
+      response: ServerResponse,
+      owner: boolean,
+    ) {
+      const reconcile = request.url === BUYER_API.RECONCILE_POOL_PATH;
+      if (reconcile || request.url === BUYER_API.PAID_PREPARATION_PATH) {
+        await prepareRequest(
+          request,
+          response,
+          policy,
+          authenticated && owner,
+          reconcile ? reconcilePool : preparePaidChat,
+        );
+        return true;
+      }
+      return metadataRequest(
+        request,
+        response,
+        policy,
+        authenticated,
+        !!preparePaidChat && owner,
+        !!reconcilePool && owner,
+      );
+    },
     accepts(request: IncomingMessage, json: boolean) {
       const path = request.url?.split('?')[0];
       return (

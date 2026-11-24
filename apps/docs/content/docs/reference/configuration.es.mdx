@@ -68,7 +68,7 @@ motor. Consulta la [referencia de la CLI](/es/reference/cli#valida-la-configurac
 | `transport.bind`          | `ip:port` literal opcional para escuchar; IPv6 entre corchetes; el puerto puede ser `0`                               |
 | `transport.external_addr` | `ip:port` opcional para anunciar; puerto de 1 a 65535                                                                 |
 | `telemetry.file`          | Booleano; por defecto `false`. Escribe archivos privados de telemetría sin contenido en este equipo; no envía nada    |
-| `diagnostics.enabled`     | Booleano; por defecto `true`. El log de diagnóstico del comprador local; el nodo vendedor no escribe uno              |
+| `diagnostics.enabled`     | Booleano; por defecto `true`. Registra diagnósticos del comprador y fallos de canal del vendedor                      |
 | `diagnostics.level`       | `debug`, `info`, `warn` o `error`; por defecto `warn`                                                                 |
 | `buyer.relay_only`        | Booleano; por defecto `false`. Un ajuste del comprador; el vendedor lo ignora                                         |
 
@@ -109,11 +109,11 @@ el vendedor arranque, y solo se publican las ofertas listas.
 | Campo                    | Regla                                                                                                                                                |
 | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `model`                  | ID o alias del catálogo, como `qwen3:0.6b`; un ID fuera del catálogo necesita `custom = true`                                                        |
-| `custom`                 | Booleano; no puede ser `true` para un modelo del catálogo                                                                                            |
+| `custom`                 | Booleano; en un modelo del catálogo se ignora, con la advertencia `CUSTOM_MODEL_NOW_IN_CATALOG`                                                      |
 | `reasoning`              | Niveles distintos entre `off`, `low`, `medium`, `high`; por defecto los del catálogo, o `off`. El vendedor solo sirve `["off"]`                      |
 | `engine.kind`            | Obligatorio: `ollama`, `openai` o `anthropic`                                                                                                        |
 | `engine.url`             | URL base obligatoria; HTTPS, o HTTP para loopback o `host.docker.internal`; consulta [Motores](#compatibilidad-de-motores-al-iniciar)                |
-| `engine.upstream_model`  | Nombre opcional del modelo en el proveedor, hasta 256 caracteres; por defecto `model`                                                                |
+| `engine.upstream_model`  | Nombre opcional del modelo en el proveedor, hasta 256 caracteres; por defecto `model` tal como está escrito                                          |
 | `engine.api_key_env`     | Nombre de la variable de la API key; obligatorio para Anthropic; no puede empezar por `GYBLOS_` ni reutilizar la variable del token de relay         |
 | `engine.context_tokens`  | Entero de 1024 a 2.000.000; obligatorio para OpenAI y Anthropic; con Ollama fija el contexto (por defecto 8.192, como máximo 32.768)                 |
 | `free.daily_token_cap`   | Obligatorio en una oferta gratis; entero de 1 a 1.000.000.000.000; tokens de entrada más salida por día UTC                                          |
@@ -126,7 +126,8 @@ se reinicia.
 Para cobrar por una oferta, cambia `free` por `price`: `price.input_per_mtok` y `price.output_per_mtok` son
 cadenas decimales en USDC de devnet por millón de tokens, con `price.currency = "USDC"`. Al menos una tarifa
 debe ser positiva. No escribas signo, exponente ni ceros a la izquierda, y usa como máximo cuatro dígitos
-enteros y seis decimales. Solo `qwen3:0.6b` puede tener precio. Lee [Cobrar](/es/sellers/get-paid) antes de
+enteros y seis decimales. Cualquier modelo puede tener precio: el comprador recuenta la familia Qwen3, y los demás
+cobran el uso que informa tu proveedor, dentro de límites por bytes que revisa el comprador. Lee [Cobrar](/es/sellers/get-paid) antes de
 ponerle precio a una oferta.
 
 ### Motores [#compatibilidad-de-motores-al-iniciar]
@@ -141,7 +142,7 @@ ponerle precio a una oferta.
 - **Compatible con Anthropic:** reasoning `off`, un tamaño de contexto y una API key no vacía. Usa la raíz de
   la API sin `/v1`; el proveedor debe admitir la consulta de modelos y Messages.
 
-Con modelos distintos del Qwen fijado, el vendedor informa el conteo de tokens del proveedor sin recontarlo.
+Con modelos que no sean los Qwen3 híbridos del catálogo, el vendedor informa el conteo de tokens del proveedor sin recontarlo.
 Un proveedor remoto puede cobrarte y recibe los prompts de los compradores, incluso con una oferta gratis.
 
 ## Variables de entorno [#variables-que-prevalecen-sobre-el-archivo]
@@ -151,23 +152,23 @@ por defecto. El vendedor Docker toma su entorno de `seller.env`; una variable de
 host no llega al contenedor. El servicio nativo también lee solo su `seller.env`. Después de editar
 `seller.env`, reinicia el vendedor como explica [Operación](/es/sellers/operate).
 
-| Variable                    | Significado                                                                                       |
-| --------------------------- | ------------------------------------------------------------------------------------------------- |
-| `GYBLOS_CONFIG`             | El archivo que leen `start`, `doctor` y `seller init`; `config validate` usa `--config`           |
-| `GYBLOS_HOME`               | El home del vendedor (llaves y estado); fijo en `/data` en la imagen Docker                       |
-| `GYBLOS_RELAYS`             | Orígenes de relay separados por comas                                                             |
-| `GYBLOS_RELAY_TOKEN`        | Token de relay opcional, solo para un relay que lo exija; guárdalo en `seller.env`                |
-| `GYBLOS_RELAY_ONLY`         | `1` activa el modo solo relay, `0` lo desactiva; cualquier otro valor lo desactiva con un aviso   |
-| `GYBLOS_IROH_BIND`          | Reemplaza `transport.bind`; vacía se ignora                                                       |
-| `GYBLOS_IROH_EXTERNAL_ADDR` | Reemplaza `transport.external_addr`; vacía se ignora                                              |
-| `GYBLOS_DISCOVERY_PUBLISH`  | `1` o `0` estrictos para reemplazar `discovery.publish`; cualquier otro valor es un error         |
-| `GYBLOS_DISCOVERY_URL`      | Reemplaza `discovery.url`; se comprueba cuando la publicación está activa                         |
-| `GYBLOS_OBSERVATIONS`       | `off` deja de subir observaciones de telemetría; los recibos se siguen subiendo                   |
-| `GYBLOS_COLLECTOR_URL`      | Otro recolector de métricas (HTTPS, o HTTP en loopback); cualquier otro valor desactiva la subida |
-| `GYBLOS_UPDATE_CHECK`       | `0` impide que `gyblos seller status` busque una versión más nueva                                |
-| `GYBLOS_INVITE`             | El código de invitación para `gyblos seller register`; nunca lo pongas en TOML ni en el historial |
-| `GYBLOS_BUYER_RELAY_ONLY`   | Un ajuste del comprador; el vendedor lo ignora                                                    |
-| `GYBLOS_RPC_URL`            | La validación lo acepta pero el vendedor lo ignora; sus archivos de rol fijan el RPC              |
+| Variable                    | Significado                                                                                                                                                                        |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GYBLOS_CONFIG`             | El archivo que leen `start`, `doctor` y `seller init`; `config validate` usa `--config`                                                                                            |
+| `GYBLOS_HOME`               | El home del vendedor (llaves y estado); fijo en `/data` en la imagen Docker                                                                                                        |
+| `GYBLOS_RELAYS`             | Orígenes de relay separados por comas                                                                                                                                              |
+| `GYBLOS_RELAY_TOKEN`        | Token de relay opcional, solo para un relay que lo exija; guárdalo en `seller.env`                                                                                                 |
+| `GYBLOS_RELAY_ONLY`         | `1` activa el modo solo relay, `0` lo desactiva; cualquier otro valor lo desactiva con un aviso                                                                                    |
+| `GYBLOS_IROH_BIND`          | Reemplaza `transport.bind`; vacía se ignora                                                                                                                                        |
+| `GYBLOS_IROH_EXTERNAL_ADDR` | Reemplaza `transport.external_addr`; vacía se ignora                                                                                                                               |
+| `GYBLOS_DISCOVERY_PUBLISH`  | `1` o `0` estrictos para reemplazar `discovery.publish`; cualquier otro valor es un error                                                                                          |
+| `GYBLOS_DISCOVERY_URL`      | Reemplaza `discovery.url`; se comprueba cuando la publicación está activa                                                                                                          |
+| `GYBLOS_OBSERVATIONS`       | `off` deja de subir observaciones de telemetría; los recibos se siguen subiendo                                                                                                    |
+| `GYBLOS_COLLECTOR_URL`      | Otro recolector de métricas (HTTPS, o HTTP en loopback); cualquier otro valor desactiva la subida                                                                                  |
+| `GYBLOS_UPDATE_CHECK`       | `0` impide que `gyblos seller status` busque una versión más nueva                                                                                                                 |
+| `GYBLOS_INVITE`             | El código de invitación para `gyblos seller register`; nunca lo pongas en TOML ni en el historial                                                                                  |
+| `GYBLOS_BUYER_RELAY_ONLY`   | Un ajuste del comprador; el vendedor lo ignora                                                                                                                                     |
+| `GYBLOS_RPC_URL`            | El vendedor en marcha lo ignora, porque su archivo de rol fija el RPC; lo leen la primera ejecución del instalador y [`gyblos seller rpc set`](/es/sellers/beta-guide#cambiar-rpc) |
 
 `[limits]`, las ofertas, `[telemetry]` y `[diagnostics]` no tienen variable de entorno.
 

@@ -1,5 +1,6 @@
 // Owns the metrics collector's canonical values: wire error codes, statuses, routes, limits and binding
 // names. Upload formats and signing domains belong to protocol; receipt policy belongs to core.
+import { LOOPBACK_HOST_NAMES } from '@gyblos/config/hosts';
 
 // Static `error` values on the wire. Request input is never echoed.
 export const COLLECTOR_ERRORS = {
@@ -49,6 +50,9 @@ export const COLLECTOR_ROUTES = {
   STATS_MODELS: '/v1/stats/models',
   STATS_SELLER: '/v1/stats/sellers/:nodeId',
   STATS_CHAIN: '/v1/stats/chain',
+  STATS_CHAIN_TXS: '/v1/stats/chain/txs',
+  // The operator's RPC probe (rpc-probe.ts): 404 unless its admin token is set and sent.
+  RPC_PROBE: '/v1/admin/rpc-probe',
 } as const;
 // What an accepted envelope carried.
 export const ENVELOPE_KINDS = {
@@ -82,11 +86,7 @@ export const COLLECTOR_PROTOCOLS = {
   SECURE: 'https:',
   LOOPBACK: 'http:',
 } as const;
-export const LOOPBACK_HOSTS: ReadonlySet<string> = new Set([
-  'localhost',
-  '127.0.0.1',
-  '[::1]',
-]);
+export const LOOPBACK_HOSTS: ReadonlySet<string> = new Set(LOOPBACK_HOST_NAMES);
 
 export const COLLECTOR_LIMITS = {
   // Above the envelope's structural maximum (about 170 KiB) plus JSON whitespace.
@@ -126,21 +126,14 @@ export type CollectorLimiterName =
 // Hex radix for envelope ids derived from signatures; not a wire value.
 export const HEX_RADIX = 16;
 
-// Fallback rate-limit key when no client address header is present (local development only).
-export const LOCAL_CLIENT_KEY = 'local';
 // Key of the shared write budget.
 export const GLOBAL_LIMIT_KEY = 'global';
-export const IPV6 = {
-  groups: 8,
-  prefixGroups: 4,
-  hexRadix: 16,
-} as const;
 
 // Aggregates (#351). Changing a formula bumps formulaVersion; rows are then rebuilt from raw.
 export const AGGREGATES = {
   // 2: origin and failure breakdowns (recomputes every day once).
   // 3: per-model observations (recomputes every day once).
-  formulaVersion: 3,
+  formulaVersion: 4,
   // Upper bounds of the latency histogram buckets, in ms; one more bucket holds everything above.
   // Fixed so histograms can be summed across hours, days, sellers and models.
   latencyBucketsMs: [
@@ -180,6 +173,7 @@ export const FIRST_SEEN_KINDS = {
 } as const;
 // The single row of collector_agg_state.
 export const AGG_STATE_ID = 1;
+export const CHAIN_CURSOR_ID = 1;
 
 // Chain index (#349): the x402 payment-channels program (@x402/svm 2.28 Codama client). Discriminators
 // are one u8 at data[0]; account positions are the program's instruction account order.
@@ -262,6 +256,11 @@ export const CHAIN_CHANNEL_STATUSES = [
   'distributed',
 ] as const;
 export const CHAIN_CHANNEL_CLOSED = 'closed';
+export const CHAIN_TX_PAGE = {
+  defaultLimit: 25,
+  maxLimit: 50,
+  params: { BEFORE: 'before', LIMIT: 'limit', RECIPIENT: 'recipient' },
+} as const;
 // The address holds no channel of this program (another owner, or another size).
 export const CHAIN_CHANNEL_UNKNOWN = 'unknown';
 export const CHAIN_PROGRAMS = {

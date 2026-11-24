@@ -2,16 +2,23 @@
 // collector's inclusive UTC days; a model's mark comes from its id's family name, never a guess; the
 // daily series keep every day of the range, empty ones as zero; the index's network status is read
 // with its exact states and the sellers not online keep the index's order; the average uptime says over
-// how many sellers it is taken; a source read gives up after the fetch timeout.
+// how many sellers it is taken; a settlement count is singular only for exactly one; a source read gives
+// up after the fetch timeout.
 import assert from 'node:assert/strict';
 import test, { afterEach } from 'node:test';
 
+import { barAxis } from '@gyblos/explorer/board-bar-axis';
 import { delta } from '@gyblos/explorer/board-delta';
 import { hoveredPoint } from '@gyblos/explorer/board-hovered';
-import { dailySettled } from '@gyblos/explorer/chain-shape';
-import { FETCH } from '@gyblos/explorer/constants';
+import { chainHistoryNote, dailySettled } from '@gyblos/explorer/chain-shape';
+import { FETCH, HELP_TRIGGER } from '@gyblos/explorer/constants';
 import { fetchJson } from '@gyblos/explorer/fetch-json';
-import { tokensPerSecond, usdcDecimal } from '@gyblos/explorer/format';
+import {
+  percent,
+  settlementCount,
+  tokensPerSecond,
+  usdcDecimal,
+} from '@gyblos/explorer/format';
 import { modelFamily } from '@gyblos/explorer/model-family';
 import { notOnline, parseNetworkStatus } from '@gyblos/explorer/network-status';
 import { summarizeOffers } from '@gyblos/explorer/offers';
@@ -25,10 +32,51 @@ afterEach(() => {
   AbortSignal.timeout = realTimeout;
 });
 
+void test('settlement counts use singular only for one settlement', () => {
+  assert.equal(settlementCount(0), '0 settlements');
+  assert.equal(settlementCount(1), '1 settlement');
+  assert.equal(settlementCount(2), '2 settlements');
+  assert.equal(settlementCount(1000), '1,000 settlements');
+});
+
+void test('percentages below one never round to complete', () => {
+  for (const ratio of [0.9995, 0.9996, 0.9999, 1 - Number.EPSILON])
+    assert.equal(percent(ratio), '99.9%');
+});
+
+void test('percentages keep consistent precision and ordinary rounding', () => {
+  assert.equal(percent(1), '100.0%');
+  assert.equal(percent(0), '0.0%');
+  assert.equal(percent(0.1236), '12.4%');
+  assert.equal(percent(0.999), '99.9%');
+  assert.equal(percent(0.9984), '99.8%');
+});
+
+void test('amount bars allow fractional ticks so tiny USDC values retain their scale', () => {
+  assert.deepEqual(barAxis(false), { hide: true, allowDecimals: true });
+});
+
+void test('request bars keep visible integer ticks by default and explicitly', () => {
+  const counts = { hide: false, allowDecimals: false };
+  assert.deepEqual(barAxis(), counts);
+  assert.deepEqual(barAxis(true), counts);
+});
+
 void test('the range is a preset or the 30-day default', () => {
   assert.equal(parseRange('7'), 7);
   assert.equal(parseRange('90'), 90);
-  for (const value of [undefined, '', '8', '365', ['7'], '7d', 7])
+  for (const value of [
+    undefined,
+    '',
+    '8',
+    '365',
+    ['7'],
+    '7d',
+    7,
+    '7.0',
+    ' 7',
+    '7e0',
+  ])
     assert.equal(parseRange(value), 30);
 });
 
@@ -66,11 +114,7 @@ void test('a change says its direction and whether it is good news', () => {
     direction: 'up',
     tone: 'neutral',
   });
-  assert.deepEqual(delta(68, 0), {
-    label: 'New',
-    direction: 'up',
-    tone: 'good',
-  });
+  assert.equal(delta(68, 0), null);
   assert.deepEqual(delta(0, 0), {
     label: '0%',
     direction: 'flat',
@@ -135,6 +179,7 @@ const STATUS = {
       firstSeenAt: 1,
       lastSeenAt: 2,
       models: [],
+      name: 'Ada Lovelace',
     },
     {
       nodeId: NODE('c'),
@@ -159,6 +204,22 @@ void test('the network status is read with its exact states', () => {
     ],
   );
   assert.equal(status.nodes[2]?.lastSeenAt, null);
+});
+
+void test('a seller display name is read when present and null when absent', () => {
+  const status = parseNetworkStatus(STATUS);
+  assert.deepEqual(
+    status.nodes.map((node) => node.name),
+    [null, 'Ada Lovelace', null],
+  );
+  const cleared = { ...STATUS, nodes: [{ ...STATUS.nodes[0], name: null }] };
+  assert.equal(parseNetworkStatus(cleared).nodes[0]?.name, null);
+  assert.throws(() =>
+    parseNetworkStatus({
+      ...STATUS,
+      nodes: [{ ...STATUS.nodes[1], name: 42 }],
+    }),
+  );
 });
 
 void test('an unknown state or a malformed status is refused', () => {
@@ -237,7 +298,7 @@ void test('the Usage note names the comparison only when the earlier span was re
   const at = Date.UTC(2026, 10, 19, 20, 10);
   assert.equal(
     usageMeta(30, at, true),
-    'vs previous 30 days · updated 2026-11-19 20:10 UTC',
+    'vs previous 30 days, updated 2026-11-19 20:10 UTC',
   );
   assert.equal(usageMeta(30, at, false), 'updated 2026-11-19 20:10 UTC');
   assert.equal(usageMeta(30, null, true), 'no data yet');
@@ -252,4 +313,14 @@ void test('a chart hover picks a bar only at a real index, never the first day o
   assert.equal(hoveredPoint(days, ''), null);
   assert.equal(hoveredPoint(days, 5), null);
   assert.equal(hoveredPoint(days, 1.5), null);
+});
+
+void test('chain figures say when the chain history is still being read', () => {
+  assert.equal(chainHistoryNote(null), 'chain index starting');
+  assert.equal(chainHistoryNote(false), 'reading chain history');
+  assert.equal(chainHistoryNote(true), null);
+});
+
+void test('a help tap toggles its tooltip: the press itself never closes it', () => {
+  assert.equal(HELP_TRIGGER.shouldCloseOnPress, false);
 });

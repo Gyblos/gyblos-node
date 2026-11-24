@@ -131,6 +131,33 @@ void test('unknown settlement retains closing and blocks new reservations across
   rig.confirmed(true);
   assert.equal((await rig.seller().close()).chargedAtomic, '145');
 });
+void test('an unconfirmed close preserves only the catalog reason from the settlement attempt', async (t) => {
+  const rig = await sessionRig();
+  t.after(rig.dispose);
+  await rig.open();
+  const factory = rig.sellerOptions.facilitator;
+  t.mock.method(
+    rig.sellerOptions,
+    'facilitator',
+    async (...args: Parameters<typeof factory>) => ({
+      ...(await factory(...args)),
+      settle: async () => ({
+        success: false,
+        network: rig.terms.network,
+        transaction: '',
+        errorReason:
+          'invalid_batch_settlement_svm_close_state: synthetic private detail',
+      }),
+    }),
+  );
+  await rig.restart();
+  await assert.rejects(rig.seller().close(), {
+    code: SESSION_CODES.UNAVAILABLE,
+    cause: new Error('invalid_batch_settlement_svm_close_state'),
+  });
+  assert.equal(rig.seller().snapshot().state, SESSION_STATES.CLOSING);
+});
+
 void test('same request cannot be reserved twice and a second active reservation is refused', async (t) => {
   const rig = await sessionRig();
   t.after(rig.dispose);

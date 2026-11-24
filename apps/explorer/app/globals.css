@@ -1,4 +1,7 @@
 @import 'tailwindcss';
+@import '../boardui/styles/typography.css';
+@import '../boardui/styles/tokens.css';
+@import '../boardui/styles/boardui.css' layer(components);
 
 /* Gyblos brand tokens (DESIGN.md): one blue, neutral surfaces; light values match the web's. The
    signal tone is the brand blue on light surfaces and #2e6bff on dark ones, for status dots and focus
@@ -50,6 +53,7 @@
   --color-money: var(--money);
   --color-good: var(--good);
   --color-bad: var(--bad);
+  --color-chart: var(--chart);
   --font-sans: var(--font-instrument), system-ui, sans-serif;
   --font-mono: var(--font-jetbrains), ui-monospace, monospace;
 }
@@ -58,4 +62,95 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font-instrument), system-ui, sans-serif;
+}
+
+/* Sticky first column and scroll divider; the opaque header mix prevents content showing through. */
+.explorer-table {
+  background: var(--panel);
+}
+
+.explorer-table-scroll {
+  scroll-timeline: --table-scroll inline;
+}
+
+.explorer-table thead,
+.explorer-table thead th {
+  background: color-mix(in srgb, var(--raised) 50%, var(--panel));
+}
+
+.explorer-table thead th {
+  border-top: 0;
+  border-bottom: 0;
+}
+
+.explorer-table thead {
+  border-bottom: 1px solid var(--line);
+}
+
+.explorer-table thead th[data-group] {
+  border-bottom: 1px solid var(--line);
+}
+
+.explorer-table thead th[data-edge~='start'] {
+  border-left: 1px solid var(--line);
+}
+
+.explorer-table thead th[data-edge~='end'] {
+  border-right: 1px solid var(--line);
+}
+
+.explorer-table tbody td {
+  transition: box-shadow 80ms ease-out;
+}
+
+.explorer-table [data-cross] {
+  box-shadow: inset 0 0 0 100vmax color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+.explorer-table [data-cross='cell'] {
+  box-shadow: inset 0 0 0 100vmax
+    color-mix(in srgb, var(--ink) 13%, transparent);
+}
+
+.explorer-table :is(tbody, tr) {
+  background: inherit;
+}
+
+.explorer-table tr > :first-child:not([colspan]) {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: inherit;
+}
+
+.explorer-table tr > :first-child:not([colspan])::after {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 8px;
+  content: '';
+  pointer-events: none;
+  opacity: 0;
+  box-shadow:
+    inset -1px 0 var(--line),
+    inset -6px 0 8px -8px var(--muted);
+}
+
+@supports (animation-timeline: scroll()) {
+  .explorer-table tr > :first-child:not([colspan])::after {
+    animation: table-divider linear both;
+    animation-timeline: --table-scroll;
+    animation-range: 0px 1px;
+  }
+}
+
+@keyframes table-divider {
+  to {
+    opacity: 1;
+  }
+}
+
+@media (width < theme(--breakpoint-md)) {
+  [data-overflow] > .explorer-table tr > :first-child:not([colspan]) > span {
+    max-width: calc(55vw - 2rem);
+  }
 }

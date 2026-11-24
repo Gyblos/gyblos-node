@@ -16,6 +16,7 @@ import {
 } from './free-selection';
 import { verifyBuyerIdentity } from './identity';
 import { routedRequest, type RoutedModel } from './model-routes';
+import { openDiscoveryRequest } from './quote-selection';
 import { verifiedSnapshots } from './selection';
 import type { StaticControlSeller } from './selection-config';
 
@@ -25,19 +26,14 @@ export type RouteContext<Route extends RoutedModel = RoutedModel> = (
   signal: AbortSignal,
 ) => Promise<number | undefined>;
 
-const free = (request: SellerRequest): SellerRequest => ({
-  ...request,
-  maxAtomic: '0',
-  priceCeilings: { inputAtomicPerMtok: '0', outputAtomicPerMtok: '0' },
-});
-
 // The sellers a request may reach, as selection reaches them: configured sellers at the buyer's own
-// prices, and, with open discovery, sellers found only in the index for free.
+// prices, and, with open discovery, sellers found in the index at the authorized ceilings.
 export function routeContextTokens(input: {
   request: SellerRequest;
   sellers: readonly KnownSeller[];
   configured: ReadonlySet<string>;
   open: boolean;
+  paidAuto?: boolean;
   now: number;
 }) {
   const isConfigured = (seller: KnownSeller) =>
@@ -50,7 +46,7 @@ export function routeContextTokens(input: {
     }),
     ...(input.open
       ? listedContexts({
-          request: free(input.request),
+          request: openDiscoveryRequest(input.request, input.paidAuto),
           sellers: input.sellers.filter((seller) => !isConfigured(seller)),
           now: input.now,
         })
@@ -71,7 +67,13 @@ export async function routeContext(
   const open = prepared.config.discovery?.open === true;
   const config = await withDiscovered(
     prepared,
-    routedPolicy(prepared.config, new Set(), request),
+    routedPolicy(
+      prepared.config,
+      new Set(),
+      open
+        ? openDiscoveryRequest(request, prepared.config.discovery?.paidAuto)
+        : request,
+    ),
     { fetch: options.fetch ?? globalThis.fetch, now, signal, verifyIdentity },
     // With open discovery, every seller the index lists is read too (a desktop buyer configures none).
     open ? new Set() : undefined,
@@ -94,6 +96,7 @@ export async function routeContext(
     sellers,
     configured: new Set(prepared.config.sellers.map((seller) => seller.nodeId)),
     open,
+    paidAuto: prepared.config.discovery?.paidAuto,
     now: now(),
   });
 }

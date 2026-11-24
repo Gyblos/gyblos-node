@@ -16,13 +16,14 @@ export interface BuyerDiscoveryConfig {
   // Also use sellers found only in the index, never configured here: each must hold a registered
   // identity (selection.json `identity` is required) and is reached through the configured relay.
   open?: true;
+  paidAuto?: true;
 }
 export function parseBuyerDiscoveryConfig(
   value: unknown,
 ): BuyerDiscoveryConfig {
   const present =
     value !== null && typeof value === 'object'
-      ? ['baseUrl', 'maxPages', 'open'].filter((key) =>
+      ? ['baseUrl', 'maxPages', 'open', 'paidAuto'].filter((key) =>
           Object.hasOwn(value, key),
         )
       : [];
@@ -45,8 +46,14 @@ export function parseBuyerDiscoveryConfig(
   )
     return controlFail();
   if (input.open !== undefined && input.open !== true) return controlFail();
+  if (
+    input.paidAuto !== undefined &&
+    (input.paidAuto !== true || input.open !== true)
+  )
+    return controlFail();
   return {
     baseUrl,
+    ...(input.paidAuto === true && { paidAuto: true as const }),
     ...(input.open ? { open: true as const } : {}),
     maxPages:
       input.maxPages === undefined

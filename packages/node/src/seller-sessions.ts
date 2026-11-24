@@ -21,16 +21,23 @@ import {
 import type {
   BatchBlockExchange,
   BatchChannelService,
+  BatchExchangeTail,
 } from '@gyblos/transport-iroh/batch-server';
 
 import { batchLiveOffer } from './batch-generation';
 import { createSellerBatchSession } from './batch-seller';
+import { SELLER_CHANNEL_DIAGNOSTICS } from './constants';
+import {
+  sellerChannelDiagnostics,
+  type SellerChannelOperation,
+} from './seller-channel-diagnostics';
 import type { LiveSellerOffer } from './seller-offer-set';
 import type { SellerSessionBackend } from './session-backend';
 
 export interface SellerSessionOptions {
   admit?: () => Promise<void>;
   receipts?: import('./batch-seller').SellerBatchSessionOptions['receipts'];
+  diagnostics?: import('@gyblos/runtime/diagnostics').DiagnosticSink;
   telemetry?: {
     sink: import('@gyblos/protocol/telemetry').TelemetrySink;
     engineKind: (
@@ -108,16 +115,33 @@ function binding(
     }),
   };
 }
+// Empty transport identity is only a candidate; backend.renew verifies exact unsigned durable state. A
+// session preparing without a channel is bound again through the backend before an OPEN with its terms,
+// so the registry checks capacity and indexes the buyer first (a released never-funded one left the
+// index); new terms still renew.
+async function refuseBusyOrRebind(
+  state: { current?: Binding },
+  replacing: boolean,
+  opening: boolean,
+) {
+  const snapshot = state.current?.session.snapshot();
+  const preparing =
+    snapshot?.state === SESSION_STATES.OPENING && snapshot.channelId === '';
+  if (replacing && snapshot?.state !== SESSION_STATES.CLOSED && !preparing)
+    return batchFail(SESSION_CODES.BUSY);
+  if (!preparing || replacing || !opening) return;
+  await state.current!.session.dispose();
+  state.current = undefined;
+}
 async function operation(
   options: SellerSessionOptions,
   state: { current?: Binding },
   request: BatchChannelRequest,
   peer: string,
   signal: AbortSignal,
-  onDelta?: (text: string) => Promise<void>,
-  blocks?: BatchBlockExchange,
-  blockMode?: boolean,
+  ...tail: BatchExchangeTail
 ) {
+  const [, , blockMode] = tail;
   signal.throwIfAborted();
   if (!state.current) {
     const stored = await options.backend.inspect();
@@ -138,12 +162,11 @@ async function operation(
       state.current !== undefined &&
       canonicalJson(state.current.terms) !== canonicalJson(proposed);
     const terms = ownTerms(proposed, options, !state.current || replacing);
-    const snapshot = state.current?.session.snapshot();
-    const preparing =
-      snapshot?.state === SESSION_STATES.OPENING && snapshot.channelId === '';
-    // Empty transport identity is only a candidate; backend.renew verifies exact unsigned durable state.
-    if (replacing && snapshot?.state !== SESSION_STATES.CLOSED && !preparing)
-      return batchFail(SESSION_CODES.BUSY);
+    await refuseBusyOrRebind(
+      state,
+      replacing,
+      request.method === BATCH_METHODS.OPEN,
+    );
     const offer = await verifyBatchQuote(
       request.params.quote,
       terms,
@@ -180,14 +203,7 @@ async function operation(
     }
   }
   if (!state.current) return batchFail(SESSION_CODES.UNAVAILABLE);
-  return state.current.service.exchange(
-    request,
-    peer,
-    signal,
-    onDelta,
-    blocks,
-    blockMode,
-  );
+  return state.current.service.exchange(request, peer, signal, ...tail);
 }
 export async function startSellerSessions(
   options: SellerSessionOptions,
@@ -204,9 +220,11 @@ export async function startSellerSessions(
   }
   let active: Promise<unknown> | undefined;
   let closed = false;
+  const report = sellerChannelDiagnostics(options.diagnostics);
   const run = async <T>(
     peer: string,
     signal: AbortSignal,
+    method: SellerChannelOperation,
     operation: () => Promise<T>,
   ) => {
     if (closed) return batchFail(SESSION_CODES.UNAVAILABLE);
@@ -214,7 +232,7 @@ export async function startSellerSessions(
       return batchFail(PAID_EXECUTION_CODES.PEER);
     if (active) return batchFail(SESSION_CODES.BUSY);
     signal.throwIfAborted();
-    const running = operation();
+    const running = report(method, operation);
     active = running;
     try {
       return await running;
@@ -236,21 +254,12 @@ export async function startSellerSessions(
       }
     },
     service: {
-      exchange: (request, peer, signal, onDelta, blocks, blockMode) =>
-        run(peer, signal, () =>
-          operation(
-            options,
-            state,
-            request,
-            peer,
-            signal,
-            onDelta,
-            blocks,
-            blockMode,
-          ),
+      exchange: (request, peer, signal, ...tail) =>
+        run(peer, signal, request.method, () =>
+          operation(options, state, request, peer, signal, ...tail),
         ),
       resumeBlock: (approval, peer, signal) =>
-        run(peer, signal, () => {
+        run(peer, signal, SELLER_CHANNEL_DIAGNOSTICS.resumeBlock, () => {
           if (!state.current?.service.resumeBlock)
             return batchFail(SESSION_CODES.UNAVAILABLE);
           return state.current.service.resumeBlock(approval, peer, signal);

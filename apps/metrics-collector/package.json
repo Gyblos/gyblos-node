@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "scripts": {
+    "db:generate": "node --import tsx ../../tooling/d1-migrations.ts generate .",
+    "db:check": "drizzle-kit check"
+  },
   "exports": {
     "./app": "./src/app.ts",
     "./constants": "./src/constants.ts",
@@ -18,6 +22,8 @@
     "./stats-shape": "./src/stats-shape.ts",
     "./stats": "./src/stats.ts",
     "./stats-chain": "./src/stats-chain.ts",
+    "./stats-chain-txs": "./src/stats-chain-txs.ts",
+    "./stats-chain-txs-read": "./src/stats-chain-txs-read.ts",
     "./rpc-probe": "./src/rpc-probe.ts",
     "./chain/base58": "./src/chain/base58.ts",
     "./chain/channel-account": "./src/chain/channel-account.ts",
@@ -30,6 +36,7 @@
     "@gyblos/config": "workspace:*",
     "@gyblos/core": "workspace:*",
     "@gyblos/protocol": "workspace:*",
+    "@gyblos/runtime": "workspace:*",
     "drizzle-orm": "0.45.4",
     "hono": "4.13.18"
   }

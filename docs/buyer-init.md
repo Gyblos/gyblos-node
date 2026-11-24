@@ -56,7 +56,8 @@ profiles must add the session settings before starting. See
 
 With no seller, setup saves an open-network buyer: no configured sellers and
 `"discovery": { "open": true }`. It then uses any seller the index lists whose
-8004 agent registry entry matches, for free answers only (see
+8004 agent registry entry matches. Short setup accepts free offers. Advanced
+open setup with a positive request maximum and paid rates enables paid Auto (see
 [discovery.md](discovery.md#open-discovery)). Short setup does not discover a
 model or check a seller's availability.
 
@@ -85,8 +86,17 @@ accepts free quotes only, and `buyer:chat` shows the mode
 The ceiling applies per request and includes the protocol fee. A positive
 ceiling does not force payment: the buyer still chooses free or paid execution
 from each verified signed quote. Paid execution also needs devnet SOL and devnet
-USDC in the buyer wallet and the pinned tokenizer (`pnpm node:tokenizer`); setup
-prepares neither. See [Paid endpoint](running-a-node.md#paid-v2-buyer-endpoint).
+USDC in the buyer wallet and the pinned tokenizer. CLI setup prepares neither;
+run `pnpm node:tokenizer` to install the CLI tokenizer. The desktop buyer
+verifies its local copy when a paid profile starts and downloads both pinned
+files automatically if the copy is missing or fails verification. See
+[Paid endpoint](running-a-node.md#paid-v2-buyer-endpoint).
+
+Stopping a paid desktop chat during tokenizer preparation leaves its budget
+available. The app checks readiness with an authenticated, empty request to the
+local buyer before it reserves the response budget. If the chat request has
+already been sent, the buyer keeps the reservation until the payment outcome is
+known.
 
 ## Endpoints and relays
 

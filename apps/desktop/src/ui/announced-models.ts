@@ -95,3 +95,13 @@ export function announcedModels(
 export function chatNetworkOptions(models: readonly ModelOption[]) {
   return models.filter((item) => item.source === MODEL_SOURCE.ANNOUNCED);
 }
+
+export function networkModelGroups(models: readonly ModelOption[]) {
+  const groups = new Map<string, ModelOption[]>();
+  for (const item of chatNetworkOptions(models)) {
+    const offers = groups.get(item.name);
+    if (offers) offers.push(item);
+    else groups.set(item.name, [item]);
+  }
+  return groups;
+}

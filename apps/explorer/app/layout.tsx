@@ -3,6 +3,7 @@
 // rendered (gyblos.raw-html). Icons and the link-preview image are the website's (app/ icon files).
 import type { Metadata, Viewport } from 'next';
 import { Instrument_Sans, JetBrains_Mono } from 'next/font/google';
+import NextTopLoader from 'nextjs-toploader';
 import type { ReactNode } from 'react';
 
 import { SITE } from '../lib/site';
@@ -62,7 +63,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <head>
         <link rel="describedby" type="text/plain" href="/llms.txt" />
       </head>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <NextTopLoader color="var(--signal)" height={2} showSpinner={false} />
+        {children}
+      </body>
     </html>
   );
 }

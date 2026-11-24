@@ -2,11 +2,14 @@
 import { PaypalLogo } from '@phosphor-icons/react';
 import { useState } from 'react';
 
+import { BUYER_SESSION_DEFAULT_POLICY } from '@gyblos/config/batch-session';
+import { DEVNET } from '@gyblos/config/network';
 import {
   PAYPAL_SESSION_PHASE,
   PAYPAL_SESSION_STATUS,
 } from '@gyblos/node/constants';
 
+import { depositShortfall } from '../funding/model';
 import {
   managePaypal,
   PAYMENT_METHOD,
@@ -14,19 +17,19 @@ import {
   paypalSessionCanConnectAgent,
   type PaymentMethod,
 } from '../paypal-model';
-import { WALLET_STATUS } from '../wallet/model';
+import { BuyerFundingAddress, fundingAmount } from './BuyerFunding';
 import { BUTTON_VARIANT } from './constants';
-import { CopyField, FormActions } from './Form';
+import { FormActions } from './Form';
 import { displayDollars } from './history-presentation';
 import { Modal } from './Modal';
 import { PaypalSessionPanel } from './PaypalSessionPanel';
 import { SpendingHistory } from './SpendingHistory';
 import { Badge, Button, PagePanel } from './UI';
 import type { ActivityView } from './useActivity';
+import { useBuyerFunding } from './useBuyerFunding';
 import type { PaypalSessionView } from './usePaypalSession';
 import type { X402View } from './useX402';
 import { WalletDetails } from './WalletDetails';
-import { useDesktopWallet } from './WalletState';
 import { X402Payments } from './X402Payments';
 
 type Props = {
@@ -55,6 +58,7 @@ export function Payments(props: Props) {
         />
       )}
       <WalletOverview
+        buyer={props.x402}
         onAddFunds={props.onAddFunds}
         onDetails={() => setWalletOpen(true)}
       />
@@ -107,79 +111,65 @@ export function Payments(props: Props) {
   );
 }
 function WalletOverview({
+  buyer,
   onAddFunds,
   onDetails,
 }: {
+  buyer?: X402View;
   onAddFunds(): void;
   onDetails(): void;
 }) {
-  const wallet = useDesktopWallet();
-  const ready = wallet.status === WALLET_STATUS.READY;
+  const { funding, loading, refresh } = useBuyerFunding(
+    buyer?.state.policy?.payer,
+  );
+  const balance = funding?.balanceAtomic;
+  const needed =
+    balance != null
+      ? depositShortfall(
+          balance,
+          buyer?.state.policy?.depositAtomic ??
+            BUYER_SESSION_DEFAULT_POLICY.depositAtomic,
+        )
+      : null;
   return (
     <section className="ui-section ui-wallet-overview" aria-label="USDC wallet">
       <div className="ui-section-title">
-        <h2>USDC wallet</h2>
-        <Badge>
-          {ready
-            ? wallet.backupVerified
-              ? 'Backup verified'
-              : 'Backup needed'
-            : wallet.status === WALLET_STATUS.LOCKED
-              ? 'Locked'
-              : 'Not available'}
-        </Badge>
+        <h2>USDC buyer wallet</h2>
       </div>
       <div className="ui-wallet-summary">
         <div>
-          <span className="ui-help-text">Available balance</span>
+          <span className="ui-help-text">
+            {funding?.network === DEVNET
+              ? 'Devnet balance'
+              : 'Available balance'}
+          </span>
           <strong className="ui-wallet-amount">
-            — <small>USDC</small>
+            {loading
+              ? 'Checking…'
+              : balance != null
+                ? fundingAmount(balance)
+                : 'Unavailable'}
           </strong>
+          {needed && needed !== '0' && (
+            <p>Add {fundingAmount(needed)} to open a new channel.</p>
+          )}
         </div>
         <FormActions align="start">
           <Button
             variant={BUTTON_VARIANT.PRIMARY}
-            disabled={!wallet.fundingEnabled}
+            disabled={!funding}
             onClick={onAddFunds}
           >
             Add funds
           </Button>
-          <Button onClick={() => onDetails()}>Wallet details</Button>
+          <Button disabled={loading} onClick={refresh}>
+            Refresh balance
+          </Button>
+          <Button onClick={onDetails}>Desktop wallet details</Button>
         </FormActions>
       </div>
-      <WalletAddress />
+      {funding && <BuyerFundingAddress funding={funding} />}
     </section>
-  );
-}
-function WalletAddress() {
-  const wallet = useDesktopWallet();
-  const [notice, setNotice] = useState('');
-  return (
-    <>
-      {' '}
-      <CopyField
-        id="wallet-address"
-        label="Wallet address · Solana"
-        value={wallet.address ?? 'Not available'}
-        actionLabel="Copy address"
-        disabled={!wallet.address}
-        onCopy={() => {
-          if (wallet.address)
-            void window.desktopWallet
-              ?.copyAddress(wallet.address)
-              .then((ok) =>
-                setNotice(ok ? 'Address copied.' : 'Could not copy address.'),
-              )
-              .catch(() => setNotice('Could not copy address.'));
-        }}
-      />
-      <p className="ui-help-text">
-        Balance and USDC transaction history are not available in this version.
-      </p>
-      <span className="sr-only" role="status">
-        {notice}
-      </span>
-    </>
   );
 }
 function PaypalSummary({

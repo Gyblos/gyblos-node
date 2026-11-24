@@ -12,7 +12,6 @@ import {
   TRANSPORT_TIMEOUTS,
 } from '@gyblos/config';
 import { FreeSellerLedger } from '@gyblos/core/free-admission';
-import { publishRecord } from '@gyblos/discovery-http';
 import {
   CONTROL_CODES,
   OFFER_PRICING_KINDS,
@@ -31,6 +30,7 @@ import {
   SELLER_PUBLIC_RECORDS,
 } from './constants';
 import { prepareSellerControl } from './control-startup';
+import { createLocalDiagnostics } from './diagnostics-startup';
 import {
   assertReadinessCurrent,
   type ReadinessRecord,
@@ -40,7 +40,7 @@ import { NodeError } from './errors';
 import { createSellerFreeOffers } from './free-offers';
 import { assertRoleHome } from './home';
 import { openSellerSequence } from './public-sequence';
-import { createSellerPublisher } from './publisher';
+import { createSellerPublisher, publishSellerRecord } from './publisher';
 import {
   startRoleUploader,
   uploadObservationBuffer,
@@ -165,6 +165,13 @@ export async function startSeller(
       observers: observations ? [observations.sink] : [],
     });
     disposers.push(telemetry.close);
+    // Local operational records for `gyblos logs`: channel failures, without their error text.
+    const diagnostics = createLocalDiagnostics(
+      process.env,
+      P2P_ROLES.SELLER,
+      settings.diagnostics,
+    );
+    disposers.push(diagnostics.close);
     const publicationConfig = settings.publication;
     const publicSequence = await openSellerSequence({
       environment: process.env,
@@ -224,6 +231,7 @@ export async function startSeller(
                   settings.offers[index]!.engine.engine.kind,
               }
             : undefined,
+          diagnostics: diagnostics.write,
           description: paid.description,
           owner: owner.address,
           nodeId: config.nodeId,
@@ -383,13 +391,17 @@ export async function startSeller(
             );
           },
           publish: async (record, signal) => {
-            await publishRecord({
-              baseUrl: publicationConfig.baseUrl,
-              record,
-              signal,
-              fetch: globalThis.fetch,
-              timeoutMs: SELLER_DISCOVERY.requestMs,
-            });
+            await publishSellerRecord(
+              {
+                baseUrl: publicationConfig.baseUrl,
+                record,
+                signal,
+                fetch: globalThis.fetch,
+                timeoutMs: SELLER_DISCOVERY.requestMs,
+              },
+              process.env,
+              nodeSigner,
+            );
           },
         })
       : undefined;

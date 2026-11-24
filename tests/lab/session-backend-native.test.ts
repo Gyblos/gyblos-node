@@ -65,16 +65,25 @@ void test(
     const buyer = await buyerBackend.create(terms);
     t.after(buyer.dispose);
     const payload = await buyer.open();
+    const signal = new AbortController().signal;
+    assert.equal(await buyer.openingRecovery!.status(signal), 'unknown');
     const sellerBackend = openBatchSellerBackend({
       ...base,
       paths: sellerPaths,
       feePayer: vm.feePayer,
       authorizer: vm.authorizer,
       signer: vm.signer,
+      // A lost confirmation reaches restart recovery instead of the bounded confirmation wait.
+      openingConfirmMs: 0,
     });
     const invalid = JSON.parse(payload);
     invalid.voucher.signature = Buffer.alloc(64).toString('base64');
     await assert.rejects(sellerBackend.create(terms, JSON.stringify(invalid)));
+    invalid.voucher.signature = '1'.repeat(64);
+    await assert.rejects(sellerBackend.create(terms, JSON.stringify(invalid)), {
+      code: SESSION_CODES.UNVERIFIED,
+      cause: new Error('invalid_batch_settlement_svm_voucher_signature'),
+    });
     assert.equal(await inspectBatchSession(sellerPaths), undefined);
     await assert.rejects(sellerBackend.create(terms, ' '.repeat(8193)), {
       code: SESSION_CODES.LIMIT,
@@ -87,6 +96,8 @@ void test(
     await assert.rejects(seller.open(payload));
     vm.loseConfirmation(false);
     const submitted = vm.sends();
+    assert.equal(await buyer.openingRecovery!.status(signal), 'present');
+    assert.equal(await buyer.open(), payload);
     assert.ok(submitted > before);
     assert.equal(
       await vm.balance(terms.buyer),

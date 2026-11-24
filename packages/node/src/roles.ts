@@ -25,6 +25,7 @@ import {
   type RoleKey,
 } from '@gyblos/config';
 import { CONFIG_ASSET_LABELS } from '@gyblos/config/constants';
+import { detachedSignerFromNodeSecret } from '@gyblos/identity';
 import { P2P_ROLES, type P2PRole } from '@gyblos/protocol/constants';
 import { saveJson } from '@gyblos/runtime';
 
@@ -217,6 +218,15 @@ export async function nodeSecret(role: P2PRole, home?: HomeEnvironment) {
       NODE_KEY_BYTES,
     )),
   ];
+}
+
+// Signs bytes with the role's node key, the Ed25519 key its NodeId names, for detached proofs such as an
+// identity claim. The secret never leaves this function's signer.
+export async function nodeKeySigner(role: P2PRole, home?: HomeEnvironment) {
+  const signer = await detachedSignerFromNodeSecret(
+    Uint8Array.from(await nodeSecret(role, home)),
+  );
+  return (bytes: Uint8Array) => signer.signDetached(bytes);
 }
 
 // The payment fields for a seller whose payout is its owner: creates (or reuses) the authorizer and fee

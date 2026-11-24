@@ -6,6 +6,8 @@ import { isDeepStrictEqual } from 'node:util';
 
 import { parse } from 'smol-toml';
 
+import { LOOPBACK_HOST_NAMES } from '@gyblos/config';
+
 import {
   AGENT_SETUP,
   AGENT_SETUP_CODES,
@@ -62,7 +64,7 @@ export function agentFilePath(
 
 function checked(endpoint: AgentEndpoint): AgentEndpoint {
   const url = new URL(endpoint.origin);
-  const loopback = ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname);
+  const loopback = LOOPBACK_HOST_NAMES.some((host) => host === url.hostname);
   if (
     url.protocol !== 'http:' ||
     !loopback ||

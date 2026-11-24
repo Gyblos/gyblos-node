@@ -11,7 +11,8 @@ import {
 } from './chat-state';
 import { AssistantProgress } from './ChatMessageParts';
 import { MessageText } from './MessageText';
-import { SIGNAL_STATE, SignalMark } from './Signal';
+import { SIGNAL_STATE } from './Signal';
+import { SignalFace } from './SignalFace';
 import { IconButton } from './UI';
 
 const PHASE_LABEL = {
@@ -87,7 +88,7 @@ export function ChatAnswer(props: Props) {
       {message.state === MESSAGE_STATE.PENDING && (
         <AssistantProgress
           mark={
-            <SignalMark
+            <SignalFace
               state={
                 run?.phase === CHAT_PHASE.CONNECTING
                   ? SIGNAL_STATE.CONNECTING
@@ -112,9 +113,7 @@ export function ChatAnswer(props: Props) {
       {message.text ? (
         <MessageText text={message.text} />
       ) : message.state === MESSAGE_STATE.FAILED ? (
-        <p className="stopped-note">
-          The response could not be confirmed. Review its status in Payments.
-        </p>
+        <p className="stopped-note">Response unavailable.</p>
       ) : message.state === MESSAGE_STATE.STOPPED ? (
         <p className="stopped-note">Stopped before a response arrived.</p>
       ) : null}

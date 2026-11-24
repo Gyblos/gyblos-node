@@ -98,6 +98,7 @@ void test('role file and key names inside a role directory are unchanged', () =>
     sellerRegistrationLock: 'registration-8004-v1.lock',
     publicSequence: 'public-sequence-v2.json',
     publicSequenceLock: 'public-sequence-v2.lock',
+    githubVerification: 'github-verification.json',
   });
   assert.deepEqual(ROLE_KEY_FILES, {
     buyer: 'buyer.json',

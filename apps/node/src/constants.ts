@@ -1,6 +1,6 @@
 // Canonical values of the node application: the seller background service's names, locations, limits and
 // error codes, `seller init`'s defaults and codes, and `seller status`'s windows, limits and results.
-// Rendering lives in service.ts and the CLIs in cli-service.ts, cli-init.ts and cli-status.ts. The unit and
+// Rendering lives in service.ts and the CLIs in cli-service.ts, cli-init.ts, cli-status.ts and cli-rpc.ts. The unit and
 // agent directories are operating-system locations under the account's home, not product-home paths
 // (config/src/home.ts).
 // 130 is the shell's code for a run stopped with Ctrl-C.
@@ -16,9 +16,13 @@ export type ServiceKind = (typeof SERVICE_KINDS)[keyof typeof SERVICE_KINDS];
 export const SERVICE_COMMANDS = {
   INSTALL: 'install',
   UNINSTALL: 'uninstall',
+  RESTART: 'restart',
 } as const;
 export type ServiceCommand =
   (typeof SERVICE_COMMANDS)[keyof typeof SERVICE_COMMANDS];
+
+// `seller rpc`'s subcommands (cli-rpc.ts); with none it shows the RPC in use.
+export const RPC_COMMANDS = { SET: 'set', RESET: 'reset' } as const;
 
 // Owner read/write only for files the service creates (launchd's log, the daemon's state).
 const SERVICE_UMASK = 0o077;
@@ -26,6 +30,12 @@ const SERVICE_UMASK = 0o077;
 export const SERVICE = {
   unit: 'gyblos-seller.service',
   label: 'com.gyblos.seller',
+  // How long restart waits for a stopped Windows task to end, and how often restart checks any stopped
+  // service.
+  taskStopWaitMs: 30_000,
+  taskStopPollMs: 500,
+  // How long one launchctl status probe may take before it is cut off.
+  agentProbeMs: 5_000,
   description: 'Gyblos seller',
   // Relative to the repository, which is also the working directory so `--import tsx` resolves; the
   // daemon is its `start` command.
@@ -35,6 +45,9 @@ export const SERVICE = {
   launchAgentsDirectory: 'Library/LaunchAgents',
   // The daemon withdraws its listing and writes its public sequence after the first SIGINT.
   stopTimeoutSeconds: 120,
+  secondMs: 1000,
+  // Extra time a macOS restart allows beyond that for launchd to tear the agent down.
+  agentStopMarginSeconds: 15,
   restartSeconds: 10,
   // systemd gives up after this many failed starts within the interval instead of retrying forever.
   startLimitBurst: 5,
@@ -120,6 +133,8 @@ export const SERVICE_ERRORS = {
   ENVIRONMENT_INVALID: 'SERVICE_ENVIRONMENT_INVALID',
   ENVIRONMENT_RESERVED: 'SERVICE_ENVIRONMENT_RESERVED',
   ALREADY_INSTALLED: 'SERVICE_ALREADY_INSTALLED',
+  NOT_INSTALLED: 'SERVICE_NOT_INSTALLED',
+  RESTART_INCOMPLETE: 'SERVICE_RESTART_INCOMPLETE',
   DOCTOR_NOT_READY: 'SERVICE_DOCTOR_NOT_READY',
   COMMAND_FAILED: 'SERVICE_COMMAND_FAILED',
   EPHEMERAL_INSTALL: 'SERVICE_EPHEMERAL_INSTALL',
@@ -220,4 +235,84 @@ export const LOG_ROLES = {
   BUYER: 'buyer',
   SELLER: 'seller',
   LAB: 'lab',
+} as const;
+
+// `gyblos seller verify github` (cli-verify-github.ts): its steps, bounds and codes.
+export const VERIFY_GITHUB = {
+  gistWebOrigin: 'https://gist.github.com',
+  gistRawOrigin: 'https://gist.githubusercontent.com',
+  // The gist's description, followed by the NodeId, so a gist made before an interruption is found again.
+  gistDescription: 'Gyblos node verification',
+  // Public gists of the signed-in account that `gh gist list` reads when looking for that gist.
+  ghListLimit: 100,
+  indexTimeoutMs: 15_000,
+  gistTimeoutMs: 5_000,
+  ghTimeoutMs: 30_000,
+  ghOutputCharacters: 64 * 1024,
+  stateVersion: 1,
+  stateBytes: 4_096,
+  // A CHECK_DEFERRED wait this short is waited out once; a longer one is left to a later run.
+  maxWaitSeconds: 120,
+  msPerSecond: 1000,
+} as const;
+// What a local verification has done so far; every run checks the index and the gist again first.
+export const VERIFY_STEPS = {
+  // A gist is chosen and not verified yet.
+  GIST: 'gist',
+  VERIFIED: 'verified',
+  // The saved gist was not found on GitHub: neither it nor the index's copy of it is used again.
+  GIST_MISSING: 'gist-missing',
+} as const;
+export type VerifyStep = (typeof VERIFY_STEPS)[keyof typeof VERIFY_STEPS];
+// Where the gist a run uses came from.
+export const GIST_SOURCES = {
+  GIVEN: 'given',
+  SAVED: 'saved',
+  INDEX: 'index',
+  CREATED: 'created',
+} as const;
+export type GistSource = (typeof GIST_SOURCES)[keyof typeof GIST_SOURCES];
+// What reading a gist's raw text found.
+export const GIST_CHECKS = {
+  FOUND: 'found',
+  MISSING: 'missing',
+  NOT_FOUND: 'not-found',
+  // The gist exists for the account but has no file named IDENTITY_CLAIM.proofFile.
+  WRONG_FILE: 'wrong-file',
+  // Any other answer (403, 5xx, a timeout): the index is asked anyway.
+  UNKNOWN: 'unknown',
+} as const;
+export type GistCheck = (typeof GIST_CHECKS)[keyof typeof GIST_CHECKS];
+export const VERIFY_ERRORS = {
+  ACCOUNT_INVALID: 'VERIFY_ACCOUNT_INVALID',
+  GIST_INVALID: 'VERIFY_GIST_INVALID',
+  GIST_OWNER: 'VERIFY_GIST_OWNER_MISMATCH',
+  NO_GIST: 'VERIFY_NO_GIST',
+  PROOF_MISSING: 'VERIFY_PROOF_MISSING',
+  PROOF_FILE_MISSING: 'VERIFY_PROOF_FILE_MISSING',
+  GIST_NOT_FOUND: 'VERIFY_GIST_NOT_FOUND',
+  CONFIG_INVALID: 'VERIFY_CONFIG_INVALID',
+  STATE_FAILED: 'VERIFY_STATE_FAILED',
+  SIGNING_FAILED: 'VERIFY_SIGNING_FAILED',
+  GH_FAILED: 'VERIFY_GH_FAILED',
+  NOT_VERIFIED: 'VERIFY_NOT_VERIFIED',
+} as const;
+
+export const NAME_ERRORS = {
+  INVALID: 'NAME_INVALID',
+  RESERVED: 'NAME_RESERVED',
+  CONFIG_INVALID: 'NAME_CONFIG_INVALID',
+  SIGNING_FAILED: 'NAME_SIGNING_FAILED',
+} as const;
+export const SELLER_NAME = {
+  indexTimeoutMs: 15_000,
+  showDelaySeconds: 10,
+  clockNoteSeconds: 2,
+  aheadNoteSeconds: 3,
+  secondsShownUpTo: 120,
+  minutesShownUpTo: 120,
+  secondsPerMinute: 60,
+  msPerSecond: 1000,
+  garbled: /[?\ufffd]/,
+  quoteMarks: /[\u2018\u201b\u2032`\u00b4]/,
 } as const;

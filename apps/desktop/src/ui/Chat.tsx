@@ -30,7 +30,11 @@ import {
   paypalDollars,
   type PaymentMethod,
 } from '../paypal-model';
-import { paidSellerLimitNotice, X402_ACTION } from '../x402-model';
+import {
+  chatBudgetReady,
+  paidSellerLimitNotice,
+  X402_ACTION,
+} from '../x402-model';
 import { activityDate, sessionOutcome } from './activity-presentation';
 import { chatNetworkOptions, modelArtwork } from './announced-models';
 import type { ChatController } from './chat-controller';
@@ -93,6 +97,7 @@ type Props = {
   onSelectModel: (id: string) => void;
   confirmedPolicy?: string;
   onDefaultModel?: () => void;
+  onAutoModel?: (name: string) => void;
   onBrowseModels: () => void;
   onReviewPaypal: () => void;
   onAuthorize: () => DemoAuthorizationStatus;
@@ -152,6 +157,7 @@ export function Chat({
   onSelectModel,
   confirmedPolicy,
   onDefaultModel,
+  onAutoModel,
   onBrowseModels,
   onReviewPaypal,
   onAuthorize,
@@ -176,13 +182,24 @@ export function Chat({
   const [reasoning, setReasoning] = useState<ReasoningSelection | null>(null);
   const usingPaypal = paymentMethod === PAYMENT_METHOD.PAYPAL;
   const usingX402 = !usingPaypal && !!x402;
+  const freeOnly =
+    model.source === MODEL_SOURCE.ANNOUNCED &&
+    model.free &&
+    x402?.state.policy?.maxAtomic !== '0';
   const x402Ready =
     x402 &&
     !!x402.state.policy &&
-    (x402.state.summary.active || !!model.offerId) &&
+    chatBudgetReady(
+      x402.state.summary.active,
+      !!model.offerId,
+      !!freeOnly,
+      !!model.automatic,
+      x402.state.policy.maxAtomic,
+    ) &&
     !x402.state.summary.blocked &&
     !x402.busy &&
-    (!x402.state.summary.active ||
+    (freeOnly ||
+      !x402.state.summary.active ||
       x402.state.summary.policy?.policyId === x402.state.policy.policyId);
   const notice = usingPaypal
     ? paypal.state.notice || session.notice
@@ -210,24 +227,28 @@ export function Chat({
     usingX402 &&
     model.source === MODEL_SOURCE.ANNOUNCED &&
     model.free &&
-    (x402?.state.policy?.maxAtomic !== '0' ||
-      x402?.state.policy?.model !== model.name);
+    x402?.state.policy?.model !== model.name;
   const limitNotice =
     usingX402 &&
     x402?.state.policy &&
     x402.state.policy.maxAtomic !== '0' &&
-    !model.offerId
+    !model.offerId &&
+    !model.automatic &&
+    !freeOnly
       ? 'Choose a seller in the model menu and confirm its prices before sending.'
       : usingX402 &&
           model.source === MODEL_SOURCE.ANNOUNCED &&
+          !model.offerId &&
           !models.some((item) => item.id === model.id)
-        ? 'This listing has expired. Select an available seller before sending.'
+        ? 'The current catalog cannot confirm this seller and price. Refresh the model list before sending.'
         : usingX402 &&
-            model.offerId &&
+            (model.offerId || model.automatic) &&
             x402?.state.policy?.policyId !== confirmedPolicy
-          ? 'Select the seller again to confirm the current channel terms.'
+          ? model.automatic
+            ? 'Select Auto again for the current buyer.'
+            : 'Select the seller again to confirm the current channel terms.'
           : freeListingMismatch
-            ? 'Select this model and set the maximum per response to zero in Payments to use free inference.'
+            ? 'Select the free model served by this buyer.'
             : usingX402 && x402 && model.offerId
               ? paidSellerLimitNotice(
                   x402.state.policy,
@@ -264,7 +285,7 @@ export function Chat({
   const composerModel = usingPaypal
     ? sandboxModel
     : usingX402
-      ? model.source === MODEL_SOURCE.ANNOUNCED
+      ? model.automatic || model.source === MODEL_SOURCE.ANNOUNCED
         ? model
         : buyerModel
       : model;
@@ -452,6 +473,15 @@ export function Chat({
             action: X402_ACTION.SEND,
             id,
             prompt: session.draft,
+            ...(freeOnly && {
+              freeOnly: true,
+              policyId: x402.state.policy?.policyId,
+            }),
+            ...(model.automatic && {
+              auto: true,
+              model: model.name,
+              policyId: confirmedPolicy,
+            }),
             ...(model.offerId && {
               offerId: model.offerId,
               policyId: confirmedPolicy,
@@ -706,6 +736,18 @@ export function Chat({
                   else onSelectModel(id);
                 }}
                 onBrowse={onBrowseModels}
+                auto={
+                  usingX402 && x402?.state.policy && onAutoModel
+                    ? {
+                        buyerModels:
+                          x402.state.policy.autoRoutes?.map(
+                            (route) => route.modelId,
+                          ) ?? [],
+                        paid: !!x402.state.policy.paidAuto,
+                        choose: onAutoModel,
+                      }
+                    : undefined
+                }
                 networkOnly={usingX402}
                 showBrowse={!usingPaypal}
                 contextLabel={
