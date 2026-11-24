@@ -2,20 +2,17 @@
 
 import { ArrowUpRight, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
+import { useRef, useState, type KeyboardEvent } from 'react';
 
 import { SITE_LINKS } from '../lib/config';
-import { PAGE_LINKS, PAGES } from '../lib/constants';
+import { PAGE_LINKS } from '../lib/constants';
+import { currentPage, isCurrentPage } from '../lib/layout';
 import { cx } from './board/cx';
 
 const ITEM = 'block rounded-lg px-3 py-1.5 hover:bg-raised hover:text-ink';
-
-const isCurrent = (pathname: string, href: string) =>
-  href === PAGES.network
-    ? pathname === href
-    : pathname === href ||
-      (href === PAGES.sellers && pathname.startsWith(`${PAGES.sellers}/`));
+const STACKED = 'flex min-h-11 items-center py-2';
+const MENU_ID = 'explorer-menu';
 
 function Items({
   pathname,
@@ -30,11 +27,11 @@ function Items({
     <ul
       className={cx(
         'text-sm whitespace-nowrap',
-        stacked ? 'flex flex-col gap-0.5' : '-mx-3 flex gap-1',
+        stacked ? 'flex flex-col gap-0.5' : '-mx-3 flex gap-1 overflow-x-auto',
       )}
     >
       {PAGE_LINKS.map((link) => {
-        const current = isCurrent(pathname, link.href);
+        const current = isCurrentPage(pathname, link.href);
         return (
           <li key={link.href}>
             <Link
@@ -45,7 +42,7 @@ function Items({
               }
               className={cx(
                 ITEM,
-                stacked && 'py-2',
+                stacked && STACKED,
                 current ? 'bg-raised text-ink' : 'text-muted',
               )}
             >
@@ -62,7 +59,7 @@ function Items({
           onClick={onPick}
           className={cx(
             ITEM,
-            stacked && 'py-2',
+            stacked && STACKED,
             'inline-flex items-center gap-1 text-muted',
           )}
         >
@@ -76,24 +73,35 @@ function Items({
 
 export function NavLinks() {
   const pathname = usePathname();
-  const [open, setOpen] = useState(false);
-  const here =
-    PAGE_LINKS.find((link) => isCurrent(pathname, link.href))?.label ??
-    PAGE_LINKS[0].label;
+  const location = `${pathname}?${useSearchParams().toString()}`;
+  const [openAt, setOpenAt] = useState<string | null>(null);
+  const button = useRef<HTMLButtonElement>(null);
+  const open = openAt === location;
+  const close = () => setOpenAt(null);
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (event.key !== 'Escape' || !open) return;
+    close();
+    button.current?.focus();
+  };
+  const here = currentPage(pathname);
   return (
     <>
       <div className="hidden sm:block">
         <Items pathname={pathname} stacked={false} />
       </div>
-      <div className="sm:hidden">
+      <div className="sm:hidden" onKeyDown={onKeyDown}>
         <button
+          ref={button}
           type="button"
           aria-expanded={open}
-          aria-controls="explorer-menu"
-          onClick={() => setOpen((isOpen) => !isOpen)}
-          className="flex w-full items-center justify-between rounded-lg bg-raised px-3 py-2 text-sm text-ink"
+          aria-controls={MENU_ID}
+          onClick={() => setOpenAt(open ? null : location)}
+          className="flex min-h-11 w-full items-center justify-between rounded-lg bg-raised px-3 py-2 text-sm text-ink"
         >
-          {here}
+          <span>
+            <span className="sr-only">Pages, current: </span>
+            {here?.label ?? 'Pages'}
+          </span>
           <ChevronDown
             aria-hidden
             className={cx(
@@ -102,11 +110,9 @@ export function NavLinks() {
             )}
           />
         </button>
-        {open ? (
-          <div id="explorer-menu" className="mt-2">
-            <Items pathname={pathname} stacked onPick={() => setOpen(false)} />
-          </div>
-        ) : null}
+        <div id={MENU_ID} hidden={!open} className="mt-2">
+          <Items pathname={pathname} stacked onPick={close} />
+        </div>
       </div>
     </>
   );

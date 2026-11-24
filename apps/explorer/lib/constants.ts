@@ -63,6 +63,7 @@ export const LATENCY_BUCKETS_MS = [
 
 export const DISPLAY = {
   statCards: 4,
+  overviewCards: 5,
   // Digits of a short address on each side of the ellipsis.
   addressHead: 4,
   addressTail: 4,
