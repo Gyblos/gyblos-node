@@ -19,24 +19,24 @@ rules in [tooling/code-standards.ts](../tooling/code-standards.ts)),
 `pnpm tooling:test`, `pnpm skills:check` and `pnpm boundaries`. Errors fail the
 check; warnings are reported and must not grow in a PR.
 
-| Rule                                      | Level | Scope and exceptions                                                                                                                           |
-| ----------------------------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| One declaration per `const`/`let`         | error | All TypeScript.                                                                                                                                |
-| `@typescript-eslint/no-explicit-any`      | error | All TypeScript.                                                                                                                                |
-| No object-literal `as` assertion          | error | Product, lab and tooling; allowed in `tests/` and `packages/*/test/` for invalid inputs and SDK doubles.                                       |
-| `@typescript-eslint/no-floating-promises` | error | All TypeScript.                                                                                                                                |
-| `gyblos/no-new-comments`                  | error | TypeScript source; comments cannot exceed the exact per-file budget.                                                                           |
-| `pnpm comments:check`                     | error | Every source format, including shell, YAML, TOML, CSS, SQL, JSONC, HTML, SVG, `.tsx.preview` and patches; no new comment text versus the base. |
-| `pnpm typescript:check`                   | error | Every tracked file: no `.js`, `.mjs` or `.cjs` file outside the exceptions recorded in `tooling/typescript-only.ts`.                           |
-| `gyblos/package-boundaries`               | error | `apps`, `packages`, `lab`: a relative import must not leave its package.                                                                       |
-| `gyblos/import-extensions`                | error | All TypeScript: relative code imports have no extension; `.json`/`.css` keep it.                                                               |
-| `gyblos/version-pins`                     | error | `packages/config/src/versions.ts` must match the dependency pins in manifests.                                                                 |
-| `pnpm boundaries` (dependency-cruiser)    | error | Layer direction, adapter and app independence, standalone packages, no product import of lab/tests/tooling.                                    |
-| Import order (prettier sort-imports)      | error | Checked by `prettier --check`; `pnpm format` fixes it.                                                                                         |
-| `max-lines-per-function` 80               | warn  | Off for `tests/`, `packages/*/test/` and `lab/`; blank lines and comments are not counted.                                                     |
-| `max-lines` 400                           | warn  | All TypeScript.                                                                                                                                |
-| `no-magic-numbers`                        | warn  | Off for `packages/config`, `constants.ts` files and tests; -1, 0, 1, 2 and their BigInt forms are allowed.                                     |
-| `gyblos/structure` (short-name denylist)  | warn  | `apps`, `packages`, `lab`: bindings such as `r`, `res`, `req`, `e`, `env`, `addr`, `sig`.                                                      |
+| Rule                                      | Level | Scope and exceptions                                                                                                                              |
+| ----------------------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| One declaration per `const`/`let`         | error | All TypeScript.                                                                                                                                   |
+| `@typescript-eslint/no-explicit-any`      | error | All TypeScript.                                                                                                                                   |
+| No object-literal `as` assertion          | error | Product, lab and tooling; allowed in `tests/` and `packages/*/test/` for invalid inputs and SDK doubles.                                          |
+| `@typescript-eslint/no-floating-promises` | error | All TypeScript.                                                                                                                                   |
+| `gyblos/no-new-comments`                  | error | TypeScript source; comments cannot exceed the exact per-file budget.                                                                              |
+| `pnpm comments:check`                     | error | Every source format, including shell, YAML, TOML, CSS, SQL, JSONC, HTML, SVG, `.tsx.preview` and patches; no new comment text versus the base.    |
+| `pnpm typescript:check`                   | error | Every tracked file: no `.js`, `.jsx`, `.mjs` or `.cjs` file, in any letter case, outside the exceptions recorded in `tooling/typescript-only.ts`. |
+| `gyblos/package-boundaries`               | error | `apps`, `packages`, `lab`: a relative import must not leave its package.                                                                          |
+| `gyblos/import-extensions`                | error | All TypeScript: relative code imports have no extension; `.json`/`.css` keep it.                                                                  |
+| `gyblos/version-pins`                     | error | `packages/config/src/versions.ts` must match the dependency pins in manifests.                                                                    |
+| `pnpm boundaries` (dependency-cruiser)    | error | Layer direction, adapter and app independence, standalone packages, no product import of lab/tests/tooling.                                       |
+| Import order (prettier sort-imports)      | error | Checked by `prettier --check`; `pnpm format` fixes it.                                                                                            |
+| `max-lines-per-function` 80               | warn  | Off for `tests/`, `packages/*/test/` and `lab/`; blank lines and comments are not counted.                                                        |
+| `max-lines` 400                           | warn  | All TypeScript.                                                                                                                                   |
+| `no-magic-numbers`                        | warn  | Off for `packages/config`, `constants.ts` files and tests; -1, 0, 1, 2 and their BigInt forms are allowed.                                        |
+| `gyblos/structure` (short-name denylist)  | warn  | `apps`, `packages`, `lab`: bindings such as `r`, `res`, `req`, `e`, `env`, `addr`, `sig`.                                                         |
 
 Review checks the rest: canonical values and derived types, error catalogs,
 boundary parsing, naming beyond the denylist and declaration placement.

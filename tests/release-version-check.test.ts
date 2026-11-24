@@ -45,7 +45,7 @@ void test('every release job that compares versions runs the script on the pinne
     const name = lines[0]?.trim();
     const setup = lines.findIndex(
       (line, index) =>
-        line.startsWith('      - uses: actions/setup-node@') &&
+        /^ {6}- uses: actions\/setup-node@[0-9a-f]{40}( |$)/.test(line) &&
         lines[index + 1] === '        with:' &&
         lines[index + 2] === '          node-version: 24.22.1',
     );
@@ -101,7 +101,8 @@ void test('a release script refuses to continue when the version check cannot ru
       encoding: 'utf8',
     },
   );
-  assert.notEqual(result.status, 0);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /not a semantic version/);
   assert.equal(readFileSync(target, 'utf8'), before);
   for (const name of readdirSync(join(REPOSITORY_ROOT, 'scripts')).filter(
     (file) => file.endsWith('.sh'),
