@@ -1,7 +1,7 @@
 # Target architecture
 
-**Status: Decided**, with the [open decisions](#open-decisions) still to be
-made. This page specifies where the repository is going, not what it does today.
+**Status: Decided.** The choices made are listed under [Decisions](#decisions).
+This page specifies where the repository is going, not what it does today.
 [architecture.md](architecture.md) describes the current code. Nothing here is
 implemented until the code and that page say so.
 
@@ -47,7 +47,7 @@ use the same operations, on either role.
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | Seller logic            | In `packages/node`; `apps/node` is a thin CLI and daemon                                                                                      | In a seller package; unchanged shape                                         |
 | Buyer logic             | Mostly in `apps/buyer`: selection, discovery, routing, the HTTP endpoint and buyer API keys                                                   | In a buyer package; `apps/buyer` is a thin executable                        |
-| Buyer commands          | Eight `pnpm buyer*` scripts, from a checkout only; `pnpm buyer` runs the buyer endpoint                                                       | `gyblos buyer <command>` in the released executable                          |
+| Buyer commands          | One buyer executable with eight subcommands, from a checkout only, behind the `pnpm buyer*` scripts                                           | `gyblos buyer <command>` in the released executable                          |
 | `packages/node`         | Both roles, PayPal, `config.toml`, receipts and agent setup in one package                                                                    | A shared node kit with nothing specific to one role                          |
 | Desktop app             | Bundles `apps/buyer` as a utility process and keeps its own Chat budget and permission state                                                  | A client of the buyer's local API; holds no financial state                  |
 | Local control           | Local buyer routes named in `@gyblos/protocol` (`buyer-api`), served only to the desktop app; the operator token lives in the desktop process | One versioned local operator API per role, usable without the desktop app    |
@@ -155,8 +155,13 @@ command that exists when the step lands, under the names decided there:
 ### Command line
 
 - One executable, `gyblos`, carries both roles: `gyblos seller <command>` and
-  `gyblos buyer <command>`. The existing top-level seller commands keep working;
-  renaming them is a separate decision.
+  `gyblos buyer <command>`. The seller starts with `gyblos seller start`;
+  `gyblos start` is removed, not kept as an alias. The release that renames it
+  makes the update path (`install.sh update`, `gyblos seller service restart`)
+  rewrite an installed service definition, so a seller who updates is not
+  interrupted. Every other place that starts the seller changes in the same
+  release: the seller image's default command and entrypoint, the compose file
+  the installer writes, and the documented commands.
 - Every command accepts `--json` and then prints exactly one JSON document, the
   operation result, on standard output. Without it, the command prints text for
   a person.
@@ -176,6 +181,9 @@ The control contract of a running role. It replaces the desktop-only wiring.
   that carries an `Origin`.
 - Authenticated by the operator token. A delegated key never grants an operator
   action.
+- A buyer with no desktop app keeps its operator token in a private file in the
+  buyer home, readable only by the owning user, on every platform. Any process
+  running as that user can read it; that limit is stated to the operator.
 - Its routes, request and response shapes, and error codes are defined in
   `packages/protocol` and covered by golden vectors, like every other contract.
 - It is separate from the inference endpoint, which keeps serving OpenAI Chat
@@ -192,8 +200,8 @@ The control contract of a running role. It replaces the desktop-only wiring.
   protected wallet's custody. Budgets, reservations, journals and keys are read
   from the buyer, not mirrored.
 - The renderer keeps no network access and never sees a credential.
-- Driving a seller from the app is possible through the same contract and is not
-  part of this specification.
+- The app stays buyer-only. The contract covers both roles, but the app does not
+  offer selling; this is revisited after the mainnet launch.
 
 ### Agents
 
@@ -316,8 +324,16 @@ Packages:
 | `packages/router` | Admission, the built-in ranking, its parameters in one versioned public file, and a simulator that replays network data | Step 9        |
 | `router-*`        | An adapter per external router, implementing the same port. It joins the adapter families in the boundary rules         | Router market |
 
-A third-party router is a remote service behind a `router-*` adapter. Its code
-never runs in the process that holds the buyer's keys.
+A third-party router is a remote service behind a `router-*` adapter, and it
+only recommends. There are no local router plugins: third-party code never runs
+in the process that holds the buyer's keys.
+
+A third party can also publish a preference file: weights, limits, and allow and
+block lists. The buyer parses it as data, validates it and applies it with the
+built-in router. It is never executed.
+
+A remote router does not receive the buyer's private history. Whether a buyer
+may choose to share it is left to the router market design.
 
 Left to the router market design, and not needed to keep the plug-in point open:
 how ranking providers are discovered and identified, the signed wire format of a
@@ -344,29 +360,32 @@ Each of these is checkable, by `pnpm boundaries`, a lint rule or a test.
 
 Each step is its own change. Structural moves and behavior changes never share
 one, and every structural step preserves wire values, journals and private
-paths.
+paths. Step numbers are stable names; the table is in the order of work.
 
-| Step | Change                                                                                                               | Kind       |
-| ---- | -------------------------------------------------------------------------------------------------------------------- | ---------- |
-| 1    | One buyer entry with subcommands; the existing scripts point to it                                                   | Behavior   |
-| 2    | The released executable includes the buyer as `gyblos buyer`                                                         | Behavior   |
-| 3    | `--json` and non-interactive operation on seller and buyer commands                                                  | Behavior   |
-| 4    | Remove v1 signed offers, which no product path uses                                                                  | Removal    |
-| 5    | Move buyer orchestration from `apps/buyer` into a buyer package                                                      | Structural |
-| 6    | Split `packages/node` into the seller package, the buyer package and the shared node kit                             | Structural |
-| 7    | Complete the local operator API in protocol and move the desktop app onto it                                         | Behavior   |
-| 8    | Agent tool surface over the same operations                                                                          | Behavior   |
-| 9    | Extract seller selection from core into `packages/router`, split into admission and ranking behind the `Router` port | Structural |
+| Step | Change                                                                                                                                 | Kind       | When                     |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ------------------------ |
+| 1    | One buyer entry with subcommands; the existing scripts point to it                                                                     | Behavior   | Done                     |
+| 5    | Move buyer orchestration from `apps/buyer` into a buyer package                                                                        | Structural | Next                     |
+| 2    | The released executable includes the buyer as `gyblos buyer`, importing that package, and the seller starts with `gyblos seller start` | Behavior   | After step 5             |
+| 3    | `--json` and non-interactive operation on seller and buyer commands                                                                    | Behavior   | After step 2             |
+| 4    | Remove v1 signed offers, which no product path uses                                                                                    | Removal    | Any time                 |
+| 7    | Complete the local operator API in protocol and move the desktop app onto it                                                           | Behavior   | After step 3             |
+| 8    | Agent tool surface over the same operations                                                                                            | Behavior   | After step 7             |
+| 6    | Split `packages/node` into the seller package, the buyer package and the shared node kit                                               | Structural | After the mainnet launch |
+| 9    | Extract seller selection from core into `packages/router`, split into admission and ranking behind the `Router` port                   | Structural | After the mainnet launch |
 
-Steps 1 to 3 give an agent a buyer without a window and move no logic.
+Steps 5, 2 and 3 give an agent a buyer without a window.
 
-## Open decisions
+## Decisions
 
-These need a maintainer decision before the step that depends on them.
+| Decision                                        | Outcome                                                                                                               |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| How the buyer reaches the released executable   | Through a buyer package that the executable imports (step 5 before step 2), not by bundling two app entry points.     |
+| Top-level seller commands                       | Renamed: `gyblos seller start`, with no `gyblos start` alias. The update path rewrites installed service definitions. |
+| Where a headless buyer keeps the operator token | A private file in the buyer home.                                                                                     |
+| When to split `packages/node`                   | After the mainnet launch.                                                                                             |
+| Whether the desktop app can run a seller        | Not for now; it stays buyer-only.                                                                                     |
+| How a third-party router takes part             | As a remote service that only recommends. No local plugins; local preferences are data files.                         |
 
-| Decision                                        | Needed before | Trade-off                                                                                                        |
-| ----------------------------------------------- | ------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Where a headless buyer keeps the operator token | Step 3        | A private file in the buyer home is simple, but any process of that user could then create delegated keys.       |
-| Renaming top-level seller commands              | Step 2        | `gyblos seller start` is symmetric; `gyblos start` is what installers and service units call today.              |
-| When to split `packages/node`                   | Step 6        | It is the largest structural change and the least visible. Steps 1 to 3 and 7 deliver the agent goal without it. |
-| Whether the desktop app can run a seller        | After step 7  | The contract allows it; it adds lifecycle, service and capacity concerns to an app that is buyer-only today.     |
+One question stays open for the router market design: whether a buyer may choose
+to share its private history with a remote router.
