@@ -9,7 +9,7 @@ import {
   COLLECTOR_ROUTES,
   COLLECTOR_STATUS,
 } from './constants';
-import { dayRange, type DayRange } from './days';
+import { dayOfTime, dayRange, type DayRange } from './days';
 import { rejection } from './http';
 import {
   modelStats,
@@ -56,7 +56,10 @@ export function statsRoutes(
       );
       return context.json(body, COLLECTOR_STATUS.OK);
     };
-  app.get(COLLECTOR_ROUTES.STATS_NETWORK, handle(networkStats));
+  app.get(
+    COLLECTOR_ROUTES.STATS_NETWORK,
+    handle((stats, range) => networkStats(stats, range, dayOfTime(now()))),
+  );
   app.get(COLLECTOR_ROUTES.STATS_MODELS, handle(modelStats));
   app.get(COLLECTOR_ROUTES.STATS_CHAIN, handle(chainStats));
   app.get(COLLECTOR_ROUTES.STATS_CHAIN_TXS, async (context) => {

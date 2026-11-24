@@ -22,7 +22,6 @@ import {
   type Speed,
 } from './stats-shape';
 import type {
-  BuyerTotalsRow,
   ModelObservedRow,
   ModelRow,
   SellerModelRow,
@@ -73,7 +72,7 @@ export interface BuyerTotals {
 }
 export interface NetworkStats extends StatsEnvelope {
   days: NetworkDay[];
-  buyers: { free: BuyerTotals; paid: BuyerTotals };
+  buyerTotals: { free: BuyerTotals; paid: BuyerTotals };
 }
 // What buyers saw and how fast the engine generated, on one side of one model; null without any
 // observation joined to a receipt of that side.
@@ -152,11 +151,13 @@ export function groupBy<T>(rows: readonly T[], key: (row: T) => string) {
 export async function networkStats(
   reader: StatsReader,
   range: DayRange,
+  today: string,
 ): Promise<NetworkStats> {
-  const { network, observed, demand, origins, failures, buyers } =
-    await reader.network(range);
-  const buyerTotals = (kind: string): BuyerTotals => {
-    const row = buyers.find((found: BuyerTotalsRow) => found.kind === kind);
+  const { network, observed, demand, origins, failures, buyerTotals } =
+    await reader.network(range, today);
+  const buyersByKind = new Map(buyerTotals.map((row) => [row.kind, row]));
+  const totalsOf = (kind: string): BuyerTotals => {
+    const row = buyersByKind.get(kind);
     return {
       allTime: publicBuyers(row?.allTime),
       newInRange: publicBuyers(row?.newInRange),
@@ -210,9 +211,9 @@ export async function networkStats(
       ...failures.map(fromRow),
     ]),
     days,
-    buyers: {
-      free: buyerTotals(FIRST_SEEN_KINDS.BUYER_FREE),
-      paid: buyerTotals(FIRST_SEEN_KINDS.BUYER_PAID),
+    buyerTotals: {
+      free: totalsOf(FIRST_SEEN_KINDS.BUYER_FREE),
+      paid: totalsOf(FIRST_SEEN_KINDS.BUYER_PAID),
     },
   };
 }

@@ -7,6 +7,7 @@ import {
   AGGREGATES,
   COLLECTOR_LIMITERS,
 } from '@gyblos/metrics-collector/constants';
+import type { NetworkStats } from '@gyblos/metrics-collector/stats';
 import { statsReader } from '@gyblos/metrics-collector/stats-read';
 import { createD1Storage } from '@gyblos/metrics-collector/storage-d1';
 
@@ -20,25 +21,16 @@ import {
 } from './support/metrics-collector-aggregates';
 import { createCollectorD1 } from './support/metrics-collector-d1';
 
+const TODAY = new Date(NOW).toISOString().split('T')[0]!;
+
 const PREVIOUS_DAY = new Date(DAY_START - AGGREGATES.dayMs)
   .toISOString()
   .split('T')[0]!;
 const MIN = AGGREGATES.minPublicBuyers;
 
-interface Count {
-  buyers: number | null;
-  withheld: boolean;
-}
-interface Totals {
-  buyers: {
-    free: { allTime: Count; newInRange: Count };
-    paid: { allTime: Count; newInRange: Count };
-  };
-}
-
 const buyer = (index: number) => index.toString(16).padStart(64, '0');
-const shown = (buyers: number): Count => ({ buyers, withheld: false });
-const hidden: Count = { buyers: null, withheld: true };
+const shown = (buyers: number) => ({ buyers, withheld: false });
+const hidden = { buyers: null, withheld: true };
 
 function collector(database: ReturnType<typeof createCollectorD1>) {
   return createMetricsCollector({
@@ -62,7 +54,7 @@ async function totals(
     `https://collector.test/v1/stats/network?from=${from}&to=${to}`,
   );
   assert.equal(response.status, 200);
-  return ((await response.json()) as Totals).buyers;
+  return ((await response.json()) as NetworkStats).buyerTotals;
 }
 
 void test('buyer totals count all time and new in the range, free and paid apart', async () => {
@@ -110,6 +102,43 @@ void test('buyer counts below the minimum are withheld, zero included', async ()
   });
   assert.deepEqual(await totals(collector(createCollectorD1()), DAY, DAY), {
     free: { allTime: hidden, newInRange: hidden },
+    paid: { allTime: hidden, newInRange: hidden },
+  });
+});
+
+void test('paid buyers are wallets and free buyers NodeIds, each counted once', async () => {
+  const database = createCollectorD1();
+  for (let index = 0; index < 2 * MIN; index++) {
+    insertReceipt(database, {
+      paid: true,
+      payer: `Wallet${index % MIN}`,
+      buyer: buyer(index),
+    });
+    insertReceipt(database, { buyer: buyer(index % MIN) });
+  }
+  await runAggregation(database, NOW);
+
+  assert.deepEqual(await totals(collector(database), DAY, DAY), {
+    free: { allTime: shown(MIN), newInRange: shown(MIN) },
+    paid: { allTime: shown(MIN), newInRange: shown(MIN) },
+  });
+});
+
+void test('buyers first seen today wait until the UTC day closes', async () => {
+  const database = createCollectorD1();
+  for (let index = 0; index < MIN; index++)
+    insertReceipt(database, { buyer: buyer(index) });
+  for (let index = MIN; index < 2 * MIN; index++)
+    insertReceipt(database, { buyer: buyer(index), receivedAt: NOW - HOUR });
+  await runAggregation(database, NOW);
+  const app = collector(database);
+
+  assert.deepEqual(await totals(app, DAY, TODAY), {
+    free: { allTime: shown(MIN), newInRange: shown(MIN) },
+    paid: { allTime: hidden, newInRange: hidden },
+  });
+  assert.deepEqual(await totals(app, TODAY, TODAY), {
+    free: { allTime: shown(MIN), newInRange: hidden },
     paid: { allTime: hidden, newInRange: hidden },
   });
 });
