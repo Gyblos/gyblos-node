@@ -34,7 +34,7 @@ Node 24.22.1+ and the pnpm version pinned in `package.json`.
 pnpm install --frozen-lockfile
 pnpm check          # typecheck + lint + test:all; run before every PR
 pnpm typecheck      # includes tests and the desktop renderer
-pnpm lint           # eslint + comments:check + prettier --check + tooling:test + skills:check + boundaries + db:check
+pnpm lint           # eslint + comments:check + typescript:check + prettier --check + tooling:test + skills:check + boundaries + db:check
 pnpm test           # product suites tests/*.test.ts and packages/*/test (required checks)
 pnpm test:lab       # lab suites tests/lab/
 pnpm tooling:test   # boundary checker and lint rule tests

@@ -40,6 +40,7 @@ export default [
       'lab/**/*.ts',
       'tests/**/*.ts',
       'tooling/**/*.ts',
+      'scripts/**/*.ts',
     ],
     languageOptions: {
       parser: tseslint.parser,

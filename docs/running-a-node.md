@@ -837,7 +837,7 @@ nothing is committed to the repository:
    the Windows seller, signs both keyless with the same identity, and creates
    the GitHub release with the installers, their SHA-256 files and Sigstore
    bundles, and the packaged sellers. Only a version newer than the latest
-   release by semantic-version precedence (`scripts/semver-newer.mjs`) becomes
+   release by semantic-version precedence (`scripts/semver-newer.ts`) becomes
    latest, which is what `https://gyblos.com/install.sh` serves, and moves the
    `:beta` tag. An older line's patch never replaces either. Releases are never
    marked pre-release, because GitHub's latest download skips those.

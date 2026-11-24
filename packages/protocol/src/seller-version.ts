@@ -8,7 +8,6 @@ import type { SignedPublicV2 } from './control-types';
 import { bytesHex, hexBytes } from './public-validation';
 import { sign, verify, type Signer } from './signing';
 
-// The same grammar as scripts/semver-newer.mjs (semver.org §2 and §9), without build metadata.
 export const SELLER_RELEASE_PATTERN =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*))?$/;
 const signatureCharacters =

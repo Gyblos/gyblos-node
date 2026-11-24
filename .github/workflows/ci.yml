@@ -65,6 +65,7 @@ jobs:
       - run: pnpm comments:check
         env:
           COMMENT_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+      - run: pnpm typescript:check
       - run: pnpm exec prettier --check .
       - run: pnpm docs:build
       - run: pnpm docs:test

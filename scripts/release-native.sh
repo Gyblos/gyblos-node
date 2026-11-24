@@ -20,9 +20,8 @@ die() {
 }
 
 version=${1:-}
-valid=0
-node "$(dirname "$0")/semver-newer.mjs" "$version" "$version" 2>/dev/null || valid=$?
-[ "$valid" -ne 2 ] || die "not a semantic version: '$version'"
+node "$(dirname "$0")/semver-newer.ts" "$version" >/dev/null 2>&1 ||
+  die "not a semantic version: '$version'"
 [ "${GITHUB_ACTIONS:-}" = true ] && [ -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ] ||
   die 'releases only in the release workflow: push the tag v<version> from main.'
 [ "${GITHUB_REF_NAME:-}" = "v$version" ] || die "the tag '${GITHUB_REF_NAME:-}' does not name the release $version."
