@@ -140,6 +140,8 @@ function Mix({
   );
 }
 
+const interval = (window: string[]) => `${window[0]} – ${window.at(-1)} UTC`;
+
 export async function Overview({ query }: { query: ExplorerQuery }) {
   const days = rangeOf(query, 'overview');
   const now = Date.now();
@@ -152,7 +154,6 @@ export async function Overview({ query }: { query: ExplorerQuery }) {
   ]);
   const current = overviewActivity(dates, source);
   const previous = overviewActivity(prior, before);
-  const interval = (window: string[]) => `${window[0]} – ${window.at(-1)} UTC`;
   const metric = (key: 'tokens' | 'requests' | 'demand') => {
     const currentValue = current[key];
     const previousValue = previous[key];
