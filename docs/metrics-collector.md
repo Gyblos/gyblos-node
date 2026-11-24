@@ -304,7 +304,9 @@ stores `formula_version` (`AGGREGATES.formulaVersion`) and `aggregated_at`.
   connect failures), and connect failures. A refusal by a chosen seller is not
   demand that no seller served.
 - **First seen:** the earliest headline receipt time per seller, free buyer,
-  paid buyer and model. Recomputing an earlier day can only move it earlier.
+  paid buyer and model. Recomputing an earlier day can only move it earlier. A
+  row is never removed: a buyer whose only receipt later turns disputed stays
+  counted in `buyerTotals`, while that day's `buyers` drops it.
 
 **What the numbers can and cannot prove.** Node keys are free. A seller-only
 receipt needs only the seller's signature, and a "bilateral" one can come from

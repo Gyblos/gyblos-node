@@ -1,7 +1,7 @@
 // Owns the public stats use case: turns aggregate rows from the read port into the typed answers of
 // GET /v1/stats/network, /v1/stats/models and /v1/stats/sellers/:nodeId (docs/metrics-collector.md).
 // Aggregates only: never a receipt, a buyer identity or a raw observation.
-import { FIRST_SEEN_KINDS } from './constants';
+import { FIRST_SEEN_KINDS, type FirstSeenKind } from './constants';
 import { daysOf, type DayRange } from './days';
 import {
   failureEntry,
@@ -156,7 +156,7 @@ export async function networkStats(
   const { network, observed, demand, origins, failures, buyerTotals } =
     await reader.network(range, today);
   const buyersByKind = new Map(buyerTotals.map((row) => [row.kind, row]));
-  const totalsOf = (kind: string): BuyerTotals => {
+  const totalsOf = (kind: FirstSeenKind): BuyerTotals => {
     const row = buyersByKind.get(kind);
     return {
       allTime: publicBuyers(row?.allTime),

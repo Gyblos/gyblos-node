@@ -1,5 +1,6 @@
 // Owns the stats read port: what the public stats use case needs from aggregate storage. Row types
 // come from the aggregate schema; the D1 adapter is stats-read.ts.
+import type { FirstSeenKind } from './constants';
 import type { DayRange } from './days';
 import type {
   aggDemandDaily,
@@ -50,7 +51,7 @@ export interface SellerBuyersRow {
   buyers: number;
 }
 export interface BuyerTotalsRow {
-  kind: string;
+  kind: FirstSeenKind;
   allTime: number;
   newInRange: number;
 }
