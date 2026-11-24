@@ -1,10 +1,13 @@
 import { execFileSync } from 'node:child_process';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-import { javascriptFiles } from './typescript-only';
+import { javascriptFiles, trackedPaths } from './typescript-only';
 
-const tracked = execFileSync('git', ['ls-files'], { encoding: 'utf8' })
-  .split('\n')
-  .filter(Boolean);
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const tracked = trackedPaths(
+  execFileSync('git', ['ls-files', '-z'], { cwd: ROOT, encoding: 'utf8' }),
+);
 const found = javascriptFiles(tracked);
 for (const path of found)
   console.error(`${path}: JavaScript-family code must be TypeScript.`);

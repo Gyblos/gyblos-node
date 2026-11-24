@@ -29,6 +29,34 @@ interface Registry {
   [key: string]: unknown;
 }
 
+function isRegistryFile(value: unknown): value is RegistryFile {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'path' in value &&
+    typeof value.path === 'string' &&
+    'type' in value &&
+    typeof value.type === 'string' &&
+    (!('target' in value) || typeof value.target === 'string')
+  );
+}
+
+function isRegistryItem(value: unknown): value is RegistryItem {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'name' in value &&
+    typeof value.name === 'string' &&
+    (!('files' in value) ||
+      (Array.isArray(value.files) && value.files.every(isRegistryFile))) &&
+    (!('registryDependencies' in value) ||
+      (Array.isArray(value.registryDependencies) &&
+        value.registryDependencies.every(
+          (name: unknown) => typeof name === 'string',
+        )))
+  );
+}
+
 function isRegistry(value: unknown): value is Registry {
   return (
     typeof value === 'object' &&
@@ -37,13 +65,7 @@ function isRegistry(value: unknown): value is Registry {
     typeof value.homepage === 'string' &&
     'items' in value &&
     Array.isArray(value.items) &&
-    value.items.every(
-      (item: unknown) =>
-        typeof item === 'object' &&
-        item !== null &&
-        'name' in item &&
-        typeof item.name === 'string',
-    )
+    value.items.every(isRegistryItem)
   );
 }
 

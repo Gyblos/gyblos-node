@@ -30,9 +30,8 @@ printf '%s\n' "$reference" |
 version=${reference#"$REPOSITORY:"}
 version=${version%@*}
 digest=${reference#*@}
-valid=0
-node "$(dirname "$0")/semver-newer.ts" "$version" "$version" 2>/dev/null || valid=$?
-[ "$valid" -ne 2 ] || die "not a semantic version: '$version'"
+node "$(dirname "$0")/semver-newer.ts" "$version" >/dev/null 2>&1 ||
+  die "not a semantic version: '$version'"
 # Keyless signing binds the installer to the workflow's identity; anywhere else it would sign as a person.
 [ "${GITHUB_ACTIONS:-}" = true ] && [ -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ] ||
   die 'publishes only in the release workflow: push the tag v<version> from main.'

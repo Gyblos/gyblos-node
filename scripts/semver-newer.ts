@@ -50,7 +50,9 @@ function compare(a: Version, b: Version): number {
   return a.pre.length - b.pre.length;
 }
 
-const [candidate, current] = process.argv.slice(2).map(parse);
+const versions = process.argv.slice(2);
+if (versions.length === 1) process.exit(parse(versions[0]) ? 0 : 2);
+const [candidate, current] = versions.map(parse);
 if (!candidate || !current) {
   console.error('semver-newer: expected two versions such as 0.1.0-beta.2');
   process.exit(2);

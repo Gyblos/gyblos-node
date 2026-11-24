@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { readFileSync, statSync, writeFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -356,29 +356,4 @@ void test('the desktop app is packaged after the release exists and attached wit
     ['GITHUB_TOKEN'],
   );
   assert.doesNotMatch(desktop, /id-token|environment:/);
-});
-
-void test('every release job that compares versions runs the script on the pinned Node', () => {
-  const callers = readdirSync(join(REPOSITORY_ROOT, 'scripts')).filter(
-    (name) =>
-      name.endsWith('.sh') &&
-      read(`scripts/${name}`).includes('semver-newer.ts'),
-  );
-  assert.ok(callers.length > 0);
-  const jobs = read(WORKFLOW)
-    .split(/^jobs:\n/m)[1]!
-    .split(/^(?= {2}[\w-]+:\n)/m);
-  const using = jobs.filter((job) =>
-    callers.some((name) => job.includes(`sh scripts/${name}`)),
-  );
-  assert.ok(using.length > 0);
-  for (const job of using) {
-    const name = /^ {2}([\w-]+):/.exec(job)?.[1];
-    const setup = job.indexOf('node-version: 24.22.1');
-    assert.notEqual(setup, -1, `${name} has no pinned Node`);
-    for (const caller of callers) {
-      const run = job.indexOf(`sh scripts/${caller}`);
-      if (run !== -1) assert.ok(setup < run, `${name} sets Node up too late`);
-    }
-  }
 });

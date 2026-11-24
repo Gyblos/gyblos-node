@@ -1107,7 +1107,7 @@
   "packages/protocol/src/receipt-v2.ts": 2,
   "packages/protocol/src/receipt-v2/constants.ts": 1,
   "packages/protocol/src/receipt.ts": 1,
-  "packages/protocol/src/seller-version.ts": 2,
+  "packages/protocol/src/seller-version.ts": 1,
   "packages/protocol/src/session-block-ports.ts": 1,
   "packages/protocol/src/session-block-verifier.ts": 1,
   "packages/protocol/src/session-block-wire.ts": 1,
