@@ -15,9 +15,9 @@ const PILL_COLORS = { good: 'lime', bad: 'rose', neutral: 'neutral' } as const;
 const COMPARED = 'vs previous period';
 const VALUE = {
   footer:
-    'max-w-full min-w-0 font-mono text-[clamp(1.125rem,10cqi,1.75rem)] leading-tight tabular-nums',
+    'max-w-full min-w-0 font-mono text-[clamp(1.125rem,10cqi,1.75rem)] leading-none tabular-nums [--number-flow-mask-height:0px]',
   plain:
-    'max-w-full min-w-0 font-mono text-[clamp(1rem,11cqi,1.375rem)] leading-tight tabular-nums',
+    'max-w-full min-w-0 font-mono text-[clamp(1rem,11cqi,1.375rem)] leading-none tabular-nums [--number-flow-mask-height:0px]',
 } as const;
 
 type Variant = keyof typeof VALUE;
