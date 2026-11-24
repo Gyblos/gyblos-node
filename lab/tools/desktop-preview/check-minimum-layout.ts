@@ -78,11 +78,18 @@ export async function checkMinimumLayout() {
     throw new Error('Key row overflow');
   if (document.documentElement.scrollWidth > innerWidth)
     throw new Error('Document overflow');
-  const iconOnlyWidth = 36;
   async function iconOnly(label: string) {
     const action = await visible('button[aria-label="' + label + '"]');
-    if (action.getBoundingClientRect().width > iconOnlyWidth)
-      throw new Error('Text action ' + label);
+    const frame = action.closest('.desktop-frame');
+    if (!frame) throw new Error('Missing frame');
+    const size = parseFloat(
+      getComputedStyle(frame).getPropertyValue('--control-size'),
+    );
+    const box = action.getBoundingClientRect();
+    if (Math.abs(box.width - size) > 0.5 || Math.abs(box.height - size) > 0.5)
+      throw new Error(
+        'Text action ' + label + ' ' + box.width + 'x' + box.height,
+      );
   }
   function apart(cells: Element[]) {
     const boxes = cells.map((cell) =>

@@ -2759,6 +2759,7 @@ html[data-density='compact']
     .ui-data-table
     :is(th, td) {
     height: auto;
+    padding-block: 0;
   }
 }
 html[data-density='compact']
@@ -2963,6 +2964,32 @@ html[data-density='compact']
   min-height: var(--control-size);
   padding-inline: 10px;
   font-size: var(--ui-detail);
+}
+html .app.desktop-frame .ui-action-button + .ui-tooltip {
+  display: none;
+}
+@container (max-width: 600px) {
+  html
+    .app.desktop-frame
+    .content
+    .ui-button.ui-action-button:not(dialog .ui-button) {
+    --control-size: inherit;
+    width: var(--control-size);
+    min-width: var(--control-size);
+    padding: 0;
+    justify-content: center;
+  }
+  html .app.desktop-frame .ui-action-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  html .app.desktop-frame .ui-action-button + .ui-tooltip {
+    display: block;
+  }
 }
 html[data-density='compact']
   .app.desktop-frame
