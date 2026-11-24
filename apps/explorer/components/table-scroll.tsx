@@ -77,6 +77,9 @@ export function TableScroll({
       <div ref={ref} className="explorer-table-scroll overflow-x-auto">
         {children}
       </div>
+      <p className="explorer-table-hint items-center gap-2 border-t border-line px-4 py-2 text-xs text-muted">
+        <span aria-hidden="true">↔</span>Scroll horizontally to see all columns.
+      </p>
       {footer}
     </section>
   );

@@ -73,6 +73,14 @@ body {
   scroll-timeline: --table-scroll inline;
 }
 
+.explorer-table-hint {
+  display: none;
+}
+
+.explorer-table-scroll[data-overflow] + .explorer-table-hint {
+  display: flex;
+}
+
 .explorer-table thead,
 .explorer-table thead th {
   background: color-mix(in srgb, var(--raised) 50%, var(--panel));
