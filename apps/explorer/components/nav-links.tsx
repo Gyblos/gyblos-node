@@ -42,6 +42,8 @@ export function NavLinks() {
       <li>
         <a
           href={SITE_LINKS.docs}
+          target="_blank"
+          rel="noopener noreferrer"
           className={cx(ITEM, 'inline-flex items-center gap-1 text-muted')}
         >
           Docs

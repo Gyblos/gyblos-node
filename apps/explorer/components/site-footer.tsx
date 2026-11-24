@@ -5,6 +5,7 @@ import { SITE_LINKS } from '../lib/config';
 import { TokenLogo } from './token-logo';
 
 const LINK = 'hover:text-ink';
+const NEW_TAB = { target: '_blank', rel: 'noopener noreferrer' } as const;
 const TEXT_LINKS = [
   { label: 'Gyblos', href: SITE_LINKS.site },
   { label: 'Docs', href: SITE_LINKS.docs },
@@ -37,13 +38,19 @@ export function SiteFooter() {
         className="flex flex-wrap items-center gap-x-4 gap-y-2"
       >
         {TEXT_LINKS.map((link) => (
-          <a key={link.href} href={link.href} className={LINK}>
+          <a key={link.href} href={link.href} className={LINK} {...NEW_TAB}>
             {link.label}
           </a>
         ))}
         <span aria-hidden className="h-3 w-px bg-line" />
         {SOCIAL.map(({ label, href, Icon }) => (
-          <a key={href} href={href} aria-label={label} className={LINK}>
+          <a
+            key={href}
+            href={href}
+            aria-label={label}
+            className={LINK}
+            {...NEW_TAB}
+          >
             <Icon aria-hidden className="size-4" />
           </a>
         ))}
