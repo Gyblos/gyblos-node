@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { copyFile, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { stripTypeScriptTypes } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -18,12 +19,12 @@ void test('the desktop renderer fits its model picker and Limits controls at nat
     const baseline = join(output, 'desktop');
     await copyFile(join(output, 'preview.js'), join(baseline, 'preview.js'));
     const probe = await readFile(
-      new URL('./check-minimum-layout.mjs', import.meta.url),
+      new URL('./check-minimum-layout.ts', import.meta.url),
       'utf8',
     );
     await writeFile(
       join(baseline, 'probe.mjs'),
-      probe +
+      stripTypeScriptTypes(probe) +
         '\ncheckMinimumLayout().catch((error) => {document.documentElement.dataset.layoutPassed = error.message;});',
     );
     const entry = join(baseline, 'index.html');

@@ -1,14 +1,19 @@
 export async function checkMinimumLayout() {
-  async function visible(selector) {
-    for (let attempt = 0; attempt < 100; attempt++) {
-      const element = document.querySelector(selector);
+  const maxAttempts = 100;
+  const pollMs = 50;
+  const keyNameLength = 60;
+
+  async function visible(selector: string) {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const element = document.querySelector<HTMLElement>(selector);
       if (element?.getBoundingClientRect().width) return element;
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, pollMs));
     }
     throw new Error('Missing ' + selector);
   }
 
-  function fits(element, container) {
+  function fits(element: Element | null, container: Element | null) {
+    if (!element || !container) throw new Error('Missing layout element');
     const box = element.getBoundingClientRect();
     const bounds = container.getBoundingClientRect();
     if (
@@ -21,10 +26,12 @@ export async function checkMinimumLayout() {
       throw new Error('Clipped ' + element.tagName);
   }
 
-  document.startViewTransition = undefined;
+  Object.defineProperty(document, 'startViewTransition', { value: undefined });
   const picker = await visible('.ui-model-trigger');
-  const read = window.desktopFunding.balance;
-  window.desktopFunding.balance = async (...args) => {
+  const funding = window.desktopFunding;
+  if (!funding) throw new Error('Missing funding bridge');
+  const read = funding.balance;
+  funding.balance = async (...args) => {
     const observed = await read(...args);
     return observed && { ...observed, balanceAtomic: '1234567890123456789' };
   };
@@ -48,18 +55,22 @@ export async function checkMinimumLayout() {
   const setter = Object.getOwnPropertyDescriptor(
     HTMLInputElement.prototype,
     'value',
-  ).set;
+  )?.set;
+  if (!setter) throw new Error('Missing input setter');
   setter.call(input, '1');
   input.dispatchEvent(new Event('input', { bubbles: true }));
   const controls = input.closest('.preview-setting-control');
+  if (!controls) throw new Error('Missing budget controls');
   await visible('.preview-setting-control > button:last-child');
-  for (const control of controls.querySelectorAll('input,button'))
+  for (const control of Array.from(controls.querySelectorAll('input,button')))
     fits(control, controls.closest('section'));
   const row = await visible('section[aria-label="API key limits"] tbody tr');
   const name = row.querySelector('th');
-  name.textContent = '界'.repeat(60);
+  if (!name) throw new Error('Missing key name');
+  name.textContent = '界'.repeat(keyNameLength);
   await document.fonts.ready;
   const region = row.closest('.preview-simple-table-region');
+  if (!region) throw new Error('Missing key region');
   fits(name, region);
   fits(row.querySelector('.preview-tabular'), region);
   fits(row.querySelector('button'), region);
@@ -68,7 +79,9 @@ export async function checkMinimumLayout() {
   if (document.documentElement.scrollWidth > innerWidth)
     throw new Error('Document overflow');
   (await visible('button[aria-label="Chat"]')).click();
-  const expand = document.querySelector('button[aria-label="Expand sidebar"]');
+  const expand = document.querySelector<HTMLButtonElement>(
+    'button[aria-label="Expand sidebar"]',
+  );
   if (expand) expand.click();
   (await visible('button[aria-label="Search conversations"]')).click();
   const search = await visible('input[aria-label="Search conversations"]');
@@ -84,7 +97,9 @@ export async function checkMinimumLayout() {
   await visible('button[aria-label="Search conversations"]');
   if (escaped || search.isConnected)
     throw new Error('History search did not consume Escape');
-  document.querySelector('button[aria-label="Collapse sidebar"]')?.click();
+  document
+    .querySelector<HTMLButtonElement>('button[aria-label="Collapse sidebar"]')
+    ?.click();
 
   document.documentElement.dataset.layoutPassed = String(innerWidth);
 }
