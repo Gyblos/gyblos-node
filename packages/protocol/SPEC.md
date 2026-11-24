@@ -41,6 +41,7 @@ Signed records and envelopes outside the Iroh channels:
 | Observation upload envelope | v1                               | `observation-upload-v1.json`                       | [Observation upload envelope v1](#observation-upload-envelope-v1)                                    |
 | Identity claim              | v1                               | `identity-claim-v1.json`                           | [Identity claim v1](#identity-claim-v1)                                                              |
 | Profile claim               | v1                               | `profile-claim-v1.json`                            | [Profile claim v1](#profile-claim-v1)                                                                |
+| Model verification          | v1                               | `model-verification-v1.json`                       | [Model verification v1](#model-verification-v1)                                                      |
 
 ## Contents
 
@@ -64,6 +65,7 @@ Signed records and envelopes outside the Iroh channels:
 - [Observation upload envelope v1](#observation-upload-envelope-v1)
 - [Identity claim v1](#identity-claim-v1)
 - [Profile claim v1](#profile-claim-v1)
+- [Model verification v1](#model-verification-v1)
 
 ## Canonical JSON and signing bytes
 
@@ -1914,3 +1916,34 @@ contract owns shape and the node signature only; freshness and replay (keeping
 the newest `issuedAt` per node) belong to the verifier, such as the discovery
 index. It is not part of any public discovery record or offer, so record and
 offer parsers are unchanged.
+
+## Model verification v1
+
+`@gyblos/protocol/model-verification` defines the signed result of the model
+verifier ([docs/model-verifier.md](../../docs/model-verifier.md)). The signed
+object is `{ result, signature }`: `signature` is hex Ed25519 by the public key
+behind the base58 address `result.verifier`, over the prefix
+`gyblos/model-verification/v1\n` (real LF). Vectors are
+`vectors/model-verification-v1.json`.
+
+`result` has exactly these fields; any other value is `INVALID`, and a
+`schemaVersion` other than `1` is `VERSION`:
+
+| Field           | Value                                                                                     |
+| --------------- | ----------------------------------------------------------------------------------------- |
+| `schemaVersion` | `1`                                                                                       |
+| `verifier`      | The verifier's base58 address                                                             |
+| `seller`        | `{ owner, nodeId }`: the seller's owner address and 64-hex NodeId                         |
+| `selection`     | The declared model selection, as in control quotes                                        |
+| `challengeSet`  | `{ id, version, digest }`: identifier, positive version, SHA-256 hex of the canonical set |
+| `reference`     | `{ model, digest }`: the reference model's identifier and 64-hex digest                   |
+| `evidence`      | `{ answers, checks, deviations, failAt, answerDigests }`                                  |
+| `verdict`       | `pass`, `fail` or `inconclusive`                                                          |
+| `issuedAt`      | A non-negative safe integer, milliseconds                                                 |
+
+`answers` is at most 64 and equals the length of `answerDigests`, one SHA-256
+hex digest per answer. `deviations` is at most `checks`, and `failAt` is at
+least 1. The verdict is `fail` exactly when `deviations ≥ failAt`; a `pass` or
+`inconclusive` result with `deviations ≥ failAt`, or a `fail` below it, is
+`INVALID`. The minimum number of checks for `pass` belongs to the challenge set,
+which the digest covers.
