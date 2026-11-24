@@ -27,7 +27,7 @@ function Items({
     <ul
       className={cx(
         'text-sm whitespace-nowrap',
-        stacked ? 'flex flex-col gap-0.5' : '-mx-3 flex gap-1 overflow-x-auto',
+        stacked ? 'flex flex-col gap-0.5' : '-mx-3 flex flex-wrap gap-1',
       )}
     >
       {PAGE_LINKS.map((link) => {
