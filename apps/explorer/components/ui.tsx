@@ -190,6 +190,75 @@ function headRuns(head: Column[]) {
   return runs;
 }
 
+function TableHead({ head, sorting }: { head: Column[]; sorting?: Sorting }) {
+  const runs = headRuns(head);
+  const grouped = runs.some((run) => run.group);
+  const align = (column: Column) => (column.right ? 'text-right' : '');
+  const edge = (run: number, first: boolean, last: boolean) =>
+    [
+      first && run > 0 ? 'start' : '',
+      last && run < runs.length - 1 ? 'end' : '',
+    ]
+      .join(' ')
+      .trim() || undefined;
+  return (
+    <thead>
+      <tr>
+        {runs.map((run, index) =>
+          run.group ? (
+            <th
+              key={index}
+              colSpan={run.columns.length}
+              data-group=""
+              data-edge={edge(index, true, true)}
+              className={`${th} text-center`}
+            >
+              <span className="inline-flex items-center justify-center gap-1.5">
+                {isToken(run.group) ? (
+                  <TokenLogo token={run.group} className="size-3.5" />
+                ) : null}
+                {run.group}
+              </span>
+            </th>
+          ) : (
+            <th
+              key={index}
+              rowSpan={grouped ? 2 : undefined}
+              aria-sort={ariaSort(run.columns[0]!, sorting)}
+              className={`${th} ${align(run.columns[0]!)} align-middle`}
+            >
+              <HeadLabel column={run.columns[0]!} sorting={sorting} />
+            </th>
+          ),
+        )}
+      </tr>
+      {grouped ? (
+        <tr>
+          {runs.flatMap((run, index) =>
+            run.group
+              ? run.columns.map((column, position) => (
+                  <th
+                    key={`${index}-${position}`}
+                    colSpan={1}
+                    data-edge={edge(
+                      index,
+                      position === 0,
+                      position === run.columns.length - 1,
+                    )}
+                    aria-sort={ariaSort(column, sorting)}
+                    className={`${th} ${align(column)}`}
+                  >
+                    <HeadLabel column={column} sorting={sorting} />
+                  </th>
+                ))
+              : [],
+          )}
+        </tr>
+      ) : null}
+    </thead>
+  );
+}
+
 export function Table({
   head,
   children,
@@ -203,60 +272,13 @@ export function Table({
   sorting?: Sorting;
   minWidth?: number;
 }) {
-  const runs = headRuns(head);
-  const grouped = runs.some((run) => run.group);
-  const align = (column: Column) => (column.right ? 'text-right' : '');
   return (
     <TableScroll footer={footer}>
       <table
         className="bui-table explorer-table w-full text-left whitespace-nowrap"
         style={{ minWidth }}
       >
-        <thead>
-          <tr>
-            {runs.map((run, index) =>
-              run.group ? (
-                <th
-                  key={index}
-                  colSpan={run.columns.length}
-                  className="px-4 pt-3 pb-0 text-center text-xs font-medium text-muted"
-                >
-                  <span className="flex items-center justify-center gap-1.5 border-b border-line pb-1.5">
-                    {isToken(run.group) ? (
-                      <TokenLogo token={run.group} className="size-3.5" />
-                    ) : null}
-                    {run.group}
-                  </span>
-                </th>
-              ) : (
-                <th
-                  key={index}
-                  rowSpan={grouped ? 2 : undefined}
-                  aria-sort={ariaSort(run.columns[0]!, sorting)}
-                  className={`${th} ${align(run.columns[0]!)} ${grouped ? 'align-bottom' : ''}`}
-                >
-                  <HeadLabel column={run.columns[0]!} sorting={sorting} />
-                </th>
-              ),
-            )}
-          </tr>
-          {grouped ? (
-            <tr>
-              {head.map((column, index) =>
-                column.group ? (
-                  <th
-                    key={index}
-                    colSpan={1}
-                    aria-sort={ariaSort(column, sorting)}
-                    className={`px-4 pt-1.5 pb-3 text-xs font-normal text-dim ${align(column)}`}
-                  >
-                    <HeadLabel column={column} sorting={sorting} />
-                  </th>
-                ) : null,
-              )}
-            </tr>
-          ) : null}
-        </thead>
+        <TableHead head={head} sorting={sorting} />
         <tbody>{children}</tbody>
       </table>
     </TableScroll>

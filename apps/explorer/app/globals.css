@@ -87,6 +87,18 @@ body {
   border-bottom: 1px solid var(--line);
 }
 
+.explorer-table thead th[data-group] {
+  border-bottom: 1px solid var(--line);
+}
+
+.explorer-table thead th[data-edge~='start'] {
+  border-left: 1px solid var(--line);
+}
+
+.explorer-table thead th[data-edge~='end'] {
+  border-right: 1px solid var(--line);
+}
+
 .explorer-table tbody td {
   transition: box-shadow 80ms ease-out;
 }
