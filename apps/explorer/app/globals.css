@@ -64,6 +64,97 @@ body {
   font-family: var(--font-instrument), system-ui, sans-serif;
 }
 
+.seller-avatar {
+  position: relative;
+  display: inline-grid;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  place-items: center;
+  overflow: hidden;
+  isolation: isolate;
+  vertical-align: middle;
+  border: 1px solid color-mix(in srgb, var(--brand-blue) 65%, white);
+  border-radius: 13px;
+  background:
+    radial-gradient(ellipse at 15% 0%, #ffffff70, transparent 65%),
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--brand-blue) 75%, white),
+      var(--brand-blue) 55%,
+      color-mix(in srgb, var(--brand-blue) 55%, black)
+    );
+  box-shadow:
+    inset 0 1px 1px #ffffff50,
+    inset 0 -2px 4px #00000025,
+    0 2px 5px color-mix(in srgb, var(--brand-blue) 18%, transparent);
+}
+
+.seller-avatar::after {
+  position: absolute;
+  inset: -50%;
+  z-index: -1;
+  content: '';
+  background: linear-gradient(
+    110deg,
+    transparent 40%,
+    #ffffff45 50%,
+    transparent 60%
+  );
+  transform: translateX(-80%);
+  animation: seller-avatar-shine 4.8s ease-in-out;
+}
+
+.seller-avatar-glyph {
+  width: 24px;
+  height: 24px;
+  color: white;
+  filter: drop-shadow(0 1px 1px #00000030);
+  animation: seller-avatar-arrive 4.8s ease-in-out;
+  transition: transform 220ms ease-out;
+}
+
+.seller-cell:is(:hover, :focus-within) .seller-avatar-glyph {
+  transform: translateY(-1px) scale(1.08);
+}
+
+@keyframes seller-avatar-arrive {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  25%,
+  65% {
+    transform: translateY(-2px) rotate(-5deg);
+  }
+  45%,
+  85% {
+    transform: translateY(1px) rotate(4deg);
+  }
+}
+
+@keyframes seller-avatar-shine {
+  25% {
+    transform: translateX(-80%);
+  }
+  75%,
+  100% {
+    transform: translateX(80%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seller-avatar::after,
+  .seller-avatar-glyph {
+    animation: none;
+    transition: none;
+  }
+
+  .seller-cell:is(:hover, :focus-within) .seller-avatar-glyph {
+    transform: none;
+  }
+}
+
 /* Sticky first column and scroll divider; the opaque header mix prevents content showing through. */
 .explorer-table {
   background: var(--panel);
