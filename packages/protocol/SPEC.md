@@ -456,8 +456,7 @@ The ALPN is **`gyblos/free/4`**. Reusing `gyblos/control/1` would break its
 no-prompt/no-engine invariant, mix long-running inference with short discovery
 queries and make their independent admission budgets ambiguous. A separate
 ALPN preserves that boundary and permits separate execution admission under the
-same endpoint limits. `gyblos/http/2` remains reserved and unregistered; the
-existing v1 HTTP bridge, routes and payment admission are unchanged.
+same endpoint limits. `gyblos/http/2` remains reserved and unregistered.
 
 An existing `SignedOfferV2` still signs `protocol: "gyblos/http/2"`: this is the
 unchanged quote-family marker, **not an instruction to dial or register that
@@ -726,11 +725,9 @@ zero-skew admission of its own quotes.
 Native ingress, generation and egress share endpoint request admission. A
 read, engine or writer ignoring cancellation retains its request permit until
 actual settlement. Timeout closes the connection and suppresses late output.
-The free-configured seller starts neither the facilitator nor the paid HTTP
-service, and does not check the devnet payment program or load the auxiliary
-payment signers. Paid-configured startup keeps
-the existing v1 service. The free branch advertises only control and free
-ALPNs. Transport allows one control connection and one data connection per
+The seller never registers HTTP over Iroh. The free-configured seller starts no
+facilitator, does not check the devnet payment program or load the auxiliary
+payment signers, and advertises only control and free ALPNs. Transport allows one control connection and one data connection per
 authenticated peer at a time (the global connection pool and the per-peer
 request quota stay shared). The buyer still closes its control connection
 before dialing the data channel; the separate data allowance covers the moment
@@ -788,8 +785,7 @@ facilitator, modify the v1 flow or reserve capacity during quotation.
 Seller and buyer startup exchange private usage receipts after supported free
 execution and completed paid block sessions. Free-only collector ingestion
 remains separate; paid collector ingestion and public aggregation are not
-enabled. Receipts apply to v2-and-later quotes; paid v1 does not have the
-required request identifiers and digests.
+enabled. Receipts apply to v2-and-later quotes.
 A receipt is evidence of what its signer reports, not proof of model execution,
 correctness or independently measured usage.
 
