@@ -15,6 +15,7 @@ passing result afterward. Documentation-only changes may mark this not applicabl
 ## Review and remaining risks
 
 - [ ] This PR targets `develop` (only release PRs target `main`).
+- [ ] The description says `Closes #N` for the issue this PR completes, or `Part of #N` when it is one part of a larger issue.
 - [ ] I read the contribution guide and kept behavior changes separate from structural moves.
 - [ ] I reviewed the diff for secrets and sensitive data; it contains no real keys, prompts, responses, journals, wallet backups or payment payloads.
 - [ ] Documentation reflects the change, its limits and any unverified behavior.

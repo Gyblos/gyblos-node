@@ -137,7 +137,8 @@ belongs.
    ```
 
 4. Open a pull request from your fork's branch into `Gyblos/gyblos-node:develop`
-   and complete the template. Link the issue if there is one. Use English for
+   and complete the template. Write `Closes #N` for the issue the PR completes, or
+   `Part of #N` when it is one part of a larger issue. Use English for
    repository content, commits and PRs, and leave unrelated fixes out.
 
 Pull requests also run [Semgrep Community Edition](docs/static-analysis.md).
