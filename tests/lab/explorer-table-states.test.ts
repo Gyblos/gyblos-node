@@ -220,7 +220,8 @@ after(async () => {
 });
 
 void test('Explorer pages expose one focusable main target after the first skip link', async () => {
-  const pages = (await pageHtml(dir, 'empty')).split(/(?=<!DOCTYPE html>)/i);
+  const { html: rendered } = await pageHtml(dir, 'empty');
+  const pages = rendered.split(/(?=<!DOCTYPE html>)/i);
   assert.equal(pages.length, 2);
   for (const html of pages) {
     assert.equal(html.match(/<main\b/g)?.length, 1);
