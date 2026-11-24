@@ -134,9 +134,11 @@ gh pr merge <n> --repo Gyblos/gyblos-node --merge --match-head-commit <SHA>
 ```
 
 Merge commits only, never `--squash` or `--rebase`. Do not pass
-`--delete-branch`. After the merge, confirm with `gh issue view <N>` that every
-issue named by `Closes #N` is closed; for `Part of #N`, close it only when its
-last part has merged. Tick the issue in any tracking issue that lists it. When remote validation is authorized, confirm the post-merge
+`--delete-branch`. After a merge into `develop`, confirm with
+`gh issue view <N> --repo Gyblos/gyblos-node` that every issue named by
+`Closes #N` is closed; for `Part of #N`, close it only when its last part has
+merged. Tick the issue in any tracking issue that lists it. A stacked child
+merge leaves its issues open until the final PR reaches `develop`. When remote validation is authorized, confirm the post-merge
 CI on the base branch for the merge SHA; otherwise report it as not run.
 
 ## 7. Post-merge vault update
