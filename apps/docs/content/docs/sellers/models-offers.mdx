@@ -85,10 +85,11 @@ own Ollama container, so a host service or another container is not reachable at
 
 You can offer any model your machine or provider serves. Two things decide how it is set up:
 
-- **A model outside the catalog needs `custom = true`.** The catalog holds the Qwen3 family by ID:
-  `qwen3-0.6b`, `qwen3-1.7b`, `qwen3-4b`, `qwen3-8b`, `qwen3-14b`, `qwen3-32b`, `qwen3-30b-a3b` and
-  `qwen3-235b-a22b`, plus aliases such as `qwen3:8b`. Any other name, such as `llama3.2:3b` or
-  `gemma3:4b`, fails with `UNKNOWN_MODEL` unless the offer sets `custom = true`.
+- **A model outside the catalog needs `custom = true`.** The catalog holds the Qwen3 family
+  (`qwen3-0.6b`, `qwen3-1.7b`, `qwen3-4b`, `qwen3-8b`, `qwen3-14b`, `qwen3-32b`, `qwen3-30b-a3b`,
+  `qwen3-235b-a22b`, with aliases such as `qwen3:8b`) and a few more IDs: `gpt-oss-20b`, `gpt-oss-120b`,
+  `llama-3.3-70b`, `gemma-4-26b`, `deepseek-v4.1-flash`, `kimi-k3` and `glm-5.3-flash`. Any other name,
+  such as `llama3.2:3b` or `gemma3:4b`, fails with `UNKNOWN_MODEL` unless the offer sets `custom = true`.
 - **Ollama serves it through its OpenAI-compatible API.** Use `engine.kind = "openai"` with Ollama's `/v1`
   URL and an explicit `context_tokens`. A loopback Ollama needs no API key.
 
@@ -112,14 +113,19 @@ free = { daily_token_cap = 200000, per_buyer_cap = 50000 }
 
 - `model` is the name buyers see; `engine.upstream_model` sets a different name for the engine when they
   differ.
-- Reasoning must be `off` on this engine; turn thinking off in the model if it has a switch.
-- Buyers recount the tokens of catalog Qwen3 models. For any other model they pay the usage the engine
-  reports, capped by the text's size, and only buyers on 0.1.0-beta.13 or later accept such an offer.
-- Ollama's `qwen3:4b` and `qwen3:30b-a3b` tags are not catalog aliases. Use the catalog ID with
-  `upstream_model`, as the [configuration reference](/en/reference/configuration#offer-fields) explains.
-
-OpenAI-compatible and Anthropic-compatible engines also exist for advanced setups outside this guide. Their
-requirements are in the [configuration reference](/en/reference/configuration#engine-compatibility-at-startup).
+- Pull only local models. A `-cloud` tag makes Ollama send buyers' prompts to ollama.com. The Docker seller
+  blocks those tags; for a native seller, start Ollama with `OLLAMA_NO_CLOUD=1`. Check the model's license
+  before you sell it.
+- The Docker Ollama keeps one model in memory. With two offers it swaps models between requests, which is
+  slow and can time out; give each extra model enough memory or keep one offer.
+- Reasoning must be `off` on this engine. Turn thinking off in the model if it has a switch: hidden
+  reasoning tokens can push a paid bill past its cap, and a bill past the cap is not paid.
+- Buyers recount the tokens of catalog Qwen3 models only. For every other model, including the other
+  catalog IDs, the usage is declared by the seller and capped by the text's size. Only buyers on
+  0.1.0-beta.13 or later accept such an offer.
+- Ollama's `qwen3:4b` and `qwen3:30b-a3b` tags are not catalog aliases: they can name builds with another
+  chat template. Use the catalog ID and name the tag in `upstream_model`, for example
+  `model = "qwen3-30b-a3b"` with `upstream_model = "qwen3:30b-a3b-q4_K_M"`.
 
 <Callout type="warn" title="A free offer can still cost you money">
   A hosted model provider can charge you for every request your seller serves,
