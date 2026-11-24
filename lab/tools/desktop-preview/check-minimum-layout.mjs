@@ -44,6 +44,17 @@ export async function checkMinimumLayout() {
   (await visible('#preview-tab-limits')).click();
   const track = await visible('.pk-segmented-track');
   fits(track, track.closest('section'));
+  const input = await visible('#chat-limit-amount:not(:disabled)');
+  const setter = Object.getOwnPropertyDescriptor(
+    HTMLInputElement.prototype,
+    'value',
+  ).set;
+  setter.call(input, '1');
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  const controls = input.closest('.preview-setting-control');
+  await visible('.preview-setting-control > button:last-child');
+  for (const control of controls.querySelectorAll('input,button'))
+    fits(control, controls.closest('section'));
   const row = await visible('section[aria-label="API key limits"] tbody tr');
   const name = row.querySelector('th');
   name.textContent = '界'.repeat(60);

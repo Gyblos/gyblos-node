@@ -36,7 +36,8 @@ void test('the desktop renderer fits its model picker and Limits controls at nat
       ),
     );
     const url = pathToFileURL(entry);
-    url.search = 'screen=chat&connection-state=ready&funding=ready';
+    url.search =
+      'screen=chat&connection-state=ready&funding=ready&seller-budget=ready';
     const { stdout } = await promisify(execFile)(
       process.env.CHROME_BIN || 'google-chrome',
       [

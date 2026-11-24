@@ -1,6 +1,6 @@
 // Describes conversation contents without deriving charges from displayed responses.
 import { PAYMENT_METHOD } from '../paypal-model';
-import type { ChatSession } from './chat-state';
+import type { ChatMessage, ChatSession } from './chat-state';
 import { CHAT_ROLE, MESSAGE_STATE } from './constants';
 
 export function conversationSummary(session: ChatSession) {
@@ -48,4 +48,19 @@ export function conversationSummary(session: ChatSession) {
     ],
     lastSentAt: sent.length ? Math.max(...sent) : null,
   };
+}
+
+export function conversationMarkdown(
+  title: string,
+  messages: readonly Pick<ChatMessage, 'role' | 'text'>[],
+) {
+  return [
+    '# ' + title,
+    ...messages.map(
+      (message) =>
+        (message.role === CHAT_ROLE.USER ? '**You:**' : '**Gyblos:**') +
+        '\n\n' +
+        message.text,
+    ),
+  ].join('\n\n');
 }

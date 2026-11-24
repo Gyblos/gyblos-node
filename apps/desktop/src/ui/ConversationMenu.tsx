@@ -9,6 +9,7 @@ import {
 import { useEffect, useState, useSyncExternalStore } from 'react';
 
 import type { ChatController } from './chat-controller';
+import { conversationMarkdown } from './chat-history';
 import type { ChatSession } from './chat-state';
 import { BUTTON_VARIANT } from './constants';
 import { Dropdown } from './Dropdown';
@@ -177,18 +178,7 @@ function copyConversation(
   session: ChatSession,
   notify: (message: string) => void,
 ) {
-  const { title } = session;
-  const text =
-    '# ' +
-    title +
-    '\n\n' +
-    session.messages
-      .map(
-        (message) =>
-          (message.role === 'user' ? '**You:**\n\n' : '**Gyblos:**\n\n') +
-          message.text,
-      )
-      .join('\n\n');
+  const text = conversationMarkdown(session.title, session.messages);
   void navigator.clipboard
     .writeText(text)
     .then(() => notify('Copied as Markdown'))

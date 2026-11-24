@@ -209,3 +209,25 @@ void test('chat budget management and actual spending sources remain independent
     /!available && \(\s*<Button|!keys \|\| !keys.keys.length/,
   );
 });
+
+void test('Markdown export keeps a leading code fence on its own line', async () => {
+  const { conversationMarkdown } = await import('@gyblos/desktop/chat-history');
+  const fence = ['```ts', 'const value = 1;', '```'].join('\n');
+  assert.equal(
+    conversationMarkdown('Example', [{ role: 'assistant', text: fence }]),
+    '# Example\n\n**Gyblos:**\n\n' + fence,
+  );
+});
+
+void test('paid seller maximum names its currency and pending activity shows the Gyblos mark', async () => {
+  const seller = await readFile(
+    'apps/desktop/src/ui/PaidSellerDialog.tsx',
+    'utf8',
+  );
+  assert.match(
+    seller,
+    /htmlFor="paid-response-maximum">\s*Maximum per response<span className="sr-only"> \(USDC\)<\/span>/,
+  );
+  const turn = await readFile('apps/desktop/src/ui/TurnActivity.tsx', 'utf8');
+  assert.match(turn, /state === MESSAGE_STATE.PENDING && <SignalMark/);
+});
