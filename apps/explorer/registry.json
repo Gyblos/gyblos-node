@@ -124,7 +124,7 @@
       "name": "stat-card",
       "type": "registry:component",
       "title": "Stat card",
-      "description": "A headline figure with an icon tile, label, value and one change per side.",
+      "description": "A headline figure with an icon tile, label, value and one change per side. Spans four rows in a parent grid so neighboring stat cards share their icon, label, figure and context tracks; account for that span when mixing with other cards.",
       "dependencies": [
         "@remixicon/react@4.9.0",
         "react-aria-components@1.22.1",
