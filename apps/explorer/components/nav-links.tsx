@@ -56,7 +56,6 @@ function Items({
           href={SITE_LINKS.docs}
           target="_blank"
           rel="noopener noreferrer"
-          onClick={onPick}
           className={cx(
             ITEM,
             stacked && STACKED,
@@ -74,10 +73,14 @@ function Items({
 export function NavLinks() {
   const pathname = usePathname();
   const location = `${pathname}?${useSearchParams().toString()}`;
-  const [openAt, setOpenAt] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const [seen, setSeen] = useState(location);
+  if (seen !== location) {
+    setSeen(location);
+    setOpen(false);
+  }
   const button = useRef<HTMLButtonElement>(null);
-  const open = openAt === location;
-  const close = () => setOpenAt(null);
+  const close = () => setOpen(false);
   const onKeyDown = (event: KeyboardEvent) => {
     if (event.key !== 'Escape' || !open) return;
     close();
@@ -95,7 +98,7 @@ export function NavLinks() {
           type="button"
           aria-expanded={open}
           aria-controls={MENU_ID}
-          onClick={() => setOpenAt(open ? null : location)}
+          onClick={() => setOpen(!open)}
           className="flex min-h-11 w-full items-center justify-between rounded-lg bg-raised px-3 py-2 text-sm text-ink"
         >
           <span>
@@ -113,6 +116,9 @@ export function NavLinks() {
         <div id={MENU_ID} hidden={!open} className="mt-2">
           <Items pathname={pathname} stacked onPick={close} />
         </div>
+        <noscript>
+          <Items pathname={pathname} stacked />
+        </noscript>
       </div>
     </>
   );

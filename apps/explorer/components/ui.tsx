@@ -8,7 +8,7 @@ import { Skeleton } from '../boardui/components/base/skeleton/skeleton';
 import { explorerAddressUrl } from '../lib/config';
 import { DISPLAY, PAGING } from '../lib/constants';
 import { short } from '../lib/format';
-import { overviewLayout } from '../lib/layout';
+import { FULL_OVERVIEW, overviewLayout } from '../lib/layout';
 import { sortHref, type ExplorerQuery, type SortedTable } from '../lib/paging';
 import type { RangeDays, RangeSection } from '../lib/range';
 import { ModelLogo } from './model-logo';
@@ -35,7 +35,7 @@ const LOADING_CARDS = Array.from(
   (_, card) => card,
 );
 
-const OVERVIEW_LOADING = overviewLayout(DISPLAY.overviewCards);
+const OVERVIEW_LOADING = overviewLayout(FULL_OVERVIEW);
 
 export function Loading({
   cards = false,

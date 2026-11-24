@@ -16,9 +16,10 @@ const FIVE_SPANS = [
   'lg:col-span-3 xl:col-span-1',
   'lg:col-span-3 xl:col-span-1',
 ];
+export const FULL_OVERVIEW = FIVE_SPANS.length;
 
 export function overviewLayout(cards: number) {
-  if (cards === FIVE_SPANS.length)
+  if (cards === FULL_OVERVIEW)
     return {
       grid: 'grid grid-cols-2 gap-3 lg:grid-cols-6 xl:grid-cols-5',
       spans: FIVE_SPANS,

@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { currentPage, overviewLayout } from '@gyblos/explorer/layout';
+import {
+  currentPage,
+  FULL_OVERVIEW,
+  overviewLayout,
+} from '@gyblos/explorer/layout';
 
 void test('the page menu names the page the path belongs to, and nothing for an unknown path', () => {
   assert.equal(currentPage('/')?.label, 'Network');
@@ -13,8 +17,9 @@ void test('the page menu names the page the path belongs to, and nothing for an 
 });
 
 void test('overview cards never leave one alone in a row', () => {
-  const five = overviewLayout(5);
-  assert.equal(five.spans.length, 5);
+  const five = overviewLayout(FULL_OVERVIEW);
+  assert.equal(FULL_OVERVIEW, 5);
+  assert.equal(five.spans.length, FULL_OVERVIEW);
   assert.match(five.grid, /lg:grid-cols-6/);
   assert.match(five.grid, /xl:grid-cols-5/);
   assert.match(five.spans[0]!, /^col-span-2 /);
