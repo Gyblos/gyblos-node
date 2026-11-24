@@ -3,8 +3,8 @@ title: Cambia modelos y límites
 description: Baja o sube tus límites gratuitos de tokens, ajusta la longitud de respuesta y de contexto, y conoce qué modelos y motores puede servir un vendedor.
 ---
 
-El instalador prepara una oferta gratuita: **Qwen3 0.6B con Ollama**, con razonamiento `off`. Es el único
-modelo admitido en la beta. La oferta se cambia en la entrada `[[offers]]` de `config.toml`:
+El instalador prepara una oferta gratuita: **Qwen3 0.6B con Ollama**, con razonamiento `off`. También puedes
+[vender cualquier otro modelo](#vender-cualquier-modelo). La oferta se cambia en la entrada `[[offers]]` de `config.toml`:
 
 | Tipo de instalación        | Ubicación de `config.toml`          |
 | -------------------------- | ----------------------------------- |
@@ -80,6 +80,45 @@ Una oferta de Ollama solo arranca con:
 
 Deja la URL del vendedor Docker en `http://127.0.0.1:11434/`: el vendedor comparte el espacio de red con su
 propio contenedor de Ollama, así que un servicio del host u otro contenedor no responde en esa dirección.
+
+## Vende cualquier modelo [#vender-cualquier-modelo]
+
+Puedes ofrecer cualquier modelo que sirva tu máquina o tu proveedor. Dos cosas deciden cómo se configura:
+
+- **Un modelo fuera del catálogo necesita `custom = true`.** El catálogo tiene la familia Qwen3 por ID:
+  `qwen3-0.6b`, `qwen3-1.7b`, `qwen3-4b`, `qwen3-8b`, `qwen3-14b`, `qwen3-32b`, `qwen3-30b-a3b` y
+  `qwen3-235b-a22b`, más alias como `qwen3:8b`. Cualquier otro nombre, como `llama3.2:3b` o `gemma3:4b`,
+  falla con `UNKNOWN_MODEL` si la oferta no pone `custom = true`.
+- **Ollama lo sirve con su API compatible con OpenAI.** Usa `engine.kind = "openai"` con la URL `/v1` de
+  Ollama y un `context_tokens` explícito. Un Ollama en loopback no necesita clave de API.
+
+Primero descarga el modelo en el Ollama que usa tu vendedor:
+
+| Tipo de instalación | Comando                                                                  |
+| ------------------- | ------------------------------------------------------------------------ |
+| Vendedor Docker     | `cd ~/gyblos-seller && docker compose exec ollama ollama pull gemma3:4b` |
+| Vendedor nativo     | `ollama pull gemma3:4b`                                                  |
+
+Luego agrega una oferta:
+
+```toml
+[[offers]]
+model = "gemma3:4b"
+custom = true
+reasoning = ["off"]
+engine = { kind = "openai", url = "http://127.0.0.1:11434/v1", context_tokens = 8192 }
+free = { daily_token_cap = 200000, per_buyer_cap = 50000 }
+```
+
+- `model` es el nombre que ven los compradores; `engine.upstream_model` pone otro nombre para el motor
+  cuando son distintos.
+- En este motor el razonamiento debe ser `off`; apaga el pensamiento en el modelo si tiene ese interruptor.
+- Los compradores recuentan los tokens de los modelos Qwen3 del catálogo. Para cualquier otro modelo pagan
+  el uso que informa el motor, con un tope por el tamaño del texto, y solo los compradores en 0.1.0-beta.13
+  o posterior aceptan esa oferta.
+- Las etiquetas `qwen3:4b` y `qwen3:30b-a3b` de Ollama no son alias del catálogo. Usa el ID del catálogo
+  con `upstream_model`, como explica la
+  [referencia de configuración](/es/reference/configuration#campos-de-la-oferta).
 
 También existen motores compatibles con OpenAI y con Anthropic para instalaciones avanzadas, fuera de esta
 guía. Sus requisitos están en la
