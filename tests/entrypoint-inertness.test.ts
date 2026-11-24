@@ -102,6 +102,7 @@ void test('all executable modules are inert when imported', async (context) => {
     await import('@gyblos/buyer/control');
     await import('@gyblos/node/control');
     await import('@gyblos/receipt-collector/main');
+    await import('@gyblos/model-verifier/main');
     await import('@gyblos/node/receipts');
     await import('@gyblos/node/buyer-paid-error');
     await import('@gyblos/node/control-readiness');

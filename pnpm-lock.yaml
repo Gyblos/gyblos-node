@@ -62,6 +62,9 @@ importers:
       '@gyblos/metrics-collector':
         specifier: workspace:*
         version: link:apps/metrics-collector
+      '@gyblos/model-verifier':
+        specifier: workspace:*
+        version: link:apps/model-verifier
       '@gyblos/node':
         specifier: workspace:*
         version: link:packages/node
@@ -417,6 +420,33 @@ importers:
       hono:
         specifier: 4.13.18
         version: 4.13.18
+
+  apps/model-verifier:
+    dependencies:
+      '@gyblos/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@gyblos/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@gyblos/engine-ollama':
+        specifier: workspace:*
+        version: link:../../packages/engine-ollama
+      '@gyblos/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      '@gyblos/runtime':
+        specifier: workspace:*
+        version: link:../../packages/runtime
+      '@gyblos/transport-iroh':
+        specifier: workspace:*
+        version: link:../../packages/transport-iroh
+      '@number0/iroh':
+        specifier: 1.2.0
+        version: 1.2.0
+      '@solana/kit':
+        specifier: 5.1.0
+        version: 5.1.0(typescript@5.9.3)(ws@8.23.0)
 
   apps/node:
     dependencies:

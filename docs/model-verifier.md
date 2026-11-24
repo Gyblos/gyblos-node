@@ -137,6 +137,17 @@ A run takes a few minutes on this machine, mostly the seller's generation.
 - A cloud provider serving the same weights in another precision.
 - Sizes above 1.7B as the declared model.
 
+## Run it
+
+`pnpm model-verifier verify --seller seller.json --model qwen3-1.7b` runs the
+challenge set against one seller and writes `result.json` and `evidence.json`;
+`pnpm model-verifier check result.json` verifies a result. The seller file and
+the full steps are on the docs site:
+[Model verification](https://docs.gyblos.com/en/sellers/model-verification). The
+app is `apps/model-verifier`. It uses public package entries only (protocol,
+core, the Iroh transport and the Ollama engine's chat template) and never
+imports the buyer, node or desktop code.
+
 ## Signed result
 
 The result is a `gyblos/model-verification/v1` record in `packages/protocol`
