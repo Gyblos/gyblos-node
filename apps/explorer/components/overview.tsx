@@ -1,9 +1,10 @@
-import { Binary, MessagesSquare } from 'lucide-react';
+import { Hash, MessagesSquare, type LucideIcon } from 'lucide-react';
 import type { ReactElement } from 'react';
 
 import { chainHistoryNote, summarizeChain } from '../lib/chain-shape';
 import { getChainStats } from '../lib/chain-stats';
 import { getCollector } from '../lib/collector';
+import { HELP_TEXT } from '../lib/config';
 import { getDiscovery } from '../lib/discovery-render';
 import { usdcDecimal } from '../lib/format';
 import { overviewLayout } from '../lib/layout';
@@ -54,7 +55,14 @@ export async function Overview({ query }: { query: ExplorerQuery }) {
     snapshot.error ? null : (
       <SellersOnline key="sellers" snapshot={snapshot} variant="footer" />
     ),
-    <RequestsCard key="requests" requests={requests} before={requestsBefore} />,
+    <SideCard
+      key="requests"
+      figure="requests"
+      icon={MessagesSquare}
+      label="Requests"
+      usage={requests}
+      before={requestsBefore}
+    />,
     <BuyersCard
       key="buyers"
       variant="footer"
@@ -83,7 +91,15 @@ export async function Overview({ query }: { query: ExplorerQuery }) {
         ) : undefined
       }
     />,
-    <TokensCard key="tokens" usage={requests} before={requestsBefore} />,
+    <SideCard
+      key="tokens"
+      figure="tokens"
+      icon={Hash}
+      label="Tokens processed"
+      hint={HELP_TEXT.tokens}
+      usage={requests}
+      before={requestsBefore}
+    />,
   ].filter((card) => card !== null);
   return (
     <>
@@ -96,53 +112,34 @@ export async function Overview({ query }: { query: ExplorerQuery }) {
   );
 }
 
-function RequestsCard({
-  requests,
-  before,
-}: {
-  requests: ReturnType<typeof summarizeUsage> | null;
-  before: ReturnType<typeof summarizeUsage> | null;
-}) {
-  const side = (figure: 'free' | 'paid') =>
-    requests ? <Flow value={requests[figure].requests} kind="count" /> : '—';
-  return (
-    <StatCard
-      variant="footer"
-      icon={MessagesSquare}
-      label="Requests"
-      sides={{ free: side('free'), paid: side('paid') }}
-      deltas={
-        requests && before
-          ? [
-              delta(requests.free.requests, before.free.requests),
-              delta(requests.paid.requests, before.paid.requests),
-            ]
-          : undefined
-      }
-    />
-  );
-}
+type Usage = ReturnType<typeof summarizeUsage>;
 
-function TokensCard({
+function SideCard({
   usage,
   before,
+  figure,
+  ...card
 }: {
-  usage: ReturnType<typeof summarizeUsage> | null;
-  before: ReturnType<typeof summarizeUsage> | null;
+  usage: Usage | null;
+  before: Usage | null;
+  figure: 'requests' | 'tokens';
+  icon: LucideIcon;
+  label: string;
+  hint?: string;
 }) {
-  const side = (figure: 'free' | 'paid') =>
-    usage ? <Flow value={usage[figure].tokens} kind="compact" /> : '—';
+  const kind = figure === 'tokens' ? 'compact' : 'count';
+  const side = (paid: 'free' | 'paid') =>
+    usage ? <Flow value={usage[paid][figure]} kind={kind} /> : '—';
   return (
     <StatCard
+      {...card}
       variant="footer"
-      icon={Binary}
-      label="Tokens processed"
       sides={{ free: side('free'), paid: side('paid') }}
       deltas={
         usage && before
           ? [
-              delta(usage.free.tokens, before.free.tokens),
-              delta(usage.paid.tokens, before.paid.tokens),
+              delta(usage.free[figure], before.free[figure]),
+              delta(usage.paid[figure], before.paid[figure]),
             ]
           : undefined
       }

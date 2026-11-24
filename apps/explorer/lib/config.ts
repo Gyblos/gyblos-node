@@ -48,6 +48,8 @@ export const SITE_LINKS = {
   x: 'https://x.com/gyblos',
 } as const;
 export const HELP_TEXT = {
+  tokens:
+    'Input and output tokens of the receipts in the range, the same receipts as Requests, free and paid apart. Stats shows output tokens only.',
   verified:
     "A ✓ means the discovery index found the seller's NodeId in a gist of that GitHub account. It links the seller to the account; it does not identify a person or rate quality. A name in smaller type is chosen by the seller and is not verified.",
   channelTransactions:

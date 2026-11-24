@@ -1,5 +1,3 @@
-// Owns the summary of the offers in the discovery index: free vs paid offers, the average 24 h
-// uptime, and per model the sellers, free offers, cheapest paid prices and largest context.
 import type { DiscoverySnapshot, OfferedModel, Seller } from './discovery';
 
 export interface ModelOffers {
