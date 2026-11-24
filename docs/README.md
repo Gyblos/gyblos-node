@@ -78,12 +78,15 @@ is [apps/docs](../apps/docs/README.md).
   endpoints, security model and storage.
 - [Metrics collector](metrics-collector.md): the metrics collector Worker that
   receives receipts and observations and serves public stats.
-- [Model verifier](model-verifier.md): checks that a seller serves the model it
-  declares, with the measured error rates behind its rule.
 - [Repository maintenance](repository-maintenance.md): maintainer
   responsibilities for the public repository.
 - [AI security review](../tooling/security-review/README.md): the automated
   security review tooling.
+
+## Design notes
+
+- [Model verifier](model-verifier.md): design and measurements for checking that
+  a seller serves the model it declares, and what is implemented today.
 
 ## Lab
 
