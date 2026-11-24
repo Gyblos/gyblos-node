@@ -171,3 +171,26 @@ export async function checkMinimumLayout() {
 
   document.documentElement.dataset.layoutPassed = String(innerWidth);
 }
+
+export async function checkWideDialogAction() {
+  const maxAttempts = 100;
+  const pollMs = 50;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const action = document.querySelector(
+      'dialog button[aria-label="Spending limits"]',
+    );
+    const text = action?.querySelector('.ui-action-label');
+    if (text?.getBoundingClientRect().width) {
+      const tip = action?.nextElementSibling;
+      if (!tip?.matches('.ui-tooltip'))
+        throw new Error('Missing tooltip Spending limits');
+      action?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+      if (getComputedStyle(tip).display !== 'none')
+        throw new Error('Tooltip beside label Spending limits');
+      document.documentElement.dataset.layoutPassed = String(innerWidth);
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, pollMs));
+  }
+  throw new Error('Missing dialog action');
+}
