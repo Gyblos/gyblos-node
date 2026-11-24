@@ -161,6 +161,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm desktop:build
+      - run: node --import tsx --test lab/tools/desktop-preview/minimum-layout.test.ts
       # The release's path: pinned Node and iroh downloads, then the packaged seller runs.
       - name: Build the packaged seller for linux-x64
         run: |
