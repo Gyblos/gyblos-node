@@ -9,6 +9,7 @@ import { explorerAddressUrl } from '../lib/config';
 import { DISPLAY, PAGING } from '../lib/constants';
 import { short } from '../lib/format';
 import { FULL_OVERVIEW, overviewLayout } from '../lib/layout';
+import { modelLab } from '../lib/model-family';
 import { sortHref, type ExplorerQuery, type SortedTable } from '../lib/paging';
 import type { RangeDays, RangeSection } from '../lib/range';
 import { ModelLogo } from './model-logo';
@@ -328,8 +329,9 @@ export function Addr({ value }: { value: string | null }) {
   if (!value) return <>—</>;
   return (
     <a
-      className="hover:text-ink hover:underline underline-offset-2"
+      className="underline decoration-line underline-offset-2 hover:text-ink hover:decoration-current"
       href={explorerAddressUrl(value)}
+      title={value}
     >
       {short(value)}
     </a>
@@ -354,6 +356,9 @@ export function ModelName({
     >
       <ModelLogo modelId={modelId} />
       <span className="truncate">
+        <span className="block text-xs font-sans text-muted">
+          {modelLab(modelId) ?? 'Lab unknown'}
+        </span>
         {modelId}
         {detail ? (
           <span className="ml-2 font-mono text-xs text-dim">{detail}</span>

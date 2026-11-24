@@ -28,3 +28,25 @@ export function modelFamily(modelId: string): ModelFamily | null {
 }
 
 export const modelMarkUrl = (family: ModelFamily) => `/models/${family}.svg`;
+
+const LABS: Record<ModelFamily, string> = {
+  qwen: 'Alibaba · Qwen',
+  meta: 'Meta',
+  mistral: 'Mistral AI',
+  gemma: 'Google DeepMind',
+  google: 'Google DeepMind',
+  deepseek: 'DeepSeek',
+  microsoft: 'Microsoft',
+  openai: 'OpenAI',
+  claude: 'Anthropic',
+  nvidia: 'NVIDIA',
+  ibm: 'IBM',
+  huggingface: 'Hugging Face',
+  kimi: 'Moonshot AI',
+  zhipu: 'Zhipu AI',
+  yi: '01.AI',
+};
+export function modelLab(modelId: string) {
+  const family = modelFamily(modelId);
+  return family ? LABS[family] : null;
+}

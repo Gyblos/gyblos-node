@@ -5,20 +5,25 @@ import { txRow } from '../lib/chain-txs-shape';
 import { NETWORKS } from '../lib/config';
 import { PAGES, PAGING } from '../lib/constants';
 import { getDiscovery } from '../lib/discovery-render';
-import { count, pricePerMtok, short, utc } from '../lib/format';
+import { count, pricePerMtok, utc } from '../lib/format';
 import { modelKey } from '../lib/offers';
 import type { ExplorerQuery } from '../lib/paging';
 import {
   emptySellersMessage,
   githubByNode,
+  namesByNode,
   sellerHref,
   verifiedOnly,
 } from '../lib/seller-identity';
+import { SellerCell } from './seller-cell';
+import { Addr, ModelName } from './ui';
 
 export async function OverviewOffers({ query }: { query: ExplorerQuery }) {
   const snapshot = await getDiscovery();
+  const accounts = githubByNode(snapshot.network);
+  const names = namesByNode(snapshot.network);
   const sellers = query.verified
-    ? verifiedOnly(snapshot.sellers, githubByNode(snapshot.network))
+    ? verifiedOnly(snapshot.sellers, accounts)
     : snapshot.sellers;
   const rows = sellers.flatMap((seller) =>
     seller.models.map((model) => ({ seller, model })),
@@ -59,17 +64,17 @@ export async function OverviewOffers({ query }: { query: ExplorerQuery }) {
               {rows.slice(0, PAGING.rowsPerPage).map(({ seller, model }) => (
                 <tr key={seller.nodeId + modelKey(model)}>
                   <td>
-                    {[model.modelId, model.variant, model.quantization]
-                      .filter(Boolean)
-                      .join(' · ')}
+                    <ModelName {...model} />
                   </td>
                   <td>
-                    <Link
+                    <SellerCell
+                      nodeId={seller.nodeId}
+                      github={accounts.get(seller.nodeId) ?? null}
+                      name={names.get(seller.nodeId)}
                       href={sellerHref(seller.nodeId, query)}
-                      title={seller.nodeId}
                     >
-                      {short(seller.nodeId)}
-                    </Link>
+                      <Addr value={seller.owner} />
+                    </SellerCell>
                   </td>
                   <td>{count(model.contextTokens)}</td>
                   <td>{pricePerMtok(model.pricing.inputAtomicPerMtok)}</td>

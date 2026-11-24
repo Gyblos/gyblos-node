@@ -75,22 +75,3 @@ export function overviewActivity(
     daysObserved: points.filter((point) => point.tokens !== null).length,
   };
 }
-
-export function groupWeeks(points: TokenPoint[]) {
-  const weeks: {
-    day: string;
-    end: string;
-    tokens: number | null;
-    missing: number;
-  }[] = [];
-  for (const point of points) {
-    if (!weeks.length || new Date(point.day).getUTCDay() === 1)
-      weeks.push({ day: point.day, end: point.day, tokens: null, missing: 0 });
-    const week = weeks.at(-1);
-    if (!week) continue;
-    week.end = point.day;
-    if (point.tokens === null) week.missing++;
-    else week.tokens = (week.tokens ?? 0) + point.tokens;
-  }
-  return weeks;
-}

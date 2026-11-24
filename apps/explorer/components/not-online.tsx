@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 import { DISPLAY, PAGING } from '../lib/constants';
 import { short, utc } from '../lib/format';
 import {
@@ -90,7 +92,14 @@ function NotOnlineTable({
                 name={node.name}
                 href={sellerHref(node.nodeId, query)}
               >
-                {node.github ? short(node.nodeId) : null}
+                {node.github ? (
+                  <Link
+                    href={sellerHref(node.nodeId, query)}
+                    title={node.nodeId}
+                  >
+                    {short(node.nodeId)}
+                  </Link>
+                ) : null}
               </SellerCell>
             </td>
             <td className={td}>

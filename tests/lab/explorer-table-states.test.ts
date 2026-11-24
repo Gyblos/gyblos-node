@@ -25,7 +25,7 @@ type State = 'empty' | 'populated' | 'unavailable';
 
 function sources(state: State) {
   const generatedAt = Date.now();
-  const modelId = 'fixture-model';
+  const modelId = 'fixture-model-qwen';
   const model = {
     modelId,
     contextTokens: 4096,
@@ -145,15 +145,17 @@ async function pageHtml(dir: string, state: State) {
       });
     });
     let html = '';
+    let overview = '';
     let css = '';
     const stylesheets = new Set<string>();
-    for (const path of ['/?range=7', '/stats?range=7']) {
+    for (const path of ['/?range=7', '/sellers?range=7', '/stats?range=7']) {
       const response = await fetch(url + path, {
-        signal: AbortSignal.timeout(60_000),
+        signal: AbortSignal.timeout(120_000),
       });
       assert.equal(response.status, 200, output);
       const page = await response.text();
-      html += page;
+      if (path.startsWith('/?')) overview = page;
+      else html += page;
       for (const [, href] of page.matchAll(
         /<link\b[^>]*href="([^"]+\.css[^"]*)"/g,
       ))
@@ -166,7 +168,7 @@ async function pageHtml(dir: string, state: State) {
       assert.equal(response.status, 200);
       css += await response.text();
     }
-    return { html, css };
+    return { overview, html, css };
   } finally {
     app.kill();
     try {
@@ -220,10 +222,9 @@ after(async () => {
 });
 
 void test('Explorer pages expose one focusable main target after the first skip link', async () => {
-  const pages = (await pageHtml(dir, 'empty')).html.split(
-    /(?=<!DOCTYPE html>)/i,
-  );
-  assert.equal(pages.length, 2);
+  const { overview, html: directories } = await pageHtml(dir, 'empty');
+  const pages = [overview, ...directories.split(/(?=<!DOCTYPE html>)/i)];
+  assert.equal(pages.length, 3);
   for (const html of pages) {
     assert.equal(html.match(/<main\b/g)?.length, 1);
     assert.equal(html.match(/\bid="main-content"/g)?.length, 1);
@@ -255,7 +256,12 @@ void test('Explorer gives offerless Sellers and inactive Daily one spanning row 
 });
 
 void test('Explorer shows offer and active-day rows without empty rows', async () => {
-  const { html: populated, css } = await pageHtml(dir, 'populated');
+  const { overview, html: populated, css } = await pageHtml(dir, 'populated');
+  const offers = bodyFor(overview, 'Model / variant');
+  assert.match(offers, /fixture-model/);
+  assert.match(offers, /Alibaba · Qwen/);
+  assert.match(offers, /href="\/sellers\/fixture-node/);
+  assert.doesNotMatch(overview, />Details<|>Weeks</);
   const sellers = bodyFor(populated, 'Online since');
   const daily = bodyFor(populated, 'Seller first token p50');
   assert.match(sellers, /fixture-model/);
@@ -283,7 +289,10 @@ void test('Explorer shows offer and active-day rows without empty rows', async (
 });
 
 void test('Explorer keeps the unavailable panels when the sources fail', async () => {
-  const { html: unavailable } = await pageHtml(dir, 'unavailable');
+  const { overview, html: unavailable } = await pageHtml(dir, 'unavailable');
+  assert.match(overview, /Metrics collector unavailable/);
+  assert.match(overview, /Discovery unavailable/);
+  assert.match(overview, /Transaction history unavailable/);
   assert.match(
     unavailable,
     />Network<\/h2><\/div><\/div><div[^>]*>Source unavailable\.<\/div>/,

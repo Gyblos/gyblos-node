@@ -517,3 +517,8 @@ body {
     margin-top: 14px;
   }
 }
+
+.ov-chart-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}

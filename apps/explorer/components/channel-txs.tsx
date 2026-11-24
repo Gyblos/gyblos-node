@@ -1,5 +1,4 @@
 import { ArrowUpRight } from 'lucide-react';
-import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 import { Chip, type ChipColor } from '../boardui/components/base/badges/chip';
@@ -12,10 +11,11 @@ import {
 } from '../lib/config';
 import { DISPLAY, PAGES, PAGING } from '../lib/constants';
 import { getDiscovery } from '../lib/discovery-render';
-import { short } from '../lib/format';
+import type { GithubAccount } from '../lib/network-status';
 import { txPager, type ExplorerQuery } from '../lib/paging';
-import { sellerHref } from '../lib/seller-identity';
+import { githubByNode, namesByNode, sellerHref } from '../lib/seller-identity';
 import { Pager } from './pager';
+import { SellerCell } from './seller-cell';
 import {
   Addr,
   moneyCell,
@@ -68,10 +68,14 @@ function Meta({ programId }: { programId: string }) {
 function Seller({
   row,
   lookup,
+  accounts,
+  names,
   query,
 }: {
   row: Row;
   lookup: boolean;
+  accounts: ReadonlyMap<string, GithubAccount>;
+  names: ReadonlyMap<string, string>;
   query: ExplorerQuery;
 }) {
   if (!lookup)
@@ -79,18 +83,14 @@ function Seller({
   if (row.shared) return <span className="text-muted">Several channels</span>;
   if (row.seller)
     return (
-      <span className="font-mono">
-        <Link
-          className="text-ink underline-offset-2 hover:underline"
-          href={sellerHref(row.seller.nodeId, query)}
-          title={`Node ${row.seller.nodeId}`}
-        >
-          {short(row.seller.nodeId)}
-        </Link>
-        <span className="block text-xs text-dim">
-          <Addr value={row.seller.owner} />
-        </span>
-      </span>
+      <SellerCell
+        nodeId={row.seller.nodeId}
+        github={accounts.get(row.seller.nodeId) ?? null}
+        name={names.get(row.seller.nodeId)}
+        href={sellerHref(row.seller.nodeId, query)}
+      >
+        <Addr value={row.seller.owner} />
+      </SellerCell>
     );
   return (
     <span className="text-muted" title={row.payTo ?? undefined}>
@@ -175,6 +175,8 @@ export async function ChannelTxs({
       <Unavailable title={TITLE} anchors={[PAGING.anchors.transactions]} />
     );
   const owners = sellerOwners(discovery.sellers);
+  const accounts = githubByNode(discovery.network);
+  const names = namesByNode(discovery.network);
   const lookup = discovery.error === null;
   return (
     <>
@@ -211,7 +213,15 @@ export async function ChannelTxs({
             <TxLine
               key={row.key}
               row={row}
-              seller={<Seller row={row} lookup={lookup} query={query} />}
+              seller={
+                <Seller
+                  accounts={accounts}
+                  names={names}
+                  row={row}
+                  lookup={lookup}
+                  query={query}
+                />
+              }
             />
           );
         })}

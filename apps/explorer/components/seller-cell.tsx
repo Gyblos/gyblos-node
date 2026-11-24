@@ -36,7 +36,8 @@ export function SellerCell({
         <div className="flex items-center gap-1 font-mono">
           {href ? (
             <Link
-              className="text-ink underline-offset-2 hover:underline"
+              className="text-ink underline decoration-line underline-offset-2 hover:decoration-current"
+              title={nodeId}
               href={href}
             >
               {label}

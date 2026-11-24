@@ -25,7 +25,7 @@ void test('overview compares consecutive closed UTC days across a leap day', () 
   }
 });
 
-void test('overview reconciles observed tokens and weekly buckets without filling gaps', () => {
+void test('overview reconciles observed tokens and daily points without filling gaps', () => {
   const latency = {
     samples: 0,
     p50Ms: null,
@@ -72,10 +72,10 @@ void test('overview reconciles observed tokens and weekly buckets without fillin
   assert.equal(current.complete, false);
   assert.equal(current.demand, null);
   assert.equal(current.free?.tokens, 100);
-  assert.deepEqual(groupWeeks(current.points), [
-    { day: dates[0], end: dates[0], tokens: 120, missing: 0 },
-    { day: dates[1], end: dates[2], tokens: null, missing: 2 },
-  ]);
+  assert.deepEqual(
+    current.points.map((point) => point.tokens),
+    [120, null, null],
+  );
   assert.equal(overviewActivity(dates, null).requests, null);
 });
 
@@ -116,4 +116,10 @@ void test('a fall from 100 to 80 unserved attempts is favorable', () => {
     direction: 'down',
     tone: 'good',
   });
+});
+
+void test('model labels name a recognized lab and leave an unknown family unattributed', async () => {
+  const { modelLab } = await import('@gyblos/explorer/model-family');
+  assert.equal(modelLab('qwen3-0.6b'), 'Alibaba · Qwen');
+  assert.equal(modelLab('custom-local-model'), null);
 });

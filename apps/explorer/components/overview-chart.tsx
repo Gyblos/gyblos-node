@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import {
   Bar,
   BarChart,
@@ -12,9 +11,10 @@ import {
 
 import { RANGE } from '../lib/constants';
 import { count } from '../lib/format';
-import { compact, groupWeeks, type TokenPoint } from '../lib/overview-activity';
+import { compact, type TokenPoint } from '../lib/overview-activity';
 import { CHART } from './board/constants';
-import { SegmentedControl } from './board/segmented-control';
+
+const DAY_WIDTH = 16;
 
 export function OverviewChart({
   points,
@@ -23,34 +23,16 @@ export function OverviewChart({
   points: TokenPoint[];
   total: number | null;
 }) {
-  const [group, setGroup] = useState('days');
-  const data =
-    group === 'weeks'
-      ? groupWeeks(points).map((week) => ({
-          day: week.day,
-          label: `${week.day} – ${week.end}${week.missing ? ' (partial coverage)' : ''}`,
-          tokens: week.tokens,
-        }))
-      : points.map((point) => ({ ...point, label: point.day }));
   return (
     <section className="ov-panel">
       <div className="ov-heading">
         <h3>Tokens processed</h3>
-        <SegmentedControl
-          label="Group token bars"
-          options={[
-            { value: 'days', label: 'Days' },
-            { value: 'weeks', label: 'Weeks' },
-          ]}
-          selected={group}
-          onChange={setGroup}
-        />
       </div>
       <strong>{total === null ? '—' : compact(total)}</strong>
       {total === null ? (
         <p className="ov-empty">No token observations in this period.</p>
       ) : (
-        <TokenPlot data={data} />
+        <TokenPlot data={points} />
       )}
       <details>
         <summary>View data</summary>
@@ -58,14 +40,14 @@ export function OverviewChart({
           <table>
             <thead>
               <tr>
-                <th>Interval (UTC)</th>
+                <th>Day (UTC)</th>
                 <th>Tokens observed</th>
               </tr>
             </thead>
             <tbody>
-              {data.map((row) => (
+              {points.map((row) => (
                 <tr key={row.day}>
-                  <td>{row.label}</td>
+                  <td>{row.day}</td>
                   <td>{row.tokens === null ? 'No data' : count(row.tokens)}</td>
                 </tr>
               ))}
@@ -77,53 +59,66 @@ export function OverviewChart({
   );
 }
 
-function TokenPlot({ data }: { data: (TokenPoint & { label: string })[] }) {
+function TokenPlot({ data }: { data: TokenPoint[] }) {
   return (
-    <div className="ov-plot">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart
-          data={data}
-          accessibilityLayer
-          margin={{ left: 0, right: 4, top: 8, bottom: 0 }}
-        >
-          <XAxis
-            dataKey="label"
-            tickFormatter={(value: string) =>
-              value.slice(CHART.monthDayStart, RANGE.dayPrecision)
-            }
-            minTickGap={22}
-            tickLine={false}
-            axisLine={false}
-            stroke="var(--dim)"
-            fontSize={11}
-          />
-          <YAxis
-            width={40}
-            tickCount={4}
-            tickFormatter={compact}
-            allowDecimals={false}
-            tickLine={false}
-            axisLine={false}
-            stroke="var(--dim)"
-            fontSize={11}
-          />
-          <Tooltip
-            contentStyle={{
-              background: 'var(--raised)',
-              border: 0,
-              color: 'var(--ink)',
-            }}
-            cursor={{ fill: 'var(--raised)' }}
-            formatter={(value) => [count(Number(value)), 'Tokens']}
-          />
-          <Bar
-            dataKey="tokens"
-            fill="var(--chart)"
-            radius={[CHART.barRadius, CHART.barRadius, 0, 0]}
-            isAnimationActive={false}
-          />
-        </BarChart>
-      </ResponsiveContainer>
+    <div
+      className="ov-chart-scroll"
+      tabIndex={0}
+      role="region"
+      aria-label="Daily tokens, scroll for all dates"
+    >
+      <div
+        className="ov-plot"
+        style={{ minWidth: data.length * DAY_WIDTH + CHART.axisWidth }}
+      >
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart
+            data={data}
+            accessibilityLayer
+            margin={{ left: 0, right: 4, top: 8, bottom: 0 }}
+          >
+            <XAxis
+              dataKey="day"
+              tickFormatter={(value: string) =>
+                value.slice(CHART.monthDayStart, RANGE.dayPrecision)
+              }
+              interval={0}
+              angle={-90}
+              textAnchor="end"
+              height={40}
+              tickLine={false}
+              axisLine={false}
+              stroke="var(--dim)"
+              fontSize={11}
+            />
+            <YAxis
+              width={40}
+              tickCount={4}
+              tickFormatter={compact}
+              allowDecimals={false}
+              tickLine={false}
+              axisLine={false}
+              stroke="var(--dim)"
+              fontSize={11}
+            />
+            <Tooltip
+              contentStyle={{
+                background: 'var(--raised)',
+                border: 0,
+                color: 'var(--ink)',
+              }}
+              cursor={{ fill: 'var(--raised)' }}
+              formatter={(value) => [count(Number(value)), 'Tokens']}
+            />
+            <Bar
+              dataKey="tokens"
+              fill="var(--chart)"
+              radius={[CHART.barRadius, CHART.barRadius, 0, 0]}
+              isAnimationActive={false}
+            />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }

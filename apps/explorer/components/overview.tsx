@@ -10,7 +10,7 @@ import { overviewNetwork } from '../lib/collector';
 import { DISPLAY, UNITS } from '../lib/constants';
 import { getDiscovery } from '../lib/discovery-render';
 import { count, percent, utc } from '../lib/format';
-import { compact, overviewActivity } from '../lib/overview-activity';
+import { overviewActivity } from '../lib/overview-activity';
 import { rangeOf, type ExplorerQuery } from '../lib/paging';
 import { overviewWindow } from '../lib/range';
 import { delta, type Delta } from './board/delta';
@@ -39,22 +39,11 @@ function Metric({
       <Icon size={27} aria-hidden />
       <h3>{label}</h3>
       <div className="ov-value">
-        <strong>{value === null ? '—' : compact(value)}</strong>
+        <strong>{value === null ? '—' : count(value)}</strong>
         {change && <DeltaChip delta={change} />}
       </div>
       {caption && <small>{caption}</small>}
-      {value !== null && (
-        <details>
-          <summary
-            aria-label={`Exact ${label.toLowerCase()} and source details`}
-          >
-            Details
-          </summary>
-          <small>
-            {count(value)} · {detail ?? caption}
-          </small>
-        </details>
-      )}
+      {change && detail && <small>{detail}</small>}
     </section>
   );
 }
