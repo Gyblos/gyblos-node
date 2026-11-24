@@ -35,6 +35,11 @@ export function sideFigures(sections: Section[]) {
       0,
     ),
     successRate: successRate(sections),
+    tokens: sections.reduce(
+      (sum, totals) =>
+        sum + (totals ? totals.tokens.input + totals.tokens.output : 0),
+      0,
+    ),
     outputTokens: sections.reduce(
       (sum, totals) => sum + (totals?.tokens.output ?? 0),
       0,

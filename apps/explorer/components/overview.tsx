@@ -1,13 +1,13 @@
-import { Activity, MessagesSquare } from 'lucide-react';
+import { Hash, MessagesSquare, type LucideIcon } from 'lucide-react';
 import type { ReactElement } from 'react';
 
 import { chainHistoryNote, summarizeChain } from '../lib/chain-shape';
 import { getChainStats } from '../lib/chain-stats';
 import { getCollector } from '../lib/collector';
+import { HELP_TEXT } from '../lib/config';
 import { getDiscovery } from '../lib/discovery-render';
-import { count, percent, usdcDecimal } from '../lib/format';
+import { usdcDecimal } from '../lib/format';
 import { overviewLayout } from '../lib/layout';
-import { summarizeOffers } from '../lib/offers';
 import { rangeOf, type ExplorerQuery } from '../lib/paging';
 import { summarizeUsage } from '../lib/usage';
 import { Flow } from './board/animated-number';
@@ -51,12 +51,18 @@ export async function Overview({ query }: { query: ExplorerQuery }) {
     paid !== null && !chainBefore.error && chainBefore.backfillDone
       ? summarizeChain(chainBefore).totals.paidOut
       : null;
-  const offers = snapshot.error ? null : summarizeOffers(snapshot);
   const cards = [
     snapshot.error ? null : (
       <SellersOnline key="sellers" snapshot={snapshot} variant="footer" />
     ),
-    <RequestsCard key="requests" requests={requests} before={requestsBefore} />,
+    <SideCard
+      key="requests"
+      figure="requests"
+      icon={MessagesSquare}
+      label="Requests"
+      usage={requests}
+      before={requestsBefore}
+    />,
     <BuyersCard
       key="buyers"
       variant="footer"
@@ -85,21 +91,14 @@ export async function Overview({ query }: { query: ExplorerQuery }) {
         ) : undefined
       }
     />,
-    <StatCard
-      key="uptime"
-      variant="footer"
-      icon={Activity}
-      label="Uptime 24 h"
-      value={
-        offers?.averageDayUptime == null
-          ? '—'
-          : percent(offers.averageDayUptime)
-      }
-      caption={
-        offers?.averageDayUptime == null || snapshot.error
-          ? undefined
-          : `Average of ${count(offers.sellersWithDayUptime)} ${offers.sellersWithDayUptime === 1 ? 'seller' : 'sellers'}`
-      }
+    <SideCard
+      key="tokens"
+      figure="tokens"
+      icon={Hash}
+      label="Tokens processed"
+      hint={HELP_TEXT.tokens}
+      usage={requests}
+      before={requestsBefore}
     />,
   ].filter((card) => card !== null);
   return (
@@ -113,26 +112,34 @@ export async function Overview({ query }: { query: ExplorerQuery }) {
   );
 }
 
-function RequestsCard({
-  requests,
+type Usage = ReturnType<typeof summarizeUsage>;
+
+function SideCard({
+  usage,
   before,
+  figure,
+  ...card
 }: {
-  requests: ReturnType<typeof summarizeUsage> | null;
-  before: ReturnType<typeof summarizeUsage> | null;
+  usage: Usage | null;
+  before: Usage | null;
+  figure: 'requests' | 'tokens';
+  icon: LucideIcon;
+  label: string;
+  hint?: string;
 }) {
-  const side = (figure: 'free' | 'paid') =>
-    requests ? <Flow value={requests[figure].requests} kind="count" /> : '—';
+  const kind = figure === 'tokens' ? 'compact' : 'count';
+  const side = (paid: 'free' | 'paid') =>
+    usage ? <Flow value={usage[paid][figure]} kind={kind} /> : '—';
   return (
     <StatCard
+      {...card}
       variant="footer"
-      icon={MessagesSquare}
-      label="Requests"
       sides={{ free: side('free'), paid: side('paid') }}
       deltas={
-        requests && before
+        usage && before
           ? [
-              delta(requests.free.requests, before.free.requests),
-              delta(requests.paid.requests, before.paid.requests),
+              delta(usage.free[figure], before.free[figure]),
+              delta(usage.paid[figure], before.paid[figure]),
             ]
           : undefined
       }

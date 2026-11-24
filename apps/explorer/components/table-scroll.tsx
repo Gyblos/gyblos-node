@@ -3,6 +3,31 @@
 // Measures uncapped table overflow; server-rendered cells remain owned by the caller.
 import { useLayoutEffect, useRef, type ReactNode } from 'react';
 
+function observeOverflow(wrapper: HTMLDivElement, table: Element) {
+  const edge = () => {
+    const remaining =
+      wrapper.scrollWidth - wrapper.clientWidth - wrapper.scrollLeft;
+    wrapper.toggleAttribute('data-scroll-end', remaining <= 1);
+  };
+  const measure = () => {
+    wrapper.removeAttribute('data-overflow');
+    const overflow = wrapper.scrollWidth > wrapper.clientWidth;
+    wrapper.toggleAttribute('data-overflow', overflow);
+    const scrollable = wrapper.scrollWidth > wrapper.clientWidth;
+    wrapper.toggleAttribute('data-scrollable', scrollable);
+    edge();
+  };
+  measure();
+  const observer = new ResizeObserver(measure);
+  observer.observe(wrapper);
+  observer.observe(table);
+  wrapper.addEventListener('scroll', edge, { passive: true });
+  return () => {
+    observer.disconnect();
+    wrapper.removeEventListener('scroll', edge);
+  };
+}
+
 export function TableScroll({
   children,
   footer,
@@ -60,22 +85,16 @@ export function TableScroll({
     const wrapper = ref.current;
     const table = wrapper?.firstElementChild;
     if (!wrapper || !table) return;
-    const measure = () => {
-      wrapper.removeAttribute('data-overflow');
-      const overflow = wrapper.scrollWidth > wrapper.clientWidth;
-      wrapper.toggleAttribute('data-overflow', overflow);
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(wrapper);
-    observer.observe(table);
-    return () => observer.disconnect();
+    return observeOverflow(wrapper, table);
   }, [children]);
 
   return (
     <section className="mt-4 overflow-hidden rounded-xl border border-line bg-panel">
-      <div ref={ref} className="explorer-table-scroll overflow-x-auto">
-        {children}
+      <div className="relative">
+        <div ref={ref} className="explorer-table-scroll overflow-x-auto">
+          {children}
+        </div>
+        <div aria-hidden="true" className="explorer-table-edge" />
       </div>
       {footer}
     </section>

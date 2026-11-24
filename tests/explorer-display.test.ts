@@ -21,7 +21,6 @@ import {
 } from '@gyblos/explorer/format';
 import { modelFamily } from '@gyblos/explorer/model-family';
 import { notOnline, parseNetworkStatus } from '@gyblos/explorer/network-status';
-import { summarizeOffers } from '@gyblos/explorer/offers';
 import { parseRange, rangeQuery } from '@gyblos/explorer/range';
 import { dailyRequests, usageMeta } from '@gyblos/explorer/usage';
 
@@ -272,26 +271,6 @@ void test('a source that never answers is given up after the fetch timeout', asy
   });
   assert.equal(asked, FETCH.timeoutMs);
   clearTimeout(hold);
-});
-
-void test('the average 24 h uptime is over the sellers with an uptime read, and counts them', () => {
-  const seller = (nodeId: string, ratio: number | null) => ({
-    nodeId,
-    owner: 'o',
-    models: [],
-    uptime:
-      ratio === null ? null : { firstSeenAt: 1, windows: [{ days: 1, ratio }] },
-  });
-  const summary = summarizeOffers({
-    generatedAt: 0,
-    network: null,
-    datedAt: null,
-    networkDatedAt: null,
-    error: null,
-    sellers: [seller('a', 1), seller('b', 0.5), seller('c', null)],
-  });
-  assert.equal(summary.sellersWithDayUptime, 2);
-  assert.equal(summary.averageDayUptime, 0.75);
 });
 
 void test('the Usage note names the comparison only when the earlier span was read', () => {
