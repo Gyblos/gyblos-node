@@ -32,7 +32,7 @@ export default async function Home({
     <PageFrame title="Gyblos Explorer">
       <Suspense
         key={`overview-${rangeOf(query, 'overview')}`}
-        fallback={<Loading cards />}
+        fallback={<Loading overview />}
       >
         <Overview query={query} />
       </Suspense>

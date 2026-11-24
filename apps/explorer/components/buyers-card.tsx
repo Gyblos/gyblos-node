@@ -16,12 +16,14 @@ export function BuyersCard({
   buyers: NetworkBuyers | null;
   days: number;
   variant?: 'footer' | 'plain';
-  className: string;
+  className?: string;
 }) {
   const side = (figure: 'free' | 'paid') =>
     buyersText(buyers?.[figure].allTime ?? null);
   return (
-    <div className={`row-span-4 grid grid-rows-subgrid gap-y-0 ${className}`}>
+    <div
+      className={`row-span-4 grid grid-rows-subgrid gap-y-0 ${className ?? ''}`}
+    >
       <StatCard
         variant={variant}
         icon={Users}

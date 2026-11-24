@@ -13,7 +13,7 @@ import type { Delta } from './delta';
 const SIDES = ['free', 'paid'] as const;
 const PILL_COLORS = { good: 'lime', bad: 'rose', neutral: 'neutral' } as const;
 const COMPARED = 'vs previous period';
-const LABEL = 'text-body-medium break-words text-text-secondary';
+const LABEL = 'text-body-medium text-balance break-words text-text-secondary';
 const VALUE = {
   footer:
     'max-w-full min-w-0 font-mono text-[clamp(1.125rem,calc(10cqi_+_0.1rem),1.75rem)] leading-tight tabular-nums',
