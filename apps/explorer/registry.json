@@ -86,66 +86,6 @@
           "path": "components/board/LICENSE",
           "type": "registry:file",
           "target": "components/board/LICENSE"
-        }
-      ],
-      "registryDependencies": ["gyblos-theme"]
-    },
-    {
-      "name": "animated-number",
-      "type": "registry:component",
-      "title": "Animated number",
-      "description": "A count, percent or exact USDC amount that rolls to its new value (NumberFlow), and a free · paid pair.",
-      "dependencies": ["@number-flow/react@0.6.2"],
-      "registryDependencies": ["board-base"],
-      "files": [
-        {
-          "path": "components/board/animated-number.tsx",
-          "type": "registry:component",
-          "target": "components/board/animated-number.tsx"
-        }
-      ]
-    },
-    {
-      "name": "delta-chip",
-      "type": "registry:component",
-      "title": "Delta chip",
-      "description": "A figure's change against the previous period, with a direction glyph and good, bad or neutral tone.",
-      "dependencies": ["lucide-react@1.68.0"],
-      "registryDependencies": ["board-base"],
-      "files": [
-        {
-          "path": "components/board/delta-chip.tsx",
-          "type": "registry:component",
-          "target": "components/board/delta-chip.tsx"
-        }
-      ]
-    },
-    {
-      "name": "stat-card",
-      "type": "registry:component",
-      "title": "Stat card",
-      "description": "A headline figure with an icon tile, label, value and one change per side. Spans four rows in a parent grid so neighboring stat cards share their icon, label, figure and context tracks; account for that span when mixing with other cards.",
-      "dependencies": [
-        "@remixicon/react@4.9.0",
-        "react-aria-components@1.22.1",
-        "tailwind-merge@3.7.0"
-      ],
-      "registryDependencies": ["board-base"],
-      "files": [
-        {
-          "path": "components/board/stat-card.tsx",
-          "type": "registry:component",
-          "target": "components/board/stat-card.tsx"
-        },
-        {
-          "path": "boardui/components/application/dashboard/stat-cards.tsx",
-          "type": "registry:component",
-          "target": "boardui/components/application/dashboard/stat-cards.tsx"
-        },
-        {
-          "path": "boardui/components/base/tooltip/tooltip.tsx",
-          "type": "registry:component",
-          "target": "boardui/components/base/tooltip/tooltip.tsx"
         },
         {
           "path": "boardui/components/foundations/direction/direction.tsx",
@@ -166,6 +106,67 @@
           "path": "boardui/LICENSE",
           "type": "registry:file",
           "target": "boardui/LICENSE"
+        }
+      ],
+      "registryDependencies": ["gyblos-theme"],
+      "dependencies": ["tailwind-merge@3.7.0", "react-aria-components@1.22.1"]
+    },
+    {
+      "name": "animated-number",
+      "type": "registry:component",
+      "title": "Animated number",
+      "description": "A count, percent or exact USDC amount that rolls to its new value (NumberFlow), and a free \u00b7 paid pair.",
+      "dependencies": ["@number-flow/react@0.6.2"],
+      "registryDependencies": ["board-base"],
+      "files": [
+        {
+          "path": "components/board/animated-number.tsx",
+          "type": "registry:component",
+          "target": "components/board/animated-number.tsx"
+        }
+      ]
+    },
+    {
+      "name": "delta-chip",
+      "type": "registry:component",
+      "title": "Delta chip",
+      "description": "A figure's change against the previous period, with a direction glyph and good, bad or neutral tone.",
+      "dependencies": ["@remixicon/react@4.9.0"],
+      "registryDependencies": ["board-base"],
+      "files": [
+        {
+          "path": "components/board/delta-chip.tsx",
+          "type": "registry:component",
+          "target": "components/board/delta-chip.tsx"
+        },
+        {
+          "path": "boardui/components/application/dashboard/stat-cards.tsx",
+          "type": "registry:component",
+          "target": "boardui/components/application/dashboard/stat-cards.tsx"
+        },
+        {
+          "path": "boardui/components/base/tooltip/tooltip.tsx",
+          "type": "registry:component",
+          "target": "boardui/components/base/tooltip/tooltip.tsx"
+        }
+      ]
+    },
+    {
+      "name": "stat-card",
+      "type": "registry:component",
+      "title": "Stat card",
+      "description": "A headline figure with an icon tile, label, value and one change per side. Spans four rows in a parent grid so neighboring stat cards share their icon, label, figure and context tracks; account for that span when mixing with other cards.",
+      "dependencies": [
+        "@remixicon/react@4.9.0",
+        "react-aria-components@1.22.1",
+        "tailwind-merge@3.7.0"
+      ],
+      "registryDependencies": ["delta-chip"],
+      "files": [
+        {
+          "path": "components/board/stat-card.tsx",
+          "type": "registry:component",
+          "target": "components/board/stat-card.tsx"
         }
       ]
     },
@@ -205,6 +206,11 @@
           "path": "components/board/segmented-control.tsx",
           "type": "registry:component",
           "target": "components/board/segmented-control.tsx"
+        },
+        {
+          "path": "boardui/components/base/segmented-control/segmented-control.tsx",
+          "target": "boardui/components/base/segmented-control/segmented-control.tsx",
+          "type": "registry:file"
         }
       ],
       "registryDependencies": ["board-base"]
@@ -235,6 +241,11 @@
           "path": "components/board/chip.tsx",
           "type": "registry:component",
           "target": "components/board/chip.tsx"
+        },
+        {
+          "path": "boardui/components/base/badges/chip.tsx",
+          "target": "boardui/components/base/badges/chip.tsx",
+          "type": "registry:file"
         }
       ]
     },

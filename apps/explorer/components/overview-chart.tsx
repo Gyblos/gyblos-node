@@ -8,6 +8,7 @@ import { UNITS } from '../lib/constants';
 import { compact, type TokenPoint } from '../lib/overview-activity';
 import type { RangeDays } from '../lib/range';
 import { Flow, type FlowKind, type FlowValue } from './board/animated-number';
+import { Chip } from './board/chip';
 import { CHART } from './board/constants';
 import { cx } from './board/cx';
 import type { Delta } from './board/delta';
@@ -306,9 +307,7 @@ function ComparisonChip({ metric }: { metric: MetricData }) {
       {metric.change ? (
         <DeltaChip delta={metric.change} />
       ) : (
-        <span className="inline-flex items-center rounded-md bg-raised px-1.5 py-0.5 font-mono text-xs text-muted">
-          No baseline
-        </span>
+        <Chip>No baseline</Chip>
       )}
     </span>
   );

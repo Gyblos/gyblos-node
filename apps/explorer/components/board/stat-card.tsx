@@ -3,15 +3,12 @@
 // change per side, in the same order) and an optional line of context.
 import type { ComponentType, ReactNode } from 'react';
 
-import {
-  DeltaPill,
-  StatHint,
-} from '../../boardui/components/application/dashboard/stat-cards';
+import { StatHint } from '../../boardui/components/application/dashboard/stat-cards';
 import { cx } from './cx';
 import type { Delta } from './delta';
+import { DeltaChip } from './delta-chip';
 
 const SIDES = ['free', 'paid'] as const;
-const PILL_COLORS = { good: 'lime', bad: 'rose', neutral: 'neutral' } as const;
 const COMPARED = 'vs previous period';
 const LABEL = 'text-body-medium text-balance break-words text-text-secondary';
 const VALUE = {
@@ -24,16 +21,6 @@ const VALUE = {
 type Variant = keyof typeof VALUE;
 type Sides = Record<(typeof SIDES)[number], ReactNode>;
 
-function Pill({ delta, side }: { delta: Delta; side?: string }) {
-  return (
-    <DeltaPill
-      delta={side ? `${side} ${delta.label}` : delta.label}
-      deltaColor={PILL_COLORS[delta.tone]}
-      direction={delta.direction}
-    />
-  );
-}
-
 function Pills({
   deltas,
   sides,
@@ -45,7 +32,7 @@ function Pills({
     <span className="flex flex-wrap items-center gap-1">
       {deltas.map((delta, index) =>
         delta ? (
-          <Pill
+          <DeltaChip
             key={index}
             delta={delta}
             side={sides ? SIDES[index] : undefined}

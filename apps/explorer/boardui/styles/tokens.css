@@ -9,6 +9,8 @@
 }
 
 @theme inline {
+  --color-segmented-control-background: var(--panel);
+  --color-segmented-control-selected-background: var(--raised);
   --color-text-primary: var(--ink);
   --color-text-secondary: var(--muted);
   --color-text-tertiary: var(--dim);
