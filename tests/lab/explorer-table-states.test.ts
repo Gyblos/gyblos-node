@@ -219,6 +219,27 @@ after(async () => {
   if (dir) await rm(dir, { recursive: true, force: true });
 });
 
+void test('Explorer pages expose one focusable main target after the first skip link', async () => {
+  const pages = (await pageHtml(dir, 'empty')).split(/(?=<!DOCTYPE html>)/i);
+  assert.equal(pages.length, 2);
+  for (const html of pages) {
+    assert.equal(html.match(/<main\b/g)?.length, 1);
+    assert.equal(html.match(/\bid="main-content"/g)?.length, 1);
+    const main = /<main\b[^>]*>(.*?)<\/main>/s.exec(html)?.[0];
+    assert.ok(main);
+    assert.match(main, /^<main\b[^>]*\bid="main-content"/);
+    assert.match(main, /^<main\b[^>]*\btabindex="-1"/i);
+    assert.doesNotMatch(main, /<(header|footer)\b/);
+    const link = /<a\b[^>]*>(.*?)<\/a>/s.exec(html)?.[0];
+    assert.ok(link);
+    assert.match(link, /\bhref="#main-content"/);
+    assert.match(link, />Skip to content<\/a>$/);
+    assert.ok(html.indexOf(link) < html.indexOf('<header'));
+    assert.ok(html.indexOf('</header>') < html.indexOf('<main'));
+    assert.ok(html.indexOf('</main>') < html.indexOf('<footer'));
+  }
+});
+
 void test('Explorer gives offerless Sellers and inactive Daily one spanning row each', async () => {
   const { html: empty } = await pageHtml(dir, 'empty');
   assert.match(
