@@ -368,7 +368,7 @@ paths. Step numbers are stable names; the table is in the order of work.
 | 5    | Move buyer orchestration from `apps/buyer` into a buyer package                                                                        | Structural | Next                     |
 | 2    | The released executable includes the buyer as `gyblos buyer`, importing that package, and the seller starts with `gyblos seller start` | Behavior   | After step 5             |
 | 3    | `--json` and non-interactive operation on seller and buyer commands                                                                    | Behavior   | After step 2             |
-| 4    | Remove v1 signed offers, which no product path uses                                                                                    | Removal    | Any time                 |
+| 4    | Remove v1 signed offers, which no product path uses                                                                                    | Removal    | Done                     |
 | 7    | Complete the local operator API in protocol and move the desktop app onto it                                                           | Behavior   | After step 3             |
 | 8    | Agent tool surface over the same operations                                                                                            | Behavior   | After step 7             |
 | 6    | Split `packages/node` into the seller package, the buyer package and the shared node kit                                               | Structural | After the mainnet launch |

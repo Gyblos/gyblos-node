@@ -29,7 +29,8 @@ the matching service (`packages/transport-iroh/src/endpoint.ts`).
 
 Retired channels: `gyblos/session/1`, `/2` and `/3` (vectors
 `batch-*-v1.json` to `batch-*-v3.json`) and `gyblos/paid-stream/1`. Active
-parsers reject them.
+parsers reject them. The signing domain `gyblos/signed-inference-offer/v1\n` is
+retired with its payload and is never reused.
 
 Signed records and envelopes outside the Iroh channels:
 
@@ -90,7 +91,7 @@ introduce a new domain policy. `./constants` names `GYBLOS_ALPN`
 
 `sign` invokes an injected byte signer; it must use Ed25519. `verify` uses Web
 Crypto Ed25519 with a raw 32-byte public key. Signature encoding is the caller's
-responsibility. The v1 signed private offer is removed; no product path used it.
+responsibility.
 
 `EngineUsage` retains camelCase domain counters. `EngineWireUsage` retains the
 distinct snake_case wire counters; inferenceWireUsage performs the existing
