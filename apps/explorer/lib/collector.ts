@@ -6,6 +6,7 @@ import { cache } from 'react';
 import {
   aggregatedAt,
   parseModel,
+  parseNetworkBuyers,
   parseNetworkDay,
   type CollectorSnapshot,
 } from './collector-shape';
@@ -16,6 +17,7 @@ import { list, record } from './validate';
 
 export type {
   CollectorSnapshot,
+  NetworkBuyers,
   NetworkDay,
   NetworkSide,
   Totals,
@@ -36,6 +38,7 @@ const readCollector = cache(
         aggregatedAt: null,
         days: [],
         models: [],
+        buyers: null,
         error: error instanceof Error ? error.message : 'collector unavailable',
       };
     }
@@ -53,6 +56,7 @@ async function loadCollector(query: string): Promise<CollectorSnapshot> {
     aggregatedAt: Math.max(aggregatedAt(network), aggregatedAt(models)) || null,
     days: list(network.days, 'network.days').map(parseNetworkDay),
     models: list(models.models, 'models.models').map(parseModel),
+    buyers: parseNetworkBuyers(network.buyerTotals),
     error: null,
   };
 }

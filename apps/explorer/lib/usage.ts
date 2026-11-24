@@ -1,7 +1,8 @@
 import type {
+  BuyerCount,
   CollectorSnapshot,
+  NetworkBuyers,
   NetworkDay,
-  NetworkSide,
   Totals,
 } from './collector-shape';
 import { DISPLAY } from './constants';
@@ -108,11 +109,14 @@ export function usageMeta(
   return compared ? `vs previous ${days} days, ${updated}` : updated;
 }
 
-export const buyersText = (
-  side: Pick<NetworkSide, 'buyers' | 'withheld'> | null,
-) =>
+export const buyersText = (side: BuyerCount | null) =>
   !side
     ? '—'
     : side.withheld
       ? `< ${DISPLAY.minPublicBuyers}`
       : count(side.buyers ?? 0);
+
+export const newBuyersText = (buyers: NetworkBuyers | null, days: number) =>
+  buyers
+    ? `New in ${days} days: ${buyersText(buyers.free.newInRange)} free · ${buyersText(buyers.paid.newInRange)} paid`
+    : undefined;

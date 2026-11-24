@@ -7,7 +7,11 @@ import {
   Wallet,
 } from 'lucide-react';
 
-import { getCollector, type NetworkDay } from '../lib/collector';
+import {
+  getCollector,
+  type NetworkBuyers,
+  type NetworkDay,
+} from '../lib/collector';
 import { DISPLAY, PAGING } from '../lib/constants';
 import { count, usdcDecimal } from '../lib/format';
 import { rangeOf, tablePager, type ExplorerQuery } from '../lib/paging';
@@ -27,6 +31,7 @@ import { Flow } from './board/animated-number';
 import { BarChartCard } from './board/bar-chart-card';
 import { delta, type Delta } from './board/delta';
 import { StatCard } from './board/stat-card';
+import { BuyersCard } from './buyers-card';
 import { pagedRows, Pager } from './pager';
 import {
   ModelName,
@@ -95,13 +100,17 @@ function changes(
 function UsageCards({
   usage,
   change,
+  buyers,
+  days,
 }: {
   usage: ReturnType<typeof summarizeUsage>;
   change: ReturnType<typeof changes>;
+  buyers: NetworkBuyers | null;
+  days: number;
 }) {
   const { free, paid } = usage;
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       <StatCard
         icon={MessagesSquare}
         label="Requests"
@@ -120,6 +129,9 @@ function UsageCards({
         }}
         hint="Completed requests out of completed and failed ones. Cancellations are not counted as failures."
       />
+      <div className="col-span-2 grid">
+        <BuyersCard buyers={buyers} days={days} />
+      </div>
       <StatCard
         icon={Hash}
         label="Output tokens"
@@ -178,7 +190,12 @@ export async function UsageSection({ query }: { query: ExplorerQuery }) {
         meta={usageMeta(days, snapshot.aggregatedAt, change !== null)}
         range={{ section: 'usage', days }}
       />
-      <UsageCards usage={usage} change={change} />
+      <UsageCards
+        usage={usage}
+        change={change}
+        buyers={snapshot.buyers}
+        days={days}
+      />
       <RequestCharts days={snapshot.days} change={change?.requests ?? null} />
       <DailyTable query={query} days={usage.active} />
       <DemandTable query={query} demand={usage.demand} />

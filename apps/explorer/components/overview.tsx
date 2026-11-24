@@ -11,6 +11,7 @@ import { summarizeUsage } from '../lib/usage';
 import { Flow } from './board/animated-number';
 import { delta } from './board/delta';
 import { StatCard } from './board/stat-card';
+import { BuyersCard } from './buyers-card';
 import { SellersOnline } from './network-section';
 import { UsdcIcon } from './token-logo';
 import { SectionTitle } from './ui';
@@ -39,11 +40,18 @@ export async function Overview({ query }: { query: ExplorerQuery }) {
         title={`Overview, last ${days} days`}
         range={{ section: 'overview', days }}
       />
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {snapshot.error ? null : (
           <SellersOnline snapshot={snapshot} variant="footer" />
         )}
         <RequestsCard requests={requests} before={requestsBefore} />
+        <div className="grid sm:col-span-2 xl:col-span-1">
+          <BuyersCard
+            variant="footer"
+            buyers={usage.error ? null : usage.buyers}
+            days={days}
+          />
+        </div>
         <StatCard
           variant="footer"
           icon={UsdcIcon}
