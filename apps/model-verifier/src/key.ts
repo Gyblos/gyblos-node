@@ -33,6 +33,10 @@ function fromSeed(seed: Buffer): VerifierKey {
   };
 }
 
+export function ephemeralAddress(): string {
+  return fromSeed(randomBytes(SEED_BYTES)).address;
+}
+
 function parseSeed(text: string) {
   let value: unknown;
   try {

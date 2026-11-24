@@ -1,3 +1,5 @@
+import { setTimeout as delay } from 'node:timers/promises';
+
 import { ROUTES } from '@gyblos/config';
 import { MODEL_CLASSIFICATIONS } from '@gyblos/protocol/constants';
 import { resolveModel, usesPinnedTokenizer } from '@gyblos/protocol/models';
@@ -86,29 +88,41 @@ export async function openReference(
   base: string,
   modelId: string,
   fetchImpl: typeof fetch = fetch,
+  retryMs: number = MODEL_VERIFIER.referenceRetryMs,
 ): Promise<ReferenceModel> {
   const tag = referenceTag(modelId);
   const tags = await call(fetchImpl, new URL(ROUTES.ollamaTags, base));
   const listed = Array.isArray(tags.models)
     ? tags.models.map(record).find((model) => model.name === tag)
     : undefined;
-  if (!listed || typeof listed.digest !== 'string') throw unavailable();
+  if (
+    !listed ||
+    typeof listed.digest !== 'string' ||
+    !/^[0-9a-f]{64}$/.test(listed.digest)
+  )
+    throw unavailable();
   const generate = new URL(ROUTES.ollamaGenerate, base);
   return {
     tag,
     digest: listed.digest,
     async candidates(prompt, topLogprobs) {
-      return parseCandidates(
-        await call(fetchImpl, generate, {
-          model: tag,
-          prompt,
-          raw: true,
-          stream: false,
-          logprobs: true,
-          top_logprobs: topLogprobs,
-          options: { temperature: 0, num_predict: 1 },
-        }),
-      );
+      const body = {
+        model: tag,
+        prompt,
+        raw: true,
+        stream: false,
+        logprobs: true,
+        top_logprobs: topLogprobs,
+        options: { temperature: 0, num_predict: 1 },
+      };
+      for (let attempt = 1; ; attempt++) {
+        try {
+          return parseCandidates(await call(fetchImpl, generate, body));
+        } catch (error) {
+          if (attempt >= MODEL_VERIFIER.referenceAttempts) throw error;
+          await delay(retryMs * attempt);
+        }
+      }
     },
   };
 }

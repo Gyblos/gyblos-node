@@ -17,13 +17,13 @@ import {
   MODEL_VERIFIER_CODES,
   MODEL_VERIFIER_COMMANDS,
   ModelVerifierError,
+  SECRET_BYTES,
 } from './constants';
 import { loadVerifierKey } from './key';
 import { openReference } from './reference';
 import { openSeller, parseSellerTarget } from './seller';
 import { runVerification } from './verify';
 
-const SECRET_BYTES = 32;
 const OPTIONS = {
   seller: { type: 'string' },
   model: { type: 'string' },
@@ -75,12 +75,7 @@ async function verify(values: Record<string, string | undefined>) {
     http: false,
   });
   try {
-    const seller = await openSeller(
-      endpoint,
-      target,
-      key.address,
-      values.model,
-    );
+    const seller = await openSeller(endpoint, target, values.model);
     try {
       const { signed, answers } = await runVerification({
         target,
@@ -105,10 +100,12 @@ async function verify(values: Record<string, string | undefined>) {
       await writeFile(
         join(out, MODEL_VERIFIER.resultFile),
         `${JSON.stringify(signed, null, 2)}\n`,
+        { flag: 'wx', mode: MODEL_VERIFIER.privateFileMode },
       );
       await writeFile(
         join(out, MODEL_VERIFIER.evidenceFile),
         `${JSON.stringify({ challengeSet: CHALLENGE_SET, answers }, null, 2)}\n`,
+        { flag: 'wx', mode: MODEL_VERIFIER.privateFileMode },
       );
       return { ...summary(signed), out };
     } finally {
@@ -160,7 +157,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
         code:
           error instanceof ModelVerifierError
             ? error.code
-            : MODEL_VERIFIER_CODES.USAGE,
+            : MODEL_VERIFIER_CODES.INTERNAL,
       }),
     );
     return 1;

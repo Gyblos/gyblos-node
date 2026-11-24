@@ -5,15 +5,7 @@ import {
   CHALLENGE_SET,
   challengeSetDigest,
 } from '@gyblos/model-verifier/challenge-set';
-import {
-  cutPoints,
-  failAt,
-  isDeviation,
-  verdictOf,
-} from '@gyblos/model-verifier/scoring';
-import { MODEL_VERIFICATION_VERDICTS } from '@gyblos/protocol/model-verification';
-
-const PPM = 1_000_000;
+import { cutPoints, isDeviation } from '@gyblos/model-verifier/scoring';
 
 void test('cut points fall just before a word and are a stable, bounded subset', () => {
   const text =
@@ -48,35 +40,20 @@ void test('a deviation is a continuation the reference ranks out or finds improb
   assert.equal(isDeviation(' of', [], minimum), true);
 });
 
-void test('the failure threshold keeps the false positive bound and grows with the checks', () => {
-  const rate = 5_000;
-  const alpha = 100;
-  const tail = (n: number, k: number) => {
-    let total = 0;
-    for (let x = k; x <= n; x++) {
-      let term = 1;
-      for (let i = 0; i < x; i++) term *= ((n - i) / (i + 1)) * (rate / PPM);
-      total += term * (1 - rate / PPM) ** (n - x);
-    }
-    return total;
-  };
-  for (const checks of [24, 480, 720]) {
-    const k = failAt(checks, rate, alpha);
-    assert.ok(tail(checks, k) <= alpha / PPM);
-    assert.ok(k === 1 || tail(checks, k - 1) > alpha / PPM);
-  }
-  assert.equal(failAt(720, rate, alpha), 13);
-  assert.equal(failAt(480, rate, alpha), 11);
-});
-
-void test('the verdict fails on enough deviations, otherwise passes only with enough checks', () => {
-  assert.equal(verdictOf(720, 13, 480, 13), MODEL_VERIFICATION_VERDICTS.FAIL);
-  assert.equal(verdictOf(720, 12, 480, 13), MODEL_VERIFICATION_VERDICTS.PASS);
-  assert.equal(
-    verdictOf(100, 0, 480, 5),
-    MODEL_VERIFICATION_VERDICTS.INCONCLUSIVE,
-  );
-  assert.equal(verdictOf(100, 9, 480, 5), MODEL_VERIFICATION_VERDICTS.FAIL);
+void test('the deviation check does not depend on the order candidates arrive in', () => {
+  const minimum = Math.log(1e-3);
+  const sorted = [
+    { token: ' then', logprob: -0.1 },
+    { token: ' the', logprob: -9 },
+  ];
+  const reversed = [...sorted].reverse();
+  for (const rest of [' then x', ' the cat', ' thermal'])
+    assert.equal(
+      isDeviation(rest, reversed, minimum),
+      isDeviation(rest, sorted, minimum),
+      rest,
+    );
+  assert.equal(isDeviation(' the cat', reversed, minimum), true);
 });
 
 void test('the challenge set is versioned and its digest covers prompts and rule', () => {

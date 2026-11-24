@@ -7,6 +7,7 @@
     "./challenge-set": "./src/challenge-set.ts",
     "./constants": "./src/constants.ts",
     "./scoring": "./src/scoring.ts",
+    "./quotes": "./src/quotes.ts",
     "./reference": "./src/reference.ts",
     "./seller": "./src/seller.ts",
     "./verify": "./src/verify.ts",

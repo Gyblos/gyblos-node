@@ -1,14 +1,20 @@
 export const PARTS_PER_MILLION = 1_000_000;
+export const SECRET_BYTES = 32;
+export const MAX_DIRECT_ADDRESSES = 16;
+export const FREE_ATOMIC = '0';
+export const TEMPLATE_MARKER = /<\|[A-Za-z0-9_]+\|>/;
 
 export const MODEL_VERIFIER = {
   defaultOllamaUrl: 'http://127.0.0.1:11434',
   referenceTimeoutMs: 120_000,
+  referenceAttempts: 3,
+  referenceRetryMs: 3_000,
   answerTimeoutMs: 180_000,
-  keyFileMode: 0o600,
   directoryMode: 0o700,
   resultFile: 'result.json',
   evidenceFile: 'evidence.json',
   maxSellerFileBytes: 16_384,
+  privateFileMode: 0o600,
 } as const;
 
 export const MODEL_VERIFIER_COMMANDS = {
@@ -25,6 +31,9 @@ export const MODEL_VERIFIER_CODES = {
   INVALID_SELLER: 'INVALID_SELLER',
   INVALID_KEY: 'INVALID_KEY',
   INVALID_RESULT: 'INVALID_RESULT',
+  TEMPLATE_MARKER: 'TEMPLATE_MARKER',
+  UNKNOWN: 'UNKNOWN',
+  INTERNAL: 'INTERNAL',
 } as const;
 
 export type ModelVerifierCode =

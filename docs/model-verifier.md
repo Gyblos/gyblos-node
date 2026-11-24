@@ -40,12 +40,17 @@ a fast large model. Throughput is not part of the verdict.
 ## Chosen signal: rereading with the declared model
 
 For each answer the verifier picks up to 24 points just before a word (a space
-followed by a letter or digit, not after another space). At each point it gives
-the declared model the exact rendered prompt plus the seller's answer up to that
-point, asks for one token at temperature 0 and reads its 20 most likely next
-tokens with their log probabilities. The point is a **deviation** when no
-candidate is a prefix of the seller's continuation, or the highest-ranked
-candidate that is has a probability below 0.1 % (1,000 parts per million).
+followed by a letter or digit, not after another space). The points are drawn
+after the answer arrives, from a secret 32-byte nonce made for each run, so a
+seller cannot know them in advance; the nonce is published in the result. At
+each point it gives the declared model the exact rendered prompt plus the
+seller's answer up to that point, asks for one token at temperature 0 and reads
+its 20 most likely next tokens with their log probabilities. The point is a
+**deviation** when no candidate is a prefix of the seller's continuation, or the
+most probable candidate that is has a probability below 0.1 % (1,000 parts per
+million). An answer that contains a chat template marker such as `<|im_end|>` is
+not scored and counts as unanswered, because those markers could steer the
+reference.
 
 This is the approach recorded in the internal model verification research: it
 needs no log probabilities from the seller and no protocol change, it tolerates
@@ -75,9 +80,12 @@ is 13; with 480 checks it is 11.
 
 - `fail`: deviations ≥ `failAt`. This holds for any number of checks, because
   `failAt` is computed for the checks actually made.
-- `inconclusive`: fewer deviations, but fewer than 480 checks (for example, the
-  seller refused or failed most prompts).
-- `pass`: fewer deviations and at least 480 checks.
+- `inconclusive`: fewer deviations, but a prompt went unanswered or fewer than
+  480 checks were made.
+- `pass`: fewer deviations, every prompt answered and at least 480 checks.
+
+A seller cannot skip the prompts it is unsure about and still pass, and each run
+asks for quotes from a new, unrelated buyer address.
 
 The assumed honest rate, 0.5 %, is about 3.7 times the 95 % upper bound of the
 measured honest rate below (0.14 %), as margin for hardware and serving stacks
@@ -153,11 +161,13 @@ imports the buyer, node or desktop code.
 The result is a `gyblos/model-verification/v1` record in `packages/protocol`
 (`model-verification.ts`, with golden vectors). It holds the verifier address,
 the seller's owner and NodeId, the declared selection, the challenge set id,
-version and digest, the reference tag and digest, the evidence counts
-(`answers`, `checks`, `deviations`, `failAt`), one SHA-256 digest per answer and
-the verdict, signed with the verifier's Ed25519 key. The parser refuses a
-verdict its own evidence contradicts. The evidence file next to it keeps the
-prompts, answers and every check, so the result can be recomputed.
+version and digest, the reference tag and digest, the evidence (prompt, answer,
+check and deviation counts, the rule's minimum checks, assumed honest rate and
+false positive bound, `failAt`, the nonce and one SHA-256 digest per answer) and
+the verdict, signed with the verifier's Ed25519 key. The parser recomputes
+`failAt` and the verdict from the evidence and refuses any result that does not
+match. The evidence file next to it keeps the prompts, answers and every check,
+so the result can be recomputed.
 
 ## Limits
 
@@ -165,8 +175,10 @@ prompts, answers and every check, so the result can be recomputed.
   target. Earlier internal measurements put it near 5 % deviations at
   temperature 0 under a stricter rule; it needs its own rule.
 - **A seller that recognizes the verifier.** The challenge prompts are public in
-  this repository. A seller could route them to the real model. Rotating private
-  challenge sets and prompts shaped like real traffic are follow-ups.
+  this repository. A seller could route them to the real model, or give an
+  answer with too few word starts to reach the minimum, which only yields
+  `inconclusive`. Rotating private challenge sets and prompts shaped like real
+  traffic are follow-ups.
 - **Free offers only.** Paid verification needs a budget decision.
 - **Reference hardware.** The verifier must run the declared model, so verifying
   a large model needs a machine that can load it.

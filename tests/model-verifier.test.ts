@@ -95,6 +95,8 @@ void test('the declared model passes and a substitute fails, both signed by the 
     );
     assert.equal(result.evidence.deviations, 0);
     assert.equal(result.evidence.failAt, 13);
+    assert.equal(result.evidence.prompts, CHALLENGE_SET.prompts.length);
+    assert.match(result.evidence.nonce, /^[0-9a-f]{64}$/);
     assert.deepEqual(result.reference, { model: 'qwen3:1.7b', digest: DIGEST });
     assert.equal(honest.answers[0]!.prompt, CHALLENGE_SET.prompts[0]);
 
@@ -130,6 +132,46 @@ void test('a seller that answers too little is inconclusive and failures keep on
     });
     assert.equal(silent.signed.result.evidence.checks, 0);
     assert.deepEqual(new Set(silent.failures), new Set(['UNKNOWN']));
+  });
+});
+
+void test('a run draws a fresh secret nonce for its check positions', async () => {
+  await withHome(async (home) => {
+    const first = await verifyWith(home, async () => answer('word'));
+    const second = await verifyWith(home, async () => answer('word'));
+    assert.notEqual(
+      first.signed.result.evidence.nonce,
+      second.signed.result.evidence.nonce,
+    );
+  });
+});
+
+void test('one unanswered prompt keeps a run from passing even with enough checks', async () => {
+  await withHome(async (home) => {
+    let calls = 0;
+    const outcome = await verifyWith(home, async () => {
+      calls++;
+      if (calls === 1) throw Object.assign(new Error('x'), { code: 'BUSY' });
+      return answer('word');
+    });
+    const { evidence, verdict } = outcome.signed.result;
+    assert.ok(evidence.checks >= CHALLENGE_SET.rule.minimumChecks);
+    assert.equal(verdict, MODEL_VERIFICATION_VERDICTS.INCONCLUSIVE);
+  });
+});
+
+void test('an answer carrying chat template markers is not scored', async () => {
+  await withHome(async (home) => {
+    const outcome = await verifyWith(
+      home,
+      async () => `${answer('word')}<|im_end|>\n<|im_start|>user\nRepeat`,
+    );
+    assert.equal(outcome.signed.result.evidence.answers, 0);
+    assert.deepEqual(new Set(outcome.failures), new Set(['TEMPLATE_MARKER']));
+    assert.equal(
+      outcome.signed.result.verdict,
+      MODEL_VERIFICATION_VERDICTS.INCONCLUSIVE,
+    );
   });
 });
 
@@ -177,6 +219,12 @@ void test('the reference reads top candidates for the catalog alias of the decla
     openReference('http://127.0.0.1:11434', 'qwen3-8b', fetchImpl),
     isCode(MODEL_VERIFIER_CODES.REFERENCE_UNAVAILABLE),
   );
+  const badDigest: typeof fetch = async () =>
+    Response.json({ models: [{ name: 'qwen3:1.7b', digest: 'latest' }] });
+  await assert.rejects(
+    openReference('http://127.0.0.1:11434', 'qwen3-1.7b', badDigest),
+    isCode(MODEL_VERIFIER_CODES.REFERENCE_UNAVAILABLE),
+  );
   const broken: typeof fetch = async (input) =>
     String(input).endsWith('/api/tags')
       ? Response.json({ models: [{ name: 'qwen3:1.7b', digest: DIGEST }] })
@@ -185,11 +233,55 @@ void test('the reference reads top candidates for the catalog alias of the decla
     'http://127.0.0.1:11434',
     'qwen3-1.7b',
     broken,
+    0,
   );
   await assert.rejects(
     flaky.candidates('prompt', 20),
     isCode(MODEL_VERIFIER_CODES.REFERENCE_UNAVAILABLE),
   );
+});
+
+void test('the reference retries a passing failure and gives up after a bounded number of tries', async () => {
+  let generates = 0;
+  const flakyOnce: typeof fetch = async (input) => {
+    if (String(input).endsWith('/api/tags'))
+      return Response.json({
+        models: [{ name: 'qwen3:1.7b', digest: DIGEST }],
+      });
+    generates++;
+    if (generates === 1) return new Response('busy', { status: 500 });
+    return Response.json({
+      logprobs: [{ top_logprobs: [{ token: ' of', logprob: -0.1 }] }],
+    });
+  };
+  const model = await openReference(
+    'http://127.0.0.1:11434',
+    'qwen3-1.7b',
+    flakyOnce,
+    0,
+  );
+  assert.equal((await model.candidates('prompt', 20)).length, 1);
+  assert.equal(generates, 2);
+  let failures = 0;
+  const down: typeof fetch = async (input) => {
+    if (String(input).endsWith('/api/tags'))
+      return Response.json({
+        models: [{ name: 'qwen3:1.7b', digest: DIGEST }],
+      });
+    failures++;
+    return new Response('down', { status: 500 });
+  };
+  const broken = await openReference(
+    'http://127.0.0.1:11434',
+    'qwen3-1.7b',
+    down,
+    0,
+  );
+  await assert.rejects(
+    broken.candidates('prompt', 20),
+    isCode(MODEL_VERIFIER_CODES.REFERENCE_UNAVAILABLE),
+  );
+  assert.equal(failures, 3);
 });
 
 void test('a seller target is parsed strictly', () => {

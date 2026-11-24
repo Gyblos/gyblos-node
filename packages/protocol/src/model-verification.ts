@@ -26,10 +26,15 @@ export {
 } from './model-verification/constants';
 
 export interface ModelVerificationEvidence {
+  prompts: number;
   answers: number;
   checks: number;
   deviations: number;
+  minimumChecks: number;
+  honestRatePpm: number;
+  falsePositivePpm: number;
   failAt: number;
+  nonce: string;
   answerDigests: string[];
 }
 export interface ModelVerificationV1 {
@@ -66,12 +71,52 @@ function parseVerdict(value: unknown): ModelVerificationVerdict {
   return controlFail();
 }
 
+export function modelVerificationFailAt(
+  checks: number,
+  honestRatePpm: number,
+  falsePositivePpm: number,
+): number {
+  const rate = honestRatePpm / MODEL_VERIFICATION.partsPerMillion;
+  const alpha = falsePositivePpm / MODEL_VERIFICATION.partsPerMillion;
+  let mass = (1 - rate) ** checks;
+  let below = 0;
+  for (let deviations = 0; deviations <= checks; deviations++) {
+    if (1 - below <= alpha) return Math.max(deviations, 1);
+    below += mass;
+    mass *= ((checks - deviations) / (deviations + 1)) * (rate / (1 - rate));
+  }
+  return checks + 1;
+}
+
+export function modelVerificationVerdict(
+  evidence: Pick<
+    ModelVerificationEvidence,
+    'prompts' | 'answers' | 'checks' | 'deviations' | 'minimumChecks' | 'failAt'
+  >,
+): ModelVerificationVerdict {
+  if (evidence.deviations >= evidence.failAt)
+    return MODEL_VERIFICATION_VERDICTS.FAIL;
+  if (
+    evidence.answers < evidence.prompts ||
+    evidence.checks < evidence.minimumChecks
+  )
+    return MODEL_VERIFICATION_VERDICTS.INCONCLUSIVE;
+  return MODEL_VERIFICATION_VERDICTS.PASS;
+}
+
+const PPM_BELOW_ONE = MODEL_VERIFICATION.partsPerMillion - 1;
+
 function parseEvidence(value: unknown): ModelVerificationEvidence {
   const input = controlObject(value, [
+    'prompts',
     'answers',
     'checks',
     'deviations',
+    'minimumChecks',
+    'honestRatePpm',
+    'falsePositivePpm',
     'failAt',
+    'nonce',
     'answerDigests',
   ]);
   const answerDigests = controlArray(
@@ -79,27 +124,30 @@ function parseEvidence(value: unknown): ModelVerificationEvidence {
     MODEL_VERIFICATION.maxAnswers,
   ).map((digest) => controlHex(digest));
   const evidence = {
+    prompts: controlInteger(input.prompts, 1, MODEL_VERIFICATION.maxAnswers),
     answers: controlInteger(input.answers, 0, MODEL_VERIFICATION.maxAnswers),
-    checks: controlInteger(input.checks),
+    checks: controlInteger(input.checks, 0, MODEL_VERIFICATION.maxChecks),
     deviations: controlInteger(input.deviations),
+    minimumChecks: controlInteger(input.minimumChecks, 1),
+    honestRatePpm: controlInteger(input.honestRatePpm, 1, PPM_BELOW_ONE),
+    falsePositivePpm: controlInteger(input.falsePositivePpm, 1, PPM_BELOW_ONE),
     failAt: controlInteger(input.failAt, 1),
+    nonce: controlHex(input.nonce, MODEL_VERIFICATION.nonceBytes),
     answerDigests,
   };
   if (
     evidence.answers !== answerDigests.length ||
-    evidence.deviations > evidence.checks
+    evidence.answers > evidence.prompts ||
+    evidence.deviations > evidence.checks ||
+    evidence.failAt !==
+      modelVerificationFailAt(
+        evidence.checks,
+        evidence.honestRatePpm,
+        evidence.falsePositivePpm,
+      )
   )
     return controlFail();
   return evidence;
-}
-
-function consistentVerdict(
-  evidence: ModelVerificationEvidence,
-  verdict: ModelVerificationVerdict,
-) {
-  const failed = evidence.deviations >= evidence.failAt;
-  if (verdict === MODEL_VERIFICATION_VERDICTS.FAIL) return failed;
-  return !failed;
 }
 
 export function parseModelVerification(value: unknown): ModelVerificationV1 {
@@ -115,7 +163,7 @@ export function parseModelVerification(value: unknown): ModelVerificationV1 {
   const reference = controlObject(input.reference, ['model', 'digest']);
   const evidence = parseEvidence(input.evidence);
   const verdict = parseVerdict(input.verdict);
-  if (!consistentVerdict(evidence, verdict)) return controlFail();
+  if (verdict !== modelVerificationVerdict(evidence)) return controlFail();
   return {
     schemaVersion: MODEL_VERIFICATION.schemaVersion,
     verifier: controlAddress(input.verifier),

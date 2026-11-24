@@ -15,6 +15,7 @@ import { ControlError } from '@gyblos/protocol/control-validation';
 import {
   MODEL_VERIFICATION,
   MODEL_VERIFICATION_VERDICTS,
+  modelVerificationFailAt,
   parseModelVerification,
   signModelVerification,
   verifyModelVerification,
@@ -24,6 +25,11 @@ import { signingBytes } from '@gyblos/protocol/signing';
 
 const T0 = 1_800_000_000_000;
 const DIGEST = 'cd'.repeat(32);
+const RULE = {
+  minimumChecks: 40,
+  honestRatePpm: 5_000,
+  falsePositivePpm: 100,
+};
 
 function verifierKey() {
   const pair = generateKeyPairSync('ed25519');
@@ -49,10 +55,13 @@ function result(
     challengeSet: { id: 'gyblos-text', version: 1, digest: DIGEST },
     reference: { model: 'qwen3:1.7b', digest: DIGEST },
     evidence: {
+      prompts: 2,
       answers: 2,
       checks: 48,
       deviations: 0,
-      failAt: 3,
+      ...RULE,
+      failAt: 5,
+      nonce: DIGEST,
       answerDigests: [DIGEST, DIGEST],
     },
     verdict: MODEL_VERIFICATION_VERDICTS.PASS,
@@ -70,14 +79,22 @@ async function rejects(promise: Promise<unknown>, code: string) {
 
 void test('a verifier signs a result and it verifies detached', async () => {
   const key = verifierKey();
-  for (const verdict of Object.values(MODEL_VERIFICATION_VERDICTS)) {
+  const cases = [
+    [MODEL_VERIFICATION_VERDICTS.PASS, 1, 48, 0],
+    [MODEL_VERIFICATION_VERDICTS.FAIL, 1, 48, 5],
+    [MODEL_VERIFICATION_VERDICTS.INCONCLUSIVE, 1, 24, 0],
+  ] as const;
+  for (const [verdict, prompts, checks, deviations] of cases) {
     const value = result(key.address, {
       verdict,
       evidence: {
+        prompts,
         answers: 1,
-        checks: 24,
-        deviations: verdict === MODEL_VERIFICATION_VERDICTS.FAIL ? 5 : 0,
-        failAt: 3,
+        checks,
+        deviations,
+        ...RULE,
+        failAt: checks === 48 ? 5 : 4,
+        nonce: DIGEST,
         answerDigests: [DIGEST],
       },
     });
@@ -104,10 +121,10 @@ void test('the parser refuses a verdict its own evidence contradicts and malform
   const key = verifierKey();
   const evidence = result(key.address).evidence;
   const bad: unknown[] = [
-    result(key.address, { evidence: { ...evidence, deviations: 3 } }),
+    result(key.address, { evidence: { ...evidence, deviations: 5 } }),
     result(key.address, {
       verdict: MODEL_VERIFICATION_VERDICTS.INCONCLUSIVE,
-      evidence: { ...evidence, deviations: 4 },
+      evidence: { ...evidence, deviations: 6 },
     }),
     result(key.address, { verdict: MODEL_VERIFICATION_VERDICTS.FAIL }),
     result(key.address, { evidence: { ...evidence, answers: 3 } }),
@@ -115,6 +132,23 @@ void test('the parser refuses a verdict its own evidence contradicts and malform
       evidence: { ...evidence, checks: 1, deviations: 2, failAt: 9 },
     }),
     result(key.address, { evidence: { ...evidence, failAt: 0 } }),
+    result(key.address, { evidence: { ...evidence, failAt: 1_000_000 } }),
+    result(key.address, {
+      evidence: { ...evidence, checks: 0, failAt: 1 },
+    }),
+    result(key.address, {
+      evidence: {
+        ...evidence,
+        prompts: 3,
+      },
+    }),
+    result(key.address, {
+      evidence: { ...evidence, honestRatePpm: 1_000_000 },
+    }),
+    result(key.address, {
+      evidence: { ...evidence, checks: 1_000_000, failAt: 5_085 },
+    }),
+    result(key.address, { evidence: { ...evidence, nonce: 'ab' } }),
     result(key.address, { verdict: 'same' as never }),
     result(key.address, { verifier: 'ab'.repeat(32) }),
     { ...result(key.address), extra: true },
@@ -130,6 +164,13 @@ void test('the parser refuses a verdict its own evidence contradicts and malform
     (error: unknown) =>
       error instanceof ControlError && error.code === CONTROL_CODES.VERSION,
   );
+});
+
+void test('the failure threshold is the smallest count an honest seller reaches at most once in the bound', () => {
+  assert.equal(modelVerificationFailAt(720, 5_000, 100), 13);
+  assert.equal(modelVerificationFailAt(480, 5_000, 100), 11);
+  assert.equal(modelVerificationFailAt(48, 5_000, 100), 5);
+  assert.equal(modelVerificationFailAt(0, 5_000, 100), 1);
 });
 
 void test('golden vectors keep the model verification domain and canonical bytes', async () => {

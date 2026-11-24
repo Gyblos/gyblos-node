@@ -1937,13 +1937,20 @@ behind the base58 address `result.verifier`, over the prefix
 | `selection`     | The declared model selection, as in control quotes                                        |
 | `challengeSet`  | `{ id, version, digest }`: identifier, positive version, SHA-256 hex of the canonical set |
 | `reference`     | `{ model, digest }`: the reference model's identifier and 64-hex digest                   |
-| `evidence`      | `{ answers, checks, deviations, failAt, answerDigests }`                                  |
+| `evidence`      | The counts, rule, nonce and answer digests described below                                |
 | `verdict`       | `pass`, `fail` or `inconclusive`                                                          |
 | `issuedAt`      | A non-negative safe integer, milliseconds                                                 |
 
-`answers` is at most 64 and equals the length of `answerDigests`, one SHA-256
-hex digest per answer. `deviations` is at most `checks`, and `failAt` is at
-least 1. The verdict is `fail` exactly when `deviations ≥ failAt`; a `pass` or
-`inconclusive` result with `deviations ≥ failAt`, or a `fail` below it, is
-`INVALID`. The minimum number of checks for `pass` belongs to the challenge set,
-which the digest covers.
+`evidence` has exactly `prompts` (1 to 64), `answers` (at most `prompts`),
+`checks` (at most 16,384), `deviations` (at most `checks`), `minimumChecks`
+(positive), `honestRatePpm` and `falsePositivePpm` (1 to 999,999 parts per
+million), `failAt`, `nonce` (64 hex) and `answerDigests` (one SHA-256 hex digest
+per answer, so its length is `answers`).
+
+`failAt` must equal `modelVerificationFailAt(checks, honestRatePpm,
+falsePositivePpm)`: the smallest count k ≥ 1 whose probability of k or more
+deviations under a binomial distribution with the honest rate is at most the
+false positive bound. The verdict must equal `modelVerificationVerdict`: `fail`
+when `deviations ≥ failAt`, else `inconclusive` when `answers < prompts` or
+`checks < minimumChecks`, else `pass`. A result that disagrees with either is
+`INVALID`.
