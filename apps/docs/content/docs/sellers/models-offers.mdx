@@ -107,7 +107,7 @@ Then add an offer:
 model = "gemma3:4b"
 custom = true
 reasoning = ["off"]
-engine = { kind = "openai", url = "http://127.0.0.1:11434/v1", context_tokens = 8192 }
+engine = { kind = "openai", url = "http://127.0.0.1:11434/v1", context_tokens = 4096 }
 free = { daily_token_cap = 200000, per_buyer_cap = 50000 }
 ```
 
@@ -118,13 +118,17 @@ free = { daily_token_cap = 200000, per_buyer_cap = 50000 }
   before you sell it.
 - The Docker Ollama keeps one model in memory. With two offers it swaps models between requests, which is
   slow and can time out; give each extra model enough memory or keep one offer.
+- `context_tokens` is what buyers are told; it does not change Ollama. Ollama's OpenAI API serves the
+  context its server is set to (`OLLAMA_CONTEXT_LENGTH`), which `ollama ps` shows while the model is
+  loaded. Keep `context_tokens` at or below it.
 - Reasoning must be `off` on this engine. Turn thinking off in the model if it has a switch: hidden
   reasoning tokens can push a paid bill past its cap, and a bill past the cap is not paid.
-- Buyers recount the tokens of catalog Qwen3 models only. For every other model, including the other
+- Buyers recount the tokens of catalog Qwen3 models only. The catalog's `gpt-oss-20b` and `gpt-oss-120b` cannot
+  turn reasoning off, so this engine cannot serve them yet. For every other model, including the other
   catalog IDs, the usage is declared by the seller and capped by the text's size. Only buyers on
   0.1.0-beta.13 or later accept such an offer.
 - Ollama's `qwen3:4b` and `qwen3:30b-a3b` tags are not catalog aliases: they can name builds with another
-  chat template. Use the catalog ID and name the tag in `upstream_model`, for example
+  chat template. Use the catalog ID and name a hybrid tag, never the bare one, in `upstream_model`, for example
   `model = "qwen3-30b-a3b"` with `upstream_model = "qwen3:30b-a3b-q4_K_M"`.
 
 <Callout type="warn" title="A free offer can still cost you money">

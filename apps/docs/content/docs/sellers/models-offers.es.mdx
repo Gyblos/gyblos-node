@@ -107,7 +107,7 @@ Luego agrega una oferta:
 model = "gemma3:4b"
 custom = true
 reasoning = ["off"]
-engine = { kind = "openai", url = "http://127.0.0.1:11434/v1", context_tokens = 8192 }
+engine = { kind = "openai", url = "http://127.0.0.1:11434/v1", context_tokens = 4096 }
 free = { daily_token_cap = 200000, per_buyer_cap = 50000 }
 ```
 
@@ -118,15 +118,19 @@ free = { daily_token_cap = 200000, per_buyer_cap = 50000 }
   con `OLLAMA_NO_CLOUD=1`. Revisa la licencia del modelo antes de venderlo.
 - El Ollama de Docker mantiene un solo modelo en memoria. Con dos ofertas alterna de modelo entre
   solicitudes, lo que es lento y puede agotar el tiempo; dale memoria a cada modelo extra o deja una oferta.
+- `context_tokens` es lo que se anuncia a los compradores; no cambia Ollama. La API compatible con OpenAI
+  de Ollama sirve el contexto que tenga su servidor (`OLLAMA_CONTEXT_LENGTH`), que `ollama ps` muestra
+  mientras el modelo está cargado. Deja `context_tokens` igual o por debajo.
 - En este motor el razonamiento debe ser `off`. Apaga el pensamiento en el modelo si tiene ese
   interruptor: los tokens de razonamiento ocultos pueden pasar un cobro de su tope, y un cobro sobre el
   tope no se paga.
-- Los compradores recuentan los tokens solo de los modelos Qwen3 del catálogo. Para cualquier otro
-  modelo, incluidos los demás IDs del catálogo, el uso lo declara el vendedor, con un tope por el tamaño
+- Los compradores recuentan los tokens solo de los modelos Qwen3 del catálogo. `gpt-oss-20b` y `gpt-oss-120b` del catálogo no
+  pueden apagar el razonamiento, así que este motor todavía no los sirve. Para cualquier otro modelo,
+  incluidos los demás IDs del catálogo, el uso lo declara el vendedor, con un tope por el tamaño
   del texto. Solo los compradores en 0.1.0-beta.13 o posterior aceptan esa oferta.
 - Las etiquetas `qwen3:4b` y `qwen3:30b-a3b` de Ollama no son alias del catálogo: pueden nombrar
-  versiones con otra plantilla de chat. Usa el ID del catálogo y pon la etiqueta en `upstream_model`, por
-  ejemplo `model = "qwen3-30b-a3b"` con `upstream_model = "qwen3:30b-a3b-q4_K_M"`.
+  versiones con otra plantilla de chat. Usa el ID del catálogo y pon una etiqueta híbrida, nunca la que va
+  sin sufijo, en `upstream_model`, por ejemplo `model = "qwen3-30b-a3b"` con `upstream_model = "qwen3:30b-a3b-q4_K_M"`.
 
 <Callout type="warn" title="Una oferta gratuita también puede costarte dinero">
   Un proveedor de modelos alojado puede cobrarte por cada solicitud que atienda
