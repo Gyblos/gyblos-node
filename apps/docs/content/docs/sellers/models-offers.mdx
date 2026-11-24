@@ -116,13 +116,14 @@ free = { daily_token_cap = 200000, per_buyer_cap = 50000 }
 - Pull only local models. A `-cloud` tag makes Ollama send buyers' prompts to ollama.com. The Docker seller
   blocks those tags; for a native seller, start Ollama with `OLLAMA_NO_CLOUD=1`. Check the model's license
   before you sell it.
-- The Docker Ollama keeps one model in memory. With two offers it swaps models between requests, which is
-  slow and can time out; give each extra model enough memory or keep one offer.
+- The Docker Ollama loads one model at a time (`OLLAMA_MAX_LOADED_MODELS=1`), whatever the memory. Two
+  offers on different models swap between requests, which is slow and can time out, so keep one model per
+  Docker seller.
 - `context_tokens` is what buyers are told; it does not change Ollama. Ollama's OpenAI API serves the
   context its server is set to (`OLLAMA_CONTEXT_LENGTH`), which `ollama ps` shows while the model is
-  loaded. Keep `context_tokens` at or below it.
+  loaded (on Docker, `docker compose exec ollama ollama ps`). Keep `context_tokens` at or below it.
 - Reasoning must be `off` on this engine. Turn thinking off in the model if it has a switch: hidden
-  reasoning tokens can push a paid bill past its cap, and a bill past the cap is not paid.
+  reasoning tokens count against the bill's cap, and usage past the cap is not paid.
 - Buyers recount the tokens of catalog Qwen3 models only. The catalog's `gpt-oss-20b` and `gpt-oss-120b` cannot
   turn reasoning off, so this engine cannot serve them yet. For every other model, including the other
   catalog IDs, the usage is declared by the seller and capped by the text's size. Only buyers on
