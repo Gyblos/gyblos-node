@@ -1,7 +1,7 @@
 {
   // Static docs site for docs.gyblos.com (apps/docs): Cloudflare serves the next build output from
-  // out/ with no Worker code. Deploying is a founder-approved manual step; Wrangler is not a workspace
-  // dependency: from this directory, `pnpm build` then `npx wrangler@4.151.1 deploy`.
+  // out/ with no Worker code. Deploying is a founder-approved manual step; the local redirect test uses the workspace
+  // Wrangler dependency. From this directory, build with `pnpm build` before deployment.
   "name": "gyblos-docs",
   "compatibility_date": "2026-10-01",
   "workers_dev": false,
