@@ -129,9 +129,7 @@ function UsageCards({
         }}
         hint="Completed requests out of completed and failed ones. Cancellations are not counted as failures."
       />
-      <div className="col-span-2 grid">
-        <BuyersCard buyers={buyers} days={days} />
-      </div>
+      <BuyersCard className="col-span-2" buyers={buyers} days={days} />
       <StatCard
         icon={Hash}
         label="Output tokens"
@@ -193,7 +191,7 @@ export async function UsageSection({ query }: { query: ExplorerQuery }) {
       <UsageCards
         usage={usage}
         change={change}
-        buyers={snapshot.buyers}
+        buyers={snapshot.buyerTotals}
         days={days}
       />
       <RequestCharts days={snapshot.days} change={change?.requests ?? null} />

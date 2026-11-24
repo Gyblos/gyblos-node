@@ -38,6 +38,14 @@ void test('network buyers are checked at the boundary, and an older collector ha
     { ...buyers, paid: { allTime: hidden } },
     { ...buyers, free: { ...buyers.free, allTime: { buyers: '7' } } },
     { ...buyers, free: { ...buyers.free, allTime: { buyers: 7 } } },
+    {
+      ...buyers,
+      free: { ...buyers.free, allTime: { buyers: 7, withheld: true } },
+    },
+    {
+      ...buyers,
+      paid: { ...buyers.paid, newInRange: { buyers: null, withheld: false } },
+    },
   ])
     assert.throws(() => parseNetworkBuyers(broken), {
       name: 'SourceShapeError',
@@ -55,7 +63,7 @@ void test('withheld buyer counts read as "< 5", never zero, and new buyers keep 
       },
       30,
     ),
-    'New in 30 days: 6 free · < 5 paid',
+    'New in the last 30 days: 6 free · < 5 paid',
   );
   assert.equal(newBuyersText(null, 7), undefined);
 });
@@ -79,6 +87,7 @@ void test('the explorer reads the buyers the collector publishes', async () => {
   const response = await app.request(
     `https://collector.test/v1/stats/network?from=${DAY}&to=${DAY}`,
   );
+  assert.equal(response.status, 200);
   const body = (await response.json()) as { buyerTotals: unknown };
   assert.deepEqual(parseNetworkBuyers(body.buyerTotals), {
     free: {

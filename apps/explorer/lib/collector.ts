@@ -38,7 +38,7 @@ const readCollector = cache(
         aggregatedAt: null,
         days: [],
         models: [],
-        buyers: null,
+        buyerTotals: null,
         error: error instanceof Error ? error.message : 'collector unavailable',
       };
     }
@@ -56,7 +56,7 @@ async function loadCollector(query: string): Promise<CollectorSnapshot> {
     aggregatedAt: Math.max(aggregatedAt(network), aggregatedAt(models)) || null,
     days: list(network.days, 'network.days').map(parseNetworkDay),
     models: list(models.models, 'models.models').map(parseModel),
-    buyers: parseNetworkBuyers(network.buyerTotals),
+    buyerTotals: parseNetworkBuyers(network.buyerTotals),
     error: null,
   };
 }

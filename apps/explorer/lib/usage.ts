@@ -118,5 +118,5 @@ export const buyersText = (side: BuyerCount | null) =>
 
 export const newBuyersText = (buyers: NetworkBuyers | null, days: number) =>
   buyers
-    ? `New in ${days} days: ${buyersText(buyers.free.newInRange)} free · ${buyersText(buyers.paid.newInRange)} paid`
+    ? `New in the last ${days} days: ${buyersText(buyers.free.newInRange)} free · ${buyersText(buyers.paid.newInRange)} paid`
     : undefined;

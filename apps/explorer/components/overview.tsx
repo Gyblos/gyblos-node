@@ -45,13 +45,12 @@ export async function Overview({ query }: { query: ExplorerQuery }) {
           <SellersOnline snapshot={snapshot} variant="footer" />
         )}
         <RequestsCard requests={requests} before={requestsBefore} />
-        <div className="grid sm:col-span-2 xl:col-span-1">
-          <BuyersCard
-            variant="footer"
-            buyers={usage.error ? null : usage.buyers}
-            days={days}
-          />
-        </div>
+        <BuyersCard
+          variant="footer"
+          className="sm:col-span-2 xl:col-span-1"
+          buyers={usage.buyerTotals}
+          days={days}
+        />
         <StatCard
           variant="footer"
           icon={UsdcIcon}

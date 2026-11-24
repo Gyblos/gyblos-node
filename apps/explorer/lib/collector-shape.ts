@@ -39,7 +39,7 @@ export type NetworkSide = Totals & {
   buyers: number | null;
   withheld: boolean;
 };
-export type SellerSide = Totals & Pick<NetworkSide, 'buyers' | 'withheld'>;
+export type SellerSide = Totals & BuyerCount;
 export interface SellerDay {
   day: string;
   free: SellerSide | null;
@@ -90,7 +90,7 @@ export interface CollectorSnapshot {
   aggregatedAt: number | null;
   days: NetworkDay[];
   models: ModelStat[];
-  buyers: NetworkBuyers | null;
+  buyerTotals: NetworkBuyers | null;
   error: string | null;
 }
 
