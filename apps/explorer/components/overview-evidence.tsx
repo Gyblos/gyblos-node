@@ -85,7 +85,7 @@ export async function OverviewOffers({ query }: { query: ExplorerQuery }) {
             {emptySellersMessage(
               sellers,
               query.verified,
-              snapshot.network !== null,
+              !!snapshot.network && !snapshot.network.truncated,
             )}
           </p>
         )
