@@ -16,9 +16,9 @@ const COMPARED = 'vs previous period';
 const LABEL = 'text-body-medium break-words text-text-secondary';
 const VALUE = {
   footer:
-    'max-w-full min-w-0 font-mono text-[clamp(1.125rem,calc(10cqi_+_0.1rem),1.75rem)] leading-none tabular-nums [--number-flow-mask-height:0px]',
+    'max-w-full min-w-0 font-mono text-[clamp(1.125rem,calc(10cqi_+_0.1rem),1.75rem)] leading-tight tabular-nums',
   plain:
-    'max-w-full min-w-0 font-mono text-[clamp(1rem,11cqi,1.375rem)] leading-none tabular-nums [--number-flow-mask-height:0px]',
+    'max-w-full min-w-0 font-mono text-[clamp(1rem,11cqi,1.375rem)] leading-tight tabular-nums',
 } as const;
 
 type Variant = keyof typeof VALUE;
@@ -127,7 +127,7 @@ export function StatCard({
           {hint ? <StatHint label={label} hint={hint} /> : null}
         </div>
         <p className={cx('mt-3', LABEL)}>{label}</p>
-        <div className="@container mt-1 flex min-w-0 items-baseline self-start">
+        <div className="@container mt-1 flex min-w-0 items-baseline self-baseline">
           <Value variant={variant} value={value} sides={sides} money={money} />
         </div>
         {changed || caption ? (
@@ -155,7 +155,7 @@ export function StatCard({
         {hint ? <StatHint label={label} hint={hint} /> : null}
       </div>
       <p className={cx('mx-2 mt-2.5', LABEL)}>{label}</p>
-      <div className="@container mx-2 mt-0.5 mb-3.5 flex min-w-0 items-baseline self-start">
+      <div className="@container mx-2 mt-0.5 mb-3.5 flex min-w-0 items-baseline self-baseline">
         <Value variant={variant} value={value} sides={sides} money={money} />
       </div>
       {band ? (
