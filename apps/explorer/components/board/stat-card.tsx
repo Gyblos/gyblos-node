@@ -115,7 +115,7 @@ export function StatCard({
   const changed = deltas?.some(Boolean) ? deltas : null;
   if (variant === 'plain')
     return (
-      <section className="@container row-span-4 grid min-w-0 grid-rows-subgrid gap-y-0 rounded-xl bg-background-secondary-default p-4">
+      <section className="row-span-4 grid min-w-0 grid-rows-subgrid gap-y-0 rounded-xl bg-background-secondary-default p-4">
         <div className="flex items-start justify-between gap-2">
           <span className="flex items-center rounded-md bg-stat-card-icon-background p-1.5">
             <Icon
@@ -128,7 +128,7 @@ export function StatCard({
         <p className="mt-3 text-body-medium break-words text-text-secondary">
           {label}
         </p>
-        <div className="mt-1 min-w-0 self-baseline">
+        <div className="@container mt-1 flex min-w-0 items-baseline self-start">
           <Value variant={variant} value={value} sides={sides} money={money} />
         </div>
         {changed || caption ? (
@@ -145,7 +145,7 @@ export function StatCard({
     );
   const band = caption ?? (changed ? COMPARED : null);
   return (
-    <section className="@container row-span-4 grid min-w-0 grid-rows-subgrid gap-y-0 rounded-xl bg-background-secondary-default p-2">
+    <section className="row-span-4 grid min-w-0 grid-rows-subgrid gap-y-0 rounded-xl bg-background-secondary-default p-2">
       <div className="flex w-full items-start justify-between gap-2.5 p-2">
         <span className="flex size-10 shrink-0 items-center justify-center rounded-2lg bg-stat-card-icon-background">
           <Icon
@@ -158,7 +158,7 @@ export function StatCard({
       <p className="mx-2 mt-2.5 text-body-medium break-words text-text-secondary">
         {label}
       </p>
-      <div className="mx-2 mt-0.5 mb-3.5 min-w-0 self-baseline">
+      <div className="@container mx-2 mt-0.5 mb-3.5 flex min-w-0 items-baseline self-start">
         <Value variant={variant} value={value} sides={sides} money={money} />
       </div>
       {band ? (
