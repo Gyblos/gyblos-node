@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { chatSession } from '@gyblos/buyer/chat-cli';
+import { chatSession } from '@gyblos/buyer-app/chat-cli';
 import { BATCH_CHANNEL } from '@gyblos/protocol/batch-channel';
 import { OFFER_PRICING_KINDS } from '@gyblos/protocol/constants';
 

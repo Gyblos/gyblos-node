@@ -28,6 +28,7 @@ export const BOUNDARY_LAYERS = {
   INFERENCE: 'inference',
   ADAPTER: 'adapter',
   NODE: 'node',
+  BUYER: 'buyer',
   CONFIG: 'config',
   RUNTIME: 'runtime',
   APPS: 'apps',
@@ -57,7 +58,8 @@ export function layerOf(source: string): BoundaryLayer | null {
     name === BOUNDARY_LAYERS.PROTOCOL ||
     name === BOUNDARY_LAYERS.CONFIG ||
     name === BOUNDARY_LAYERS.RUNTIME ||
-    name === BOUNDARY_LAYERS.NODE
+    name === BOUNDARY_LAYERS.NODE ||
+    name === BOUNDARY_LAYERS.BUYER
   )
     return name;
   return null;
@@ -97,7 +99,7 @@ export function boundaryConfig(
 ): BoundaryConfig {
   const adapters = packageNames.filter((name) => ADAPTER_NAME.test(name));
   const adapterPath = `^packages/(?:${adapters.join('|')})/`;
-  const higherThanCore = `(?:${adapterPath}|^packages/(?:inference|node)/|^apps/)`;
+  const higherThanCore = `(?:${adapterPath}|^packages/(?:inference|node|buyer)/|^apps/)`;
   return {
     forbidden: [
       rule(
@@ -162,11 +164,16 @@ export function boundaryConfig(
       rule(
         'adapters-do-not-import-composition',
         { path: adapterPath },
-        { path: '^(?:packages/(?:inference|node)/|apps/)' },
+        { path: '^(?:packages/(?:inference|node|buyer)/|apps/)' },
       ),
       rule(
         'node-does-not-import-apps',
         { path: '^packages/node/' },
+        { path: '^(?:apps/|packages/buyer/)' },
+      ),
+      rule(
+        'buyer-does-not-import-apps',
+        { path: '^packages/buyer/' },
         { path: '^apps/' },
       ),
       rule(

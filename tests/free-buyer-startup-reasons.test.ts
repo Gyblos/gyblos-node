@@ -57,7 +57,7 @@ void test('buyer:free names state, role, key, reasoning and port failures separa
   const buyer = join(home, 'buyer');
   const { startFreeBuyer } = await import('@gyblos/buyer/free-startup');
   const { startupMessage, startupReason } =
-    await import('@gyblos/buyer/free-main');
+    await import('@gyblos/buyer-app/free-main');
   const reason = async (options: Parameters<typeof startFreeBuyer>[0] = {}) => {
     try {
       const host = await startFreeBuyer(options);

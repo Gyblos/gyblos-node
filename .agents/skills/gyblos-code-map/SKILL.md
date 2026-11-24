@@ -42,7 +42,7 @@ they disagree, `AGENTS.md` and `tooling/boundaries/config.ts` win.
 Splitting by concern inside a package uses a filename prefix, as in
 `packages/protocol/src/control-*.ts`, `packages/core/src/seller-selection-*.ts`,
 `packages/transport-iroh/src/control-{client,server,io}.ts` and
-`apps/buyer/src/selection-*.ts`.
+`packages/buyer/src/selection-*.ts`.
 
 ## 2. Worked examples from the tree
 
@@ -56,7 +56,7 @@ Splitting by concern inside a package uses a filename prefix, as in
 | seller control startup/readiness            | `packages/node/src/control-*.ts`                                | composes transport + core                                  |
 | seller engine plugin (refuse, create)       | `packages/node/src/engine-registry-<kind>.ts`                   | implements `engine-factory`; register in `engine-registry` |
 | seller daemon composition                   | `packages/node/src/seller.ts`                                   | free offer only; paid selling off until phase 2            |
-| buyer selection proxy, offer race           | `apps/buyer/src/selection-proxy.ts`, `offer-race.ts`            | executable wiring                                          |
+| buyer selection, offer race                 | `packages/buyer/src/selection.ts`, `offer-race.ts`              | buyer orchestration; `apps/buyer` only parses arguments    |
 | discovery index client                      | `packages/discovery-http`                                       | HTTP adapter; index defaults in `config`                   |
 | discovery index server (Worker)             | `apps/discovery-index`                                          | deployable app; verification via protocol only             |
 | `GYBLOS_HOME` / `GYBLOS_LAB_HOME` layout    | `packages/config/src/home.ts`                                   | single path owner                                          |

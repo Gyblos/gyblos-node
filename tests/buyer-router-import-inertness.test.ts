@@ -16,7 +16,7 @@ void test('free execution import does not initialize a buyer secret', () => {
  import {createRequire,syncBuiltinESMExports} from 'node:module';
  const crypto=createRequire(import.meta.url)('node:crypto');
  const original=crypto.randomBytes;let calls=0;
- crypto.randomBytes=(...args)=>{if(new Error().stack?.includes('/apps/buyer/src/free-execution.ts'))calls++;return Reflect.apply(original,crypto,args);};
+ crypto.randomBytes=(...args)=>{if(new Error().stack?.includes('/packages/buyer/src/free-execution.ts'))calls++;return Reflect.apply(original,crypto,args);};
  syncBuiltinESMExports();await import('@gyblos/buyer/free-execution');assert.equal(calls,0);
  `,
     ],

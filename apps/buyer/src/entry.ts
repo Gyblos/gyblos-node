@@ -1,4 +1,4 @@
-import { BUYER_COMMANDS, BUYER_HELP_FLAGS } from './constants';
+import { BUYER_COMMANDS, BUYER_HELP_FLAGS } from '@gyblos/buyer/constants';
 
 type BuyerCommand = (typeof BUYER_COMMANDS)[keyof typeof BUYER_COMMANDS];
 type BuyerRoute = (args: readonly string[]) => Promise<unknown>;
@@ -21,14 +21,15 @@ const USAGE = `Usage: buyer <command> [options]
 
 export const BUYER_ROUTES: BuyerRoutes = {
   [BUYER_COMMANDS.START]: async () => {
-    const { startBuyer } = await import('./buyer-startup');
+    const { startBuyer } = await import('@gyblos/buyer/buyer-startup');
     return (await import('./free-main')).main(startBuyer);
   },
   [BUYER_COMMANDS.FREE]: async () => (await import('./free-main')).main(),
   [BUYER_COMMANDS.CHAT]: async () => (await import('./chat-cli')).main(),
   [BUYER_COMMANDS.INIT]: async (args) =>
     (await import('./init')).main([...args]),
-  [BUYER_COMMANDS.SETUP]: async () => (await import('./setup')).main(),
+  [BUYER_COMMANDS.SETUP]: async () =>
+    (await import('@gyblos/buyer/setup')).main(),
   [BUYER_COMMANDS.AUTO]: async (args) =>
     (await import('./auto-cli')).main([...args]),
   [BUYER_COMMANDS.AGENT]: async (args) =>

@@ -1,4 +1,16 @@
 // Owns the free buyer process lifetime. Importing this entry creates no endpoint, timer or files.
+import {
+  FREE_BUYER_CODES,
+  FREE_BUYER_STARTUP,
+  PAID_BUYER,
+  SELLER_FAILURES,
+  type FreeBuyerStartupReason,
+} from '@gyblos/buyer/constants';
+import {
+  FreeBuyerStartupError,
+  startFreeBuyer,
+} from '@gyblos/buyer/free-startup';
+import type { SellerFailure } from '@gyblos/buyer/seller-failures';
 import { FREE_OUTPUT_TOKENS, PORTS } from '@gyblos/config';
 import { BUYER_DEPOSIT_MINIMUM_HINT } from '@gyblos/config/batch-session';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
@@ -6,16 +18,6 @@ import { NodeError } from '@gyblos/node/errors';
 import { shutdownSignal } from '@gyblos/runtime';
 import type { RelayConfigurationCode } from '@gyblos/transport-iroh/constants';
 import { RelayConfigurationError } from '@gyblos/transport-iroh/relays';
-
-import {
-  FREE_BUYER_CODES,
-  FREE_BUYER_STARTUP,
-  PAID_BUYER,
-  SELLER_FAILURES,
-  type FreeBuyerStartupReason,
-} from './constants';
-import { FreeBuyerStartupError, startFreeBuyer } from './free-startup';
-import type { SellerFailure } from './seller-failures';
 
 const BUYER_DOCS = 'docs/running-a-node.md "Free v2 buyer endpoint"';
 // Next steps by reason; static text only, never a path from the environment.

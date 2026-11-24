@@ -22,6 +22,9 @@ importers:
     dependencies:
       '@gyblos/buyer':
         specifier: workspace:*
+        version: link:packages/buyer
+      '@gyblos/buyer-app':
+        specifier: workspace:*
         version: link:apps/buyer
       '@gyblos/config':
         specifier: workspace:*
@@ -180,24 +183,18 @@ importers:
 
   apps/buyer:
     dependencies:
+      '@gyblos/buyer':
+        specifier: workspace:*
+        version: link:../../packages/buyer
       '@gyblos/config':
         specifier: workspace:*
         version: link:../../packages/config
       '@gyblos/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@gyblos/discovery-http':
-        specifier: workspace:*
-        version: link:../../packages/discovery-http
-      '@gyblos/inference':
-        specifier: workspace:*
-        version: link:../../packages/inference
       '@gyblos/node':
         specifier: workspace:*
         version: link:../../packages/node
-      '@gyblos/payments-upto':
-        specifier: workspace:*
-        version: link:../../packages/payments-upto
       '@gyblos/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
@@ -207,9 +204,6 @@ importers:
       '@gyblos/transport-iroh':
         specifier: workspace:*
         version: link:../../packages/transport-iroh
-      '@number0/iroh':
-        specifier: 1.2.0
-        version: 1.2.0
 
   apps/desktop:
     dependencies:
@@ -455,7 +449,7 @@ importers:
     dependencies:
       '@gyblos/buyer':
         specifier: workspace:*
-        version: link:../../apps/buyer
+        version: link:../../packages/buyer
       '@gyblos/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -519,6 +513,39 @@ importers:
       express:
         specifier: 4.22.3
         version: 4.22.3
+
+  packages/buyer:
+    dependencies:
+      '@gyblos/config':
+        specifier: workspace:*
+        version: link:../config
+      '@gyblos/core':
+        specifier: workspace:*
+        version: link:../core
+      '@gyblos/discovery-http':
+        specifier: workspace:*
+        version: link:../discovery-http
+      '@gyblos/inference':
+        specifier: workspace:*
+        version: link:../inference
+      '@gyblos/node':
+        specifier: workspace:*
+        version: link:../node
+      '@gyblos/payments-upto':
+        specifier: workspace:*
+        version: link:../payments-upto
+      '@gyblos/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@gyblos/runtime':
+        specifier: workspace:*
+        version: link:../runtime
+      '@gyblos/transport-iroh':
+        specifier: workspace:*
+        version: link:../transport-iroh
+      '@number0/iroh':
+        specifier: 1.2.0
+        version: 1.2.0
 
   packages/config:
     dependencies:

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 
-import { chatSession } from '@gyblos/buyer/chat-cli';
+import { chatSession } from '@gyblos/buyer-app/chat-cli';
 import { batchSessionPathsIn } from '@gyblos/config/home';
 import { OFFER_PRICING_KINDS, P2P_ROLES } from '@gyblos/protocol/constants';
 
