@@ -8,6 +8,7 @@ import {
   nullable,
   num,
   record,
+  SourceShapeError,
   text,
   type JsonRecord,
 } from './validate';
@@ -38,7 +39,7 @@ export type NetworkSide = Totals & {
   buyers: number | null;
   withheld: boolean;
 };
-export type SellerSide = Totals & Pick<NetworkSide, 'buyers' | 'withheld'>;
+export type SellerSide = Totals & BuyerCount;
 export interface SellerDay {
   day: string;
   free: SellerSide | null;
@@ -76,10 +77,20 @@ export interface ModelStat {
   free: ModelSide | null;
   paid: ModelSide | null;
 }
+export type BuyerCount = Pick<NetworkSide, 'buyers' | 'withheld'>;
+export interface BuyerTotals {
+  allTime: BuyerCount;
+  newInRange: BuyerCount;
+}
+export interface NetworkBuyers {
+  free: BuyerTotals;
+  paid: BuyerTotals;
+}
 export interface CollectorSnapshot {
   aggregatedAt: number | null;
   days: NetworkDay[];
   models: ModelStat[];
+  buyerTotals: NetworkBuyers | null;
   error: string | null;
 }
 
@@ -155,6 +166,39 @@ function sellerSide(value: unknown, where: string): SellerSide {
     ),
     withheld: flag(source.withheld, `${where}.withheld`),
   };
+}
+function buyerCount(value: unknown, where: string): BuyerCount {
+  const source = record(value, where);
+  const withheld = flag(source.withheld, `${where}.withheld`);
+  const buyers = nullable(source.buyers, (present) =>
+    num(present, `${where}.buyers`),
+  );
+  if (withheld !== (buyers === null)) throw new SourceShapeError(where);
+  return { buyers, withheld };
+}
+function buyerTotals(value: unknown, where: string): BuyerTotals {
+  const source = record(value, where);
+  return {
+    allTime: buyerCount(source.allTime, `${where}.allTime`),
+    newInRange: buyerCount(source.newInRange, `${where}.newInRange`),
+  };
+}
+export function parseNetworkBuyers(value: unknown): NetworkBuyers | null {
+  return nullable(value, (present) => {
+    const source = record(present, 'buyerTotals');
+    return {
+      free: buyerTotals(source.free, 'buyerTotals.free'),
+      paid: buyerTotals(source.paid, 'buyerTotals.paid'),
+    };
+  });
+}
+export function optionalNetworkBuyers(value: unknown): NetworkBuyers | null {
+  try {
+    return parseNetworkBuyers(value);
+  } catch (error) {
+    if (error instanceof SourceShapeError) return null;
+    throw error;
+  }
 }
 function networkSide(value: unknown, where: string): NetworkSide {
   const source = record(value, where);
