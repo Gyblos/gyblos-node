@@ -4,6 +4,8 @@
 const VERSION =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*))?$/;
 
+const CORE_PARTS = 3;
+
 interface Version {
   core: bigint[];
   pre: string[];
@@ -13,8 +15,8 @@ function parse(text: string | undefined): Version | undefined {
   const match = VERSION.exec(text ?? '');
   if (!match) return undefined;
   return {
-    core: match.slice(1, 4).map(BigInt),
-    pre: match[4] === undefined ? [] : match[4].split('.'),
+    core: match.slice(1, CORE_PARTS + 1).map(BigInt),
+    pre: match[CORE_PARTS + 1]?.split('.') ?? [],
   };
 }
 
@@ -32,7 +34,7 @@ function compareIdentifiers(a: string, b: string): number {
 }
 
 function compare(a: Version, b: Version): number {
-  for (let index = 0; index < 3; index += 1) {
+  for (let index = 0; index < CORE_PARTS; index += 1) {
     const left = a.core[index] ?? 0n;
     const right = b.core[index] ?? 0n;
     if (left !== right) return left < right ? -1 : 1;
