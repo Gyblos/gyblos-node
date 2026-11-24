@@ -217,20 +217,28 @@ void test('private local conversation file survives close and reopen with owner-
   const storage = createChatArchiveStorage(profile);
   try {
     const loaded = await storage.store.load();
+    const chat = conversation();
+    chat.pinChat(chat.getSnapshot().activeId, true);
     storage.store.save({
       generation: loaded.generation,
       sequence: 1,
-      archive: projectChatArchive(conversation().getSnapshot()),
+      archive: projectChatArchive(chat.getSnapshot()),
     });
     await storage.close();
     const paths = desktopChatPaths(profile);
-    assert.match(await readFile(paths.state, 'utf8'), /Synthetic answer/);
+    const transcript = await readFile(paths.state, 'utf8');
+    assert.match(transcript, /Synthetic answer/);
+    assert.doesNotMatch(transcript, /"pinned"/);
     if (process.platform !== 'win32')
       assert.equal((await stat(paths.state)).mode & 0o777, 0o600);
     const reopened = createChatArchiveStorage(profile);
     assert.equal(
       (await reopened.store.load()).archive?.sessions[0]?.draft,
       'Unsent draft',
+    );
+    assert.equal(
+      (await reopened.store.load()).archive?.sessions[0]?.pinned,
+      true,
     );
     await reopened.close();
   } finally {

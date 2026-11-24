@@ -9,7 +9,8 @@ import {
 
 type Files = {
   read(): Promise<string | undefined>;
-  write(text: string): Promise<void>;
+  write(text: string, pins: readonly string[]): Promise<void>;
+  readPins?(): Promise<readonly string[]>;
 };
 export class ChatArchiveStore {
   private archive: ChatArchive | null = null;
@@ -23,6 +24,7 @@ export class ChatArchiveStore {
   private writing = Promise.resolve();
   private pending: {
     text: string;
+    pins: string[];
     sequence: number;
     generation: number;
   } | null = null;
@@ -37,6 +39,11 @@ export class ChatArchiveStore {
           const value: unknown = JSON.parse(text);
           this.archive = parseChatArchive(value);
           if (!this.archive) this.available = false;
+          else if (this.files.readPins) {
+            const pins = new Set(await this.files.readPins());
+            for (const session of this.archive.sessions)
+              if (pins.has(session.id)) session.pinned = true;
+          }
         }
       } catch {
         this.available = false;
@@ -83,7 +90,15 @@ export class ChatArchiveStore {
     this.archive = request.archive;
     this.acceptedSequence = request.sequence;
     this.pending = {
-      text: JSON.stringify(request.archive),
+      text: JSON.stringify({
+        ...request.archive,
+        sessions: request.archive.sessions.map(
+          ({ pinned: _pinned, ...conversation }) => conversation,
+        ),
+      }),
+      pins: request.archive.sessions
+        .filter((item) => item.pinned)
+        .map((item) => item.id),
       sequence: request.sequence,
       generation: request.generation,
     };
@@ -98,7 +113,7 @@ export class ChatArchiveStore {
         while (this.pending) {
           const next = this.pending;
           this.pending = null;
-          await this.files.write(next.text);
+          await this.files.write(next.text, next.pins);
           if (next.generation === this.generation)
             this.savedSequence = next.sequence;
         }
