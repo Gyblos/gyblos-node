@@ -82,6 +82,14 @@ pending wait on disk for the next start; observations not sent by then are dropp
 model and per-seller daily totals, keyed by NodeId. It uses your IP address for rate limiting and does
 not store it.
 
+The network totals also count distinct buyers: free buyers by NodeId and paid buyers by wallet (or by
+NodeId when a paid receipt names no wallet), never added together. Each count is published for all
+time and for the buyers whose first confirmed or seller-reported receipt falls in the chosen days.
+Buyers new today are counted only once the UTC day ends. A count below 5, zero included, is withheld.
+These are counts only, never which buyers they are. Subtracting the counts of two ranges, or of all
+time and a range, can still give counts below 5, down to the new buyers of a single day, and anyone
+who creates their own keys can push a count past 5.
+
 **On your machine.** The seller keeps pending receipts until the collector accepts them, plus a short
 history of uploaded ones (at most 256, for up to seven days). `gyblos seller status` shows the queue.
 

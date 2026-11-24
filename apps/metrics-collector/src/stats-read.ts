@@ -5,16 +5,19 @@ import {
   and,
   asc,
   between,
+  count,
   countDistinct,
   desc,
   eq,
+  inArray,
+  lt,
   lte,
   sql,
   type SQL,
 } from 'drizzle-orm';
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core';
 
-import { AGGREGATES } from './constants';
+import { AGGREGATES, FIRST_SEEN_KINDS } from './constants';
 import {
   createD1Orm,
   type CollectorDatabase,
@@ -32,6 +35,7 @@ import {
   aggSellerBuyersDaily,
   aggSellerDaily,
   chainCursor,
+  firstSeen,
 } from './schema';
 import {
   HISTOGRAM_KEYS,
@@ -39,7 +43,7 @@ import {
   type ReceiptTotalKey,
   type ReceiptTotals,
 } from './schema-aggregates';
-import { histogramSum, total } from './sql-primitives';
+import { distinctWhere, histogramSum, total } from './sql-primitives';
 import type { StatsReader } from './stats-store';
 
 type TotalsTable = typeof aggSellerDaily | typeof aggNetworkDaily;
@@ -74,7 +78,7 @@ const within = (column: SQLiteColumn, range: DayRange) =>
 const modelColumns = (table: typeof aggSellerDaily) =>
   [table.modelId, table.variant, table.quantization] as const;
 
-function network(orm: CollectorDatabase, range: DayRange) {
+function network(orm: CollectorDatabase, range: DayRange, today: string) {
   const net = aggNetworkDaily;
   const dem = aggDemandDaily;
   // The largest demand rows of each day, in SQL.
@@ -148,6 +152,26 @@ function network(orm: CollectorDatabase, range: DayRange) {
         asc(aggFailuresDaily.event),
         asc(aggFailuresDaily.reason),
       ),
+    orm
+      .select({
+        kind: firstSeen.kind,
+        allTime: count(),
+        newInRange: distinctWhere(
+          firstSeen.id,
+          within(firstSeen.firstDay, range),
+        ),
+      })
+      .from(firstSeen)
+      .where(
+        and(
+          inArray(firstSeen.kind, [
+            FIRST_SEEN_KINDS.BUYER_FREE,
+            FIRST_SEEN_KINDS.BUYER_PAID,
+          ]),
+          lt(firstSeen.firstDay, today),
+        ),
+      )
+      .groupBy(firstSeen.kind),
   ]);
 }
 
@@ -284,12 +308,17 @@ function chain(orm: CollectorDatabase, range: DayRange) {
 export function statsReader(database: D1Database): StatsReader {
   const orm = createD1Orm(database);
   return {
-    async network(range) {
-      const [networkRows, observed, demand, origins, failures] = await network(
-        orm,
-        range,
-      );
-      return { network: networkRows, observed, demand, origins, failures };
+    async network(range, today) {
+      const [networkRows, observed, demand, origins, failures, buyerTotals] =
+        await network(orm, range, today);
+      return {
+        network: networkRows,
+        observed,
+        demand,
+        origins,
+        failures,
+        buyerTotals,
+      };
     },
     async models(range) {
       const [rows, observed] = await models(orm, range);

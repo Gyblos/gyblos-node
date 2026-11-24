@@ -1,6 +1,7 @@
 // Owns the public stats use case: turns aggregate rows from the read port into the typed answers of
 // GET /v1/stats/network, /v1/stats/models and /v1/stats/sellers/:nodeId (docs/metrics-collector.md).
 // Aggregates only: never a receipt, a buyer identity or a raw observation.
+import { FIRST_SEEN_KINDS, type FirstSeenKind } from './constants';
 import { daysOf, type DayRange } from './days';
 import {
   failureEntry,
@@ -65,8 +66,13 @@ export interface ModelEntry<F = object, P = object> extends Sides<F, P> {
   variant: string | null;
   quantization: string | null;
 }
+export interface BuyerTotals {
+  allTime: PublicBuyers;
+  newInRange: PublicBuyers;
+}
 export interface NetworkStats extends StatsEnvelope {
   days: NetworkDay[];
+  buyerTotals: { free: BuyerTotals; paid: BuyerTotals };
 }
 // What buyers saw and how fast the engine generated, on one side of one model; null without any
 // observation joined to a receipt of that side.
@@ -145,9 +151,18 @@ export function groupBy<T>(rows: readonly T[], key: (row: T) => string) {
 export async function networkStats(
   reader: StatsReader,
   range: DayRange,
+  today: string,
 ): Promise<NetworkStats> {
-  const { network, observed, demand, origins, failures } =
-    await reader.network(range);
+  const { network, observed, demand, origins, failures, buyerTotals } =
+    await reader.network(range, today);
+  const buyersByKind = new Map(buyerTotals.map((row) => [row.kind, row]));
+  const totalsOf = (kind: FirstSeenKind): BuyerTotals => {
+    const row = buyersByKind.get(kind);
+    return {
+      allTime: publicBuyers(row?.allTime),
+      newInRange: publicBuyers(row?.newInRange),
+    };
+  };
   const originsByDay = groupBy(origins, (row) => row.day);
   const failuresByDay = groupBy(failures, (row) => row.day);
   const networkByDay = groupBy(network, (row) => row.day);
@@ -196,6 +211,10 @@ export async function networkStats(
       ...failures.map(fromRow),
     ]),
     days,
+    buyerTotals: {
+      free: totalsOf(FIRST_SEEN_KINDS.BUYER_FREE),
+      paid: totalsOf(FIRST_SEEN_KINDS.BUYER_PAID),
+    },
   };
 }
 

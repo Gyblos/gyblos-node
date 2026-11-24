@@ -9,7 +9,7 @@ import {
   text,
 } from 'drizzle-orm/sqlite-core';
 
-import { AGG_STATE_ID } from './constants';
+import { AGG_STATE_ID, type FirstSeenKind } from './constants';
 
 // Additive receipt columns shared by the seller hourly, seller daily and network tables. Fresh
 // builders per table, as Drizzle requires.
@@ -161,7 +161,7 @@ export const aggDemandDaily = sqliteTable(
 export const firstSeen = sqliteTable(
   'collector_first_seen',
   {
-    kind: text('kind').notNull(),
+    kind: text('kind').$type<FirstSeenKind>().notNull(),
     id: text('id').notNull(),
     firstDay: text('first_day').notNull(),
     firstAt: integer('first_at').notNull(),

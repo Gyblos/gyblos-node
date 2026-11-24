@@ -83,6 +83,15 @@ descartan. La subida nunca retrasa ni bloquea una respuesta.
 de la red, por modelo y por vendedor, identificados por NodeId. Usa tu dirección IP para limitar la tasa
 de solicitudes y no la guarda.
 
+Los totales de la red también cuentan compradores distintos: los gratuitos por NodeId y los de pago por
+billetera (o por NodeId cuando un recibo de pago no nombra billetera), sin sumarlos nunca. Cada conteo
+se publica para todo el historial y para los compradores cuyo primer recibo confirmado o informado por
+el vendedor cae en los días elegidos. Los compradores nuevos de hoy se cuentan solo cuando termina el
+día UTC. Un conteo menor que 5, incluido el cero, se oculta. Son solo conteos, nunca quiénes son esos
+compradores. Aun así, restar los conteos de dos rangos, o del historial y un rango, puede dar conteos
+menores que 5, hasta los compradores nuevos de un solo día, y quien cree sus propias llaves puede
+llevar un conteo por encima de 5.
+
 **En tu equipo.** El vendedor guarda los recibos pendientes hasta que el recolector los acepta, más un
 historial corto de los ya subidos (como máximo 256, durante hasta siete días). `gyblos seller status`
 muestra la cola.

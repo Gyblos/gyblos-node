@@ -304,7 +304,9 @@ stores `formula_version` (`AGGREGATES.formulaVersion`) and `aggregated_at`.
   connect failures), and connect failures. A refusal by a chosen seller is not
   demand that no seller served.
 - **First seen:** the earliest headline receipt time per seller, free buyer,
-  paid buyer and model. Recomputing an earlier day can only move it earlier.
+  paid buyer and model. Recomputing an earlier day can only move it earlier. A
+  row is never removed: a buyer whose only receipt later turns disputed stays
+  counted in `buyerTotals`, while that day's `buyers` drops it.
 
 **What the numbers can and cannot prove.** Node keys are free. A seller-only
 receipt needs only the seller's signature, and a "bilateral" one can come from
@@ -422,16 +424,33 @@ the count is withheld: a seller's day and model totals (requests, tokens,
 authorized amounts) are published whatever its number of buyers, so on a day
 with one buyer they describe that one pseudonymous buyer's use of that seller.
 
-| Route                           | Answer                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `GET /v1/stats/network`         | `days`: every day of the range with `free` and `paid` (plus `conflicts`, `activeSellers`, `modelsServed`, `buyers`, `withheld`); `observed` (`buyerLatency.firstToken`, `buyerLatency.total`, `routes.direct`, `routes.relay`, `routes.unknown`), `null` without observations that day; and `demand`: up to 20 models per day, largest first, each `modelId`, `unserved`, `refusedBeforeSelection`, `connectFailed`; `origins`: each `client`, `paid`, `requests`, `outcomes` (`completed`, `failed`, `cancelled`), `buyers`, `withheld`; and `failures`: each `side`, `client`, `event`, `reason`, `events`, `buyers`, `withheld`, most events first. |
-| `GET /v1/stats/models`          | `models`: up to 100 models (model, variant and quantization) with the most completed requests, free and paid together, each with `free` and `paid` (plus `sellers`, and `observed`: `buyerFirstToken` as a latency, and `engineSpeed` with `samples`, `p50MinTokensPerSecond` (the lower bound of the median's bucket; `null` only without samples), `bucketsTokensPerSecond` and `counts`; `observed` is `null` without any observation joined to a receipt of that side, and either metric is empty, with `samples` 0, when only the other has data).                                                                                                |
-| `GET /v1/stats/sellers/:nodeId` | `days`: every day of the range with `free` and `paid` plus `buyers` and `withheld`; `models`: up to 100 of the seller's models over the range, ordered as above.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+The network answer also has `buyerTotals`, distinct buyers from
+`collector_first_seen` in a `free` section (NodeIds) and a `paid` section
+(wallets, or the NodeId when a paid receipt names no wallet), never added
+together. Each section has `allTime` (every buyer first seen before today, UTC,
+whatever the range) and `newInRange` (buyers whose first headline receipt falls
+on a day of the range before today), each a `buyers` count with `withheld` under
+the same rule: below 5, zero included, the count is `null`. Today's new buyers
+are left out until the UTC day ends, so repeated reads do not show when each new
+buyer arrived. The counts are published, never the buyers, but they can be
+subtracted: two ranges, or `allTime` and a range up to yesterday, give exact
+counts below 5, down to the new buyers of a single day. Self-made keys (see
+above) can also be used to cross the threshold of 5. `buyerTotals` is outside
+the envelope: `aggregatedAt` and `formulaVersion` describe the days only, and an
+answer whose days have no data can still carry `buyerTotals`.
 
-Each stats request is one batch of reads over aggregate tables: five statements
+| Route                           | Answer                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /v1/stats/network`         | `days`: every day of the range with `free` and `paid` (plus `conflicts`, `activeSellers`, `modelsServed`, `buyers`, `withheld`); `observed` (`buyerLatency.firstToken`, `buyerLatency.total`, `routes.direct`, `routes.relay`, `routes.unknown`), `null` without observations that day; and `demand`: up to 20 models per day, largest first, each `modelId`, `unserved`, `refusedBeforeSelection`, `connectFailed`; `origins`: each `client`, `paid`, `requests`, `outcomes` (`completed`, `failed`, `cancelled`), `buyers`, `withheld`; and `failures`: each `side`, `client`, `event`, `reason`, `events`, `buyers`, `withheld`, most events first. Also `buyerTotals` with `free` and `paid`, each `allTime` and `newInRange` (`buyers`, `withheld`). |
+| `GET /v1/stats/models`          | `models`: up to 100 models (model, variant and quantization) with the most completed requests, free and paid together, each with `free` and `paid` (plus `sellers`, and `observed`: `buyerFirstToken` as a latency, and `engineSpeed` with `samples`, `p50MinTokensPerSecond` (the lower bound of the median's bucket; `null` only without samples), `bucketsTokensPerSecond` and `counts`; `observed` is `null` without any observation joined to a receipt of that side, and either metric is empty, with `samples` 0, when only the other has data).                                                                                                                                                                                                   |
+| `GET /v1/stats/sellers/:nodeId` | `days`: every day of the range with `free` and `paid` plus `buyers` and `withheld`; `models`: up to 100 of the seller's models over the range, ordered as above.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+
+Each stats request is one batch of reads over aggregate tables: six statements
 for the network answer, three for the seller answer, two in one batch for
 models, two for chain, whatever the range; the chain transaction list is one
-statement per page. Histograms are summed and lists are capped in SQL.
+statement per page. Histograms are summed and lists are capped in SQL. The one
+read whose cost grows with history is the network answer's buyer totals: one
+grouped count over every first-seen buyer row, whatever the range.
 
 ### Chain stats
 
