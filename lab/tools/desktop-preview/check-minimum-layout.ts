@@ -93,6 +93,15 @@ export async function checkMinimumLayout() {
       throw new Error(
         'Text action ' + label + ' ' + box.width + 'x' + box.height,
       );
+    const text = action.querySelector('.ui-action-label');
+    if (!text || text.getBoundingClientRect().width > 1)
+      throw new Error('Visible label ' + label);
+    const tip = action.nextElementSibling;
+    if (
+      !tip?.matches('.ui-tooltip') ||
+      getComputedStyle(tip).display === 'none'
+    )
+      throw new Error('Missing tooltip ' + label);
   }
   function apart(cells: Element[]) {
     const boxes = cells.map((cell) =>
