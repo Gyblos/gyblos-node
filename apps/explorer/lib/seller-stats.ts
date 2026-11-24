@@ -5,10 +5,8 @@ import {
   type ModelStat,
   type SellerDay,
 } from './collector-shape';
-import { COLLECTOR_URL } from './config';
-import { UNITS } from './constants';
-import { fetchJson } from './fetch-json';
-import { rangeQuery, type RangeDays } from './range';
+import { rangeEnd, type RangeDays } from './range';
+import { readStats } from './stats-window';
 
 export interface SellerStats {
   aggregatedAt: number | null;
@@ -24,9 +22,10 @@ export const getSellerStats = cache(
     closed = false,
   ): Promise<SellerStats> => {
     try {
-      const body = await fetchJson(
-        `${COLLECTOR_URL}/stats/sellers/${nodeId}${rangeQuery(days, Date.now() - (closed ? UNITS.msPerDay : 0))}`,
-        'collector seller',
+      const body = await readStats(
+        `sellers/${encodeURIComponent(nodeId)}`,
+        days,
+        rangeEnd(days, Date.now(), closed),
       );
       return { ...parseSellerStats(body), error: null };
     } catch (error) {

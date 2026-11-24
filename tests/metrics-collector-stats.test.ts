@@ -57,6 +57,9 @@ interface Side {
 }
 interface Answer {
   error?: string;
+  from?: string;
+  range?: string;
+  historyAvailable?: boolean;
   to?: string;
   formulaVersion?: number | null;
   aggregatedAt?: number | null;
@@ -326,4 +329,52 @@ void test('models carry buyer first token and engine speed per side, from joined
     observed.engineSpeed.bucketsTokensPerSecond,
     AGGREGATES.tokensPerSecondBuckets,
   );
+});
+
+void test('all-time stats start at the first eligible aggregate and keep buyer thresholds', async () => {
+  const database = createCollectorD1();
+  insertReceipt(database);
+  await runAggregation(database, NOW);
+  const end = '2027-04-01';
+  const app = collector(database, Date.parse(end));
+  for (const route of ['network', 'models', `sellers/${SELLER_A}`]) {
+    const { body, status } = await get(
+      app,
+      `/v1/stats/${route}?range=all&to=${end}`,
+    );
+    assert.equal(status, 200);
+    assert.deepEqual(
+      [body.range, body.from, body.to, body.historyAvailable],
+      ['all', DAY, end, true],
+    );
+    if (route === 'network') {
+      assert.ok(body.days.length > AGGREGATES.maxRangeDays);
+      assert.equal(body.days[0]?.free.buyers, null);
+      assert.equal(body.days[0]?.free.withheld, true);
+    }
+  }
+  for (const route of ['chain', `sellers/${SELLER_B}`]) {
+    const { body } = await get(app, `/v1/stats/${route}?range=all&to=${end}`);
+    assert.deepEqual(
+      [body.from, body.to, body.historyAvailable],
+      [end, end, false],
+    );
+  }
+  const before = '2026-01-01';
+  const empty = await get(app, `/v1/stats/network?range=all&to=${before}`);
+  assert.deepEqual(
+    [empty.body.from, empty.body.to, empty.body.historyAvailable],
+    [before, before, false],
+  );
+  for (const tail of [
+    '&from=2026-11-01',
+    '&to=9999-01-01',
+    '&range=all',
+    '&to=2026-02-30',
+  ]) {
+    assert.equal(
+      (await get(app, `/v1/stats/network?range=all${tail}`)).status,
+      400,
+    );
+  }
 });

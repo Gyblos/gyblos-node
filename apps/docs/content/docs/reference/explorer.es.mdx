@@ -11,15 +11,15 @@ explorador muestra una versión corta.
 
 | Página          | Qué muestra                                                                         |
 | --------------- | ----------------------------------------------------------------------------------- |
-| Red (`/`)       | Tokens, solicitudes y demanda observados, ofertas actuales y operaciones recientes. |
+| Red (`/`)       | Tokens y solicitudes registrados, pagos a vendedores, ofertas actuales y operaciones recientes. |
 | `/sellers`      | Cada vendedor en línea ahora, y los que están desconectados o sin publicar.         |
 | `/models`       | Cada modelo ofrecido ahora, sus precios pagados más bajos y lo servido en el rango. |
 | `/transactions` | Cada transacción de canal de Gyblos, de la más nueva a la más vieja.                |
 | `/stats`        | Uso y pagos en el rango, con sus tablas diarias y la demanda sin atender.           |
 
-Un vendedor cuenta como en línea cuando el índice de descubrimiento lo lista, así el resumen y las tablas coinciden. Cada sección que cubre un período (Overview, Models, Usage, Payments y la actividad de un vendedor) tiene su propio control de 7, 30 o 90 días, guardado en la dirección de la página. Las columnas con flechas ordenan la tabla: de mayor a menor, de menor a mayor y vuelta al orden por defecto. Las columnas de día y Unserved demand ya muestran primero lo más reciente o lo más pedido, así que su primer clic muestra primero lo más antiguo o lo menos pedido.
+Un vendedor cuenta como en línea cuando el índice de descubrimiento lo lista, así el resumen y las tablas coinciden. Cada sección que cubre un período (Overview, Models, Usage, Payments y la actividad de un vendedor) tiene su propio selector de período, guardado en la dirección de la página. Por defecto, **All** muestra el historial disponible. Selecciona **24h**, **7d** o **30d** para ver un período reciente. En todas las páginas, **24h** cubre el último día calendario completo en UTC. Por ejemplo, el 1 de marzo de 2024 abarca el 29 de febrero UTC. Las columnas con flechas ordenan la tabla: de mayor a menor, de menor a mayor y vuelta al orden por defecto. Las columnas de día y Unserved demand ya muestran primero lo más reciente o lo más pedido, así que su primer clic muestra primero lo más antiguo o lo menos pedido.
 
-Network Overview suma los tokens de entrada y salida de los recibos gratuitos y de pago de los días UTC completos seleccionados. Las tarjetas muestran las cifras exactas. Cada fecha del gráfico representa un día. View data permite consultar los tokens observados de cada día. La comparación abarca la ventana inmediatamente anterior. El colector publica la hora de la última agregación sin certificar que todo el período esté completo, por lo que la portada omite el cambio porcentual cuando se desconoce la cobertura. Los dos desgloses por modalidad usan las solicitudes y los tokens observados, respectivamente.
+Network Overview suma los tokens de entrada y salida de los recibos gratuitos y de pago de los días UTC completos seleccionados. Selecciona una métrica para consultar sus valores diarios. Cada fecha del gráfico representa un día UTC. En los períodos de 24 horas, 7 días o 30 días, la comparación abarca la ventana inmediatamente anterior. El colector publica la hora de la última agregación sin certificar que todo el período esté completo, por lo que la portada omite el cambio porcentual cuando se desconoce la cobertura. La tabla de ofertas vigentes es independiente del período.
 
 ## Marca de verificación y nombres [#verificado]
 
@@ -37,8 +37,7 @@ nombre.
 
 La tarjeta Buyers de la sección Usage en Stats cuenta los compradores distintos de todo el
 historial: los gratuitos por NodeId y los de pago por billetera (o por NodeId cuando el recibo no nombra
-billetera), sin sumarlos nunca. Debajo de los conteos de todo el historial, la tarjeta muestra los
-compradores nuevos en el rango de la sección. Un comprador cuenta desde su primer recibo informado por el vendedor y no disputado por el comprador, y sigue contado aunque ese recibo se dispute después. Los dos se cuentan hasta el
+billetera), sin sumarlos nunca. Para un período de 24 horas, 7 días o 30 días también se muestran los compradores nuevos. Un comprador cuenta desde su primer recibo informado por el vendedor y no disputado por el comprador, y sigue contado aunque ese recibo se dispute después. Los dos se cuentan hasta el
 final de ayer (UTC), así que los compradores nuevos de hoy aparecen mañana. Un conteo menor que 5,
 incluido el cero, se muestra como "< 5". Consulta
 [Datos y privacidad](/es/reference/data-and-privacy#recibos) para ver qué pueden y qué no pueden ocultar

@@ -10,7 +10,7 @@ import { overviewWindow } from '@gyblos/explorer/range';
 
 void test('overview compares consecutive closed UTC days across a leap day', () => {
   const now = Date.parse('2024-03-01T18:00:00Z');
-  for (const days of [7, 30, 90] as const) {
+  for (const days of [7, 30] as const) {
     const current = overviewWindow(days, now);
     const previous = overviewWindow(days, now, 1);
     assert.equal(current.at(-1), '2024-02-29');
@@ -148,4 +148,77 @@ void test('zero payouts require a closed and indexed day', () => {
   });
   assert.equal(fresh.complete, true);
   assert.deepEqual(fresh.points, [0n, 0n]);
+});
+
+void test('lifetime activity begins at the oldest observed day, skipping empty padding', async () => {
+  const { firstOverviewDay } =
+    await import('@gyblos/explorer/overview-activity');
+  const blank = {
+    day: '2026-01-01',
+    free: null,
+    paid: null,
+    observed: null,
+    demand: [],
+  };
+  assert.equal(firstOverviewDay([blank], []), null);
+  assert.equal(
+    firstOverviewDay(
+      [
+        blank,
+        {
+          ...blank,
+          day: '2026-01-03',
+          demand: [{ modelId: 'qwen', requests: 1 }],
+        },
+        {
+          ...blank,
+          day: '2026-01-02',
+          observed: { routes: { direct: 1, relay: 0, unknown: 0 } },
+        },
+      ],
+      [],
+    ),
+    '2026-01-02',
+  );
+});
+
+void test('24h uses a complete UTC calendar day across midnight and preserves its range in links', async () => {
+  const { displayRange, parseRange, rangeQuery, rangeEnd } =
+    await import('@gyblos/explorer/range');
+  const { canonicalPageHref, rangeOf, readQuery, sectionRangeHref } =
+    await import('@gyblos/explorer/paging');
+  const now = Date.parse('2024-03-01T00:00:01Z');
+  assert.equal(parseRange('24h'), 1);
+  assert.equal(parseRange('1'), 1);
+  assert.equal(displayRange(1), 'last complete UTC day');
+  assert.equal(canonicalPageHref({ range: '1' }), '/?range=24h');
+  assert.equal(sectionRangeHref('', 'overview', 1), '/?overviewRange=24h');
+  assert.equal(rangeOf(readQuery({ usageRange: '24h' }), 'usage'), 1);
+  assert.equal(
+    rangeQuery(1, rangeEnd(1, now)),
+    '?from=2024-02-29&to=2024-02-29',
+  );
+  assert.equal(
+    rangeQuery(1, rangeEnd(1, now, true), 1),
+    '?from=2024-02-28&to=2024-02-28',
+  );
+});
+
+void test('an explicit all-time chart survives switching the overview period', async () => {
+  const { readQuery, queryHref } = await import('@gyblos/explorer/paging');
+  const query = readQuery({ chartRange: 'all' });
+  assert.equal(
+    queryHref(query, { ranges: { overview: 7 } }),
+    '/?overviewRange=7&chartRange=all',
+  );
+});
+
+void test('published receipt changes compare observed samples from matching formulas', async () => {
+  const { observedBaseline } =
+    await import('@gyblos/explorer/overview-activity');
+  assert.equal(observedBaseline(100, 2, 4, 4), 100);
+  assert.equal(observedBaseline(100, 0, 4, 4), null);
+  assert.equal(observedBaseline(100, 2, null, null), null);
+  assert.equal(observedBaseline(100, 2, 4, 3), null);
+  assert.equal(observedBaseline(0, 2, 4, 4), null);
 });

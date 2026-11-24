@@ -20,9 +20,10 @@ import {
   type ChainSummary,
 } from '../lib/chain-shape';
 import { getChainStats } from '../lib/chain-stats';
-import { DISPLAY, PAGING, UNITS } from '../lib/constants';
+import { ALL_TIME, DISPLAY, PAGING, UNITS } from '../lib/constants';
 import { count, settlementCount, usdc, usdcDecimal, utc } from '../lib/format';
 import { rangeOf, tablePager, type ExplorerQuery } from '../lib/paging';
+import { displayRange, previousRange } from '../lib/range';
 import { Flow } from './board/animated-number';
 import { BarChartCard } from './board/bar-chart-card';
 import { delta, type Delta } from './board/delta';
@@ -63,7 +64,7 @@ export async function PaymentsSection({ query }: { query: ExplorerQuery }) {
   const days = rangeOf(query, 'payments');
   const [chain, before] = await Promise.all([
     getChainStats(days, 0, query.closed),
-    getChainStats(days, 1, query.closed),
+    days === ALL_TIME ? null : getChainStats(days, 1, query.closed),
   ]);
   if (chain.error)
     return (
@@ -71,15 +72,15 @@ export async function PaymentsSection({ query }: { query: ExplorerQuery }) {
     );
   const summary = summarizeChain(chain);
   const { totals } = summary;
-  const change = changes(totals, before);
+  const change = before ? changes(totals, before) : null;
   return (
     <>
       <SectionTitle
-        title={`Payments, last ${days} days`}
+        title={`Payments, ${displayRange(days)}`}
         range={{ section: 'payments', days }}
         meta={
           change
-            ? `vs previous ${days} days, ${meta(chain.backfillDone, chain.aggregatedAt)}`
+            ? `vs ${previousRange(days)}, ${meta(chain.backfillDone, chain.aggregatedAt)}`
             : meta(chain.backfillDone, chain.aggregatedAt)
         }
       />
@@ -215,7 +216,6 @@ function DailyTable({
       paidOut: (row) => row.gyblos.paidOut,
     },
   );
-  if (!summary.days.length) return null;
   return (
     <>
       <SectionTitle id={PAGING.anchors.chainDaily} title="Daily on chain" />
@@ -239,6 +239,13 @@ function DailyTable({
           />
         }
       >
+        {!page.total && (
+          <tr>
+            <td className={td} colSpan={8}>
+              No indexed channel activity in this period.
+            </td>
+          </tr>
+        )}
         {page.rows.map(({ day, gyblos, program }) => (
           <tr key={day} className="border-t border-line">
             <td className={`${td} font-mono`}>{day}</td>

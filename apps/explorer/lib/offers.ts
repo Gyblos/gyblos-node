@@ -1,6 +1,6 @@
 import { PAGES, RANGE } from './constants';
 import type { DiscoverySnapshot, OfferedModel, Seller } from './discovery';
-import type { RangeDays } from './range';
+import { rangeValue, type RangeDays } from './range';
 
 export interface ModelOffers {
   modelId: string;
@@ -29,7 +29,8 @@ export function modelHref(
     .replaceAll('~', '%7E')
     .replaceAll('%', '~');
   const params = new URLSearchParams();
-  if (days && days !== RANGE.defaultDays) params.set(RANGE.param, String(days));
+  if (days && days !== RANGE.defaultDays)
+    params.set(RANGE.param, rangeValue(days));
   if (closed) params.set(RANGE.closedParam, '1');
   const search = params.toString();
   return `${PAGES.models}/${slug}${search ? `?${search}` : ''}`;

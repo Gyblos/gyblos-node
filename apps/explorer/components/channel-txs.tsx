@@ -195,12 +195,10 @@ export async function ChannelTxs({
         minWidth={DISPLAY.txTable}
         head={HEAD}
         footer={
-          preview ? undefined : (
-            <Pager
-              label={TITLE}
-              view={txPager(query, page.transactions.length, page.next)}
-            />
-          )
+          <Pager
+            label={TITLE}
+            view={txPager(query, page.transactions.length, page.next)}
+          />
         }
       >
         {page.transactions.length ? null : (

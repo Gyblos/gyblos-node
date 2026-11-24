@@ -44,6 +44,7 @@ import {
   type ReceiptTotals,
 } from './schema-aggregates';
 import { distinctWhere, histogramSum, total } from './sql-primitives';
+import { firstPublicDay } from './stats-history';
 import type { StatsReader } from './stats-store';
 
 type TotalsTable = typeof aggSellerDaily | typeof aggNetworkDaily;
@@ -308,6 +309,8 @@ function chain(orm: CollectorDatabase, range: DayRange) {
 export function statsReader(database: D1Database): StatsReader {
   const orm = createD1Orm(database);
   return {
+    firstDay: (resource, to, nodeId) =>
+      firstPublicDay(orm, resource, to, nodeId),
     async network(range, today) {
       const [networkRows, observed, demand, origins, failures, buyerTotals] =
         await network(orm, range, today);

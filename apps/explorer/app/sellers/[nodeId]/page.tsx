@@ -7,11 +7,10 @@ import { SellerActivity } from '../../../components/seller-activity';
 import { SellerProfileSection } from '../../../components/seller-profile';
 import { SellerTxs } from '../../../components/seller-txs';
 import { Loading } from '../../../components/ui';
-import { SELLER_STATUS } from '../../../lib/constants';
+import { ALL_TIME, SELLER_STATUS } from '../../../lib/constants';
 import { getDiscovery } from '../../../lib/discovery-render';
 import { short } from '../../../lib/format';
 import { rangeOf, readQuery } from '../../../lib/paging';
-import { WIDEST_RANGE } from '../../../lib/range';
 import { sellerHref } from '../../../lib/seller-identity';
 import { sellerNodeId } from '../../../lib/seller-page';
 import { sellerProfile, unknownSeller } from '../../../lib/seller-profile';
@@ -51,7 +50,7 @@ export default async function SellerPage({ params, searchParams }: Props) {
   const query = readQuery(await searchParams, sellerHref(nodeId));
   const [snapshot, stats] = await Promise.all([
     getDiscovery(),
-    getSellerStats(nodeId, WIDEST_RANGE),
+    getSellerStats(nodeId, ALL_TIME),
   ]);
   if (unknownSeller(nodeId, snapshot, stats)) notFound();
   return (

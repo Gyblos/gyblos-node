@@ -385,7 +385,13 @@ observation. The one list of single rows is
 [chain transactions](#chain-transactions), which is public chain data. Query
 parameters `from` and `to` are UTC days (`YYYY-MM-DD`); the range is inclusive
 and at most 92 days long (for example 2026-08-17 to 2026-11-16). The default is
-the 30 days up to today. A malformed, impossible, reversed or too long range, or
+the 30 days up to today. For the complete published history, use `range=all`
+with an optional inclusive `to`. The collector discovers the earliest available
+day per resource, including the requested node on seller reads. All-time
+responses include `range: "all"` and `historyAvailable`. When the resource has
+no history through the cutoff, `historyAvailable` is false and `from` equals
+`to`. Combining `range=all` with `from` or a future `to` is invalid.
+A malformed, impossible, reversed or too long bounded range, or
 a NodeId that is not 64 lowercase hex characters, answers `400 INVALID_QUERY`.
 Without a database the stats routes answer `503 COLLECTOR_UNAVAILABLE`. Reads
 spend their own per-address budget (`COLLECTOR_READ_LIMITER`, 120 per minute). A

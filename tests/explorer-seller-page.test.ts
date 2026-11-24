@@ -62,10 +62,10 @@ void test('seller page links stay on the seller page and keep every other parame
     sectionRangeHref(
       'modelsPage=2&dailyPage=2&verified=1',
       'activity',
-      90,
+      30,
       PATH,
     ),
-    `${PATH}?activityRange=90&verified=1`,
+    `${PATH}?activityRange=30&verified=1`,
   );
   assert.equal(
     sectionRangeHref('verified=1', 'overview', 7),

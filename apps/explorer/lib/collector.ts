@@ -10,11 +10,9 @@ import {
   parseNetworkDay,
   type CollectorSnapshot,
 } from './collector-shape';
-import { COLLECTOR_URL } from './config';
-import { UNITS } from './constants';
-import { fetchJson } from './fetch-json';
-import { rangeQuery, type RangeDays } from './range';
-import { list, record } from './validate';
+import { rangeEnd, type RangeDays } from './range';
+import { readStats } from './stats-window';
+import { list, text } from './validate';
 
 export type {
   CollectorSnapshot,
@@ -41,11 +39,9 @@ const readCollector = cache(
   ): Promise<CollectorSnapshot> => {
     try {
       return await loadCollector(
-        rangeQuery(
-          days,
-          Date.now() - (closed ? UNITS.msPerDay : 0),
-          periodsBack,
-        ),
+        days,
+        rangeEnd(days, Date.now(), closed),
+        periodsBack,
       );
     } catch (error) {
       return {
@@ -59,35 +55,39 @@ const readCollector = cache(
   },
 );
 
-async function loadCollector(query: string): Promise<CollectorSnapshot> {
-  const [networkBody, modelsBody] = await Promise.all([
-    fetchJson(`${COLLECTOR_URL}/stats/network${query}`, 'collector network'),
-    fetchJson(`${COLLECTOR_URL}/stats/models${query}`, 'collector models'),
+async function loadCollector(
+  days: RangeDays,
+  end: number,
+  periodsBack: number,
+): Promise<CollectorSnapshot> {
+  const [network, models] = await Promise.all([
+    readStats('network', days, end, periodsBack),
+    readStats('models', days, end, periodsBack),
   ]);
-  const network = record(networkBody, 'network');
-  const models = record(modelsBody, 'models');
   return {
+    error: null,
     aggregatedAt: Math.max(aggregatedAt(network), aggregatedAt(models)) || null,
     days: list(network.days, 'network.days').map(parseNetworkDay),
     models: list(models.models, 'models.models').map(parseModel),
     buyerTotals: optionalNetworkBuyers(network.buyerTotals),
-    error: null,
   };
 }
 
-export async function overviewNetwork(dates: string[]) {
-  const from = dates[0];
-  const to = dates.at(-1);
+export async function getOverviewNetwork(
+  days: RangeDays,
+  now: number,
+  periodsBack = 0,
+) {
   try {
-    const source = record(
-      await fetchJson(
-        `${COLLECTOR_URL}/stats/network?from=${from}&to=${to}`,
-        'collector network',
-      ),
+    const source = await readStats(
       'network',
+      days,
+      rangeEnd(days, now, true),
+      periodsBack,
     );
-    if (source.from !== from || source.to !== to) return null;
     return {
+      from: text(source.from, 'network.from'),
+      to: text(source.to, 'network.to'),
       days: list(source.days, 'network.days').map(parseNetworkDay),
       version:
         typeof source.formulaVersion === 'number'

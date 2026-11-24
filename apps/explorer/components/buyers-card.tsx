@@ -2,6 +2,7 @@ import { Users } from 'lucide-react';
 
 import type { NetworkBuyers } from '../lib/collector';
 import { DISPLAY } from '../lib/constants';
+import type { RangeDays } from '../lib/range';
 import { buyersText, newBuyersText } from '../lib/usage';
 import { StatCard } from './board/stat-card';
 
@@ -14,7 +15,7 @@ export function BuyersCard({
   className,
 }: {
   buyers: NetworkBuyers | null;
-  days: number;
+  days: RangeDays;
   variant?: 'footer' | 'plain';
   className?: string;
 }) {

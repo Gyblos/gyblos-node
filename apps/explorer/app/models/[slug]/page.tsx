@@ -17,7 +17,7 @@ import {
 } from '../../../components/ui';
 import { getCollector } from '../../../lib/collector';
 import type { ModelSide, ModelStat } from '../../../lib/collector-shape';
-import { DISPLAY, PAGES } from '../../../lib/constants';
+import { DISPLAY, PAGES, PAGING } from '../../../lib/constants';
 import type {
   DiscoverySnapshot,
   OfferedModel,
@@ -42,6 +42,7 @@ import {
   tablePager,
   type ExplorerQuery,
 } from '../../../lib/paging';
+import { displayRange } from '../../../lib/range';
 import {
   githubByNode,
   namesByNode,
@@ -127,21 +128,41 @@ const measures: { label: string; value: (side: ModelSide) => string }[] = [
   },
 ];
 
-function ActivityTable({ stat }: { stat: ModelStat }) {
+function ActivityTable({
+  stat,
+  query,
+}: {
+  stat: ModelStat | undefined;
+  query: ExplorerQuery;
+}) {
+  const page = pagedRows(query, 'models', stat ? measures : []);
   return (
     <Table
       minWidth={320}
+      footer={
+        <Pager
+          label="Activity metrics"
+          view={tablePager(query, 'models', page)}
+        />
+      }
       head={[
         { label: 'Metric' },
         { label: 'Free', right: true },
         { label: 'Paid', right: true },
       ]}
     >
-      {measures.map(({ label, value }) => (
+      {!stat && (
+        <tr>
+          <td className={td} colSpan={3}>
+            No published aggregate for this variant in the selected period.
+          </td>
+        </tr>
+      )}
+      {page.rows.map(({ label, value }) => (
         <tr key={label} className="border-t border-line">
           <td className={td}>{label}</td>
-          <td className={numberCell}>{stat.free ? value(stat.free) : '—'}</td>
-          <td className={numberCell}>{stat.paid ? value(stat.paid) : '—'}</td>
+          <td className={numberCell}>{stat?.free ? value(stat.free) : '—'}</td>
+          <td className={numberCell}>{stat?.paid ? value(stat.paid) : '—'}</td>
         </tr>
       ))}
     </Table>
@@ -297,18 +318,15 @@ export default async function ModelPage({
         <OffersTable discovery={discovery} offers={offers} query={query} />
       )}
       <SectionTitle
-        title={`Recorded activity, last ${days} days`}
+        id={PAGING.anchors.models}
+        title={`Recorded activity, ${displayRange(days)}`}
         meta={query.closed ? 'Completed UTC days' : undefined}
         range={{ section: 'models', days }}
       />
-      {stat ? (
-        <ActivityTable stat={stat} />
+      {collector.error ? (
+        <p className="text-sm text-muted">Metrics collector unavailable.</p>
       ) : (
-        <p className="text-sm text-muted">
-          {collector.error
-            ? 'Metrics collector unavailable.'
-            : 'No published aggregate for this variant in the selected period.'}
-        </p>
+        <ActivityTable stat={stat} query={query} />
       )}
       {siblings.size > 0 && (
         <>

@@ -242,14 +242,17 @@ void test('the seller is only the listed, unique owner of the channel payout rec
   assert.equal(credited(distribute(), sellerOwners([])), null);
 });
 
-const txPageHref = (days: number, before: string | null, verified = '') =>
-  queryHref(readQuery({ range: String(days), verified }), { before });
+const txPageHref = (
+  days: number | 'all',
+  before: string | null,
+  verified = '',
+) => queryHref(readQuery({ range: String(days), verified }), { before });
 
 void test('pager links keep the range and carry the cursor', () => {
   assert.equal(txPageHref(RANGE.defaultDays, null), '/');
   assert.equal(txPageHref(RANGE.defaultDays, CURSOR), `/?before=${CURSOR}`);
   assert.equal(txPageHref(7, CURSOR), `/?range=7&before=${CURSOR}`);
-  assert.equal(txPageHref(90, null), '/?range=90');
+  assert.equal(txPageHref(90, null), '/');
 });
 
 void test('every page URL asks for a 5-row page in canonical order', () => {
@@ -270,7 +273,7 @@ void test('transaction pages keep the verified seller filter', () => {
   );
   assert.equal(
     sectionRangeHref(`verified=1&before=${CURSOR}`, 'payments', 30),
-    `/?verified=1&before=${CURSOR}`,
+    `/?paymentsRange=30&verified=1&before=${CURSOR}`,
   );
 });
 

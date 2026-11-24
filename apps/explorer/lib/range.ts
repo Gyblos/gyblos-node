@@ -1,19 +1,46 @@
 // Owns the date range the page shows: a preset number of UTC days ending today, read from the `range`
 // search parameter, and the collector query it maps to. Pure, no I/O.
-import { RANGE, UNITS } from './constants';
+import { ALL_TIME, RANGE, UNITS } from './constants';
 
 export type RangeDays = (typeof RANGE.presets)[number];
 
-export const WIDEST_RANGE = RANGE.presets.reduce<RangeDays>(
-  (widest, days) => (days > widest ? days : widest),
-  RANGE.defaultDays,
-);
+export const displayRange = (days: RangeDays) =>
+  days === ALL_TIME
+    ? 'all time'
+    : days === 1
+      ? 'last complete UTC day'
+      : `last ${days} days`;
+
+export const rangeValue = (days: RangeDays) =>
+  days === 1 ? RANGE.dayParam : String(days);
+
+export const rangeEnd = (days: RangeDays, now: number, closed = false) =>
+  now - (days === 1 || closed ? UNITS.msPerDay : 0);
+
+export const previousRange = (days: RangeDays) =>
+  days === 1 ? 'previous UTC day' : `previous ${days} days`;
 
 export type RangeSection = keyof typeof RANGE.sections;
 export const RANGE_SECTIONS = Object.keys(RANGE.sections) as RangeSection[];
 
+const RANGE_PARAMS = [
+  RANGE.param,
+  ...RANGE_SECTIONS.map((section) => RANGE.sections[section].param),
+];
+
+export function hasRangeAlias(read: (param: string) => unknown) {
+  return RANGE_PARAMS.some((param) => {
+    const value = read(param);
+    return value === RANGE.legacyRange || value === '1';
+  });
+}
+
 export const presetRange = (value: unknown): RangeDays | undefined =>
-  RANGE.presets.find((preset) => value === String(preset));
+  value === RANGE.legacyRange
+    ? ALL_TIME
+    : RANGE.presets.find(
+        (preset) => value === String(preset) || value === rangeValue(preset),
+      );
 
 // The preset the parameter names, or the default for anything else (missing, repeated, unknown).
 export function parseRange(value: unknown): RangeDays {
@@ -25,17 +52,13 @@ const utcDay = (ms: number) =>
 
 // The collector's inclusive `from`/`to` days for the last `days` UTC days ending on `now`'s day, or,
 // `periodsBack` periods earlier, the span of the same length just before it (for a change).
-export function rangeQuery(
-  days: RangeDays,
-  now: number,
-  periodsBack = 0,
-): string {
+export function rangeQuery(days: number, now: number, periodsBack = 0): string {
   const end = now - periodsBack * days * UNITS.msPerDay;
   const from = utcDay(end - (days - 1) * UNITS.msPerDay);
   return `?from=${from}&to=${utcDay(end)}`;
 }
 
-export function overviewWindow(days: RangeDays, now: number, periodsBack = 0) {
+export function overviewWindow(days: number, now: number, periodsBack = 0) {
   return Array.from({ length: days }, (_, index) =>
     utcDay(now - ((periodsBack + 1) * days - index) * UNITS.msPerDay),
   );

@@ -1,7 +1,25 @@
-import type { overviewNetwork } from './collector';
+import type { ChainDay } from './chain-shape';
+import type { NetworkDay } from './collector-shape';
 import { DISPLAY } from './constants';
 
-type Source = Awaited<ReturnType<typeof overviewNetwork>>;
+type Source = {
+  days: NetworkDay[];
+  version: number | null;
+  updated: number | null;
+} | null;
+
+export function firstOverviewDay(receipts: NetworkDay[], chain: ChainDay[]) {
+  const observed = [
+    ...receipts.filter(
+      (row) => row.free || row.paid || row.observed || row.demand.length,
+    ),
+    ...chain.filter((row) => row.gyblos),
+  ];
+  return observed.reduce<string | null>(
+    (first, { day }) => (first === null || day < first ? day : first),
+    null,
+  );
+}
 export interface TokenPoint {
   day: string;
   tokens: number | null;
@@ -78,4 +96,19 @@ export function overviewActivity(
       ),
     daysObserved: points.filter((point) => point.tokens !== null).length,
   };
+}
+
+export function observedBaseline(
+  baseline: number | null,
+  observedDays: number,
+  currentVersion: number | null,
+  previousVersion: number | null,
+) {
+  return baseline !== null &&
+    baseline > 0 &&
+    observedDays > 0 &&
+    currentVersion !== null &&
+    currentVersion === previousVersion
+    ? baseline
+    : null;
 }

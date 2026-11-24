@@ -180,20 +180,23 @@ export const SELLER_STATUS = {
   unknown: 'unknown',
 } as const;
 
-// The date range control: preset spans of UTC days ending today. The collector answers at most 92 days
-// (AGGREGATES.maxRangeDays) and 30 by default.
+export const ALL_TIME = 'all';
+
 export const RANGE = {
   param: 'range',
   closedParam: 'closed',
   sections: {
     overview: { param: 'overviewRange', tables: [] },
+    chart: { param: 'chartRange', tables: [] },
     models: { param: 'modelsRange', tables: ['models'] },
     usage: { param: 'usageRange', tables: ['daily', 'demand'] },
     payments: { param: 'paymentsRange', tables: ['chainDaily'] },
     activity: { param: 'activityRange', tables: ['models', 'daily'] },
   },
-  presets: [7, 30, 90],
-  defaultDays: 30,
+  dayParam: '24h',
+  presets: [1, 7, 30, ALL_TIME],
+  defaultDays: ALL_TIME,
+  legacyRange: '90',
   // "YYYY-MM-DD" from an ISO timestamp.
   dayPrecision: 10,
 } as const;

@@ -2,7 +2,7 @@
 // unavailable states, and linked addresses. No data access.
 import { ChevronDown, ChevronsUpDown, ChevronUp } from 'lucide-react';
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 
 import { Skeleton } from '../boardui/components/base/skeleton/skeleton';
 import { addressHref } from '../lib/config';
@@ -279,7 +279,7 @@ export function Table({
 }: {
   head: Column[];
   children: ReactNode;
-  footer?: ReactNode;
+  footer: ReactElement;
   sorting?: Sorting;
   minWidth?: number;
 }) {

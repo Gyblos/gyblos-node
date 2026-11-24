@@ -62,7 +62,6 @@ function NotOnlineTable({
     lastSeen: (node) => node.lastSeenAt,
     firstSeen: (node) => node.firstSeenAt,
   });
-  if (!nodes.length) return null;
   return (
     <>
       <SectionTitle
@@ -83,6 +82,13 @@ function NotOnlineTable({
           <Pager label="Not online" view={tablePager(query, 'offline', page)} />
         }
       >
+        {!nodes.length && (
+          <tr>
+            <td className={td} colSpan={4}>
+              No offline or unpublished sellers in this list.
+            </td>
+          </tr>
+        )}
         {page.rows.map((node) => (
           <tr key={node.nodeId} className="border-t border-line">
             <td className={`${td} font-mono`} title={`Node ${node.nodeId}`}>

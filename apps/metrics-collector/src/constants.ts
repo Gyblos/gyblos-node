@@ -153,6 +153,7 @@ export const AGGREGATES = {
   maxPublicModels: 100,
   maxPublicDemandPerDay: 20,
   // Public day ranges.
+  allTimeRange: 'all',
   maxRangeDays: 92,
   defaultRangeDays: 30,
   dayMs: 86_400_000,

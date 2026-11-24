@@ -5,9 +5,10 @@ import type {
   NetworkDay,
   Totals,
 } from './collector-shape';
-import { DISPLAY } from './constants';
+import { ALL_TIME, DISPLAY } from './constants';
 import { count, latencyMs, percent, utc } from './format';
 import { mergedLatency } from './latency';
+import { previousRange, type RangeDays } from './range';
 
 type Section = Totals | null | undefined;
 // Requests that ended in success or failure; cancellations are not failures and stay out.
@@ -105,13 +106,15 @@ export function dailyRequests(
 
 // The Usage title's note: the comparison is named only when the span before the range could be read.
 export function usageMeta(
-  days: number,
+  days: RangeDays,
   aggregatedAt: number | null,
   compared: boolean,
 ): string {
   if (!aggregatedAt) return 'no data yet';
   const updated = `updated ${utc(aggregatedAt)}`;
-  return compared ? `vs previous ${days} days, ${updated}` : updated;
+  return compared && days !== ALL_TIME
+    ? `vs ${previousRange(days)}, ${updated}`
+    : updated;
 }
 
 export const buyersText = (side: BuyerCount | null) =>
@@ -121,7 +124,7 @@ export const buyersText = (side: BuyerCount | null) =>
       ? `< ${DISPLAY.minPublicBuyers}`
       : count(side.buyers ?? 0);
 
-export const newBuyersText = (buyers: NetworkBuyers | null, days: number) =>
-  buyers
-    ? `New in the last ${days} days: ${buyersText(buyers.free.newInRange)} free · ${buyersText(buyers.paid.newInRange)} paid`
+export const newBuyersText = (buyers: NetworkBuyers | null, days: RangeDays) =>
+  buyers && days !== ALL_TIME
+    ? `New in the ${days === 1 ? 'last complete UTC day' : `last ${days} days`}: ${buyersText(buyers.free.newInRange)} free · ${buyersText(buyers.paid.newInRange)} paid`
     : undefined;

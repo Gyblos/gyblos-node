@@ -12,9 +12,10 @@ import {
   type NetworkBuyers,
   type NetworkDay,
 } from '../lib/collector';
-import { DISPLAY, PAGING } from '../lib/constants';
+import { ALL_TIME, DISPLAY, PAGING } from '../lib/constants';
 import { count, usdcDecimal } from '../lib/format';
 import { rangeOf, tablePager, type ExplorerQuery } from '../lib/paging';
+import { displayRange, type RangeDays } from '../lib/range';
 import {
   buyersText,
   countText,
@@ -106,7 +107,7 @@ function UsageCards({
   usage: ReturnType<typeof summarizeUsage>;
   change: ReturnType<typeof changes>;
   buyers: NetworkBuyers | null;
-  days: number;
+  days: RangeDays;
 }) {
   const { free, paid } = usage;
   return (
@@ -170,7 +171,7 @@ export async function UsageSection({ query }: { query: ExplorerQuery }) {
   const days = rangeOf(query, 'usage');
   const [snapshot, before] = await Promise.all([
     getCollector(days, 0, query.closed),
-    getCollector(days, 1, query.closed),
+    days === ALL_TIME ? null : getCollector(days, 1, query.closed),
   ]);
   if (snapshot.error)
     return (
@@ -180,11 +181,14 @@ export async function UsageSection({ query }: { query: ExplorerQuery }) {
       />
     );
   const usage = summarizeUsage(snapshot);
-  const change = changes(usage, before.error ? null : summarizeUsage(before));
+  const change = changes(
+    usage,
+    before && !before.error ? summarizeUsage(before) : null,
+  );
   return (
     <>
       <SectionTitle
-        title={`Usage, last ${days} days`}
+        title={`Usage, ${displayRange(days)}`}
         meta={usageMeta(days, snapshot.aggregatedAt, change !== null)}
         range={{ section: 'usage', days }}
       />
@@ -303,7 +307,6 @@ function DemandTable({
   const page = pagedRows(query, 'demand', demand, true, {
     requests: ([, requests]) => requests,
   });
-  if (!demand.length) return null;
   return (
     <>
       <SectionTitle id={PAGING.anchors.demand} title="Unserved demand" />
@@ -326,6 +329,13 @@ function DemandTable({
           />
         }
       >
+        {!page.total && (
+          <tr>
+            <td className={td} colSpan={2}>
+              No published unserved demand in this period.
+            </td>
+          </tr>
+        )}
         {page.rows.map(([model, requests]) => (
           <tr key={model} className="border-t border-line">
             <td className={td}>

@@ -3,7 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useTransition } from 'react';
 
-import { RANGE } from '../lib/constants';
+import { ALL_TIME, RANGE } from '../lib/constants';
 import { sectionRangeHref } from '../lib/paging';
 import type { RangeDays, RangeSection } from '../lib/range';
 import { pagePath } from '../lib/seller-page';
@@ -11,7 +11,7 @@ import { SegmentedControl } from './board/segmented-control';
 
 const OPTIONS = RANGE.presets.map((days) => ({
   value: days,
-  label: `${days}d`,
+  label: days === ALL_TIME ? 'All' : days === 1 ? RANGE.dayParam : `${days}d`,
 }));
 
 export function RangeControl({

@@ -2,9 +2,11 @@ import { txCursor } from './chain-txs-shape';
 import { CHAIN_TXS, IDENTITY, PAGES, PAGING, RANGE } from './constants';
 import { count } from './format';
 import {
+  hasRangeAlias,
   parseRange,
   presetRange,
   RANGE_SECTIONS,
+  rangeValue,
   type RangeDays,
   type RangeSection,
 } from './range';
@@ -174,11 +176,11 @@ export function queryHref(
   const sorts = { ...query.sorts, ...change.sorts };
   const params = new URLSearchParams();
   if (query.closed) params.set(RANGE.closedParam, '1');
-  if (days !== RANGE.defaultDays) params.set(RANGE.param, String(days));
+  if (days !== RANGE.defaultDays) params.set(RANGE.param, rangeValue(days));
   for (const section of RANGE_SECTIONS) {
     const shown = ranges[section];
-    if (shown && shown !== days)
-      params.set(RANGE.sections[section].param, String(shown));
+    if (shown && (shown !== days || section === 'chart'))
+      params.set(RANGE.sections[section].param, rangeValue(shown));
   }
   if (verified) params.set(IDENTITY.verifiedParam, IDENTITY.verifiedValue);
   if (before) params.set(CHAIN_TXS.param, before);
@@ -208,6 +210,7 @@ export function canonicalPageHref(
 ): string | null {
   const query = readQuery(source, path);
   const dropped =
+    hasRangeAlias((param) => readParam(source, param)) ||
     PAGED_TABLES.some(
       (table) =>
         readParam(source, PAGING.params[table]) !== undefined &&
@@ -329,8 +332,7 @@ export function tablePager(
   query: ExplorerQuery,
   table: PagedTable,
   page: Page<unknown>,
-): PagerView | null {
-  if (page.pages <= 1 && !query.overviewTables) return null;
+): PagerView {
   const targets = new Set<number>();
   for (let offset = 0; offset < PAGER_EDGE; offset++) {
     targets.add(1 + offset);
@@ -346,7 +348,9 @@ export function tablePager(
         table,
       );
   return {
-    rows: `${rowSpan(page.first, page.last)} of ${count(page.total)}`,
+    rows: page.total
+      ? `${rowSpan(page.first, page.last)} of ${count(page.total)}`
+      : '0 rows',
     page: page.page,
     pages: page.pages,
     hrefs,
@@ -360,8 +364,7 @@ export function txPager(
   query: ExplorerQuery,
   shown: number,
   older: string | null,
-): PagerView | null {
-  if (!query.before && !older) return null;
+): PagerView {
   const page = query.before ? (query.pages.transactions ?? null) : 1;
   const table = PAGING.cursorTable;
   const current = page ?? 2;
@@ -378,11 +381,15 @@ export function txPager(
     );
   const first = page === null ? 0 : (page - 1) * CHAIN_TXS.pageRows + 1;
   return {
-    rows: page === null || !shown ? null : rowSpan(first, first + shown - 1),
+    rows: !shown
+      ? '0 rows'
+      : page === null
+        ? null
+        : rowSpan(first, first + shown - 1),
     page: current,
     pages: older ? current + 1 : current,
     hrefs,
-    showPages: false,
+    showPages: !query.before && !older,
     previousLabel: 'Newest',
     nextLabel: 'Older',
   };

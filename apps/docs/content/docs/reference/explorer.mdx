@@ -11,15 +11,15 @@ explorer shows a short version of it.
 
 | Page            | What it shows                                                                       |
 | --------------- | ----------------------------------------------------------------------------------- |
-| Network (`/`)   | Observed tokens, requests and demand, current offers and the latest operations.     |
+| Network (`/`)   | Recorded tokens and requests, payments to sellers, current offers and recent operations.     |
 | `/sellers`      | Every seller online now, and the ones offline or not published.                     |
 | `/models`       | Each model offered now, its lowest paid prices, and what was served over the range. |
 | `/transactions` | Every Gyblos channel transaction, newest first.                                     |
 | `/stats`        | Usage and payments over the range, with their daily tables and unserved demand.     |
 
-A seller counts as online when the discovery index lists it, so the overview count and the tables agree. Each section that covers a span of days (Overview, Models, Usage, Payments and a seller's Activity) has its own 7, 30 or 90 day control, kept in the page address. Columns with arrows sort the table: highest first, then lowest first, then the default order. The day columns and Unserved demand already show newest or most requests first, so their first click shows oldest or fewest first.
+A seller counts as online when the discovery index lists it, so the overview count and the tables agree. Each section that covers a span of days (Overview, Models, Usage, Payments and a seller's Activity) has its own period selector, saved in the page address. It defaults to **All** for the available history. Choose **24h**, **7d** or **30d** for a recent window. Across all pages, **24h** covers the last completed UTC calendar day. For example, on March 1, 2024 it covers February 29 UTC. Columns with arrows sort the table: highest first, then lowest first, then the default order. The day columns and Unserved demand already show newest or most requests first, so their first click shows oldest or fewest first.
 
-Network Overview adds input and output tokens across free and paid receipts for the selected closed UTC days. The cards show exact counts. Each chart date represents one day. View data lists every day and its observed token count. The comparison covers the immediately preceding window. The collector publishes the latest aggregation timestamp without certifying that a whole window is complete, so the overview omits percentage changes when coverage cannot be established. The two mode breakdowns use observed requests and tokens respectively.
+Network Overview adds input and output tokens across free and paid receipts for the selected closed UTC days. Select a metric to see its daily values. Every chart date represents one UTC day. For a 24h, 7-day or 30-day period, the comparison covers the immediately preceding window. The collector publishes the latest aggregation timestamp without certifying that a whole window is complete, so the overview omits percentage changes when coverage cannot be established. The current offers table remains independent of the period.
 
 ## Check mark and names [#verified]
 
@@ -35,7 +35,7 @@ another seller can use the same name. The ✓ always belongs to the GitHub accou
 
 The Buyers card in Usage on Stats counts distinct buyers of all time: free buyers
 by NodeId and paid buyers by wallet (or by NodeId when the receipt names no wallet), never added
-together. Below the all-time counts, the card shows the buyers new in the section's range. A buyer counts from its first receipt reported by the seller and not disputed by the buyer, and stays counted even if that receipt is disputed later. Both are counted up to the end of yesterday (UTC), so today's new buyers appear
+together. For a 24h, 7-day or 30-day window, the card also shows newly seen buyers. A buyer counts from its first receipt reported by the seller and not disputed by the buyer, and stays counted even if that receipt is disputed later. Both are counted up to the end of yesterday (UTC), so today's new buyers appear
 tomorrow. A count below 5, zero included, is shown as "< 5". See
 [Data and privacy](/en/reference/data-and-privacy#receipts) for what these counts can and cannot hide.
 

@@ -21,7 +21,7 @@ import {
 } from '@gyblos/explorer/format';
 import { modelFamily } from '@gyblos/explorer/model-family';
 import { notOnline, parseNetworkStatus } from '@gyblos/explorer/network-status';
-import { parseRange, rangeQuery } from '@gyblos/explorer/range';
+import { displayRange, parseRange, rangeQuery } from '@gyblos/explorer/range';
 import { dailyRequests, usageMeta } from '@gyblos/explorer/usage';
 
 const realFetch = globalThis.fetch;
@@ -61,9 +61,13 @@ void test('request bars keep visible integer ticks by default and explicitly', (
   assert.deepEqual(barAxis(true), counts);
 });
 
-void test('the range is a preset or the 30-day default', () => {
+void test('the range defaults to all public history and accepts the finite presets', () => {
   assert.equal(parseRange('7'), 7);
-  assert.equal(parseRange('90'), 90);
+  assert.equal(parseRange('30'), 30);
+  assert.equal(parseRange('90'), 'all');
+  assert.equal(parseRange('all'), 'all');
+  assert.equal(displayRange('all'), 'all time');
+  assert.equal(displayRange(7), 'last 7 days');
   for (const value of [
     undefined,
     '',
@@ -76,7 +80,7 @@ void test('the range is a preset or the 30-day default', () => {
     ' 7',
     '7e0',
   ])
-    assert.equal(parseRange(value), 30);
+    assert.equal(parseRange(value), 'all');
 });
 
 void test('a range maps to the collector days ending today, inclusive', () => {

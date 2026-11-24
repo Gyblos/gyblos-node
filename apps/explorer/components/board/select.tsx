@@ -4,6 +4,7 @@
 // that turns while open, and a floating list with the same row surface for hover and selection. Built on
 // React Aria, so it is keyboard- and screen-reader-complete; disabled options stay listed with a hint.
 import { Check, ChevronDown } from 'lucide-react';
+import type { ReactNode } from 'react';
 import {
   Select as AriaSelect,
   Button,
@@ -41,8 +42,10 @@ export function Select<Id extends string>({
   options,
   selected,
   onChange,
+  leadingIcon,
 }: {
   label: string;
+  leadingIcon?: ReactNode;
   options: SelectOption<Id>[];
   selected: Id;
   onChange?: (id: Id) => void;
@@ -69,6 +72,7 @@ export function Select<Id extends string>({
               SURFACE.focus,
             )}
           >
+            {leadingIcon}
             <SelectValue className="truncate" />
             <ChevronDown
               aria-hidden

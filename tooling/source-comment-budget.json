@@ -454,7 +454,7 @@
   "apps/explorer/lib/collector-shape.ts": 9,
   "apps/explorer/lib/collector.ts": 6,
   "apps/explorer/lib/config.ts": 3,
-  "apps/explorer/lib/constants.ts": 44,
+  "apps/explorer/lib/constants.ts": 42,
   "apps/explorer/lib/discovery-render.ts": 5,
   "apps/explorer/lib/discovery-shape.ts": 3,
   "apps/explorer/lib/discovery-snapshot.ts": 13,

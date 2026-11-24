@@ -20,6 +20,7 @@ import {
 } from '../lib/model-table';
 import { summarizeOffers } from '../lib/offers';
 import { rangeOf, tablePager, type ExplorerQuery } from '../lib/paging';
+import { displayRange } from '../lib/range';
 import { pagedRows, Pager } from './pager';
 import {
   ModelName,
@@ -114,7 +115,7 @@ export async function ModelsSection({ query }: { query: ExplorerQuery }) {
       <SectionTitle
         id={PAGING.anchors.models}
         title="Models"
-        meta={`Offered now, served in the last ${days} days`}
+        meta={`Offered now · Recorded activity, ${displayRange(days)}`}
         range={{ section: 'models', days }}
       />
       <Table

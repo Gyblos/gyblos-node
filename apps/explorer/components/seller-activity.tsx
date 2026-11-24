@@ -12,6 +12,7 @@ import { DISPLAY, PAGING } from '../lib/constants';
 import { getDiscovery } from '../lib/discovery-render';
 import { count, pricePerMtok, usdcDecimal } from '../lib/format';
 import { rangeOf, tablePager, type ExplorerQuery } from '../lib/paging';
+import { displayRange } from '../lib/range';
 import {
   modelsNote,
   modelsServedText,
@@ -321,13 +322,13 @@ export async function SellerActivity({
     <>
       {stats.error ? (
         <Unavailable
-          title={`Activity, last ${days} days`}
+          title={`Activity, ${displayRange(days)}`}
           anchors={[PAGING.anchors.daily]}
         />
       ) : (
         <>
           <SectionTitle
-            title={`Activity, last ${days} days`}
+            title={`Activity, ${displayRange(days)}`}
             meta={`${query.closed ? 'Completed UTC days · ' : ''}${usageMeta(days, stats.aggregatedAt, false)}`}
             range={{ section: 'activity', days }}
           />

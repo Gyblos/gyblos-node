@@ -6,12 +6,14 @@ import { useState, type KeyboardEvent } from 'react';
 
 import { UNITS } from '../lib/constants';
 import { compact, type TokenPoint } from '../lib/overview-activity';
+import type { RangeDays } from '../lib/range';
 import { Flow, type FlowKind, type FlowValue } from './board/animated-number';
 import { CHART } from './board/constants';
 import { cx } from './board/cx';
 import type { Delta } from './board/delta';
 import { DeltaChip } from './board/delta-chip';
 import { SURFACE } from './board/styles';
+import { ChartRange } from './chart-range';
 
 const METRICS = {
   tokens: { label: 'Tokens processed', kind: 'count', icon: Hash },
@@ -21,7 +23,14 @@ const METRICS = {
 const DAY_WIDTH = 19;
 type Metric = keyof typeof METRICS;
 const keys = Object.keys(METRICS) as Metric[];
-type Metrics = Record<Metric, { total: FlowValue; change: Delta | null }>;
+type MetricData = {
+  total: FlowValue;
+  change: Delta | null;
+  comparison: string;
+  sample: string;
+  detail: string;
+};
+type Metrics = Record<Metric, MetricData>;
 type Point = TokenPoint & { paidOut: FlowValue };
 
 function moveDay(event: KeyboardEvent<HTMLButtonElement>) {
@@ -44,28 +53,39 @@ function dayLabel(value: FlowValue, kind: FlowKind) {
     : Number(value).toLocaleString('en-US');
 }
 
-export function OverviewChart({
-  points,
-  metrics,
-  receiptHref,
-  paymentHref,
-  receiptNote,
-  paymentNote,
-}: {
+interface OverviewChartProps {
   points: Point[];
   metrics: Metrics;
+  chartMetrics: Metrics;
+  globalDays: RangeDays;
+  chartOverride?: RangeDays;
+  chartDates: string;
   receiptHref: string;
   paymentHref: string;
   receiptNote: string;
   paymentNote: string;
-}) {
+}
+
+export function OverviewChart({
+  points,
+  metrics,
+  chartMetrics,
+  globalDays,
+  chartOverride,
+  chartDates,
+  receiptHref,
+  paymentHref,
+  receiptNote,
+  paymentNote,
+}: OverviewChartProps) {
   const [selected, select] = useState<Metric>('tokens');
   const [active, setActive] = useState<number | null>(null);
   const point = active === null ? null : points[active];
   const { label, kind } = METRICS[selected];
   const maximum = Math.max(0, ...points.map((row) => Number(row[selected])));
   const money = selected === 'paidOut';
-  const value = point ? point[selected] : metrics[selected].total;
+  const metric = chartMetrics[selected];
+  const value = point ? point[selected] : metric.total;
   return (
     <>
       <MetricSelector
@@ -83,17 +103,17 @@ export function OverviewChart({
       >
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h3 className="text-base font-medium">{label} by day</h3>
-          <Link
-            className="inline-flex items-center gap-1 text-sm text-muted hover:text-ink hover:underline"
-            href={money ? paymentHref : receiptHref}
-          >
-            Daily breakdown <ArrowUpRight size={14} aria-hidden />
-          </Link>
+          <ChartRange
+            globalDays={globalDays}
+            override={chartOverride}
+            onSelect={() => setActive(null)}
+          />
         </div>
         <div className="mt-2 flex flex-wrap items-baseline gap-3">
           <span className="font-mono text-2xl tabular-nums">
             <Flow kind={kind} value={value} />
           </span>
+          <ComparisonChip metric={metric} />
           <span className="text-xs text-muted">
             {point
               ? `${point.day} UTC${value === null ? ' · No observation' : ''}`
@@ -110,6 +130,17 @@ export function OverviewChart({
           setActive={setActive}
         />
         <ChartScale points={points} selected={selected} maximum={maximum} />
+        <div className="mt-3 flex flex-wrap items-baseline justify-between gap-2 border-t border-line pt-3 text-xs text-muted">
+          <span>
+            {chartDates} · {metric.comparison}
+          </span>
+          <Link
+            className="inline-flex items-center gap-1 text-sm text-muted hover:text-ink hover:underline"
+            href={money ? paymentHref : receiptHref}
+          >
+            Daily breakdown <ArrowUpRight size={14} aria-hidden />
+          </Link>
+        </div>
       </section>
     </>
   );
@@ -132,7 +163,7 @@ function MetricSelector({
     >
       {keys.map((key) => {
         const { label: name, kind: format, icon: Icon } = METRICS[key];
-        const { total, change } = metrics[key];
+        const metric = metrics[key];
         return (
           <button
             key={key}
@@ -153,9 +184,15 @@ function MetricSelector({
             </span>
             <span className="mt-2 flex flex-wrap items-center gap-2">
               <span className="font-mono text-2xl tabular-nums">
-                <Flow kind={format} value={total} />
+                <Flow kind={format} value={metric.total} />
               </span>
-              {change && <DeltaChip delta={change} />}
+              <ComparisonChip metric={metric} />
+            </span>
+            <span
+              className="mt-2 block text-xs text-muted"
+              title={metric.detail}
+            >
+              {metric.comparison} · {metric.sample}
             </span>
           </button>
         );
@@ -257,5 +294,22 @@ function ChartScale({
         </span>
       )}
     </div>
+  );
+}
+
+function ComparisonChip({ metric }: { metric: MetricData }) {
+  return (
+    <span
+      title={`${metric.detail} · ${metric.sample}`}
+      aria-label={`${metric.change?.label ?? 'No comparison'} · ${metric.comparison} · ${metric.sample}`}
+    >
+      {metric.change ? (
+        <DeltaChip delta={metric.change} />
+      ) : (
+        <span className="inline-flex items-center rounded-md bg-raised px-1.5 py-0.5 font-mono text-xs text-muted">
+          No baseline
+        </span>
+      )}
+    </span>
   );
 }

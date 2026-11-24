@@ -86,7 +86,7 @@ void test('the query reads every table page and drops invalid values', () => {
 
 void test('every link keeps the range, the filter, the cursor and the other tables pages', () => {
   const query = readQuery({
-    range: '90',
+    range: '30',
     verified: '1',
     before: CURSOR,
     sellersPage: '2',
@@ -95,15 +95,15 @@ void test('every link keeps the range, the filter, the cursor and the other tabl
   });
   assert.equal(
     queryHref(query, { pages: { models: 4 } }),
-    `/?range=90&verified=1&before=${CURSOR}&sellersPage=2&offlinePage=3&modelsPage=4&txPage=2`,
+    `/?range=30&verified=1&before=${CURSOR}&sellersPage=2&offlinePage=3&modelsPage=4&txPage=2`,
   );
   assert.equal(
     queryHref(query, { pages: { sellers: 1 } }),
-    `/?range=90&verified=1&before=${CURSOR}&offlinePage=3&txPage=2`,
+    `/?range=30&verified=1&before=${CURSOR}&offlinePage=3&txPage=2`,
   );
   assert.equal(
     queryHref(query, { before: null }),
-    '/?range=90&verified=1&sellersPage=2&offlinePage=3',
+    '/?range=30&verified=1&sellersPage=2&offlinePage=3',
   );
   assert.equal(queryHref(readQuery({})), '/');
   for (const param of Object.values(PAGING.params))
@@ -122,6 +122,7 @@ void test("a section's range resets only that section's tables, and an old range
     ),
     {
       overview: [],
+      chart: [],
       models: ['models'],
       usage: ['daily', 'demand'],
       payments: ['chainDaily'],
@@ -146,7 +147,10 @@ void test("a section's range resets only that section's tables, and an old range
 
 void test('a table pager links every page it can show to its table, keeping the other parameters', () => {
   const query = readQuery({ range: '7', offlinePage: '2' });
-  assert.equal(tablePager(query, 'models', pageOf(rows(5), 1)), null);
+  const single = tablePager(query, 'models', pageOf(rows(5), 1));
+  assert.equal(single?.rows, 'Rows 1–5 of 5');
+  assert.equal(single?.pages, 1);
+  assert.equal(tablePager(query, 'models', pageOf([], 1))?.rows, '0 rows');
   const models = `#${PAGING.anchors.models}`;
   const first = tablePager(query, 'models', pageOf(rows(1200), 1));
   assert.deepEqual(
@@ -220,7 +224,8 @@ void test('the transaction pager counts rows without a total and keeps its curso
   assert.equal(PAGING.cursorTable, 'transactions');
   assert.equal(CHAIN_TXS.pageRows, PAGING.rowsPerPage);
   assert.ok(CHAIN_TXS.pageRows <= CHAIN_TX_PAGE.maxLimit);
-  assert.equal(txPager(readQuery({}), 3, null), null);
+  assert.equal(txPager(readQuery({}), 3, null)?.rows, 'Rows 1–3');
+  assert.equal(txPager(readQuery({}), 0, null)?.rows, '0 rows');
   assert.deepEqual(txPager(readQuery({ sellersPage: '2' }), 5, OLDER), {
     rows: 'Rows 1–5',
     page: 1,
@@ -280,8 +285,8 @@ void test('switching a section range keeps a valid transaction page', () => {
     `/?before=${CURSOR}`,
   );
   assert.equal(
-    sectionRangeHref('usageRange=7', 'usage', 90),
-    '/?usageRange=90',
+    sectionRangeHref('usageRange=7', 'usage', 30),
+    '/?usageRange=30',
   );
   assert.equal(
     sectionRangeHref('usageRange=7&before=bad', 'usage', RANGE.defaultDays),
@@ -362,4 +367,19 @@ void test('overview table links keep the range and paginate inside Network', () 
 void test('an operation opens the indexed instruction through the exclusive collector cursor', () => {
   assert.equal(operationBefore(CURSOR), `140-${SIGNATURE}-2`);
   assert.equal(operationBefore('invalid'), null);
+});
+
+void test('legacy 90-day bookmarks become All while retaining the surrounding page state', () => {
+  assert.equal(
+    canonicalPageHref({ range: '90', verified: '1' }),
+    '/?verified=1',
+  );
+  assert.equal(
+    canonicalPageHref(
+      { range: '7', modelsRange: '90', modelsPage: '2' },
+      '/models',
+    ),
+    '/models?range=7&modelsRange=all&modelsPage=2',
+  );
+  assert.equal(readQuery({}).days, 'all');
 });

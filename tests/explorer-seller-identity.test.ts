@@ -197,10 +197,10 @@ void test('a section range switch keeps the other query parameters', () => {
     '/?modelsRange=7&verified=1',
   );
   assert.equal(
-    sectionRangeHref('verified=1&modelsRange=7', 'models', 30),
+    sectionRangeHref('verified=1&modelsRange=7', 'models', 'all'),
     '/?verified=1',
   );
-  assert.equal(sectionRangeHref('', 'models', 30), '/');
+  assert.equal(sectionRangeHref('', 'models', 30), '/?modelsRange=30');
 });
 
 void test('llms.txt states the verified filter and the ordering window', () => {
