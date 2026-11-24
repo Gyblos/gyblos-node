@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-import { PARTS_PER_MILLION } from './constants';
+import { MODEL_VERIFICATION } from '@gyblos/protocol/model-verification';
 
 export interface Candidate {
   token: string;
@@ -43,5 +43,5 @@ export function isDeviation(
 }
 
 export function minimumLogprob(minProbabilityPpm: number) {
-  return Math.log(minProbabilityPpm / PARTS_PER_MILLION);
+  return Math.log(minProbabilityPpm / MODEL_VERIFICATION.partsPerMillion);
 }

@@ -129,7 +129,11 @@ function parseEvidence(value: unknown): ModelVerificationEvidence {
     checks: controlInteger(input.checks, 0, MODEL_VERIFICATION.maxChecks),
     deviations: controlInteger(input.deviations),
     minimumChecks: controlInteger(input.minimumChecks, 1),
-    honestRatePpm: controlInteger(input.honestRatePpm, 1, PPM_BELOW_ONE),
+    honestRatePpm: controlInteger(
+      input.honestRatePpm,
+      1,
+      MODEL_VERIFICATION.maxHonestRatePpm,
+    ),
     falsePositivePpm: controlInteger(input.falsePositivePpm, 1, PPM_BELOW_ONE),
     failAt: controlInteger(input.failAt, 1),
     nonce: controlHex(input.nonce, MODEL_VERIFICATION.nonceBytes),

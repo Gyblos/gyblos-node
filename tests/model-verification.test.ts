@@ -146,6 +146,9 @@ void test('the parser refuses a verdict its own evidence contradicts and malform
       evidence: { ...evidence, honestRatePpm: 1_000_000 },
     }),
     result(key.address, {
+      evidence: { ...evidence, honestRatePpm: 50_000, failAt: 11 },
+    }),
+    result(key.address, {
       evidence: { ...evidence, checks: 1_000_000, failAt: 5_085 },
     }),
     result(key.address, { evidence: { ...evidence, nonce: 'ab' } }),

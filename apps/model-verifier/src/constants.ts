@@ -1,4 +1,3 @@
-export const PARTS_PER_MILLION = 1_000_000;
 export const SECRET_BYTES = 32;
 export const MAX_DIRECT_ADDRESSES = 16;
 export const FREE_ATOMIC = '0';

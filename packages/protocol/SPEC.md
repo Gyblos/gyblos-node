@@ -1943,8 +1943,8 @@ behind the base58 address `result.verifier`, over the prefix
 
 `evidence` has exactly `prompts` (1 to 64), `answers` (at most `prompts`),
 `checks` (at most 16,384), `deviations` (at most `checks`), `minimumChecks`
-(positive), `honestRatePpm` and `falsePositivePpm` (1 to 999,999 parts per
-million), `failAt`, `nonce` (64 hex) and `answerDigests` (one SHA-256 hex digest
+(positive), `honestRatePpm` (1 to 40,000 parts per million, so the binomial
+stays finite at 16,384 checks), `falsePositivePpm` (1 to 999,999), `failAt`, `nonce` (64 hex) and `answerDigests` (one SHA-256 hex digest
 per answer, so its length is `answers`).
 
 `failAt` must equal `modelVerificationFailAt(checks, honestRatePpm,
@@ -1954,3 +1954,8 @@ false positive bound. The verdict must equal `modelVerificationVerdict`: `fail`
 when `deviations ≥ failAt`, else `inconclusive` when `answers < prompts` or
 `checks < minimumChecks`, else `pass`. A result that disagrees with either is
 `INVALID`.
+
+The parser checks only that the rule values are in range. A consumer must
+compare `minimumChecks`, `honestRatePpm` and `falsePositivePpm` with the rule of
+the challenge set named by `challengeSet.id`, `version` and `digest` before it
+trusts a verdict.
