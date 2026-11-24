@@ -8,10 +8,12 @@ import { DISPLAY, IDENTITY } from '@gyblos/explorer/constants';
 import type { Seller } from '@gyblos/explorer/discovery';
 import { uptime } from '@gyblos/explorer/discovery-shape';
 import {
+  listedOnline,
   normalizeNetwork,
   parseNetworkStatus,
+  type NetworkStatus,
 } from '@gyblos/explorer/network-status';
-import { rangeSwitchHref } from '@gyblos/explorer/paging';
+import { sectionRangeHref } from '@gyblos/explorer/paging';
 import {
   emptySellersMessage,
   githubByNode,
@@ -189,10 +191,16 @@ void test('the empty sellers message says what is known', () => {
   );
 });
 
-void test('a date range switch keeps the other query parameters', () => {
-  assert.equal(rangeSwitchHref('verified=1', 7), '/?range=7&verified=1');
-  assert.equal(rangeSwitchHref('verified=1&range=7', 30), '/?verified=1');
-  assert.equal(rangeSwitchHref('', 30), '/');
+void test('a section range switch keeps the other query parameters', () => {
+  assert.equal(
+    sectionRangeHref('verified=1', 'models', 7),
+    '/?modelsRange=7&verified=1',
+  );
+  assert.equal(
+    sectionRangeHref('verified=1&modelsRange=7', 'models', 30),
+    '/?verified=1',
+  );
+  assert.equal(sectionRangeHref('', 'models', 30), '/');
 });
 
 void test('llms.txt states the verified filter and the ordering window', () => {
@@ -244,7 +252,7 @@ void test('a stored network status from before the GitHub field reads as unverif
 void test('the not-online counts follow the verified filter', () => {
   const status = parseNetworkStatus(network(null));
   assert.equal(notOnlineMeta(status, 2), '2 verified sellers not online');
-  assert.equal(notOnlineMeta(status, null), '0 offline · 0 not published');
+  assert.equal(notOnlineMeta(status, null), '0 offline, 0 not published');
 });
 
 void test('a week of history is counted when the index computed the uptime', () => {
@@ -261,4 +269,59 @@ void test('a week of history is counted when the index computed the uptime', () 
     5,
   );
   assert.equal(uptime({ firstSeenAt: 1, windows: [] }).generatedAt, undefined);
+});
+
+void test('the seller list decides who is online, so the count, the Sellers table and Not online agree', () => {
+  const node = (
+    nodeId: string,
+    state: 'online' | 'offline' | 'unpublished',
+  ) => ({
+    nodeId,
+    state,
+    firstSeenAt: 1,
+    lastSeenAt: 2,
+    models: [],
+    name: null,
+    github: null,
+  });
+  const status: NetworkStatus = {
+    counts: { total: 3, online: 1, offline: 1, unpublished: 1 },
+    nodes: [
+      node(NODE_A, 'offline'),
+      node(NODE_B, 'online'),
+      node('c'.repeat(64), 'unpublished'),
+    ],
+    truncated: false,
+    generatedAt: 1,
+  };
+  const shown = listedOnline(status, [NODE_A]);
+  assert.deepEqual(shown?.counts, {
+    total: 3,
+    online: 1,
+    offline: 1,
+    unpublished: 1,
+  });
+  assert.deepEqual(
+    shown?.nodes.map((entry) => entry.state),
+    ['online', 'offline', 'unpublished'],
+  );
+  assert.deepEqual(listedOnline(status, [NODE_A, 'd'.repeat(64)])?.counts, {
+    total: 4,
+    online: 2,
+    offline: 1,
+    unpublished: 1,
+  });
+  const partial = {
+    ...status,
+    counts: { total: 10, online: 6, offline: 3, unpublished: 1 },
+    nodes: [node(NODE_A, 'offline')],
+    truncated: true,
+  };
+  assert.deepEqual(listedOnline(partial, [NODE_A, NODE_B, NODE_C])?.counts, {
+    total: 10,
+    online: 3,
+    offline: 6,
+    unpublished: 1,
+  });
+  assert.equal(listedOnline(null, [NODE_A]), null);
 });

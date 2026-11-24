@@ -57,13 +57,8 @@ export interface PayoutSplit {
   unclassified: bigint;
 }
 type SplitPart = Exclude<keyof PayoutSplit, 'channels'>;
-const SPLIT_LABELS: [SplitPart, string][] = [
-  ['paidOut', 'seller'],
-  ['gyblosFees', 'Gyblos fee'],
-  ['programTreasury', 'payments program'],
-  ['refunded', 'to buyer'],
-  ['unclassified', 'unclassified'],
-];
+const SPLIT_COLUMNS = ['gyblosFees', 'programTreasury', 'refunded'] as const;
+export type SplitColumn = (typeof SPLIT_COLUMNS)[number];
 const MAIN_PART: Partial<Record<ChainTxKind, SplitPart>> = {
   distribute: 'paidOut',
   reclaim: 'refunded',
@@ -152,6 +147,7 @@ export function chainTxsQuery(
 ) {
   const params = new URLSearchParams();
   if (before) params.set(CHAIN_TXS.param, before);
+  params.set(CHAIN_TXS.limitParam, String(CHAIN_TXS.pageRows));
   if (recipient) params.set(CHAIN_TXS.recipientParam, recipient);
   return params.toString();
 }
@@ -162,7 +158,7 @@ export function chainTxsUrl(
   recipient: string | null = null,
 ) {
   const query = chainTxsQuery(before, recipient);
-  return `${collector}/stats/chain/txs${query ? `?${query}` : ''}`;
+  return `${collector}/stats/chain/txs?${query}`;
 }
 
 export interface ListedOwner {
@@ -184,23 +180,30 @@ export function sellerOwners(sellers: ListedOwner[]) {
   );
 }
 
-function splitLines(tx: ChainTx): string[] {
-  if (!tx.split) return [];
-  const split = tx.split;
+function splitParts(tx: ChainTx): Record<SplitColumn, string | null> {
   const main = MAIN_PART[tx.kind];
-  const parts = SPLIT_LABELS.flatMap(([key, label]) =>
-    key !== main && split[key] ? [`${label} ${usdcFixed(split[key])}`] : [],
-  );
-  return split.channels > 1
-    ? [`total of ${split.channels} channels`, ...parts]
-    : parts;
+  const part = (key: SplitColumn) => {
+    const value = tx.split?.[key];
+    return !tx.batched && key !== main && value ? usdcFixed(value) : null;
+  };
+  return {
+    gyblosFees: part('gyblosFees'),
+    programTreasury: part('programTreasury'),
+    refunded: part('refunded'),
+  };
 }
 
-const HINTS: Partial<Record<ChainTxKind, string>> = {
-  open: TX_TEXT.deposit,
-  top_up: TX_TEXT.deposit,
-  reclaim: TX_TEXT.refund,
-};
+function splitNotes(tx: ChainTx): string[] {
+  if (tx.batched) return [TX_TEXT.batched];
+  if (!tx.split) return [];
+  const notes =
+    tx.split.channels > 1 ? [`total of ${tx.split.channels} channels`] : [];
+  if (MAIN_PART[tx.kind] !== 'paidOut' && tx.split.paidOut)
+    notes.push(`to sellers ${usdcFixed(tx.split.paidOut)}`);
+  return tx.split.unclassified
+    ? [...notes, `unclassified ${usdcFixed(tx.split.unclassified)}`]
+    : notes;
+}
 
 function amountText(tx: ChainTx) {
   if (tx.amount === null) return '—';
@@ -230,8 +233,8 @@ export function txRow(
         : null,
     amount: amountText(tx),
     muted: !tx.amount || tx.kind !== 'distribute' || shared,
-    hint: HINTS[tx.kind] ?? null,
-    detail: tx.batched ? [TX_TEXT.batched] : splitLines(tx),
+    parts: splitParts(tx),
+    detail: splitNotes(tx),
     shared,
     signature: short(
       tx.signature,

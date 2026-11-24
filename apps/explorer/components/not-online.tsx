@@ -56,7 +56,10 @@ function NotOnlineTable({
   const nodes = notOnline(network).filter(
     (node) => !accounts || accounts.has(node.nodeId),
   );
-  const page = pagedRows(query, 'offline', nodes, !network.truncated);
+  const page = pagedRows(query, 'offline', nodes, !network.truncated, {
+    lastSeen: (node) => node.lastSeenAt,
+    firstSeen: (node) => node.firstSeenAt,
+  });
   if (!nodes.length) return null;
   return (
     <>
@@ -67,12 +70,16 @@ function NotOnlineTable({
       />
       <Table
         minWidth={DISPLAY.defaultTable}
+        sorting={{ query, table: 'offline' }}
         head={[
           { label: 'Node' },
           { label: 'Status' },
-          { label: 'Last seen' },
-          { label: 'First seen' },
+          { label: 'Last seen', sort: 'lastSeen' },
+          { label: 'First seen', sort: 'firstSeen' },
         ]}
+        footer={
+          <Pager label="Not online" view={tablePager(query, 'offline', page)} />
+        }
       >
         {page.rows.map((node) => (
           <tr key={node.nodeId} className="border-t border-line">
@@ -94,7 +101,6 @@ function NotOnlineTable({
           </tr>
         ))}
       </Table>
-      <Pager label="Not online" view={tablePager(query, 'offline', page)} />
     </>
   );
 }

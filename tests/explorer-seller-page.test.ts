@@ -6,8 +6,8 @@ import { DISPLAY, RANGE, SELLER_STATUS } from '@gyblos/explorer/constants';
 import type { DiscoverySnapshot, Seller } from '@gyblos/explorer/discovery';
 import {
   queryHref,
-  rangeSwitchHref,
   readQuery,
+  sectionRangeHref,
   txPager,
 } from '@gyblos/explorer/paging';
 import { pagePath, sellerNodeId } from '@gyblos/explorer/seller-page';
@@ -41,13 +41,9 @@ void test('a seller page needs a NodeId of 64 lowercase hex characters', () => {
 
 void test('only the explorer and seller pages are page paths', () => {
   assert.equal(pagePath(PATH), PATH);
-  for (const other of [
-    '/',
-    '/sellers',
-    `/sellers/${NODE}/x`,
-    '/sellers/ABC',
-    '/x',
-  ])
+  for (const page of ['/', '/sellers', '/models', '/transactions', '/stats'])
+    assert.equal(pagePath(page), page);
+  for (const other of [`/sellers/${NODE}/x`, '/sellers/ABC', '/x'])
     assert.equal(pagePath(other), '/', other);
 });
 
@@ -63,13 +59,23 @@ void test('seller page links stay on the seller page and keep every other parame
   );
   assert.equal(queryHref(readQuery({}, PATH)), PATH);
   assert.equal(
-    rangeSwitchHref('modelsPage=2&dailyPage=2&verified=1', 90, PATH),
-    `${PATH}?range=90&verified=1`,
+    sectionRangeHref(
+      'modelsPage=2&dailyPage=2&verified=1',
+      'activity',
+      90,
+      PATH,
+    ),
+    `${PATH}?activityRange=90&verified=1`,
   );
-  assert.equal(rangeSwitchHref('verified=1', 7), '/?range=7&verified=1');
+  assert.equal(
+    sectionRangeHref('verified=1', 'overview', 7),
+    '/?overviewRange=7&verified=1',
+  );
   const pager = txPager(query, 25, CURSOR);
   assert.ok(
-    pager?.links.every((link) => link.href.startsWith(`${PATH}?`)),
+    Object.values(pager?.hrefs ?? {}).every((href) =>
+      href.startsWith(`${PATH}?`),
+    ),
     JSON.stringify(pager),
   );
   assert.equal(

@@ -22,6 +22,18 @@ export interface SelectOption<Id extends string> {
   // Shown after the label, e.g. "soon" for an option not yet available.
   hint?: string;
   disabled?: boolean;
+  icon?: string;
+}
+
+function OptionIcon({ src }: { src?: string }) {
+  if (!src) return null;
+  return (
+    <span
+      aria-hidden
+      className="inline-block size-3.5 shrink-0 bg-contain bg-center bg-no-repeat"
+      style={{ backgroundImage: `url(${src})` }}
+    />
+  );
 }
 
 export function Select<Id extends string>({
@@ -69,7 +81,7 @@ export function Select<Id extends string>({
           <Popover
             offset={6}
             placement="bottom end"
-            className="min-w-(--trigger-width) rounded-2xl border border-line bg-panel p-1.5 shadow-lg outline-none transition duration-150 ease-out data-[entering]:scale-95 data-[entering]:opacity-0 data-[exiting]:scale-95 data-[exiting]:opacity-0"
+            className="min-w-(--trigger-width) rounded-xl border border-line bg-panel p-1.5 shadow-lg outline-none transition duration-150 ease-out data-[entering]:scale-95 data-[entering]:opacity-0 data-[exiting]:scale-95 data-[exiting]:opacity-0"
           >
             <ListBox className="flex flex-col gap-0.5 outline-none">
               {options.map((option) => (
@@ -108,6 +120,7 @@ function OptionRow<Id extends string>({
   return (
     <>
       <span className="flex items-center gap-2">
+        <OptionIcon src={option.icon} />
         {option.label}
         {option.hint ? (
           <span className="rounded-md bg-raised px-1.5 py-0.5 text-[10px] text-muted">

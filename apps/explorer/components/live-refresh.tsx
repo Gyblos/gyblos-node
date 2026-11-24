@@ -61,7 +61,7 @@ export function LiveRefresh() {
           className="relative inline-flex size-2 rounded-full bg-signal"
         />
       </span>
-      {pending ? 'Updating…' : `Live · updated ${ago(now - fetchedAt.current)}`}
+      {pending ? 'Updating…' : `Live, updated ${ago(now - fetchedAt.current)}`}
     </span>
   );
 }

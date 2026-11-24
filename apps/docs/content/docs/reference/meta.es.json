@@ -1,6 +1,6 @@
 {
   "title": "Referencia",
-  "pages": ["cli", "configuration", "data-and-privacy"],
+  "pages": ["cli", "configuration", "data-and-privacy", "explorer"],
   "defaultOpen": true,
   "icon": "book-open"
 }

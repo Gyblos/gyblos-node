@@ -212,6 +212,7 @@ void test('docs export: the sidebar follows the public seller and buyer paths', 
       `/${locale}/reference/cli`,
       `/${locale}/reference/configuration`,
       `/${locale}/reference/data-and-privacy`,
+      `/${locale}/reference/explorer`,
       `/${locale}/help/troubleshooting`,
     ]);
     assert.ok(

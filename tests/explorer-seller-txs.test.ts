@@ -24,11 +24,11 @@ void test('the explorer asks the collector for one seller owner with the canonic
   }
   assert.equal(
     chainTxsUrl('https://c.test/v1', null, OWNER),
-    `https://c.test/v1/stats/chain/txs?recipient=${OWNER}`,
+    `https://c.test/v1/stats/chain/txs?limit=5&recipient=${OWNER}`,
   );
   assert.equal(
     chainTxsUrl('https://c.test/v1', null),
-    'https://c.test/v1/stats/chain/txs',
+    'https://c.test/v1/stats/chain/txs?limit=5',
   );
 });
 
@@ -68,8 +68,12 @@ void test('a seller page payout row reads as what the seller got, with the rest 
     'T',
   );
   assert.deepEqual(
-    [row.amount, row.detail, row.shared],
-    ['0.000096', ['Gyblos fee 0.000004', 'to buyer 0.000900'], false],
+    [row.amount, row.parts, row.shared],
+    [
+      '0.000096',
+      { gyblosFees: '0.000004', programTreasury: null, refunded: '0.000900' },
+      false,
+    ],
   );
   const shared = txRow(
     parseChainTxs(payout({ split: split(2) })).transactions[0]!,
@@ -103,7 +107,7 @@ void test('a batched paying row says so instead of showing no amount', () => {
   );
 });
 
-void test('only a payout is money; deposits and refunds are muted with their direction', () => {
+void test('only a payout is money; deposits and refunds are muted and named by their type', () => {
   const row = (kind: string, amountAtomic: string) =>
     txRow(
       parseChainTxs(
@@ -119,13 +123,13 @@ void test('only a payout is money; deposits and refunds are muted with their dir
   assert.deepEqual(
     ['open', 'top_up', 'reclaim', 'settle'].map((kind) => {
       const shown = row(kind, '900');
-      return [kind, shown.muted, shown.hint];
+      return [kind, shown.muted, shown.label];
     }),
     [
-      ['open', true, TX_TEXT.deposit],
-      ['top_up', true, TX_TEXT.deposit],
-      ['reclaim', true, TX_TEXT.refund],
-      ['settle', true, null],
+      ['open', true, 'Deposit'],
+      ['top_up', true, 'Top-up'],
+      ['reclaim', true, 'Refunded'],
+      ['settle', true, 'Settle'],
     ],
   );
 });

@@ -1,0 +1,71 @@
+:root {
+  --boardui-inner: var(--bg);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --boardui-inner: var(--raised);
+  }
+}
+
+@theme inline {
+  --color-text-primary: var(--ink);
+  --color-text-secondary: var(--muted);
+  --color-text-tertiary: var(--dim);
+  --color-text-white: #ffffff;
+
+  --color-background-primary-default: var(--bg);
+  --color-background-primary-hover: var(--raised);
+  --color-background-primary-active: var(--raised);
+  --color-background-primary-disabled: var(--panel);
+  --color-background-secondary-default: var(--panel);
+  --color-background-secondary-hover: var(--raised);
+  --color-background-tertiary-default: var(--raised);
+  --color-background-inner-default: var(--boardui-inner);
+
+  --color-border-button-default: var(--line);
+  --color-border-button-hover: var(--line);
+  --color-border-button-active: var(--line);
+  --color-border-focus-ring: var(--signal);
+  --color-border-table: var(--line);
+  --color-separator-border: var(--line);
+
+  --color-foreground-full: var(--ink);
+  --color-foreground-icon-primary: var(--ink);
+  --color-foreground-icon-secondary: var(--muted);
+  --color-foreground-disabled-danger: var(--bad);
+  --color-stat-card-icon-background: var(--raised);
+
+  --color-status-lime-text: var(--good);
+  --color-status-lime-background: color-mix(
+    in srgb,
+    var(--good) 15%,
+    transparent
+  );
+  --color-status-rose-text: var(--bad);
+  --color-status-rose-background: color-mix(
+    in srgb,
+    var(--bad) 15%,
+    transparent
+  );
+  --color-status-blue-text: var(--ink);
+  --color-status-blue-background: color-mix(
+    in srgb,
+    var(--signal) 15%,
+    transparent
+  );
+  --color-status-cyan-text: var(--ink);
+  --color-status-cyan-background: var(--raised);
+  --color-status-yellow-text: var(--ink);
+  --color-status-yellow-background: var(--raised);
+  --color-status-orange-text: var(--ink);
+  --color-status-orange-background: var(--raised);
+  --color-status-purple-text: var(--ink);
+  --color-status-purple-background: var(--raised);
+
+  --radius-2lg: 10px;
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.08);
+  --shadow-card: 0 1px 1px 0 rgb(0 0 0 / 0.08);
+  --shadow-dropdown:
+    0 1px 1px 0 rgb(0 0 0 / 0.08), 0 4px 4px 0 rgb(0 0 0 / 0.06);
+}

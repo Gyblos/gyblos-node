@@ -8,6 +8,7 @@ export const SITE = {
   description:
     'Live, public metrics of the Gyblos peer-to-peer AI inference network: sellers online and offline, models and prices, uptime, daily requests and on-chain USDC settlements on Solana.',
   twitter: '@gyblos',
+  pagePriority: 0.8,
   // The dark page background, for the browser chrome.
   themeColor: '#090909',
 } as const;

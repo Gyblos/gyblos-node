@@ -1,0 +1,117 @@
+.bui-table {
+  @apply w-full border-collapse text-start;
+}
+
+.bui-table th {
+  @apply px-3 py-2.5 text-start align-middle text-body-medium text-text-tertiary whitespace-nowrap outline-none;
+  background-color: var(--color-background-secondary-default);
+  border-top: 1px solid var(--color-separator-border);
+  border-bottom: 1px solid var(--color-separator-border);
+  transition:
+    padding 200ms ease,
+    font-size 200ms ease;
+}
+
+.bui-table td {
+  @apply px-3 py-2.5 align-middle text-body-medium text-text-primary outline-none;
+  transition:
+    padding 200ms ease,
+    font-size 200ms ease;
+}
+
+.bui-table tbody tr:not(:last-child) {
+  border-bottom: 1px solid var(--color-separator-border);
+}
+
+.bui-table tbody tr {
+  @apply transition-colors duration-150;
+}
+
+.bui-table tbody tr[data-focus-visible] {
+  @apply ring-2 ring-inset ring-border-focus-ring;
+}
+
+.bui-table.bui-table-sm th,
+.bui-table.bui-table-sm td {
+  @apply px-2.5 py-1.5 text-body-2-medium;
+}
+
+.bui-skeleton {
+  --bui-skeleton-sheen: rgb(255 255 255 / 0.75);
+  overflow: hidden;
+  isolation: isolate;
+  container-type: inline-size;
+}
+
+@media (prefers-color-scheme: dark) {
+  .bui-skeleton {
+    --bui-skeleton-sheen: rgb(255 255 255 / 0.075);
+  }
+}
+
+.bui-skeleton::after {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 600px;
+  background: linear-gradient(
+    90deg in oklab,
+    transparent 0%,
+    color-mix(in oklab, var(--bui-skeleton-sheen) 3%, transparent) 10%,
+    color-mix(in oklab, var(--bui-skeleton-sheen) 12%, transparent) 20%,
+    color-mix(in oklab, var(--bui-skeleton-sheen) 30%, transparent) 29%,
+    color-mix(in oklab, var(--bui-skeleton-sheen) 55%, transparent) 37%,
+    color-mix(in oklab, var(--bui-skeleton-sheen) 80%, transparent) 44%,
+    var(--bui-skeleton-sheen) 50%,
+    color-mix(in oklab, var(--bui-skeleton-sheen) 80%, transparent) 56%,
+    color-mix(in oklab, var(--bui-skeleton-sheen) 55%, transparent) 63%,
+    color-mix(in oklab, var(--bui-skeleton-sheen) 30%, transparent) 71%,
+    color-mix(in oklab, var(--bui-skeleton-sheen) 12%, transparent) 80%,
+    color-mix(in oklab, var(--bui-skeleton-sheen) 3%, transparent) 90%,
+    transparent 100%
+  );
+  translate: -600px 0;
+  animation: bui-skeleton-sheen 1.9s linear infinite;
+  will-change: translate;
+}
+
+.bui-skeleton:dir(rtl)::after {
+  animation-name: bui-skeleton-sheen-rtl;
+}
+
+@keyframes bui-skeleton-sheen {
+  from {
+    translate: -600px 0;
+  }
+
+  to {
+    translate: max(100cqw, 640px) 0;
+  }
+}
+
+@keyframes bui-skeleton-sheen-rtl {
+  from {
+    translate: 600px 0;
+  }
+
+  to {
+    translate: calc(-1 * max(100cqw, 640px)) 0;
+  }
+}
+
+@keyframes bui-skeleton-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bui-skeleton::after {
+    display: none;
+  }
+
+  .bui-skeleton {
+    animation: bui-skeleton-pulse 2s ease-in-out infinite;
+  }
+}

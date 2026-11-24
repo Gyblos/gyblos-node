@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-import { PAGING } from '../../../lib/constants';
+import { PAGES } from '../../../lib/constants';
 
 export default function SellerNotFound() {
   return (
@@ -10,8 +10,8 @@ export default function SellerNotFound() {
         No seller with this NodeId in the index or in the collector&apos;s data.
       </p>
       <Link
-        href={`/#${PAGING.anchors.sellers}`}
-        className="mt-4 inline-block text-sm hover:text-brand"
+        href={PAGES.sellers}
+        className="mt-4 inline-block text-sm hover:text-ink hover:underline underline-offset-2"
       >
         See the sellers in the explorer
       </Link>

@@ -9,7 +9,7 @@ import {
   type StoredDiscovery,
 } from './discovery';
 import type { Uptime } from './discovery-shape';
-import { normalizeNetwork } from './network-status';
+import { listedOnline, normalizeNetwork } from './network-status';
 
 // The KV calls the explorer makes (a Workers KV namespace binding has them).
 export interface DiscoveryKv {
@@ -91,7 +91,10 @@ export function snapshotOf(
       ...seller,
       uptime: shownUptime(stored.uptimes[seller.nodeId], now),
     })),
-    network: normalizeNetwork(catalog.network),
+    network: listedOnline(
+      normalizeNetwork(catalog.network),
+      catalog.sellers.map((seller) => seller.nodeId),
+    ),
     datedAt:
       now - stored.progressAt > DISCOVERY.staleAfterMs ||
       now - catalog.readAt > DISCOVERY.restartAfterMs

@@ -1,12 +1,8 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 
-import { HashScroll } from '../../../components/hash-scroll';
-import { LiveRefresh } from '../../../components/live-refresh';
-import { NetworkSelect } from '../../../components/network-select';
-import { RangeControl } from '../../../components/range-control';
+import { PageFrame } from '../../../components/page-frame';
 import { SellerActivity } from '../../../components/seller-activity';
 import { SellerProfileSection } from '../../../components/seller-profile';
 import { SellerTxs } from '../../../components/seller-txs';
@@ -14,7 +10,7 @@ import { Loading } from '../../../components/ui';
 import { SELLER_STATUS } from '../../../lib/constants';
 import { getDiscovery } from '../../../lib/discovery-render';
 import { short } from '../../../lib/format';
-import { queryHref, readQuery } from '../../../lib/paging';
+import { rangeOf, readQuery } from '../../../lib/paging';
 import { WIDEST_RANGE } from '../../../lib/range';
 import { sellerHref } from '../../../lib/seller-identity';
 import { sellerNodeId } from '../../../lib/seller-page';
@@ -58,45 +54,23 @@ export default async function SellerPage({ params, searchParams }: Props) {
     getSellerStats(nodeId, WIDEST_RANGE),
   ]);
   if (unknownSeller(nodeId, snapshot, stats)) notFound();
-  const home = queryHref({ ...query, path: '/', before: null, pages: {} }, {});
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 pb-16 sm:px-6">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line py-5">
-        <h1 className="sr-only">Gyblos seller {nodeId}</h1>
-        <nav
-          aria-label="Breadcrumb"
-          className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1"
-        >
-          <Link
-            href={home}
-            className="flex items-baseline gap-3 hover:text-brand"
-          >
-            <span className="text-xl font-medium tracking-tight">gyblos</span>
-            <span className="text-muted">Explorer</span>
-          </Link>
-          <span aria-hidden className="text-dim">
-            /
-          </span>
-          <span aria-current="page" className="font-mono text-sm text-muted">
-            Seller {short(nodeId)}
-          </span>
-        </nav>
-        <div className="flex items-center gap-2">
-          <LiveRefresh />
-          <RangeControl days={query.days} />
-          <NetworkSelect />
-        </div>
-      </header>
+    <PageFrame
+      title={`Gyblos seller ${nodeId}`}
+      crumb={`Seller ${short(nodeId)}`}
+    >
       <Suspense fallback={<Loading />}>
         <SellerProfileSection nodeId={nodeId} />
       </Suspense>
-      <Suspense fallback={<Loading />}>
+      <Suspense
+        key={`activity-${rangeOf(query, 'activity')}`}
+        fallback={<Loading cards />}
+      >
         <SellerActivity nodeId={nodeId} query={query} />
       </Suspense>
       <Suspense fallback={<Loading />}>
         <SellerTxs nodeId={nodeId} query={query} />
       </Suspense>
-      <HashScroll />
-    </div>
+    </PageFrame>
   );
 }

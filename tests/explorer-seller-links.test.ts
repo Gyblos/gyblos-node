@@ -20,6 +20,8 @@ void test('a link to a seller page keeps the range and the verified filter only'
     modelsPage: '2',
     before: CURSOR,
     txPage: '2',
+    modelsRange: '90',
+    sellersSort: '-input',
   });
   assert.equal(sellerHref(NODE, query), `/sellers/${NODE}?range=7&verified=1`);
   assert.equal(sellerHref(NODE, readQuery({})), `/sellers/${NODE}`);
