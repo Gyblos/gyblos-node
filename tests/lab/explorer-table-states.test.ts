@@ -144,11 +144,15 @@ async function pageHtml(dir: string, state: State) {
         output += chunk.toString();
       });
     });
-    const response = await fetch(url + '/?range=7', {
-      signal: AbortSignal.timeout(60_000),
-    });
-    assert.equal(response.status, 200, output);
-    return await response.text();
+    let html = '';
+    for (const path of ['/?range=7', '/stats?range=7']) {
+      const response = await fetch(url + path, {
+        signal: AbortSignal.timeout(60_000),
+      });
+      assert.equal(response.status, 200, output);
+      html += await response.text();
+    }
+    return html;
   } finally {
     app.kill();
     try {
@@ -165,7 +169,7 @@ function bodyFor(html: string, column: string) {
   const tables = html.matchAll(/<table\b[^>]*>(.*?)<\/table>/gs);
   for (const [, contents = ''] of tables) {
     const [head, body] = contents.split('<tbody>');
-    if (head?.includes('>' + column + '</th>') && body !== undefined)
+    if (head?.includes('>' + column + '<') && body !== undefined)
       return body.replace(/<\/tbody>$/, '');
   }
   assert.fail('Table missing: ' + column);
@@ -176,6 +180,7 @@ before(async () => {
   dir = await mkdtemp(join(tmpdir(), 'gyblos-explorer-'));
   for (const name of [
     'app',
+    'boardui',
     'components',
     'lib',
     'package.json',
@@ -204,11 +209,11 @@ void test('Explorer gives offerless Sellers and inactive Daily one spanning row 
   const empty = await pageHtml(dir, 'empty');
   assert.match(
     bodyFor(empty, 'Seller'),
-    /^<tr><td[^>]*\btext-muted\b[^>]*\bcolSpan="8"[^>]*>No offers from online sellers\.<\/td><\/tr>$/i,
+    /^<tr><td[^>]*\btext-muted\b[^>]*\bcolSpan="9"[^>]*>No offers from online sellers\.<\/td><\/tr>$/i,
   );
   assert.match(
     bodyFor(empty, 'Day (UTC)'),
-    /^<tr><td[^>]*\btext-muted\b[^>]*\bcolSpan="7"[^>]*>No daily activity in this range\.<\/td><\/tr>$/i,
+    /^<tr><td[^>]*\btext-muted\b[^>]*\bcolSpan="12"[^>]*>No daily activity in this range\.<\/td><\/tr>$/i,
   );
 });
 
@@ -226,11 +231,11 @@ void test('Explorer keeps the unavailable panels when the sources fail', async (
   const unavailable = await pageHtml(dir, 'unavailable');
   assert.match(
     unavailable,
-    />Network<\/h2><\/div><div[^>]*>Source unavailable\.<\/div>/,
+    />Network<\/h2><\/div><\/div><div[^>]*>Source unavailable\.<\/div>/,
   );
   assert.match(
     unavailable,
-    />Usage<\/h2><\/div><div[^>]*>Source unavailable\.<\/div>/,
+    />Usage<\/h2><\/div><\/div><div[^>]*>Source unavailable\.<\/div>/,
   );
   assert.doesNotMatch(unavailable, /<table\b/);
 });
