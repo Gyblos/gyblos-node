@@ -421,7 +421,7 @@
   "apps/docs/test/brand.test.ts": 3,
   "apps/docs/test/export.test.ts": 4,
   "apps/docs/test/theme-script.test.ts": 3,
-  "apps/docs/wrangler.jsonc": 5,
+  "apps/docs/wrangler.jsonc": 2,
   "apps/explorer/app/globals.css": 3,
   "apps/explorer/app/layout.tsx": 3,
   "apps/explorer/app/page.tsx": 2,
