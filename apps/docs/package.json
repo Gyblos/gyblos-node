@@ -13,8 +13,8 @@
     "test:export": "node --import tsx --test test/*.test.ts"
   },
   "dependencies": {
-    "fumadocs-core": "16.19.3",
-    "fumadocs-mdx": "15.6.2",
+    "fumadocs-core": "16.19.5",
+    "fumadocs-mdx": "15.6.4",
     "fumadocs-ui": "npm:@fumadocs/base-ui@16.19.3",
     "next": "16.4.6",
     "react": "19.3.1",
