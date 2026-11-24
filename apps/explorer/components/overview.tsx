@@ -1,13 +1,12 @@
-import { Activity, MessagesSquare } from 'lucide-react';
+import { Binary, MessagesSquare } from 'lucide-react';
 import type { ReactElement } from 'react';
 
 import { chainHistoryNote, summarizeChain } from '../lib/chain-shape';
 import { getChainStats } from '../lib/chain-stats';
 import { getCollector } from '../lib/collector';
 import { getDiscovery } from '../lib/discovery-render';
-import { count, percent, usdcDecimal } from '../lib/format';
+import { usdcDecimal } from '../lib/format';
 import { overviewLayout } from '../lib/layout';
-import { summarizeOffers } from '../lib/offers';
 import { rangeOf, type ExplorerQuery } from '../lib/paging';
 import { summarizeUsage } from '../lib/usage';
 import { Flow } from './board/animated-number';
@@ -51,7 +50,6 @@ export async function Overview({ query }: { query: ExplorerQuery }) {
     paid !== null && !chainBefore.error && chainBefore.backfillDone
       ? summarizeChain(chainBefore).totals.paidOut
       : null;
-  const offers = snapshot.error ? null : summarizeOffers(snapshot);
   const cards = [
     snapshot.error ? null : (
       <SellersOnline key="sellers" snapshot={snapshot} variant="footer" />
@@ -85,22 +83,7 @@ export async function Overview({ query }: { query: ExplorerQuery }) {
         ) : undefined
       }
     />,
-    <StatCard
-      key="uptime"
-      variant="footer"
-      icon={Activity}
-      label="Uptime 24 h"
-      value={
-        offers?.averageDayUptime == null
-          ? '—'
-          : percent(offers.averageDayUptime)
-      }
-      caption={
-        offers?.averageDayUptime == null || snapshot.error
-          ? undefined
-          : `Average of ${count(offers.sellersWithDayUptime)} ${offers.sellersWithDayUptime === 1 ? 'seller' : 'sellers'}`
-      }
-    />,
+    <TokensCard key="tokens" usage={requests} before={requestsBefore} />,
   ].filter((card) => card !== null);
   return (
     <>
@@ -133,6 +116,33 @@ function RequestsCard({
           ? [
               delta(requests.free.requests, before.free.requests),
               delta(requests.paid.requests, before.paid.requests),
+            ]
+          : undefined
+      }
+    />
+  );
+}
+
+function TokensCard({
+  usage,
+  before,
+}: {
+  usage: ReturnType<typeof summarizeUsage> | null;
+  before: ReturnType<typeof summarizeUsage> | null;
+}) {
+  const side = (figure: 'free' | 'paid') =>
+    usage ? <Flow value={usage[figure].tokens} kind="compact" /> : '—';
+  return (
+    <StatCard
+      variant="footer"
+      icon={Binary}
+      label="Tokens processed"
+      sides={{ free: side('free'), paid: side('paid') }}
+      deltas={
+        usage && before
+          ? [
+              delta(usage.free.tokens, before.free.tokens),
+              delta(usage.paid.tokens, before.paid.tokens),
             ]
           : undefined
       }
