@@ -13,6 +13,7 @@ import type { Delta } from './delta';
 const SIDES = ['free', 'paid'] as const;
 const PILL_COLORS = { good: 'lime', bad: 'rose', neutral: 'neutral' } as const;
 const COMPARED = 'vs previous period';
+const LABEL = 'text-body-medium break-words text-text-secondary';
 const VALUE = {
   footer:
     'max-w-full min-w-0 font-mono text-[clamp(1.125rem,calc(10cqi_+_0.1rem),1.75rem)] leading-none tabular-nums [--number-flow-mask-height:0px]',
@@ -125,9 +126,7 @@ export function StatCard({
           </span>
           {hint ? <StatHint label={label} hint={hint} /> : null}
         </div>
-        <p className="mt-3 text-body-medium break-words text-text-secondary">
-          {label}
-        </p>
+        <p className={cx('mt-3', LABEL)}>{label}</p>
         <div className="@container mt-1 flex min-w-0 items-baseline self-start">
           <Value variant={variant} value={value} sides={sides} money={money} />
         </div>
@@ -155,9 +154,7 @@ export function StatCard({
         </span>
         {hint ? <StatHint label={label} hint={hint} /> : null}
       </div>
-      <p className="mx-2 mt-2.5 text-body-medium break-words text-text-secondary">
-        {label}
-      </p>
+      <p className={cx('mx-2 mt-2.5', LABEL)}>{label}</p>
       <div className="@container mx-2 mt-0.5 mb-3.5 flex min-w-0 items-baseline self-start">
         <Value variant={variant} value={value} sides={sides} money={money} />
       </div>
