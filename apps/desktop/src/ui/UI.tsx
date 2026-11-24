@@ -16,7 +16,7 @@ import {
 import { BUTTON_VARIANT } from './constants';
 import { useTooltip } from './Tooltip';
 
-type ButtonProps = ComponentPropsWithRef<'button'> & {
+export type ButtonProps = ComponentPropsWithRef<'button'> & {
   variant?: (typeof BUTTON_VARIANT)[keyof typeof BUTTON_VARIANT];
 };
 export function Button({

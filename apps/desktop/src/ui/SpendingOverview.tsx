@@ -1,8 +1,9 @@
 import { Gauge, Wallet } from '@phosphor-icons/react';
 
 import { x402Amount, x402Asset } from '../x402-model';
+import { ActionButton } from './ActionButton';
 import { Section } from './Management';
-import { Button, StatCard, StatGrid } from './UI';
+import { StatCard, StatGrid } from './UI';
 import type { X402View } from './useX402';
 
 export function SpendingOverview({
@@ -28,10 +29,11 @@ export function SpendingOverview({
       title="Spending"
       className="preview-spending"
       action={
-        <Button onClick={onLimits}>
-          <Gauge size={16} />
-          Spending limits
-        </Button>
+        <ActionButton
+          icon={<Gauge size={16} />}
+          label="Spending limits"
+          onClick={onLimits}
+        />
       }
     >
       <StatGrid>

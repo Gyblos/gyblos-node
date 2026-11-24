@@ -1,4 +1,4 @@
-import { ArrowUpRight } from '@phosphor-icons/react';
+import { ArrowUpRight, Key } from '@phosphor-icons/react';
 import { useState } from 'react';
 
 import { DEVNET_USDC } from '@gyblos/config/network';
@@ -8,6 +8,7 @@ import type { BuyerApiKeysSnapshot } from '@gyblos/protocol/buyer-api-keys';
 
 import { RESPONSE_METRICS } from '../constants';
 import { x402BudgetInput } from '../x402-model';
+import { ActionButton } from './ActionButton';
 import { AmountField } from './AmountField';
 import { Modal } from './Modal';
 import { TONE, type Tone } from './status-tone';
@@ -73,7 +74,11 @@ function KeyLimits({
     <section className="ui-section" aria-label="API key limits">
       <div className="ui-section-title">
         <h2>API keys</h2>
-        <Button onClick={manage}>Manage keys</Button>
+        <ActionButton
+          icon={<Key size={16} />}
+          label="Manage keys"
+          onClick={manage}
+        />
       </div>
       <p className="ui-help-text">
         Each API key has its own lifetime spending limit.

@@ -231,6 +231,28 @@
   width: var(--control-size);
   padding: 0;
 }
+.desktop-frame .ui-action-button + .ui-tooltip {
+  display: none;
+}
+@container (max-width: 600px) {
+  html .app.desktop-frame .ui-action-button {
+    width: var(--control-size);
+    min-width: var(--control-size);
+    padding: 0;
+    justify-content: center;
+  }
+  .desktop-frame .ui-action-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .desktop-frame .ui-action-button + .ui-tooltip {
+    display: block;
+  }
+}
 .desktop-frame .ui-button.wide {
   width: 100%;
 }

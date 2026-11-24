@@ -154,6 +154,9 @@ Shared tables preserve tabular structure at narrow widths, scroll internally,
 keep their header/identity column visible, and put pagination outside the scroll
 region. Reset the page when filtering. Loading/error states hide stale totals.
 Detail dialogs preserve linked conversations and full provider references.
+Secondary header and toolbar actions use `ActionButton`: an icon and a visible
+label that collapses to an icon with the same accessible name and tooltip when
+its container is 600 px or narrower.
 
 ## Financial accuracy and references
 

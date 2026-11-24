@@ -2751,6 +2751,16 @@ html[data-density='compact']
   padding-block: 3px;
   font-size: var(--ui-font);
 }
+@container (max-width: 620px) {
+  html[data-density='compact']
+    .app.desktop-frame
+    .content
+    .ui-table-region
+    .ui-data-table
+    :is(th, td) {
+    height: auto;
+  }
+}
 html[data-density='compact']
   .app.desktop-frame
   .content

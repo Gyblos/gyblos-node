@@ -105,13 +105,15 @@ export function PaypalSummary({
               ' limit'}
         </p>
       </div>
-      <Button
-        variant={BUTTON_VARIANT.SECONDARY}
-        disabled={session.state.busy}
-        onClick={onManage}
-      >
-        {paypalManageLabel(session)}
-      </Button>
+      <div className="preview-method-actions">
+        <Button
+          variant={BUTTON_VARIANT.SECONDARY}
+          disabled={session.state.busy}
+          onClick={onManage}
+        >
+          {paypalManageLabel(session)}
+        </Button>
+      </div>
     </li>
   );
 }
