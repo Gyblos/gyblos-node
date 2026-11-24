@@ -122,8 +122,9 @@ free = { daily_token_cap = 200000, per_buyer_cap = 50000 }
 - `context_tokens` is what buyers are told; it does not change Ollama. Ollama's OpenAI API serves the
   context its server is set to (`OLLAMA_CONTEXT_LENGTH`), which `ollama ps` shows while the model is
   loaded (on Docker, `docker compose exec ollama ollama ps`). Keep `context_tokens` at or below it.
-- Reasoning must be `off` on this engine. Turn thinking off in the model if it has a switch: hidden
-  reasoning tokens count against the bill's cap, and usage past the cap is not paid.
+- Reasoning must be `off` on this engine. Turn thinking off in the model if it has a switch. On a
+  declared offer, hidden reasoning tokens the engine reports count against the bill's cap, and usage past
+  the cap is not paid; a recounted Qwen3 bill never includes them.
 - Buyers recount the tokens of catalog Qwen3 models only. The catalog's `gpt-oss-20b` and `gpt-oss-120b` cannot
   turn reasoning off, so this engine cannot serve them yet. For every other model, including the other
   catalog IDs, the usage is declared by the seller and capped by the text's size. Only buyers on

@@ -123,8 +123,9 @@ free = { daily_token_cap = 200000, per_buyer_cap = 50000 }
   de Ollama sirve el contexto que tenga su servidor (`OLLAMA_CONTEXT_LENGTH`), que `ollama ps` muestra
   mientras el modelo está cargado (en Docker, `docker compose exec ollama ollama ps`). Deja `context_tokens` igual o por debajo.
 - En este motor el razonamiento debe ser `off`. Apaga el pensamiento en el modelo si tiene ese
-  interruptor: los tokens de razonamiento ocultos cuentan contra el tope del cobro, y el uso que pase del
-  tope no se paga.
+  interruptor. En una oferta declarada, los tokens de razonamiento ocultos que informa el motor cuentan
+  contra el tope del cobro, y el uso que pase del tope no se paga; un cobro recontado de Qwen3 nunca los
+  incluye.
 - Los compradores recuentan los tokens solo de los modelos Qwen3 del catálogo. `gpt-oss-20b` y `gpt-oss-120b` del catálogo no
   pueden apagar el razonamiento, así que este motor todavía no los sirve. Para cualquier otro modelo,
   incluidos los demás IDs del catálogo, el uso lo declara el vendedor, con un tope por el tamaño
