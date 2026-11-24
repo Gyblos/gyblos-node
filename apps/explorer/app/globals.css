@@ -92,6 +92,12 @@ body {
   display: block;
 }
 
+@media (forced-colors: active) {
+  .explorer-table-edge {
+    border-right: 3px double CanvasText;
+  }
+}
+
 .explorer-table thead,
 .explorer-table thead th {
   background: color-mix(in srgb, var(--raised) 50%, var(--panel));

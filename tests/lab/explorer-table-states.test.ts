@@ -253,6 +253,10 @@ void test('Explorer shows offer and active-day rows without empty rows', async (
     css,
     /\.explorer-table-scroll\[data-scrollable\]:not\(\[data-scroll-end\]\)\s*\+\s*\.explorer-table-edge\s*\{\s*display:\s*block;/,
   );
+  assert.match(
+    css,
+    /@media\s*\(forced-colors:\s*active\)\s*\{\s*\.explorer-table-edge\s*\{\s*border-right:\s*3px double CanvasText;/,
+  );
 });
 
 void test('Explorer keeps the unavailable panels when the sources fail', async () => {
