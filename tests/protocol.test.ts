@@ -1,10 +1,7 @@
-// Checks the signed-offer protocol: golden vector bytes and signature, domain separation, canonical encoding,
-// protocol error serialization, engine/wire contracts and that the protocol package has no SDK or adapter imports.
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 
-import { address, getAddressEncoder } from '@solana/kit';
 import ts from 'typescript';
 
 import applicationManifest from '@gyblos/core/package.json' with { type: 'json' };
@@ -20,9 +17,8 @@ import {
   type EngineUsage,
   type EngineWireUsage,
 } from '@gyblos/protocol';
-import { OFFER_DOMAIN } from '@gyblos/protocol/constants';
 import protocolManifest from '@gyblos/protocol/package.json' with { type: 'json' };
-import vector from '@gyblos/protocol/vectors/signed-inference-offer-v1.json' with { type: 'json' };
+import discovery from '@gyblos/protocol/vectors/public-discovery-v1.json' with { type: 'json' };
 
 const EXPECTED_ERROR_CODES = [
   'AMOUNT_MISMATCH',
@@ -60,29 +56,8 @@ const EXPECTED_ERROR_CODES = [
   'WRONG_CLUSTER',
 ];
 
-void test('legacy offer golden vector preserves canonical bytes, Ed25519 signature and application trust', async () => {
-  assert.equal(vector.domain, 'gyblos/signed-inference-offer/v1\n');
-  assert.equal(vector.domain, OFFER_DOMAIN);
-  assert.equal(canonicalJson(vector.offer), vector.canonicalJson);
-  assert.equal(
-    Buffer.from(signingBytes(vector.domain, vector.offer)).toString('hex'),
-    vector.signingBytesHex,
-  );
-  const publicKey = Uint8Array.from(Buffer.from(vector.publicKeyHex, 'hex'));
-  const signature = Uint8Array.from(
-    Buffer.from(vector.signatureBase64, 'base64'),
-  );
-  assert.equal(
-    Buffer.from(
-      getAddressEncoder().encode(address(vector.offer.owner)),
-    ).toString('hex'),
-    vector.publicKeyHex,
-  );
-  assert.equal(
-    await verify(vector.domain, vector.offer, publicKey, signature),
-    true,
-  );
-});
+const vector =
+  discovery.vectors[0] ?? assert.fail('public discovery vector missing');
 
 void test('SDK-independent signing uses the exact domain bytes and rejects a different domain or payload', async () => {
   const keys = await crypto.subtle.generateKey({ name: 'Ed25519' }, true, [
@@ -92,7 +67,12 @@ void test('SDK-independent signing uses the exact domain bytes and rejects a dif
   const publicKey = new Uint8Array(
     await crypto.subtle.exportKey('raw', keys.publicKey),
   );
-  const signature = await sign(vector.domain, vector.offer, async (bytes) => {
+  assert.equal(canonicalJson(vector.record), vector.canonicalJson);
+  assert.equal(
+    Buffer.from(signingBytes(vector.domain, vector.record)).toString('hex'),
+    vector.signingBytesHex,
+  );
+  const signature = await sign(vector.domain, vector.record, async (bytes) => {
     assert.equal(Buffer.from(bytes).toString('hex'), vector.signingBytesHex);
     return new Uint8Array(
       await crypto.subtle.sign('Ed25519', keys.privateKey, bytes),
@@ -100,13 +80,13 @@ void test('SDK-independent signing uses the exact domain bytes and rejects a dif
   });
   const mutableSignature = Uint8Array.from(signature);
   assert.equal(
-    await verify(vector.domain, vector.offer, publicKey, mutableSignature),
+    await verify(vector.domain, vector.record, publicKey, mutableSignature),
     true,
   );
   assert.equal(
     await verify(
       'gyblos/another-kind/v1\n',
-      vector.offer,
+      vector.record,
       publicKey,
       mutableSignature,
     ),
@@ -115,7 +95,7 @@ void test('SDK-independent signing uses the exact domain bytes and rejects a dif
   assert.equal(
     await verify(
       vector.domain,
-      { ...vector.offer, maxAtomic: '9999' },
+      { ...vector.record, expiresAt: vector.record.expiresAt + 1 },
       publicKey,
       mutableSignature,
     ),
@@ -123,7 +103,7 @@ void test('SDK-independent signing uses the exact domain bytes and rejects a dif
   );
   const failure = new Error('synthetic signer failure');
   await assert.rejects(
-    sign(vector.domain, vector.offer, async () => {
+    sign(vector.domain, vector.record, async () => {
       throw failure;
     }),
     (error) => error === failure,

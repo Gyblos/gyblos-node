@@ -24,7 +24,7 @@ the matching service (`packages/transport-iroh/src/endpoint.ts`).
 | `gyblos/session/4`     | 4       | Active when the seller has reusable sessions                                                     | `batch-channel-v4.json`, `batch-prepare-v4.json`, `batch-startup-v4.json`, `batch-stream-v4.json`, `batch-tools-v4.json` | [Active common tool-aware execution](#active-common-tool-aware-execution) |
 | `gyblos/session/5`     | 5       | Active alongside `gyblos/session/4` (response blocks)                                            | `session-blocks-v5.json`                                                                                                 | [Session block checkpoints](#reusable-session-block-checkpoints-v5)       |
 | `gyblos/receipt/1`     | 1       | Active                                                                                           | `receipt-channel-v1.json`                                                                                                | [Receipt exchange channel v1](#receipt-exchange-channel-v1)               |
-| `gyblos/http/1`        | 1       | HTTP over Iroh; endpoints register it by default, but the seller node and buyer apps turn it off | `signed-inference-offer-v1.json`                                                                                         | [Canonical JSON and signing bytes](#canonical-json-and-signing-bytes)     |
+| `gyblos/http/1`        | 1       | HTTP over Iroh; endpoints register it by default, but the seller node and buyer apps turn it off | —                                                                                                                        | [Canonical JSON and signing bytes](#canonical-json-and-signing-bytes)     |
 | `gyblos/http/2`        | —       | Reserved identifier; never registered                                                            | —                                                                                                                        | [Control contracts](#control-contracts-and-iroh-runtime)                  |
 
 Retired channels: `gyblos/session/1`, `/2` and `/3` (vectors
@@ -81,25 +81,16 @@ token bounds, context size and schema version remain safe integer JSON numbers.
 Do not convert those existing numeric fields to strings during extraction.
 
 Signing bytes are UTF-8(domain + canonicalJson(value)). Domain prefixes follow
-gyblos/&lt;kind&gt;/v&lt;n&gt; followed by one newline. The existing offer prefix is
-exactly `gyblos/signed-inference-offer/v1\n`, with a real LF byte, not the two
-characters backslash and n. Keep this kind and payload shape unchanged. Callers
-select the domain; the helpers do not introduce a new domain policy.
-
-The offer types `InferenceOffer` and `SignedInferenceOffer` are exported from
-`./offer`. `./constants` names the wire values: `OFFER_DOMAIN` (the prefix
-above), `OFFER_SCHEMA_VERSION` (`1`) and `GYBLOS_ALPN` (`gyblos/http/1`, the
-Iroh ALPN, also carried in the offer's `protocol` field).
+gyblos/&lt;kind&gt;/v&lt;n&gt; followed by one real LF byte, not the two
+characters backslash and n. Callers select the domain; the helpers do not
+introduce a new domain policy. `./constants` names `GYBLOS_ALPN`
+(`gyblos/http/1`, the Iroh ALPN).
 
 ## Signatures, contracts and compatibility
 
 `sign` invokes an injected byte signer; it must use Ed25519. `verify` uses Web
 Crypto Ed25519 with a raw 32-byte public key. Signature encoding is the caller's
-responsibility: the existing private offer stays `{ offer, signature }`, with a
-Base64 signature over the offer. Solana addresses, signing-message adaptation,
-trust checks, payment policy and expiry checks for that legacy offer stay outside
-protocol. The public discovery contracts below are separate messages: they do
-not replace, reinterpret or authorize the buyer-bound paid offer.
+responsibility. The v1 signed private offer is removed; no product path used it.
 
 `EngineUsage` retains camelCase domain counters. `EngineWireUsage` retains the
 distinct snake_case wire counters; inferenceWireUsage performs the existing
@@ -107,13 +98,6 @@ mapping. Engine completion reasons and error-code strings retain their values.
 `ProtocolError` keeps Error's existing name/message and enumerable code.
 Payment, node and buyer code throw and compare this same constructor and
 `PROTOCOL_ERROR_CODES` catalog directly; there are no payment-package aliases.
-
-`vectors/signed-inference-offer-v1.json` contains a synthetic, unfunded offer,
-canonical JSON, complete signing bytes in hexadecimal, raw public key and
-Base64 signature captured from main 6abdb6d **before** extraction. No private key
-is retained. `pnpm test` reads the vector and verifies it independently and
-through the existing application entrypoint. Changes to these bytes or wire
-contracts require a separately reviewed protocol version, not a refactor.
 
 ## Public discovery records, version 1
 
@@ -266,9 +250,7 @@ catalog reference, public key and signatures. A separate one-shot Node/OpenSSL
 oracle built and signed the records independently of the protocol helpers.
 Only synthetic public material is retained. Tests check both Web Crypto and
 OpenSSL, wrong domains, changed payloads and reordered JSON properties. These
-are public discovery signatures, not signed payment authorizations. The
-signed-offer vectors in `vectors/signed-inference-offer-v1.json` are a separate
-set.
+are public discovery signatures, not signed payment authorizations.
 
 ## Control contracts and Iroh runtime
 
@@ -333,8 +315,7 @@ delivered or the output count is zero.
 USDC-per-million configuration prices map exactly to atomic-per-million rates
 by multiplying by 1,000,000 (at most six decimal places); there is no division
 by token count during this conversion. Seller startup advertises configured v2
-rates plus the protocol fee. The legacy buyer's v1 compatibility check does not
-convert a signed v2 quote into a v1 offer. Selector weights
+rates plus the protocol fee. Selector weights
 compare the same per-million rate sums (without charge rounding); its minimum
 paid budget covers the once-rounded cost of one input and one output token.
 A quote's total budget remains a ceiling, not a promise that an unknown prompt
@@ -746,8 +727,8 @@ Native ingress, generation and egress share endpoint request admission. A
 read, engine or writer ignoring cancellation retains its request permit until
 actual settlement. Timeout closes the connection and suppresses late output.
 The free-configured seller starts neither the facilitator nor the paid HTTP
-service, does not check the devnet payment program or load the auxiliary
-payment signers, and writes no legacy v1 offer. Paid-configured startup keeps
+service, and does not check the devnet payment program or load the auxiliary
+payment signers. Paid-configured startup keeps
 the existing v1 service. The free branch advertises only control and free
 ALPNs. Transport allows one control connection and one data connection per
 authenticated peer at a time (the global connection pool and the per-peer
