@@ -14,6 +14,13 @@ seller that serves a different model than it declares. Quantization, inflated
 usage, a false context length, paid offers and any use of the result in
 discovery or routing are out of scope; see [Limits](#limits).
 
+**Status.** This is a design note, not an operations reference. The command
+`pnpm model-verifier`, the challenge set `gyblos-text` version 1 and the signed
+record parser (`@gyblos/protocol/model-verification`) exist only once the app
+change that follows this note is merged; until then they are the design. Nothing
+in discovery, routing, payments or the public metrics reads a verification
+result.
+
 ## Why not the other candidate signals
 
 **Identical tokens at temperature 0.** Only the Ollama engine adapter generates
@@ -62,38 +69,50 @@ that the same model gives less than 0.1 %; a smaller model often does.
 
 ### Decision rule
 
-The rule is fixed by challenge set `gyblos-text` version 1
-(`apps/model-verifier/src/challenge-set.ts`): 30 prompts in English and Spanish
-(explanations, code, JSON, SQL, short creative text), at most 200 output tokens
-each, reasoning off.
+The rule is fixed by challenge set `gyblos-text` version 1: 30 prompts in
+English and Spanish (explanations, code, JSON, SQL, short creative text), at
+most 200 output tokens each, reasoning off.
 
-| Parameter                     | Value                               |
-| ----------------------------- | ----------------------------------- |
-| Checks per answer             | up to 24                            |
-| Reference candidates          | top 20 next tokens                  |
-| Deviation probability floor   | 0.1 %                               |
-| Assumed honest deviation rate | 0.5 %                               |
-| False positive bound          | 0.01 % (1 in 10,000 honest sellers) |
-| Minimum checks for `pass`     | 480                                 |
+The unit of the test is the **answer**, not the check. The 24 checks of one
+answer read the same generated text, so they are not independent, and a binomial
+bound over pooled checks would not bound how often an honest seller fails a run.
+Each answer is a separate request and a separate generation, so an answer is
+**deviant** when at least one of its checks is a deviation, and the test counts
+deviant answers.
 
-`failAt` is the smallest number of deviations whose probability under a binomial
-distribution with the assumed honest rate is at most 0.01 %. With 720 checks it
-is 13; with 480 checks it is 11.
+| Parameter                              | Value                            |
+| -------------------------------------- | -------------------------------- |
+| Checks per answer                      | up to 24                         |
+| Reference candidates                   | top 20 next tokens               |
+| Deviation probability floor            | 0.1 %                            |
+| Assumed honest rate of deviant answers | 12 %                             |
+| False positive bound per run           | 0.01 % (1 in 10,000 honest runs) |
+| Minimum checks for `pass`              | 480                              |
 
-- `fail`: deviations ≥ `failAt`. This holds for any number of checks, because
-  `failAt` is computed for the checks actually made.
-- `inconclusive`: fewer deviations, but a prompt went unanswered or fewer than
-  480 checks were made.
-- `pass`: fewer deviations, every prompt answered and at least 480 checks.
+`failAt` is the smallest number of deviant answers whose probability under a
+binomial distribution over the scored answers, with the assumed honest rate, is
+at most 0.01 %. With 30 answers it is 12. An empty answer, or one with no point
+left to check, counts as unanswered.
+
+- `fail`: deviant answers ≥ `failAt`. This holds even when prompts went
+  unanswered, because `failAt` is computed for the answers actually scored.
+- `inconclusive`: not a fail, but a prompt went unanswered or fewer than 480
+  checks were made.
+- `pass`: not a fail, every prompt answered and at least 480 checks.
 
 A seller cannot skip the prompts it is unsure about and still pass, and each run
 asks for quotes from a new, unrelated buyer address.
 
-The assumed honest rate, 0.5 %, is about 3.7 times the 95 % upper bound of the
-measured honest rate below (0.14 %), as margin for hardware and serving stacks
-not yet measured. At 480 checks the rule still catches a seller that deviates on
-3.4 % of checks with probability 0.94, and at 720 checks with 0.996; a full-time
-`qwen3-0.6b` substitute deviates on 10–21 %.
+The assumed rate, 12 %, is at least the 95 % upper bound of the worst honest
+case measured below (17 deviant answers in 240 at temperature 1 without top-k:
+upper bound 10.4 %). At that bound an honest run fails with probability 0.0025
+%. A full-time `qwen3-0.6b` substitute had 27 or 28 deviant answers out of 30 in
+every run; a seller that substitutes on about a third of its answers would be
+caught only about 43 % of the time.
+
+The bound assumes each prompt's chance of a deviant honest answer is at most the
+assumed rate, independently across prompts. Per-prompt rates differ; the
+binomial with the largest rate still bounds the count.
 
 ## How references are produced
 
@@ -102,48 +121,65 @@ the catalog alias of that model (for example `qwen3-1.7b` → `qwen3:1.7b`). The
 verifier refuses models without a catalog alias or without the pinned Qwen3
 tokenizer and template. The prompt is rendered with the Qwen3 template the
 Ollama engine adapter uses (`renderChat` in `packages/engine-ollama`, thinking
-off). The reference model's Ollama digest is recorded in the signed result, so
-anyone can pull the same weights, rerun the same challenge set and recompute
-every check from the evidence file.
+off). The reference model's Ollama digest is recorded in the signed result.
+
+What that makes reproducible, and what it does not:
+
+- The digest pins the reference **weights**. It does not pin the runtime that
+  scores with them: the Ollama version, hardware and numeric path can move a
+  probability near the 0.1 % floor or a candidate near rank 20.
+- From the evidence file anyone can **recompute** the verdict: count the stored
+  checks, recompute `failAt` from the signed rule and compare. That trusts the
+  stored checks.
+- **Regenerating** the checks means pulling the same digest and scoring the
+  stored answers again at the stored positions (the nonce is published). On
+  another runtime the result can differ slightly; the margin in the assumed rate
+  is for that, but it is not measured across Ollama versions.
 
 ## Measurements
 
 Ollama 0.40.15 on one Apple M1 Max (64 GB). The verifier's reference ran on the
-Metal GPU. Honest sellers generated either on the same GPU or on the CPU only
-(`num_gpu 0`), which is a different numeric path. Each run asked each of the 30
-prompts twice (once for the 0.6B greedy runs).
+Metal GPU with the product template (`renderChat`). Honest sellers generated
+either on the same GPU or on the CPU only (`num_gpu 0`), which is a different
+numeric path. Every run asked all 30 prompts once, as a real verification does.
 
-| Seller (all declare the reference model)          | Generates on | Sampling                          | Checks | Deviations     |
-| ------------------------------------------------- | ------------ | --------------------------------- | ------ | -------------- |
-| Honest `qwen3:1.7b` through Ollama's OpenAI API   | GPU          | engine defaults (T 0.6, top-k 20) | 1,316  | **0**          |
-| Honest `qwen3:1.7b`                               | CPU          | engine defaults                   | 1,320  | **0**          |
-| Honest `qwen3:1.7b`, worst case                   | GPU          | T 1.0, no top-k, top-p 1          | 1,319  | **2 (0.15 %)** |
-| Honest `qwen3:0.6b`, the Ollama engine's own path | CPU          | T 0, seed 42                      | 647    | **0**          |
-| `qwen3:0.6b` declared as `qwen3-1.7b`             | GPU          | engine defaults                   | 1,316  | 178 (13.5 %)   |
-| `qwen3:0.6b` declared as `qwen3-1.7b`             | GPU          | T 1.0, no top-k, top-p 1          | 1,338  | 284 (21.2 %)   |
-| `qwen3:1.7b` declared as `qwen3-0.6b`             | GPU          | T 0, seed 42                      | 680    | 19 (2.8 %)     |
+**Per complete run** (deviant answers out of 30; `failAt` is 12):
 
-Honest sellers: 2 deviations in 4,602 checks. Rescoring with the product
-template, without the `/no_think` suffix Ollama's own template appends, gave 0
-and 1 deviations on the two honest GPU runs and 166 on the substitute: the
-reference does not need the seller's exact serving template.
+| Seller (all declare the reference model)          | Generates on | Sampling                          | Runs | Deviant answers per run |
+| ------------------------------------------------- | ------------ | --------------------------------- | ---- | ----------------------- |
+| Honest `qwen3:1.7b` through Ollama's OpenAI API   | GPU          | engine defaults (T 0.6, top-k 20) | 8    | 0 in every run          |
+| Honest `qwen3:1.7b`                               | CPU          | engine defaults                   | 2    | 0, 0                    |
+| Honest `qwen3:1.7b`, worst case                   | GPU          | T 1.0, no top-k, top-p 1          | 8    | 0, 1, 1, 1, 3, 3, 4, 4  |
+| Honest `qwen3:0.6b`, the Ollama engine's own path | CPU          | T 0, seed 42                      | 1    | 0                       |
+| `qwen3:0.6b` declared as `qwen3-1.7b`             | GPU          | engine defaults                   | 2    | 27, 27                  |
+| `qwen3:0.6b` declared as `qwen3-1.7b`             | GPU          | T 1.0, no top-k, top-p 1          | 2    | 28, 28                  |
+| `qwen3:1.7b` declared as `qwen3-0.6b`             | GPU          | T 0, seed 42                      | 1    | 11                      |
+
+No honest run came near the threshold: the highest was 4 deviant answers, in the
+worst-case sampling setting. With the usual engine defaults, 300 honest answers
+had no deviation at all. The last row is a larger model sold as a smaller one;
+it is not the fraud this check targets and it stays under 12.
+
+Rescoring two earlier runs with Ollama's own template, which appends
+`/no_think`, changed the counts by at most one deviation per run: the reference
+does not need the seller's exact serving template.
 
 End to end, the app ran against local sellers started with `pnpm node:start`
 (ephemeral unfunded devnet keys, discovery off, free offer `qwen3-1.7b` on the
 OpenAI-compatible engine):
 
-| Seller serves | Answers | Checks | Deviations | `failAt` | Verdict |
-| ------------- | ------- | ------ | ---------- | -------- | ------- |
-| `qwen3:1.7b`  | 30      | 666    | 0          | 13       | `pass`  |
-| `qwen3:0.6b`  | 30      | 670    | 79         | 13       | `fail`  |
+| Seller serves | Answers | Checks | Deviant answers | `failAt` | Verdict |
+| ------------- | ------- | ------ | --------------- | -------- | ------- |
+| `qwen3:1.7b`  | 30      | 664    | 0               | 12       | `pass`  |
+| `qwen3:0.6b`  | 30      | 661    | 28              | 12       | `fail`  |
 
 A run takes a few minutes on this machine, mostly the seller's generation.
 
 ### Not measured yet
 
 - An NVIDIA GPU, Windows or Linux seller, vLLM, SGLang or llama.cpp servers, and
-  other Ollama versions. The 0.5 % assumption covers some drift; a measured
-  false positive on another stack would raise it in a new challenge set version.
+  other Ollama versions. A higher measured honest rate on another stack would
+  raise the assumed rate in a new challenge set version.
 - A cloud provider serving the same weights in another precision.
 - Sizes above 1.7B as the declared model.
 
@@ -164,12 +200,13 @@ The result is a `gyblos/model-verification/v1` record in `packages/protocol`
 (`model-verification.ts`, with golden vectors). It holds the verifier address,
 the seller's owner and NodeId, the declared selection, the challenge set id,
 version and digest, the reference tag and digest, the evidence (prompt, answer,
-check and deviation counts, the rule's minimum checks, assumed honest rate and
-false positive bound, `failAt`, the nonce and one SHA-256 digest per answer) and
-the verdict, signed with the verifier's Ed25519 key. The parser recomputes
-`failAt` and the verdict from the evidence and refuses any result that does not
-match. The evidence file next to it keeps the prompts, answers and every check,
-so the result can be recomputed.
+check, deviation and deviant-answer counts, the rule's minimum checks, assumed
+honest rate and false positive bound, `failAt`, the nonce and one SHA-256 digest
+per answer) and the verdict, signed with the verifier's Ed25519 key. The parser
+recomputes `failAt` and the verdict from the evidence and refuses any result
+that does not match; a consumer still compares the signed rule with the
+challenge set's. The evidence file next to it keeps the prompts, answers and
+every check.
 
 ## Limits
 
@@ -177,10 +214,11 @@ so the result can be recomputed.
   target. Earlier internal measurements put it near 5 % deviations at
   temperature 0 under a stricter rule; it needs its own rule.
 - **A seller that recognizes the verifier.** The challenge prompts are public in
-  this repository. A seller could route them to the real model, or give an
-  answer with too few word starts to reach the minimum, which only yields
-  `inconclusive`. Rotating private challenge sets and prompts shaped like real
-  traffic are follow-ups.
+  this repository. A seller could route them to the real model, or give answers
+  with nothing to check, which only yields `inconclusive`. A seller that
+  substitutes on a fraction of its answers is caught less often (about 43 % at a
+  third). Rotating private challenge sets and prompts shaped like real traffic
+  are follow-ups.
 - **Free offers only.** Paid verification needs a budget decision.
 - **Reference hardware.** The verifier must run the declared model, so verifying
   a large model needs a machine that can load it.

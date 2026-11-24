@@ -56,6 +56,7 @@ function summary(signed: SignedModelVerification) {
     challengeSet: `${result.challengeSet.id}@${result.challengeSet.version}`,
     checks: result.evidence.checks,
     deviations: result.evidence.deviations,
+    deviantAnswers: result.evidence.deviantAnswers,
     failAt: result.evidence.failAt,
   };
 }

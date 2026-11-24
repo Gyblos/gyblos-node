@@ -30,6 +30,7 @@ export interface ModelVerificationEvidence {
   answers: number;
   checks: number;
   deviations: number;
+  deviantAnswers: number;
   minimumChecks: number;
   honestRatePpm: number;
   falsePositivePpm: number;
@@ -72,29 +73,34 @@ function parseVerdict(value: unknown): ModelVerificationVerdict {
 }
 
 export function modelVerificationFailAt(
-  checks: number,
+  answers: number,
   honestRatePpm: number,
   falsePositivePpm: number,
 ): number {
   const rate = honestRatePpm / MODEL_VERIFICATION.partsPerMillion;
   const alpha = falsePositivePpm / MODEL_VERIFICATION.partsPerMillion;
-  let mass = (1 - rate) ** checks;
+  let mass = (1 - rate) ** answers;
   let below = 0;
-  for (let deviations = 0; deviations <= checks; deviations++) {
-    if (1 - below <= alpha) return Math.max(deviations, 1);
+  for (let deviant = 0; deviant <= answers; deviant++) {
+    if (1 - below <= alpha) return Math.max(deviant, 1);
     below += mass;
-    mass *= ((checks - deviations) / (deviations + 1)) * (rate / (1 - rate));
+    mass *= ((answers - deviant) / (deviant + 1)) * (rate / (1 - rate));
   }
-  return checks + 1;
+  return answers + 1;
 }
 
 export function modelVerificationVerdict(
   evidence: Pick<
     ModelVerificationEvidence,
-    'prompts' | 'answers' | 'checks' | 'deviations' | 'minimumChecks' | 'failAt'
+    | 'prompts'
+    | 'answers'
+    | 'checks'
+    | 'deviantAnswers'
+    | 'minimumChecks'
+    | 'failAt'
   >,
 ): ModelVerificationVerdict {
-  if (evidence.deviations >= evidence.failAt)
+  if (evidence.deviantAnswers >= evidence.failAt)
     return MODEL_VERIFICATION_VERDICTS.FAIL;
   if (
     evidence.answers < evidence.prompts ||
@@ -112,6 +118,7 @@ function parseEvidence(value: unknown): ModelVerificationEvidence {
     'answers',
     'checks',
     'deviations',
+    'deviantAnswers',
     'minimumChecks',
     'honestRatePpm',
     'falsePositivePpm',
@@ -128,6 +135,7 @@ function parseEvidence(value: unknown): ModelVerificationEvidence {
     answers: controlInteger(input.answers, 0, MODEL_VERIFICATION.maxAnswers),
     checks: controlInteger(input.checks, 0, MODEL_VERIFICATION.maxChecks),
     deviations: controlInteger(input.deviations),
+    deviantAnswers: controlInteger(input.deviantAnswers),
     minimumChecks: controlInteger(input.minimumChecks, 1),
     honestRatePpm: controlInteger(
       input.honestRatePpm,
@@ -143,9 +151,12 @@ function parseEvidence(value: unknown): ModelVerificationEvidence {
     evidence.answers !== answerDigests.length ||
     evidence.answers > evidence.prompts ||
     evidence.deviations > evidence.checks ||
+    evidence.deviantAnswers > evidence.answers ||
+    evidence.deviantAnswers > evidence.deviations ||
+    (evidence.deviations > 0 && evidence.deviantAnswers === 0) ||
     evidence.failAt !==
       modelVerificationFailAt(
-        evidence.checks,
+        evidence.answers,
         evidence.honestRatePpm,
         evidence.falsePositivePpm,
       )

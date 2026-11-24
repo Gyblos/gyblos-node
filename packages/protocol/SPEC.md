@@ -1942,18 +1942,21 @@ behind the base58 address `result.verifier`, over the prefix
 | `issuedAt`      | A non-negative safe integer, milliseconds                                                 |
 
 `evidence` has exactly `prompts` (1 to 64), `answers` (at most `prompts`),
-`checks` (at most 16,384), `deviations` (at most `checks`), `minimumChecks`
-(positive), `honestRatePpm` (1 to 40,000 parts per million, so the binomial
-stays finite at 16,384 checks), `falsePositivePpm` (1 to 999,999), `failAt`, `nonce` (64 hex) and `answerDigests` (one SHA-256 hex digest
+`checks` (at most 16,384), `deviations` (at most `checks`), `deviantAnswers`
+(answers with at least one deviation: at most `answers` and `deviations`, and at
+least 1 when `deviations` is positive), `minimumChecks` (positive),
+`honestRatePpm` (1 to 500,000 parts per million), `falsePositivePpm` (1 to
+999,999), `failAt`, `nonce` (64 hex) and `answerDigests` (one SHA-256 hex digest
 per answer, so its length is `answers`).
 
-`failAt` must equal `modelVerificationFailAt(checks, honestRatePpm,
-falsePositivePpm)`: the smallest count k ≥ 1 whose probability of k or more
-deviations under a binomial distribution with the honest rate is at most the
-false positive bound. The verdict must equal `modelVerificationVerdict`: `fail`
-when `deviations ≥ failAt`, else `inconclusive` when `answers < prompts` or
-`checks < minimumChecks`, else `pass`. A result that disagrees with either is
-`INVALID`.
+The unit of the test is the answer: checks of one answer read the same text and
+are not independent. `failAt` must equal `modelVerificationFailAt(answers,
+honestRatePpm, falsePositivePpm)`: the smallest count k ≥ 1 whose probability of
+k or more deviant answers under a binomial distribution with the honest rate is
+at most the false positive bound. The verdict must equal
+`modelVerificationVerdict`: `fail` when `deviantAnswers ≥ failAt`, else
+`inconclusive` when `answers < prompts` or `checks < minimumChecks`, else
+`pass`. A result that disagrees with either is `INVALID`.
 
 The parser checks only that the rule values are in range. A consumer must
 compare `minimumChecks`, `honestRatePpm` and `falsePositivePpm` with the rule of

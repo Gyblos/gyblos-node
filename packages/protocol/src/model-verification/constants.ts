@@ -4,7 +4,7 @@ export const MODEL_VERIFICATION = {
   maxAnswers: 64,
   maxChecks: 16_384,
   partsPerMillion: 1_000_000,
-  maxHonestRatePpm: 40_000,
+  maxHonestRatePpm: 500_000,
   nonceBytes: 32,
 } as const;
 

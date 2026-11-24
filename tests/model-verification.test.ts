@@ -26,10 +26,11 @@ import { signingBytes } from '@gyblos/protocol/signing';
 const T0 = 1_800_000_000_000;
 const DIGEST = 'cd'.repeat(32);
 const RULE = {
-  minimumChecks: 40,
-  honestRatePpm: 5_000,
+  minimumChecks: 480,
+  honestRatePpm: 50_000,
   falsePositivePpm: 100,
 };
+const digests = (count: number) => Array.from({ length: count }, () => DIGEST);
 
 function verifierKey() {
   const pair = generateKeyPairSync('ed25519');
@@ -55,14 +56,15 @@ function result(
     challengeSet: { id: 'gyblos-text', version: 1, digest: DIGEST },
     reference: { model: 'qwen3:1.7b', digest: DIGEST },
     evidence: {
-      prompts: 2,
-      answers: 2,
-      checks: 48,
+      prompts: 30,
+      answers: 30,
+      checks: 600,
       deviations: 0,
+      deviantAnswers: 0,
       ...RULE,
-      failAt: 5,
+      failAt: 8,
       nonce: DIGEST,
-      answerDigests: [DIGEST, DIGEST],
+      answerDigests: digests(30),
     },
     verdict: MODEL_VERIFICATION_VERDICTS.PASS,
     issuedAt: T0,
@@ -80,22 +82,25 @@ async function rejects(promise: Promise<unknown>, code: string) {
 void test('a verifier signs a result and it verifies detached', async () => {
   const key = verifierKey();
   const cases = [
-    [MODEL_VERIFICATION_VERDICTS.PASS, 1, 48, 0],
-    [MODEL_VERIFICATION_VERDICTS.FAIL, 1, 48, 5],
-    [MODEL_VERIFICATION_VERDICTS.INCONCLUSIVE, 1, 24, 0],
+    [MODEL_VERIFICATION_VERDICTS.PASS, 30, 600, 9, 7, 8],
+    [MODEL_VERIFICATION_VERDICTS.FAIL, 30, 600, 12, 8, 8],
+    [MODEL_VERIFICATION_VERDICTS.FAIL, 20, 400, 7, 7, 7],
+    [MODEL_VERIFICATION_VERDICTS.INCONCLUSIVE, 29, 580, 0, 0, 8],
+    [MODEL_VERIFICATION_VERDICTS.INCONCLUSIVE, 30, 479, 0, 0, 8],
   ] as const;
-  for (const [verdict, prompts, checks, deviations] of cases) {
+  for (const [verdict, answers, checks, deviations, deviant, failAt] of cases) {
     const value = result(key.address, {
       verdict,
       evidence: {
-        prompts,
-        answers: 1,
+        prompts: 30,
+        answers,
         checks,
         deviations,
+        deviantAnswers: deviant,
         ...RULE,
-        failAt: checks === 48 ? 5 : 4,
+        failAt,
         nonce: DIGEST,
-        answerDigests: [DIGEST],
+        answerDigests: digests(answers),
       },
     });
     const signed = await signModelVerification(value, key.sign);
@@ -121,35 +126,32 @@ void test('the parser refuses a verdict its own evidence contradicts and malform
   const key = verifierKey();
   const evidence = result(key.address).evidence;
   const bad: unknown[] = [
-    result(key.address, { evidence: { ...evidence, deviations: 5 } }),
+    result(key.address, {
+      evidence: { ...evidence, deviations: 8, deviantAnswers: 8 },
+    }),
     result(key.address, {
       verdict: MODEL_VERIFICATION_VERDICTS.INCONCLUSIVE,
-      evidence: { ...evidence, deviations: 6 },
+      evidence: { ...evidence, deviations: 9, deviantAnswers: 9 },
     }),
     result(key.address, { verdict: MODEL_VERIFICATION_VERDICTS.FAIL }),
-    result(key.address, { evidence: { ...evidence, answers: 3 } }),
+    result(key.address, { evidence: { ...evidence, answers: 29 } }),
     result(key.address, {
-      evidence: { ...evidence, checks: 1, deviations: 2, failAt: 9 },
+      evidence: { ...evidence, deviations: 0, deviantAnswers: 1 },
+    }),
+    result(key.address, {
+      evidence: { ...evidence, deviations: 3, deviantAnswers: 0 },
+    }),
+    result(key.address, {
+      evidence: { ...evidence, checks: 1, deviations: 2, deviantAnswers: 1 },
     }),
     result(key.address, { evidence: { ...evidence, failAt: 0 } }),
-    result(key.address, { evidence: { ...evidence, failAt: 1_000_000 } }),
+    result(key.address, { evidence: { ...evidence, failAt: 9 } }),
+    result(key.address, { evidence: { ...evidence, prompts: 31 } }),
     result(key.address, {
-      evidence: { ...evidence, checks: 0, failAt: 1 },
+      evidence: { ...evidence, honestRatePpm: 500_001, failAt: 31 },
     }),
     result(key.address, {
-      evidence: {
-        ...evidence,
-        prompts: 3,
-      },
-    }),
-    result(key.address, {
-      evidence: { ...evidence, honestRatePpm: 1_000_000 },
-    }),
-    result(key.address, {
-      evidence: { ...evidence, honestRatePpm: 50_000, failAt: 11 },
-    }),
-    result(key.address, {
-      evidence: { ...evidence, checks: 1_000_000, failAt: 5_085 },
+      evidence: { ...evidence, checks: 1_000_000 },
     }),
     result(key.address, { evidence: { ...evidence, nonce: 'ab' } }),
     result(key.address, { verdict: 'same' as never }),
@@ -169,11 +171,12 @@ void test('the parser refuses a verdict its own evidence contradicts and malform
   );
 });
 
-void test('the failure threshold is the smallest count an honest seller reaches at most once in the bound', () => {
-  assert.equal(modelVerificationFailAt(720, 5_000, 100), 13);
-  assert.equal(modelVerificationFailAt(480, 5_000, 100), 11);
-  assert.equal(modelVerificationFailAt(48, 5_000, 100), 5);
-  assert.equal(modelVerificationFailAt(0, 5_000, 100), 1);
+void test('the failure threshold counts deviant answers, the independent unit', () => {
+  assert.equal(modelVerificationFailAt(30, 50_000, 100), 8);
+  assert.equal(modelVerificationFailAt(20, 50_000, 100), 7);
+  assert.equal(modelVerificationFailAt(1, 50_000, 100), 2);
+  assert.equal(modelVerificationFailAt(0, 50_000, 100), 1);
+  assert.equal(modelVerificationFailAt(64, 500_000, 100), 48);
 });
 
 void test('golden vectors keep the model verification domain and canonical bytes', async () => {

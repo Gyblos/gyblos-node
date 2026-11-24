@@ -94,7 +94,8 @@ void test('the declared model passes and a substitute fails, both signed by the 
       CHALLENGE_SET.prompts.length * CHALLENGE_SET.rule.checksPerAnswer,
     );
     assert.equal(result.evidence.deviations, 0);
-    assert.equal(result.evidence.failAt, 13);
+    assert.equal(result.evidence.failAt, 12);
+    assert.equal(result.evidence.deviantAnswers, 0);
     assert.equal(result.evidence.prompts, CHALLENGE_SET.prompts.length);
     assert.match(result.evidence.nonce, /^[0-9a-f]{64}$/);
     assert.deepEqual(result.reference, { model: 'qwen3:1.7b', digest: DIGEST });
@@ -108,6 +109,10 @@ void test('the declared model passes and a substitute fails, both signed by the 
     assert.equal(
       substitute.signed.result.evidence.deviations,
       substitute.signed.result.evidence.checks,
+    );
+    assert.equal(
+      substitute.signed.result.evidence.deviantAnswers,
+      CHALLENGE_SET.prompts.length,
     );
   });
 });
@@ -156,6 +161,23 @@ void test('one unanswered prompt keeps a run from passing even with enough check
     });
     const { evidence, verdict } = outcome.signed.result;
     assert.ok(evidence.checks >= CHALLENGE_SET.rule.minimumChecks);
+    assert.equal(verdict, MODEL_VERIFICATION_VERDICTS.INCONCLUSIVE);
+  });
+});
+
+void test('a blank answer or one with nothing to check counts as unanswered', async () => {
+  await withHome(async (home) => {
+    let calls = 0;
+    const outcome = await verifyWith(home, async () => {
+      calls++;
+      if (calls === 1) return '';
+      if (calls === 2) return '  \n\t ';
+      if (calls === 3) return 'Nospacesatall.';
+      return answer('word');
+    });
+    const { evidence, verdict } = outcome.signed.result;
+    assert.equal(evidence.answers, CHALLENGE_SET.prompts.length - 3);
+    assert.deepEqual(new Set(outcome.failures), new Set(['EMPTY_ANSWER']));
     assert.equal(verdict, MODEL_VERIFICATION_VERDICTS.INCONCLUSIVE);
   });
 });

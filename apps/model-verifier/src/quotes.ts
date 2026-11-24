@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 
-import { acceptControlQuote } from '@gyblos/core/control-quotes';
+import { acceptControlQuote, sameSelection } from '@gyblos/core/control-quotes';
 import {
   CONTROL_CODES,
   CONTROL_LIMITS,
@@ -124,14 +124,6 @@ const selectionOf = (listing: PublicModelV2) => ({
   variant: listing.variant,
   quantization: listing.quantization,
 });
-
-const sameSelection = (
-  left: ReturnType<typeof selectionOf>,
-  right: ReturnType<typeof selectionOf>,
-) =>
-  left.modelId === right.modelId &&
-  left.variant === right.variant &&
-  left.quantization === right.quantization;
 
 export function createFreeQuoter(
   exchange: QuoteExchange,

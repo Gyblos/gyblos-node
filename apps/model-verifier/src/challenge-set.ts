@@ -26,7 +26,7 @@ export const CHALLENGE_SET: ChallengeSet = {
     checksPerAnswer: 24,
     topLogprobs: 20,
     minProbabilityPpm: 1_000,
-    honestRatePpm: 5_000,
+    honestRatePpm: 120_000,
     falsePositivePpm: 100,
     minimumChecks: 480,
   },

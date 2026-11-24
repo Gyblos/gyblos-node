@@ -96,9 +96,17 @@ export async function runVerification(input: VerificationInput): Promise<{
       input.onAnswer?.(index, failureCode(error));
       continue;
     }
-    answers.push(
-      await scoreAnswer(input, `${setDigest}:${nonce}`, prompt, text),
+    const scored = await scoreAnswer(
+      input,
+      `${setDigest}:${nonce}`,
+      prompt,
+      text,
     );
+    if (!scored.checks.length) {
+      input.onAnswer?.(index, MODEL_VERIFIER_CODES.EMPTY_ANSWER);
+      continue;
+    }
+    answers.push(scored);
     input.onAnswer?.(index);
   }
   const checks = answers.reduce((sum, answer) => sum + answer.checks.length, 0);
@@ -107,16 +115,20 @@ export async function runVerification(input: VerificationInput): Promise<{
       sum + answer.checks.filter((check) => check.deviation).length,
     0,
   );
+  const deviantAnswers = answers.filter((answer) =>
+    answer.checks.some((check) => check.deviation),
+  ).length;
   const evidence = {
     prompts: set.prompts.length,
     answers: answers.length,
     checks,
     deviations,
+    deviantAnswers,
     minimumChecks: set.rule.minimumChecks,
     honestRatePpm: set.rule.honestRatePpm,
     falsePositivePpm: set.rule.falsePositivePpm,
     failAt: modelVerificationFailAt(
-      checks,
+      answers.length,
       set.rule.honestRatePpm,
       set.rule.falsePositivePpm,
     ),
