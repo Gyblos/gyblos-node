@@ -177,6 +177,11 @@ export function boundaryConfig(
         { path: '^apps/' },
       ),
       rule(
+        'only-the-buyer-app-imports-the-buyer-package',
+        { path: '^apps/(?!buyer/)' },
+        { path: '^packages/buyer/' },
+      ),
+      rule(
         'product-does-not-import-lab',
         { path: PRODUCT_PATH },
         { path: LAB_PATH },

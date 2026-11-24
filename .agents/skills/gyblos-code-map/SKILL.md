@@ -24,8 +24,10 @@ they disagree, `AGENTS.md` and `tooling/boundaries/config.ts` win.
    core, config, runtime and its SDK; never another adapter, `node` or apps.
 4. Composes adapters into a running local node for either role (lifecycle,
    roles/keys, seller free channels, control startup)? -> `packages/node`.
+   Buyer orchestration (selection, discovery, routing, payment sessions, the
+   buyer endpoint, buyer API keys)? -> `packages/buyer`.
 5. A process the user starts or deploys (CLI flags, proxy, reconcile, Electron,
-   a Worker)? -> `apps/node`, `apps/buyer`, `apps/desktop` or
+   a Worker)? -> `apps/node`, `apps/buyer` (arguments and process lifecycle only), `apps/desktop` or
    `apps/discovery-index`. Apps never import each other; shared logic moves down
    to `packages/node` or core.
 6. Operator-changeable value (port, limit, timeout, relay, index URL) or a local

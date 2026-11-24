@@ -8,7 +8,7 @@
 
 ## Layers and ownership
 
-Dependency direction is protocol → core → inference/adapters → node → apps; config and runtime are shared support above protocol. Package table: [docs/architecture.md](docs/architecture.md).
+Dependency direction is protocol → core → inference/adapters → node → buyer → apps; config and runtime are shared support above protocol. Package table: [docs/architecture.md](docs/architecture.md).
 
 - `packages/protocol`: wire contracts, canonical JSON, signing domains and golden vectors (`vectors/`). It owns v2 public records, control, offers and reusable payment channels. The seller composes payment sessions for priced offers; see [limitations](docs/limitations.md) for validation scope. It also owns plugin ports (`Engine`, `PaymentClient` and `PaymentServer`), payment binding and shared catalogs. No SDKs.
 - `packages/core`: pure policy (metering, offer trust `offers`, `control-admission`, `control-quotes`, `seller-selection*`). No SDKs, filesystem, or clock/random of its own.

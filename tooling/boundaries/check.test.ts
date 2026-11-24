@@ -25,6 +25,7 @@ void test('current and future names map to the intended layers', () => {
     'packages/x402-upto-metered/test/a.test.ts': 'standalone',
     'packages/protocol/src/a.ts': 'protocol',
     'packages/node/src/a.ts': 'node',
+    'packages/buyer/src/a.ts': 'buyer',
     'packages/config/src/a.ts': 'config',
     'packages/runtime/src/a.ts': 'runtime',
     'lab/harness/src/a.ts': 'lab',
@@ -115,6 +116,28 @@ void test('applications cannot import another app, including literal dynamic imp
     },
     async (files, root) =>
       hasRule(await analyze(files, root), 'app-buyer-is-independent'),
+  );
+});
+
+void test('the buyer package imports no app and only the buyer app imports it', async () => {
+  await fixture(
+    {
+      'packages/buyer/src/a.ts': "import '../../../apps/node/src/a.js';",
+      'packages/node/src/a.ts': "import '../../buyer/src/a.js';",
+      'apps/node/src/a.ts': 'export const value = 1;',
+      'apps/desktop/src/a.ts': "import '../../../packages/buyer/src/a.js';",
+      'apps/buyer/src/a.ts': "import '../../../packages/buyer/src/a.js';",
+    },
+    async (files, root) => {
+      const result = await analyze(files, root);
+      hasRule(result, 'buyer-does-not-import-apps');
+      hasRule(result, 'node-does-not-import-apps');
+      hasRule(result, 'only-the-buyer-app-imports-the-buyer-package');
+      assert.equal(
+        result.entries.some((entry) => entry.source === 'apps/buyer/src/a.ts'),
+        false,
+      );
+    },
   );
 });
 

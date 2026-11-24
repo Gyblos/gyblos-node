@@ -105,7 +105,7 @@ generated code behind it.
 
 ```text
 buyer machine                                  seller machine
-apps/buyer (buyer endpoint, loopback) ── Iroh ──▶ apps/node → packages/node seller
+packages/buyer (endpoint, loopback)   ── Iroh ──▶ apps/node → packages/node seller
   or apps/desktop (bundled local buyer)  direct     ├─ control, free, paid and session channels (Iroh ALPNs)
                                          or relay   └─ the seller's own engine: Ollama, an OpenAI-compatible
                                                        server or the Anthropic API (from config.toml)
