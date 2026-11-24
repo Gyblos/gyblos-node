@@ -3,7 +3,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 import { Chip as CountChip } from '../boardui/components/base/badges/chip';
-import { HELP_URL } from '../lib/config';
+import { HELP_TEXT } from '../lib/config';
 import { DISPLAY, PAGES, PAGING } from '../lib/constants';
 import type { DiscoverySnapshot, Seller } from '../lib/discovery';
 import { getDiscovery } from '../lib/discovery-render';
@@ -154,7 +154,7 @@ function SellersBlock({
       <SectionTitle
         id={PAGING.anchors.sellers}
         title="Sellers"
-        help={HELP_URL.verified}
+        help={HELP_TEXT.verified}
         meta={<VerifiedFilter query={query} />}
       />
       <SellersTable

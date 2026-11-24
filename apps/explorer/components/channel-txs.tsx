@@ -7,7 +7,7 @@ import { getChainTxs } from '../lib/chain-txs';
 import { sellerOwners, txRow, type ChainTxKind } from '../lib/chain-txs-shape';
 import {
   explorerAddressUrl,
-  HELP_URL,
+  HELP_TEXT,
   PAYMENT_PROGRAM_SOURCE_URL,
 } from '../lib/config';
 import { DISPLAY, PAGES, PAGING } from '../lib/constants';
@@ -181,7 +181,7 @@ export async function ChannelTxs({
       <SectionTitle
         id={PAGING.anchors.transactions}
         title={TITLE}
-        help={HELP_URL.channelTransactions}
+        help={HELP_TEXT.channelTransactions}
         meta={<Meta programId={page.programId} />}
       />
       <Table

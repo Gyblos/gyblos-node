@@ -1,11 +1,6 @@
 // Owns the explorer's shared presentational pieces: section titles, tables, loading and
 // unavailable states, and linked addresses. No data access.
-import {
-  ChevronDown,
-  ChevronsUpDown,
-  ChevronUp,
-  CircleHelp,
-} from 'lucide-react';
+import { ChevronDown, ChevronsUpDown, ChevronUp } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
@@ -17,6 +12,7 @@ import { sortHref, type ExplorerQuery, type SortedTable } from '../lib/paging';
 import type { RangeDays, RangeSection } from '../lib/range';
 import { ModelLogo } from './model-logo';
 import { RangeControl } from './range-control';
+import { SectionHelp } from './section-help';
 import { TableScroll } from './table-scroll';
 import { isToken, TokenLogo } from './token-logo';
 
@@ -86,16 +82,7 @@ export function SectionTitle({
     >
       <div className="flex items-center gap-2">
         <h2 className="text-xl font-medium">{title}</h2>
-        {help ? (
-          <a
-            className="text-dim hover:text-ink"
-            href={help}
-            aria-label={`What ${title} shows`}
-            title="What this shows"
-          >
-            <CircleHelp aria-hidden className="size-4" />
-          </a>
-        ) : null}
+        {help ? <SectionHelp title={title} text={help} /> : null}
       </div>
       {meta || range ? (
         <div className="flex flex-wrap items-center gap-3">

@@ -40,7 +40,6 @@ export const explorerTxUrl = (signature: string) =>
 export const PAYMENT_PROGRAM_SOURCE_URL =
   'https://github.com/solana-foundation/payment-channels/tree/0c07d5751c8972abf6a219570a3f39a72f46f879';
 
-export const EXPLORER_DOCS = 'https://docs.gyblos.com/en/reference/explorer';
 export const SITE_LINKS = {
   site: 'https://gyblos.tech',
   paper: 'https://gyblos.tech/paper',
@@ -48,10 +47,13 @@ export const SITE_LINKS = {
   github: 'https://github.com/Gyblos',
   x: 'https://x.com/gyblos',
 } as const;
-export const HELP_URL = {
-  verified: `${EXPLORER_DOCS}#verified`,
-  channelTransactions: `${EXPLORER_DOCS}#channel-transactions`,
-  sellerTransactions: `${EXPLORER_DOCS}#seller-transactions`,
+export const HELP_TEXT = {
+  verified:
+    "A ✓ means the discovery index found the seller's NodeId in a gist of that GitHub account. It links the seller to the account; it does not identify a person or rate quality. A name in smaller type is chosen by the seller and is not verified.",
+  channelTransactions:
+    'Each row is one change to a Gyblos payment channel on Solana. Amount is what the buyer deposited, what was newly settled, what the seller side received (Paid out, in green) or what went back to the buyer. A payout also fills Gyblos fee, Program and To buyer. Do not add rows up: the same USDC can appear more than once.',
+  sellerTransactions:
+    'Channels whose payout recipient is the owner address this seller declared. The seller chooses that address, so it is not verified. Amounts read as in Channel transactions.',
 } as const;
 
 export const gistUrl = (github: { account: string; gist: string }) =>

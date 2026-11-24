@@ -1,6 +1,6 @@
 import { getChainTxs } from '../lib/chain-txs';
 import { txRow } from '../lib/chain-txs-shape';
-import { HELP_URL } from '../lib/config';
+import { HELP_TEXT } from '../lib/config';
 import { DISPLAY, PAGING } from '../lib/constants';
 import { getDiscovery } from '../lib/discovery-render';
 import { txPager, type ExplorerQuery } from '../lib/paging';
@@ -55,7 +55,7 @@ export async function SellerTxs({
       <SectionTitle
         id={PAGING.anchors.transactions}
         title={TITLE}
-        help={HELP_URL.sellerTransactions}
+        help={HELP_TEXT.sellerTransactions}
         meta="Newest first, all time, not filtered by range"
       />
       {profile.ownerShared ? (
