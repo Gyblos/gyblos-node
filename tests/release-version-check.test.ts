@@ -24,16 +24,24 @@ void test('every release job that compares versions runs the script on the pinne
       name.endsWith('.sh') &&
       read(`scripts/${name}`).includes('semver-newer.ts'),
   );
-  assert.ok(callers.length > 0);
-  const jobs = read(WORKFLOW)
-    .split(/^jobs:\n/m)[1]!
-    .split(/^(?= {2}[\w-]+:\n)/m);
-  const using = jobs.filter((job) =>
-    callers.some((name) => job.includes(`sh scripts/${name}`)),
+  assert.notEqual(callers.length, 0);
+  const jobs: string[][] = [];
+  const workflow = read(WORKFLOW);
+  for (const line of workflow
+    .slice(workflow.indexOf('\njobs:\n') + 1)
+    .split('\n')
+    .slice(1)) {
+    if (line.startsWith('  ') && !line.startsWith('   ') && line.endsWith(':'))
+      jobs.push([]);
+    jobs.at(-1)?.push(line);
+  }
+  const affected = jobs.filter((lines) =>
+    callers.some((name) =>
+      lines.some((line) => line.includes('sh scripts/' + name)),
+    ),
   );
-  assert.ok(using.length > 0);
-  for (const job of using) {
-    const lines = job.split('\n');
+  assert.notEqual(affected.length, 0);
+  for (const lines of affected) {
     const name = lines[0]?.trim();
     const setup = lines.findIndex(
       (line, index) =>
@@ -46,7 +54,12 @@ void test('every release job that compares versions runs the script on the pinne
       const run = lines.findIndex((line) =>
         line.includes('sh scripts/' + caller),
       );
-      if (run !== -1) assert.ok(setup < run, name + ' sets Node up too late');
+      if (run !== -1)
+        assert.equal(
+          Math.sign(setup - run),
+          -1,
+          name + ' sets Node up too late',
+        );
     }
   }
 });
