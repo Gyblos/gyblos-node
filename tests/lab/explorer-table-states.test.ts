@@ -154,7 +154,9 @@ async function pageHtml(dir: string, state: State) {
       assert.equal(response.status, 200, output);
       const page = await response.text();
       html += page;
-      for (const [, href] of page.matchAll(/<link\b[^>]*href="([^"]+\.css[^"]*)"/g))
+      for (const [, href] of page.matchAll(
+        /<link\b[^>]*href="([^"]+\.css[^"]*)"/g,
+      ))
         if (href) stylesheets.add(href);
     }
     for (const href of stylesheets) {

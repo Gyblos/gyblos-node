@@ -77,7 +77,7 @@ body {
   display: none;
 }
 
-.explorer-table-scroll[data-overflow] + .explorer-table-hint {
+.explorer-table-scroll[data-scrollable] + .explorer-table-hint {
   display: flex;
 }
 
