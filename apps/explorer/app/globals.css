@@ -64,6 +64,53 @@ body {
   font-family: var(--font-instrument), system-ui, sans-serif;
 }
 
+.seller-avatar {
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  place-items: center;
+  vertical-align: middle;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--raised);
+}
+
+.seller-avatar-glyph {
+  color: var(--ink);
+  shape-rendering: crispEdges;
+  animation: seller-avatar-arrive 1.8s ease-out;
+  transition: transform 160ms ease-out;
+}
+
+.seller-cell:is(:hover, :focus-within) .seller-avatar-glyph {
+  transform: translateY(-1px);
+}
+
+@keyframes seller-avatar-arrive {
+  0% {
+    opacity: 0.35;
+  }
+  40%,
+  100% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 0.7;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seller-avatar-glyph {
+    animation: none;
+    transition: none;
+  }
+
+  .seller-cell:is(:hover, :focus-within) .seller-avatar-glyph {
+    transform: none;
+  }
+}
+
 /* Sticky first column and scroll divider; the opaque header mix prevents content showing through. */
 .explorer-table {
   background: var(--panel);
