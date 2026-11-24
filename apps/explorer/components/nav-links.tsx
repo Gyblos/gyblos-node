@@ -19,7 +19,7 @@ const isCurrent = (pathname: string, href: string) =>
 export function NavLinks() {
   const pathname = usePathname();
   return (
-    <ul className="-mx-3 flex gap-1 overflow-x-auto text-sm whitespace-nowrap">
+    <ul className="-mx-3 flex flex-wrap gap-1 text-sm whitespace-nowrap">
       {PAGE_LINKS.map((link) => {
         const current = isCurrent(pathname, link.href);
         return (

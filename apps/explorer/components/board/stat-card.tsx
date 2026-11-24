@@ -126,7 +126,7 @@ export function StatCard({
           {hint ? <StatHint label={label} hint={hint} /> : null}
         </div>
         <div className="mt-auto flex min-w-0 flex-col gap-1">
-          <p className="truncate text-body-medium text-text-secondary">
+          <p className="text-body-medium break-words text-text-secondary">
             {label}
           </p>
           <Value variant={variant} value={value} sides={sides} money={money} />
@@ -152,7 +152,9 @@ export function StatCard({
         {hint ? <StatHint label={label} hint={hint} /> : null}
       </div>
       <div className="flex flex-col gap-0.5 px-2 pt-2.5 pb-3.5">
-        <p className="truncate text-body-medium text-text-secondary">{label}</p>
+        <p className="text-body-medium break-words text-text-secondary">
+          {label}
+        </p>
         <Value variant={variant} value={value} sides={sides} money={money} />
       </div>
       {band ? (
