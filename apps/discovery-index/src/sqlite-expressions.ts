@@ -105,10 +105,8 @@ export const whenElse = <T>(
   then: SQLWrapper | D1Value,
   otherwise: SQLWrapper | D1Value,
 ) => sql<T>`case when ${condition} then ${then} else ${otherwise} end`;
-export const firstOf = (
-  first: AnySQLiteColumn<{ data: number }>,
-  second: AnySQLiteColumn<{ data: number }>,
-) => sql<number>`coalesce(${first}, ${second})`;
 export const nullField = (name: string) => sql<null>`null`.as(name);
 export const jsonOfferRows = (hash: string, json: string, guard: SQL) =>
   sql`select ${hash}, cast(key as integer), json_extract(value, '$.modelId'), json_extract(value, '$.variant'), json_extract(value, '$.quantization'), json_extract(value, '$.contextTokens'), json_extract(value, '$.reasoning'), json_extract(value, '$.pricing.inputAtomicPerMtok'), json_extract(value, '$.pricing.outputAtomicPerMtok'), json_extract(value, '$.pricing.unit'), json_extract(value, '$.pricing.network'), json_extract(value, '$.pricing.asset') from json_each(${json}) where ${guard}`;
+export const atLeast = (value: number, floor: SQLWrapper) =>
+  sql<number>`max(${value}, coalesce((${floor}), ${value}))`;

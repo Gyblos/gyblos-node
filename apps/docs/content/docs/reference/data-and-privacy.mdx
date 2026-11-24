@@ -172,7 +172,8 @@ contact, country or IP address. A revoked NodeId is listed only while it is onli
 The index also keeps the history of every catalog it accepts (`/v1/offers/history`): the NodeId, the
 owner address, each offered model with its exact price, and when that catalog started, was last
 renewed and ended (replaced, withdrawn or expired). Anyone can read it by NodeId or by model, for up
-to the last 92 days per request. It is kept after you unpublish, so past prices stay traceable.
+to the last 92 days per request. It is kept after you unpublish, for about ten years after each catalog
+ended, so past prices stay traceable.
 
 Buyers and the desktop app read the index to find sellers. `gyblos seller status --online` also asks it
 for the seller's own uptime by NodeId, which the seller already publishes there. The index uses IP

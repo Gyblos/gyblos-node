@@ -272,6 +272,8 @@ export const OFFER_HISTORY = {
   maxDays: 92,
   maxPeriods: 50,
   dayMs: 86_400_000,
+  retentionDays: UPTIME.retentionDays,
+  framingBytes: 256,
 } as const;
 export const PERIOD_END_REASONS = {
   REPLACED: 'replaced',

@@ -3,10 +3,12 @@ import {
   asc,
   desc,
   eq,
+  exists,
   gt,
   inArray,
   isNull,
   lte,
+  max,
   ne,
   notExists,
   or,
@@ -15,20 +17,29 @@ import {
 
 import { PUBLIC_RECORD_KINDS } from '@gyblos/protocol/constants';
 
-import { PERIOD_END_REASONS, type PeriodEndReason } from './constants';
+import {
+  OFFER_HISTORY,
+  PERIOD_END_REASONS,
+  type PeriodEndReason,
+} from './constants';
 import type { DiscoveryDatabase } from './d1-client';
 import type { HistoryPeriod, HistoryQuery } from './offer-history';
 import { catalogPeriods, nodes, offerItems } from './schema';
 import {
-  firstOf,
+  atLeast,
   jsonOfferRows,
   jsonTextValues,
+  maximum,
   nullField,
   valueField,
   whenElse,
 } from './sqlite-expressions';
 import type { StoredEntry } from './storage';
 import { integer, text } from './uptime-d1';
+
+const END_REASONS: ReadonlySet<string> = new Set(
+  Object.values(PERIOD_END_REASONS),
+);
 
 function closeOpen(
   database: DiscoveryDatabase,
@@ -42,7 +53,11 @@ function closeOpen(
   return database
     .update(catalogPeriods)
     .set({
-      endedAt: whenElse<number>(lapsed, catalogPeriods.expiresAt, now),
+      endedAt: whenElse<number>(
+        lapsed,
+        catalogPeriods.expiresAt,
+        maximum(catalogPeriods.lastPublishedAt, now),
+      ),
       endReason: whenElse<string>(lapsed, PERIOD_END_REASONS.EXPIRED, reason),
     })
     .where(
@@ -71,6 +86,51 @@ function itemsQuery(
     .onConflictDoNothing();
 }
 
+function openQuery(
+  database: DiscoveryDatabase,
+  entry: StoredEntry,
+  hash: string,
+  won: SQL,
+  open: SQL,
+) {
+  const now = entry.admission.now;
+  const start = atLeast(
+    now,
+    database
+      .select({ end: max(catalogPeriods.endedAt) })
+      .from(catalogPeriods)
+      .where(eq(catalogPeriods.nodeId, entry.nodeId)),
+  );
+  return database.insert(catalogPeriods).select(
+    database
+      .select({
+        nodeId: nodes.nodeId,
+        firstSequence: valueField(entry.sequence, 'firstSequence'),
+        contentHash: valueField(hash, 'contentHash'),
+        owner: valueField(entry.owner, 'owner'),
+        startedAt: start.as('startedAt'),
+        lastSequence: valueField(entry.sequence, 'lastSequence'),
+        lastPublishedAt: start.as('lastPublishedAt'),
+        expiresAt: valueField(entry.expiresAt, 'expiresAt'),
+        endedAt: nullField('endedAt'),
+        endReason: nullField('endReason'),
+      })
+      .from(nodes)
+      .where(
+        and(
+          eq(nodes.nodeId, entry.nodeId),
+          won,
+          notExists(
+            database
+              .select({ nodeId: catalogPeriods.nodeId })
+              .from(catalogPeriods)
+              .where(open),
+          ),
+        ),
+      ),
+  );
+}
+
 export function historyQueries(
   database: DiscoveryDatabase,
   entry: StoredEntry,
@@ -84,7 +144,7 @@ export function historyQueries(
   const open = and(
     eq(catalogPeriods.nodeId, entry.nodeId),
     isNull(catalogPeriods.endedAt),
-  );
+  )!;
   return [
     itemsQuery(database, content.hash, content.json, won),
     closeOpen(
@@ -102,71 +162,104 @@ export function historyQueries(
       .update(catalogPeriods)
       .set({
         lastSequence: entry.sequence,
-        lastPublishedAt: now,
+        lastPublishedAt: maximum(catalogPeriods.lastPublishedAt, now),
         expiresAt: entry.expiresAt,
       })
       .where(and(open, won)),
-    database.insert(catalogPeriods).select(
-      database
-        .select({
-          nodeId: nodes.nodeId,
-          firstSequence: valueField(entry.sequence, 'firstSequence'),
-          contentHash: valueField(content.hash, 'contentHash'),
-          owner: valueField(entry.owner, 'owner'),
-          startedAt: valueField(now, 'startedAt'),
-          lastSequence: valueField(entry.sequence, 'lastSequence'),
-          lastPublishedAt: valueField(now, 'lastPublishedAt'),
-          expiresAt: valueField(entry.expiresAt, 'expiresAt'),
-          endedAt: nullField('endedAt'),
-          endReason: nullField('endReason'),
-        })
-        .from(nodes)
-        .where(
-          and(
-            eq(nodes.nodeId, entry.nodeId),
-            won,
-            notExists(
-              database
-                .select({ nodeId: catalogPeriods.nodeId })
-                .from(catalogPeriods)
-                .where(open),
-            ),
-          ),
-        ),
-    ),
+    openQuery(database, entry, content.hash, won, open),
   ];
 }
 
+const endedBy = (time: number) =>
+  or(
+    lte(catalogPeriods.endedAt, time),
+    and(isNull(catalogPeriods.endedAt), lte(catalogPeriods.expiresAt, time)),
+  )!;
+
+export function historyPruneQueries(database: DiscoveryDatabase, now: number) {
+  const cutoff = now - OFFER_HISTORY.retentionDays * OFFER_HISTORY.dayMs;
+  const kept = database
+    .select({ hash: catalogPeriods.contentHash })
+    .from(catalogPeriods)
+    .where(
+      and(
+        eq(catalogPeriods.contentHash, offerItems.contentHash),
+        or(
+          gt(catalogPeriods.endedAt, cutoff),
+          and(
+            isNull(catalogPeriods.endedAt),
+            gt(catalogPeriods.expiresAt, cutoff),
+          ),
+        ),
+      ),
+    );
+  return [
+    database
+      .delete(offerItems)
+      .where(
+        and(
+          inArray(
+            offerItems.contentHash,
+            database
+              .select({ hash: catalogPeriods.contentHash })
+              .from(catalogPeriods)
+              .where(endedBy(cutoff)),
+          ),
+          notExists(kept),
+        ),
+      ),
+    database.delete(catalogPeriods).where(endedBy(cutoff)),
+  ] as const;
+}
+
 function periodsQuery(database: DiscoveryDatabase, query: HistoryQuery) {
-  const recent = gt(
-    firstOf(catalogPeriods.endedAt, catalogPeriods.expiresAt),
-    query.since,
+  const recent = or(
+    gt(catalogPeriods.endedAt, query.since),
+    and(
+      isNull(catalogPeriods.endedAt),
+      gt(catalogPeriods.expiresAt, query.since),
+    ),
   );
   const listing =
     query.model === null
       ? undefined
-      : inArray(
-          catalogPeriods.contentHash,
+      : exists(
           database
-            .selectDistinct({ hash: offerItems.contentHash })
+            .select({ hash: offerItems.contentHash })
             .from(offerItems)
-            .where(eq(offerItems.modelId, query.model)),
+            .where(
+              and(
+                eq(offerItems.modelId, query.model),
+                eq(offerItems.contentHash, catalogPeriods.contentHash),
+              ),
+            ),
         );
   return database
     .select()
     .from(catalogPeriods)
     .where(
       and(
-        recent,
         query.nodeId === null
           ? undefined
           : eq(catalogPeriods.nodeId, query.nodeId),
+        recent,
         listing,
       ),
     )
-    .orderBy(desc(catalogPeriods.startedAt), desc(catalogPeriods.firstSequence))
+    .orderBy(
+      desc(catalogPeriods.startedAt),
+      desc(catalogPeriods.firstSequence),
+      asc(catalogPeriods.nodeId),
+    )
     .limit(query.limit);
 }
+
+const endReason = (value: unknown) => {
+  if (value === null) return null;
+  const reason = text(value);
+  if (!END_REASONS.has(reason)) throw new Error('unknown period end reason');
+  return reason as PeriodEndReason;
+};
 
 export async function readOfferHistory(
   database: DiscoveryDatabase,
@@ -214,7 +307,7 @@ export async function readOfferHistory(
     lastPublishedAt: integer(period.lastPublishedAt),
     expiresAt: integer(period.expiresAt),
     endedAt: period.endedAt === null ? null : integer(period.endedAt),
-    endReason: period.endReason as PeriodEndReason | null,
+    endReason: endReason(period.endReason),
     offers: offers.get(period.contentHash) ?? [],
   }));
 }

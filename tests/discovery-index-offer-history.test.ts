@@ -3,10 +3,6 @@ import test from 'node:test';
 
 import { createD1Storage } from '@gyblos/discovery-index/storage-d1';
 import { PUBLIC_RECORD_LIMITS } from '@gyblos/protocol/constants';
-import type {
-  PublicCatalogV2,
-  SignedPublicV2,
-} from '@gyblos/protocol/control-types';
 
 import { createSqliteD1, type SqliteD1 } from './support/d1-sqlite';
 import {
@@ -16,60 +12,15 @@ import {
   indexNode,
   MODEL,
   T0,
-  type IndexHarness,
-  type IndexNode,
 } from './support/discovery-index-fixture';
-
-const MINUTE = 60_000;
-const DAY = 86_400_000;
-const HISTORY = '/v1/offers/history';
-
-function priced(
-  node: IndexNode,
-  sequence: number,
-  output: string,
-  {
-    models = [MODEL],
-    issuedAt = T0,
-  }: { models?: string[]; issuedAt?: number } = {},
-): SignedPublicV2 {
-  const record = structuredClone(
-    node.catalog(sequence, { models, issuedAt }).record,
-  ) as PublicCatalogV2;
-  for (const model of record.models) model.pricing.outputAtomicPerMtok = output;
-  return node.sign(record);
-}
-
-async function history(harness: IndexHarness, query: string) {
-  const response = await harness.call(`${HISTORY}?${query}`);
-  assert.equal(response.status, 200);
-  return (await response.json()) as {
-    periods: {
-      nodeId: string;
-      owner: string;
-      firstSequence: number;
-      startedAt: number;
-      lastPublishedAt: number;
-      expiresAt: number;
-      endedAt: number | null;
-      endReason: string | null;
-      offers: {
-        modelId: string;
-        variant: string | null;
-        quantization: string | null;
-        contextTokens: number;
-        reasoning: string[];
-        pricing: Record<string, string>;
-      }[];
-    }[];
-    truncated: boolean;
-  };
-}
-
-async function accepted(harness: IndexHarness, signed: unknown) {
-  const response = await harness.publish(signed);
-  assert.equal(response.status, 201, await response.text());
-}
+import {
+  accepted,
+  DAY,
+  history,
+  HISTORY,
+  MINUTE,
+  priced,
+} from './support/offer-history';
 
 eachStorage(
   'a catalog opens a period with its exact prices',

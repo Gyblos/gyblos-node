@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "78902bb4-dd35-4943-ba83-df688f26d345",
+  "id": "1ecf96ef-fb6f-4625-9cd6-c3af467227dd",
   "prevId": "b78d8172-9477-4865-b1f8-a973dd7df707",
   "tables": {
     "discovery_catalog_periods": {
@@ -94,10 +94,10 @@
           ],
           "isUnique": false
         },
-        "discovery_catalog_periods_by_start": {
-          "name": "discovery_catalog_periods_by_start",
+        "discovery_catalog_periods_by_end": {
+          "name": "discovery_catalog_periods_by_end",
           "columns": [
-            "started_at"
+            "ended_at"
           ],
           "isUnique": false
         }

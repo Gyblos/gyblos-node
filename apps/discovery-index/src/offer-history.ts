@@ -104,6 +104,7 @@ export async function offerHistoryPage(
   storage: OfferHistoryStorage,
   query: OfferHistoryRequest,
   now: number,
+  maxBytes: number,
 ) {
   const since = now - query.days * OFFER_HISTORY.dayMs;
   const periods = await storage.offerHistory({
@@ -112,14 +113,21 @@ export async function offerHistoryPage(
     since,
     limit: OFFER_HISTORY.maxPeriods + 1,
   });
+  const kept: HistoryPeriod[] = [];
+  let size = OFFER_HISTORY.framingBytes;
+  for (const period of periods.slice(0, OFFER_HISTORY.maxPeriods)) {
+    size += JSON.stringify(period).length + 1;
+    if (size > maxBytes) break;
+    kept.push(period);
+  }
   return JSON.stringify({
     ...(query.nodeId === null
       ? { model: query.model }
       : { node: query.nodeId }),
     days: query.days,
     from: since,
-    periods: periods.slice(0, OFFER_HISTORY.maxPeriods),
-    truncated: periods.length > OFFER_HISTORY.maxPeriods,
+    periods: kept,
+    truncated: kept.length < periods.length,
     generatedAt: now,
   });
 }
@@ -131,7 +139,9 @@ interface MemoryPeriod extends Omit<HistoryPeriod, 'offers'> {
 const periodEnd = (period: MemoryPeriod) => period.endedAt ?? period.expiresAt;
 
 const newestFirst = (left: MemoryPeriod, right: MemoryPeriod) =>
-  right.startedAt - left.startedAt || right.firstSequence - left.firstSequence;
+  right.startedAt - left.startedAt ||
+  right.firstSequence - left.firstSequence ||
+  (left.nodeId < right.nodeId ? -1 : left.nodeId > right.nodeId ? 1 : 0);
 
 function offersOf(json: string): HistoryOffer[] {
   return (JSON.parse(json) as HistoryOffer[]).map((offer) => ({
@@ -150,14 +160,28 @@ function offersOf(json: string): HistoryOffer[] {
   }));
 }
 
+function close(open: MemoryPeriod, now: number, reason: PeriodEndReason) {
+  const lapsed = open.expiresAt <= now;
+  open.endedAt = lapsed ? open.expiresAt : Math.max(open.lastPublishedAt, now);
+  open.endReason = lapsed ? PERIOD_END_REASONS.EXPIRED : reason;
+}
+
+function prunePeriods(
+  contents: Map<string, HistoryOffer[]>,
+  periods: MemoryPeriod[],
+  now: number,
+) {
+  const cutoff = now - OFFER_HISTORY.retentionDays * OFFER_HISTORY.dayMs;
+  const kept = periods.filter((period) => periodEnd(period) > cutoff);
+  periods.splice(0, periods.length, ...kept);
+  const used = new Set(kept.map((period) => period.contentHash));
+  for (const hash of contents.keys())
+    if (!used.has(hash)) contents.delete(hash);
+}
+
 export function memoryOfferHistory() {
   const contents = new Map<string, HistoryOffer[]>();
   const periods: MemoryPeriod[] = [];
-  function close(open: MemoryPeriod, now: number, reason: PeriodEndReason) {
-    const lapsed = open.expiresAt <= now;
-    open.endedAt = lapsed ? open.expiresAt : now;
-    open.endReason = lapsed ? PERIOD_END_REASONS.EXPIRED : reason;
-  }
   function record(entry: StoredEntry) {
     if (entry.kind === PUBLIC_RECORD_KINDS.PRESENCE) return;
     const now = entry.admission.now;
@@ -179,19 +203,25 @@ export function memoryOfferHistory() {
       open.expiresAt > now
     ) {
       open.lastSequence = entry.sequence;
-      open.lastPublishedAt = now;
+      open.lastPublishedAt = Math.max(open.lastPublishedAt, now);
       open.expiresAt = entry.expiresAt;
       return;
     }
     if (open) close(open, now, PERIOD_END_REASONS.REPLACED);
+    const start = Math.max(
+      now,
+      ...periods
+        .filter((period) => period.nodeId === entry.nodeId)
+        .map((period) => period.endedAt ?? now),
+    );
     periods.push({
       nodeId: entry.nodeId,
       firstSequence: entry.sequence,
       contentHash: content.hash,
       owner: entry.owner,
-      startedAt: now,
+      startedAt: start,
       lastSequence: entry.sequence,
-      lastPublishedAt: now,
+      lastPublishedAt: start,
       expiresAt: entry.expiresAt,
       endedAt: null,
       endReason: null,
@@ -219,5 +249,9 @@ export function memoryOfferHistory() {
           ),
       }));
   }
-  return { record, offerHistory };
+  return {
+    record,
+    offerHistory,
+    prune: (now: number) => prunePeriods(contents, periods, now),
+  };
 }

@@ -199,8 +199,9 @@ signed a record; clients re-verify everything.
   `429`. Capacity and the current catalog are checked in the same atomic write
   as the high-water update. Expired rows are pruned when a new NodeId publishes,
   at most once a minute per isolate. In open mode, distributed publishers can
-  fill and renew these slots and block new sellers: the cap bounds storage; it
-  is not Sybil resistance.
+  fill and renew these slots and block new sellers: the cap bounds current
+  records, not the [offer history](#offer-history), which grows with every
+  distinct catalog until its retention ends; it is not Sybil resistance.
 - **Privacy.** No IP address, header, session or request metadata is stored or
   logged; rate-limit keys go only to Cloudflare limiters.
 
@@ -417,12 +418,19 @@ past prices stay traceable after it republishes, withdraws or leaves.
   opens a new one; a catalog that arrives after the open one expired closes it
   with `"expired"` at its expiry. A withdrawal closes it with `"withdrawn"`. A
   presence never touches the history: accepting a catalog clears the presence,
-  but the period stays open.
+  but the period stays open. Times follow the index's clock but never move
+  backwards for one NodeId: a period ends no earlier than its last renewal, and
+  the next one starts no earlier than that end.
 - **Writes.** The period and its offers are written in the publish batch, under
   the same high-water guard as the record, so a replayed or rejected record
   writes nothing. Offers are stored once per distinct content (a SHA-256 of the
   catalog's `models`), one row per offer with its exact atomic prices, `unit`,
-  network and asset; a renewal reads one key and writes only the period.
+  network and asset. A renewal checks one offer key and the open period and
+  updates only the period; a change also writes the new content's offer rows,
+  all of them even when one price changed.
+- **Retention.** Periods and their offers are kept for about ten years after
+  they end (`OFFER_HISTORY.retentionDays`, the same as uptime), then dropped
+  with the other expired rows; offer rows go once no kept period uses them.
 - **History starts at the deploy.** Earlier catalogs were overwritten and are
   unknown. Sellers republish at least every 10 minutes, so every listed seller
   has a period within 10 minutes of the deploy.
@@ -474,9 +482,9 @@ still valid during the last `days`, newest first:
   only that model's offers.
 - An open period whose `expiresAt` has passed means the seller stopped
   republishing without a withdrawal.
-- At most 50 periods per answer; `truncated` says more existed. A missing,
-  repeated or unknown parameter, or a `days` outside 1 to 92, answers
-  `400 INVALID_QUERY`.
+- At most 50 periods per answer, and never more than the 1 MiB response cap;
+  `truncated` says more existed. A missing, repeated or unknown parameter, or a
+  `days` outside 1 to 92, answers `400 INVALID_QUERY`.
 
 ## GitHub claims
 
@@ -771,11 +779,13 @@ The only handwritten SQL expressions live in `src/sqlite-expressions.ts`:
 | `INDEXED BY`             | No index-hint builder. Without it SQLite reads tables holding signed JSON before pagination; a key-only `EXPLAIN` test pins it. |
 | `(VALUES (1))`           | The select builder needs a `FROM`; initial admission must still check capacity and references atomically on empty tables.       |
 | Two-argument `min`/`max` | Drizzle's versions are aggregates; retention, quota windows and uptime sightings need the scalar form inside atomic updates.    |
-| `coalesce`               | No builder; an inconclusive GitHub check moves `checked_at` forward from `NULL`, and the history window reads a period's end.   |
+| `coalesce`               | No builder; an inconclusive GitHub check moves `checked_at` forward from `NULL`, and a new offer period starts after the last.  |
 | `CASE`                   | No conditional builder; quota resets, uptime admission and closing an expired offer period use it atomically.                   |
 | `length`                 | No scalar builder; the schema keeps the database text-length checks.                                                            |
 | Bitwise OR               | No bitwise builder; concurrent uptime observations combine slot bits in one write.                                              |
 | `json_each`              | No builder; the network read matches names to the NodeIds it lists, and offer history rows come from one catalog JSON value.    |
+| `json_extract`, `cast`   | No builder; each offer row's fields and position are read from that catalog JSON value inside the guarded insert.               |
+| `NULL` select item       | The insert-select of a new offer period must name its still-empty end columns.                                                  |
 | Scalar subquery          | No correlated subquery in a SELECT list; the network read takes each NodeId's newest uptime row by primary key.                 |
 
 Migrations, applied in order:
@@ -791,6 +801,7 @@ Migrations, applied in order:
 | `0007_github_claims.sql`      | Seller GitHub claims. Apply before deploying the claim routes and the cron trigger.     |
 | `0008_claim_signature.sql`    | The node signature of each GitHub claim, served by its GET route.                       |
 | `0009_seller_profiles.sql`    | Seller display names. Apply before deploying the profile routes.                        |
+| `0010_offer_history.sql`      | Offer history. Apply before deploying it, or catalog publishes fail with `503`.         |
 
 Migrations are generated with drizzle-kit from `src/schema.ts`
 (`pnpm index:db:generate --name <change>`, configured in

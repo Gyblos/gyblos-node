@@ -268,7 +268,12 @@ function historyRoutes(app: Hono<IndexEnv>, settings: IndexSettings) {
       return {
         key: offerHistoryKey(new URL(context.req.url).origin, query),
         body: () =>
-          offerHistoryPage(context.get('storage'), query, settings.now()),
+          offerHistoryPage(
+            context.get('storage'),
+            query,
+            settings.now(),
+            settings.maxResponseBytes,
+          ),
       };
     }),
   );

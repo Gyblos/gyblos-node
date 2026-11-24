@@ -347,6 +347,7 @@ export function createMemoryStorage(): DiscoveryStorage {
       );
     },
     async prune(now) {
+      history.prune(now);
       dropExpired(presence, now);
       dropExpired(catalogs, now);
       dropWithdrawals(withdrawals, catalogs, now);

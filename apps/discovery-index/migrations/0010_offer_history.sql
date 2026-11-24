@@ -14,7 +14,7 @@ CREATE TABLE `discovery_catalog_periods` (
 
 CREATE INDEX `discovery_catalog_periods_open` ON `discovery_catalog_periods` (`node_id`,`ended_at`);
 CREATE INDEX `discovery_catalog_periods_by_content` ON `discovery_catalog_periods` (`content_hash`);
-CREATE INDEX `discovery_catalog_periods_by_start` ON `discovery_catalog_periods` (`started_at`);
+CREATE INDEX `discovery_catalog_periods_by_end` ON `discovery_catalog_periods` (`ended_at`);
 CREATE TABLE `discovery_offer_items` (
 	`content_hash` text NOT NULL,
 	`position` integer NOT NULL,

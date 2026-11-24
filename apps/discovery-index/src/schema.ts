@@ -169,7 +169,7 @@ export const catalogPeriods = sqliteTable(
     primaryKey({ columns: [table.nodeId, table.firstSequence] }),
     index('discovery_catalog_periods_open').on(table.nodeId, table.endedAt),
     index('discovery_catalog_periods_by_content').on(table.contentHash),
-    index('discovery_catalog_periods_by_start').on(table.startedAt),
+    index('discovery_catalog_periods_by_end').on(table.endedAt),
   ],
 );
 
