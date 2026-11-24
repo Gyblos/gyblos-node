@@ -3,6 +3,7 @@ import { useState } from 'react';
 
 import { DESKTOP_ACTIVITY } from '../constants';
 import { PAYMENT_METHOD } from '../paypal-model';
+import { X402_ACTION } from '../x402-model';
 import type { ChatSession } from './chat-state';
 import { CHAT_ROLE } from './constants';
 import { DataCell, TableRow } from './DataTable';
@@ -73,7 +74,7 @@ export function ActivitySessions({
         ),
     ),
   );
-  for (const record of x402?.state.summary.available && !x402.state.error
+  for (const record of x402?.state.summary.available
     ? x402.state.summary.records
     : []) {
     const match = byMessage.get(record.id + '-assistant');
@@ -117,8 +118,7 @@ export function ActivitySessions({
     period === USAGE_PERIOD.ALL && activity.state?.available === true;
   const chatAvailable =
     (period !== USAGE_PERIOD.ALL || apiAvailable) &&
-    x402?.state.summary.available === true &&
-    !x402.state.error;
+    x402?.state.summary.available === true;
   const count = totals.Chat + totals.API;
   const needle = query.trim().toLowerCase();
   const filtered = rows.filter(
@@ -216,7 +216,9 @@ export function ActivitySessions({
           }}
         />
         <Button
+          disabled={x402?.busy}
           onClick={() => {
+            void x402?.run({ action: X402_ACTION.STATUS });
             void activity.refresh();
           }}
         >

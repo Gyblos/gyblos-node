@@ -65,11 +65,7 @@ function historyRows(
           (period === HISTORY_PERIOD.WEEK
             ? HISTORY.WEEK_DAYS
             : HISTORY.MONTH_DAYS);
-  if (
-    method !== HISTORY_METHOD.PAYPAL &&
-    buyer?.state.summary.available &&
-    !buyer.state.error
-  ) {
+  if (method !== HISTORY_METHOD.PAYPAL && buyer?.state.summary.available) {
     for (const record of buyer.state.summary.records)
       if (
         record.at >= after &&
@@ -106,10 +102,9 @@ export function SpendingHistory(props: Props) {
             : 'Loading PayPal history…'}
         </p>
       )}
-      {method !== HISTORY_METHOD.PAYPAL &&
-        (!buyer?.state.summary.available || buyer.state.error) && (
-          <p role="status">USDC history unavailable.</p>
-        )}
+      {method !== HISTORY_METHOD.PAYPAL && !buyer?.state.summary.available && (
+        <p role="status">USDC history unavailable.</p>
+      )}
       {source !== HISTORY_SOURCE.ALL && method !== HISTORY_METHOD.USDC && (
         <p className="ui-help-text">
           Amounts for shared PayPal sessions include all sources.

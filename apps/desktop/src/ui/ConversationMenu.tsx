@@ -185,7 +185,7 @@ function copyConversation(
     session.messages
       .map(
         (message) =>
-          (message.role === 'user' ? '**You:** ' : '**Gyblos:** ') +
+          (message.role === 'user' ? '**You:**\n\n' : '**Gyblos:**\n\n') +
           message.text,
       )
       .join('\n\n');

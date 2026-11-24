@@ -163,3 +163,49 @@ void test('the chat picker refreshes its balance on open and distinguishes a mis
   );
   assert.match(picker, /onOpen=\{props.refreshFunding\}/);
 });
+
+void test('history search consumes Escape before the window stop shortcut', async () => {
+  const history = await readFile(
+    'apps/desktop/src/ui/ConversationHistory.tsx',
+    'utf8',
+  );
+  assert.match(history, /event\.stopPropagation\(\);\s*closeSearch\(\)/);
+});
+
+void test('key setup uses the selected key and explains the Codex and shell targets', async () => {
+  const keys = await readFile('apps/desktop/src/ui/UsdcApiKeys.tsx', 'utf8');
+  assert.match(keys, /action: USDC_API_ACTION.COPY_URL,\s*id: guideKey.id/);
+  assert.match(keys, /profile file/);
+  assert.match(keys, /shell that starts Claude Code/);
+});
+
+void test('usage remains accessible after a send error and payment links select the usage tab', async () => {
+  const ui = 'apps/desktop/src/ui/';
+  const sessions = await readFile(ui + 'ActivitySessions.tsx', 'utf8');
+  assert.doesNotMatch(sessions, /!x402.state.error/);
+  assert.match(sessions, /X402_ACTION.STATUS/);
+  const payments = await readFile(ui + 'Payments.tsx', 'utf8');
+  assert.match(payments, /setTab\('activity'\);\s*props.onActivity/);
+  assert.match(payments, /manage=\{\(\) => openUsdc\(props.onConnections\)\}/);
+});
+
+void test('both payment wallet views use the same payer-scoped observation', async () => {
+  for (const name of ['WalletDetails', 'PaymentMethods']) {
+    const source = await readFile(
+      'apps/desktop/src/ui/' + name + '.tsx',
+      'utf8',
+    );
+    assert.doesNotMatch(source, /= useBuyerFunding\(/);
+  }
+});
+
+void test('chat budget management and actual spending sources remain independent of form input', async () => {
+  const limits = await readFile(
+    'apps/desktop/src/ui/SpendingLimits.tsx',
+    'utf8',
+  );
+  assert.doesNotMatch(
+    limits,
+    /!available && \(\s*<Button|!keys \|\| !keys.keys.length/,
+  );
+});

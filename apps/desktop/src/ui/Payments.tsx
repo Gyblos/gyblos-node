@@ -17,6 +17,7 @@ import { SpendingLimits } from './SpendingLimits';
 import { SpendingOverview } from './SpendingOverview';
 import { Button, PagePanel } from './UI';
 import type { ActivityView } from './useActivity';
+import { useBuyerFunding } from './useBuyerFunding';
 import type { PaypalSessionView } from './usePaypalSession';
 import type { X402View } from './useX402';
 import { WalletDetails } from './WalletDetails';
@@ -41,6 +42,14 @@ type Props = {
 export function Payments(props: Props) {
   const [tab, setTab] = useState<Tab>(props.initialTab ?? 'overview');
   const [walletOpen, setWalletOpen] = useState(false);
+  const observation = useBuyerFunding(
+    props.x402?.state.policy?.payer,
+    undefined,
+    tab === 'overview' || walletOpen,
+  );
+  function openUsdc(destination: () => void) {
+    if (props.onPaymentMethod(PAYMENT_METHOD.USDC)) destination();
+  }
   return (
     <PagePanel>
       <TabBar tab={tab} onTab={setTab} />
@@ -53,11 +62,9 @@ export function Payments(props: Props) {
         {tab === 'activity' && props.usage}
         {tab === 'limits' && props.x402 && (
           <SpendingLimits
-            manage={props.onConnections}
+            manage={() => openUsdc(props.onConnections)}
             buyer={props.x402}
-            onChat={() => {
-              if (props.onPaymentMethod(PAYMENT_METHOD.USDC)) props.onChat();
-            }}
+            onChat={() => openUsdc(props.onChat)}
           />
         )}
         {tab === 'overview' && (
@@ -72,7 +79,7 @@ export function Payments(props: Props) {
               </div>
               <ul className="preview-method-list">
                 <WalletOverview
-                  buyer={props.x402}
+                  observation={observation}
                   onAddFunds={props.onAddFunds}
                   onDetails={() => setWalletOpen(true)}
                 />
@@ -94,13 +101,20 @@ export function Payments(props: Props) {
             chat={props.chat}
             onChat={props.onOpenChat}
             activity={props.activity}
-            onActivity={props.onActivity}
+            onActivity={(id) => {
+              setTab('activity');
+              props.onActivity(id);
+            }}
           />
         )}
       </div>
       <PaypalManagement {...props} />
       {walletOpen && (
-        <PaymentWallet props={props} close={() => setWalletOpen(false)} />
+        <PaymentWallet
+          observation={observation}
+          props={props}
+          close={() => setWalletOpen(false)}
+        />
       )}
     </PagePanel>
   );
@@ -134,11 +148,19 @@ function PaypalManagement(props: Props) {
   );
 }
 
-function PaymentWallet({ props, close }: { props: Props; close(): void }) {
+function PaymentWallet({
+  props,
+  close,
+  observation,
+}: {
+  props: Props;
+  close(): void;
+  observation: ReturnType<typeof useBuyerFunding>;
+}) {
   return (
     <Modal title="Wallet details" size="lg" close={close}>
       <WalletDetails
-        payer={props.x402?.state.policy?.payer}
+        observation={observation}
         depositAtomic={props.x402?.state.policy?.depositAtomic}
         onBackup={() => {
           close();

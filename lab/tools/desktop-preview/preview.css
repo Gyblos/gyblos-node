@@ -317,6 +317,11 @@ html
   margin: 0;
   font-size: 12px;
 }
+.desktop-frame .preview-dirty-actions {
+  display: flex;
+  gap: 6px;
+  animation: preview-fade-in var(--motion-overlay) var(--motion-push-ease) both;
+}
 @keyframes preview-fade-in {
   from {
     opacity: 0;

@@ -414,6 +414,10 @@
   width: fit-content;
   list-style: none;
 }
+.turn-signal summary .signal-mark {
+  width: 18px;
+  height: 14px;
+}
 .turn-signal summary::-webkit-details-marker {
   display: none;
 }

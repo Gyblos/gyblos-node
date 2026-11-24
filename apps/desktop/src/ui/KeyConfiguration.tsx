@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 
-import type { AgentTool } from '@gyblos/node/agent-setup-constants';
+import {
+  AGENT_TOOLS,
+  type AgentTool,
+} from '@gyblos/node/agent-setup-constants';
 
 import { USDC_API_ACTION } from '../usdc-api-model';
 import { agentCodeLanguage, CodeBlock } from './CodeBlock';
@@ -50,27 +53,39 @@ export function KeyConfiguration({
       </Button>
     );
   return (
-    <CodeBlock
-      language={agentCodeLanguage(tool)}
-      title={title}
-      code={code}
-      copyDisabled={busy || !!state.error || !!state.snapshot?.blocked}
-      onCopy={async () => {
-        const result = await run({
-          action: USDC_API_ACTION.COPY_AGENT,
-          id,
-          tool,
-        });
-        if (
-          !result ||
-          result.error ||
-          result.policyId !== policyId ||
-          result.setup?.tool !== tool
-        )
-          return false;
-        onCopied();
-        return true;
-      }}
-    />
+    <>
+      <CodeBlock
+        language={agentCodeLanguage(tool)}
+        title={title}
+        code={code}
+        copyDisabled={busy || !!state.error || !!state.snapshot?.blocked}
+        onCopy={async () => {
+          const result = await run({
+            action: USDC_API_ACTION.COPY_AGENT,
+            id,
+            tool,
+          });
+          if (
+            !result ||
+            result.error ||
+            result.policyId !== policyId ||
+            result.setup?.tool !== tool
+          )
+            return false;
+          onCopied();
+          return true;
+        }}
+      />
+      {tool === AGENT_TOOLS.CODEX && (
+        <Button
+          disabled={busy || !!state.error || !!state.snapshot?.blocked}
+          onClick={() => {
+            void run({ action: USDC_API_ACTION.WRITE_AGENT, id, tool });
+          }}
+        >
+          Write configuration
+        </Button>
+      )}
+    </>
   );
 }

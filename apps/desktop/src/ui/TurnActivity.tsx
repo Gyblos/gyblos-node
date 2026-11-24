@@ -8,6 +8,7 @@ import {
   type TurnTiming,
 } from './chat-state';
 import { TURN_ACTIVITY } from './constants';
+import { SignalMark } from './Signal';
 
 export function TurnActivity({
   timing,
@@ -44,6 +45,7 @@ export function TurnActivity({
       <details>
         <summary>
           <CaretRight size={13} aria-hidden="true" />
+          {state === MESSAGE_STATE.PENDING && <SignalMark />}
           Activity
         </summary>
         <ol>

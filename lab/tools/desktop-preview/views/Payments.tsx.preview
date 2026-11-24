@@ -25,6 +25,7 @@ import { Badge, Button, IconButton, PagePanel, StatCard, StatGrid } from './UI';
 import type { ActivityView } from './useActivity';
 import type { PaypalSessionView } from './usePaypalSession';
 import type { X402View } from './useX402';
+import { useBuyerFunding } from './useBuyerFunding';
 import { WalletDetails } from './WalletDetails';
 import { useDesktopWallet } from './WalletState';
 import { X402Payments } from './X402Payments';
@@ -81,6 +82,7 @@ function TabBar({ tab, onTab }: { tab: Tab; onTab(tab: Tab): void }) {
   );
 }
 export function Payments(props: Props) {
+  const observation = useBuyerFunding(props.x402?.state.policy?.payer);
   const requested = new URLSearchParams(location.search).get('tab');
   const [tab, setTab] = useState<Tab>(props.initialTab ?? (isTab(requested) ? requested : 'overview'));
   const [budgetOpen, setBudgetOpen] = useState(false);
@@ -149,7 +151,7 @@ export function Payments(props: Props) {
       <PreviewFundsDialog host={FUNDS_HOST.PAYMENTS} />
       <MotionPresence>{walletOpen && (
         <Modal title="Wallet details" size="lg" close={() => setWalletOpen(false)}>
-          <WalletDetails
+          <WalletDetails observation={observation}
             onBackup={() => {
               setWalletOpen(false);
               props.onBackup();

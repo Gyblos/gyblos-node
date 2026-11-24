@@ -157,7 +157,7 @@ const toolNames = {
 };
 const toolFiles = {
   [AGENT_TOOLS.OPENCODE]: AGENT_SETUP.files.opencode,
-  [AGENT_TOOLS.CODEX]: AGENT_SETUP.files.codex,
+  [AGENT_TOOLS.CODEX]: 'Codex configuration files',
   [AGENT_TOOLS.CLAUDE_CODE]: 'Terminal environment',
   [AGENT_TOOLS.PI]: AGENT_SETUP.files.pi,
 };
@@ -424,9 +424,13 @@ export function UsdcApiKeys({
                     <small>
                       {tool === 'other'
                         ? 'Use it as the OpenAI or Anthropic base URL.'
-                        : 'Paste it into the ' +
-                          toolNames[tool] +
-                          ' settings file.'}
+                        : tool === AGENT_TOOLS.CLAUDE_CODE
+                          ? 'Run these exports in the shell that starts Claude Code.'
+                          : tool === AGENT_TOOLS.CODEX
+                            ? 'Write configuration saves config.toml and each separate model profile file.'
+                            : 'Paste it into the ' +
+                              toolNames[tool] +
+                              ' settings file.'}
                     </small>
                     {tool === 'other' ? (
                       <CopyField
@@ -434,14 +438,16 @@ export function UsdcApiKeys({
                         id="preview-base-url"
                         value={state.url ?? ''}
                         actionLabel="Copy Base URL"
-                        disabled={!state.url || locked}
-                        onCopy={() =>
-                          void run({ action: USDC_API_ACTION.COPY_URL }).then(
-                            (result) => {
-                              if (result && !result.error) markCopied('other');
-                            },
-                          )
-                        }
+                        disabled={!state.url || locked || !guideKey}
+                        onCopy={() => {
+                          if (!guideKey) return;
+                          void run({
+                            action: USDC_API_ACTION.COPY_URL,
+                            id: guideKey.id,
+                          }).then((result) => {
+                            if (result && !result.error) markCopied('other');
+                          });
+                        }}
                       />
                     ) : (
                       guideKey && (

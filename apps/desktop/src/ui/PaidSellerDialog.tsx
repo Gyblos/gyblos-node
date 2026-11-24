@@ -275,7 +275,7 @@ function SellerMaximum({
   return (
     <div className="preview-amount-editor">
       <label className="preview-limit-label" htmlFor="paid-response-maximum">
-        Maximum per response
+        Maximum per response<span className="sr-only"> (USDC)</span>
       </label>
       <AmountField
         id="paid-response-maximum"

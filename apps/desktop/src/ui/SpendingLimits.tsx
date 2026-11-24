@@ -78,7 +78,7 @@ function KeyLimits({
       <p className="ui-help-text">
         Each API key has its own lifetime spending limit.
       </p>
-      <div className="preview-simple-table-region">
+      <div className="preview-simple-table-region key-limit-table">
         <table className="preview-simple-table">
           <caption className="sr-only">API key limits</caption>
           <thead>
@@ -151,11 +151,9 @@ function LimitControl({ buyer, policy, open }: LimitControlProps) {
             </small>
           </div>
           <div className="preview-setting-control">
-            {!available && (
-              <Button disabled={buyer.busy} onClick={() => open('')}>
-                Manage chat budget
-              </Button>
-            )}
+            <Button disabled={buyer.busy} onClick={() => open('')}>
+              Manage chat budget
+            </Button>
             <AmountField
               compact
               disabled={!available}
@@ -317,7 +315,7 @@ function spendingBySource(
     { id: 'chat', label: 'Chat', amount: chat, tone: TONE.INFO },
   ];
   const active = keys?.keys.filter((entry) => !entry.revoked) ?? [];
-  if (!keys || !keys.keys.length)
+  if (!keys)
     segments.push({
       id: 'api-keys',
       label: 'API keys',

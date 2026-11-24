@@ -84,7 +84,28 @@ html
   background: var(--raised);
   color: var(--ink);
 }
+.desktop-frame .key-limit-table {
+  overflow-x: auto;
+}
+.desktop-frame .key-limit-table tbody th {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 @container (max-width: 620px) {
+  .desktop-frame .key-limit-table .preview-simple-table tbody tr {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .desktop-frame .key-limit-table tbody tr > .preview-limit-action {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+  .desktop-frame .key-limit-table tbody tr > .preview-tabular {
+    grid-column: 1;
+    grid-row: 2;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
   .desktop-frame .preview-simple-table thead {
     display: none;
   }
@@ -223,11 +244,6 @@ html .app.desktop-frame .content .preview-compact-amount input {
   font-size: 14px;
   font-variant-numeric: tabular-nums;
   text-align: left;
-}
-.desktop-frame .preview-dirty-actions {
-  display: flex;
-  gap: 6px;
-  animation: preview-fade-in var(--motion-overlay) var(--motion-push-ease) both;
 }
 .desktop-frame .preview-simple-table tr[data-active='true'] > * {
   background: var(--soft);

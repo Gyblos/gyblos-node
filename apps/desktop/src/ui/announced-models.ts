@@ -1,4 +1,6 @@
 // Each paid listing shows that seller’s price per million tokens. Selection requires confirmation.
+import { MODEL_IDS } from '@gyblos/protocol/constants';
+
 import {
   CATALOG_STATE,
   NETWORK_CATALOG,
@@ -106,4 +108,16 @@ export function networkModelGroups(models: readonly ModelOption[]) {
     else groups.set(item.name, [item]);
   }
   return groups;
+}
+
+export function automaticOffersAvailable(
+  name: string,
+  offers: readonly Pick<ModelOption, 'name' | 'free'>[],
+  paidAuto: boolean,
+) {
+  return offers.some(
+    (item) =>
+      item.name === name &&
+      (item.free || (paidAuto && name === MODEL_IDS.QWEN3_0_6B)),
+  );
 }

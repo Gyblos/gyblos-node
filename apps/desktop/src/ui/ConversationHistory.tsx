@@ -119,7 +119,9 @@ export function ConversationHistory({
           value={query}
           onValueChange={setQuery}
           onKeyDown={(event) => {
-            if (event.key === 'Escape') closeSearch();
+            if (event.key !== 'Escape' || event.nativeEvent.isComposing) return;
+            event.stopPropagation();
+            closeSearch();
           }}
         />
       )}

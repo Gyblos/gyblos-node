@@ -29,3 +29,25 @@ void test('local and namespaced models use the same lab artwork as the catalog',
     './assets/models/mistral-color.svg',
   );
 });
+
+void test('catalog automatic routing requires a usable listing under the current policy', async () => {
+  const { automaticOffersAvailable } =
+    await import('@gyblos/desktop/announced-models');
+  const name = 'qwen3-0.6b';
+  assert.equal(
+    automaticOffersAvailable(name, [{ name, free: false }], false),
+    false,
+  );
+  assert.equal(
+    automaticOffersAvailable(name, [{ name, free: true }], false),
+    true,
+  );
+  assert.equal(
+    automaticOffersAvailable(name, [{ name, free: false }], true),
+    true,
+  );
+  assert.equal(
+    automaticOffersAvailable(name, [{ name: 'elsewhere', free: true }], true),
+    false,
+  );
+});

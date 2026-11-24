@@ -18,7 +18,10 @@ import {
 } from './paypal-model';
 import { prefersLightTheme, themeStyle } from './theme';
 import { Activity } from './ui/Activity';
-import { announcedModels } from './ui/announced-models';
+import {
+  announcedModels,
+  automaticOffersAvailable,
+} from './ui/announced-models';
 import { Applications } from './ui/Applications';
 import { AddBuyerFunds } from './ui/BuyerFunding';
 import { BuyerSidebar } from './ui/BuyerSidebar';
@@ -283,16 +286,16 @@ export function DesktopApp() {
       name === MODEL_IDS.QWEN3_0_6B &&
       policy.paidAuto &&
       policy.maxAtomic !== '0';
+    if (!automaticOffersAvailable(name, offers, !!paid)) {
+      setToast(
+        name === MODEL_IDS.QWEN3_0_6B
+          ? 'Only paid offers are listed. Enable paid Auto in Payments.'
+          : 'No free offers are listed for this model.',
+      );
+      if (name === MODEL_IDS.QWEN3_0_6B) navigate(UI_VIEW.PAYMENTS);
+      return;
+    }
     if (!offers.some((item) => item.free)) {
-      if (!paid) {
-        setToast(
-          name === MODEL_IDS.QWEN3_0_6B
-            ? 'Only paid offers are listed. Enable paid Auto in Payments.'
-            : 'No free offers are listed for this model.',
-        );
-        if (name === MODEL_IDS.QWEN3_0_6B) navigate(UI_VIEW.PAYMENTS);
-        return;
-      }
       setToast('Checking channel funds…');
       const funding = await Promise.all(
         offers.map(async (item) =>
@@ -514,9 +517,16 @@ export function DesktopApp() {
               auto={
                 x402.state.policy && {
                   buyerModels:
-                    x402.state.policy.autoRoutes?.map(
-                      (route) => route.modelId,
-                    ) ?? [],
+                    x402.state.policy.autoRoutes
+                      ?.map((route) => route.modelId)
+                      .filter((name) =>
+                        automaticOffersAvailable(
+                          name,
+                          networkModels,
+                          !!x402.state.policy?.paidAuto &&
+                            x402.state.policy.maxAtomic !== '0',
+                        ),
+                      ) ?? [],
                   paid: !!x402.state.policy.paidAuto,
                   selected: !!model.automatic,
                   choose: (name) => void chooseAuto(name),

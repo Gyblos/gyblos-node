@@ -16,20 +16,19 @@ import { displayDollars } from './history-presentation';
 import { TONE } from './status-tone';
 import { Tag } from './Tag';
 import { Button } from './UI';
-import { useBuyerFunding } from './useBuyerFunding';
+import type { useBuyerFunding } from './useBuyerFunding';
 import type { PaypalSessionView } from './usePaypalSession';
-import type { X402View } from './useX402';
 
 export function WalletOverview({
-  buyer,
+  observation,
   onAddFunds,
   onDetails,
 }: {
-  buyer?: X402View;
+  observation: ReturnType<typeof useBuyerFunding>;
   onAddFunds(): void;
   onDetails(): void;
 }) {
-  const { funding, loading } = useBuyerFunding(buyer?.state.policy?.payer);
+  const { funding, loading } = observation;
   const balance = funding?.balanceAtomic;
   return (
     <li className="preview-method-row" aria-label="USDC buyer wallet">

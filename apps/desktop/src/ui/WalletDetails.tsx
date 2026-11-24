@@ -17,7 +17,7 @@ import { BUTTON_VARIANT } from './constants';
 import { CopyButton } from './CopyButton';
 import { MotionPresence } from './Motion';
 import { Badge, Button, List, ListRow, Note, RowCopy } from './UI';
-import { useBuyerFunding } from './useBuyerFunding';
+import type { useBuyerFunding } from './useBuyerFunding';
 import { WalletRestore } from './WalletRestore';
 import { WalletSelector } from './WalletSelector';
 import {
@@ -55,16 +55,16 @@ function WalletFacts({ address }: Pick<WalletSummary, 'address'>) {
 export function WalletDetails({
   onBackup,
   onAddFunds,
-  payer,
+  observation,
   depositAtomic = BUYER_SESSION_DEFAULT_POLICY.depositAtomic,
 }: {
-  payer?: string;
+  observation: ReturnType<typeof useBuyerFunding>;
   depositAtomic?: string;
   onBackup: () => void;
   onAddFunds: () => void;
 }) {
   const wallet = useDesktopWallet();
-  const { funding, loading, refresh: refreshFunding } = useBuyerFunding(payer);
+  const { funding, loading, refresh: refreshFunding } = observation;
   const shortfall =
     funding?.balanceAtomic == null
       ? null
