@@ -240,17 +240,18 @@ void test('Explorer shows offer and active-day rows without empty rows', async (
   assert.ok(!daily.includes(inactiveDay));
   assert.doesNotMatch(sellers + daily, /colSpan=/i);
   const tables = [...populated.matchAll(/<table\b/g)];
-  const hints = [
+  const edges = [
     ...populated.matchAll(
-      /<\/table><\/div><p class="explorer-table-hint\b[^\"]*"><span aria-hidden="true">↔<\/span>Scroll horizontally to see all columns\.<\/p>/g,
+      /<\/table><\/div><div aria-hidden="true" class="explorer-table-edge"><\/div><\/div>/g,
     ),
   ];
   assert.ok(tables.length > 0);
-  assert.equal(hints.length, tables.length);
-  assert.match(css, /\.explorer-table-hint\s*\{\s*display:\s*none;/);
+  assert.equal(edges.length, tables.length);
+  assert.doesNotMatch(populated, /Scroll horizontally|explorer-table-hint/);
+  assert.match(css, /\.explorer-table-edge\s*\{[^}]*display:\s*none;/);
   assert.match(
     css,
-    /\.explorer-table-scroll\[data-scrollable\]\s*\+\s*\.explorer-table-hint\s*\{\s*display:\s*flex;/,
+    /\.explorer-table-scroll\[data-scrollable\]:not\(\[data-scroll-end\]\)\s*\+\s*\.explorer-table-edge\s*\{\s*display:\s*block;/,
   );
 });
 
