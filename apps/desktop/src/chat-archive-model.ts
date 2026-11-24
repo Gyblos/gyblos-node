@@ -34,6 +34,7 @@ export type ChatArchive = {
   sessions: ArchivedConversation[];
 };
 export type ChatArchiveStatus = {
+  pinsUnavailable?: boolean;
   available: boolean;
   generation: number;
   savedSequence: number;
@@ -283,8 +284,11 @@ export function parseChatArchiveSave(value: unknown): ChatArchiveSave | null {
     : null;
 }
 export function parseChatArchiveStatus(value: unknown): ChatArchiveStatus {
-  const item = object(value, 'available,generation,savedSequence');
+  const item =
+    object(value, 'available,generation,savedSequence') ??
+    object(value, 'available,generation,pinsUnavailable,savedSequence');
   return item &&
+    (item.pinsUnavailable === undefined || item.pinsUnavailable === true) &&
     typeof item.available === 'boolean' &&
     (!item.available || (integer(item.generation) && item.generation > 0)) &&
     integer(item.generation) &&
@@ -293,16 +297,22 @@ export function parseChatArchiveStatus(value: unknown): ChatArchiveStatus {
         available: item.available,
         generation: item.generation,
         savedSequence: item.savedSequence,
+        ...(item.pinsUnavailable === true && { pinsUnavailable: true }),
       }
     : unavailableChatArchive();
 }
 export function parseChatArchiveLoad(value: unknown): ChatArchiveLoad {
-  const item = object(value, 'archive,available,generation,savedSequence');
+  const item =
+    object(value, 'archive,available,generation,savedSequence') ??
+    object(value, 'archive,available,generation,pinsUnavailable,savedSequence');
   if (!item) return { ...unavailableChatArchive(), archive: null };
   const status = parseChatArchiveStatus({
     available: item.available,
     generation: item.generation,
     savedSequence: item.savedSequence,
+    ...(Object.hasOwn(item, 'pinsUnavailable') && {
+      pinsUnavailable: item.pinsUnavailable,
+    }),
   });
   const archive = item.archive === null ? null : parseChatArchive(item.archive);
   if (item.archive !== null && !archive)

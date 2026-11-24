@@ -102,6 +102,7 @@ type Props = {
   onSelectModel: (id: string) => void;
   confirmedPolicy?: string;
   onDefaultModel?: () => void;
+  autoModels?: readonly string[];
   onAutoModel?: (name: string) => void;
   onBrowseModels: () => void;
   onReviewPaypal: () => void;
@@ -163,6 +164,7 @@ export function Chat({
   onSelectModel,
   confirmedPolicy,
   onDefaultModel,
+  autoModels,
   onAutoModel,
   onBrowseModels,
   onReviewPaypal,
@@ -575,7 +577,8 @@ export function Chat({
     .reverse();
   return (
     <main className="chat-page enhanced-chat">
-      {storageState === CHAT_STORAGE_STATE.UNAVAILABLE && (
+      {(storageState === CHAT_STORAGE_STATE.UNAVAILABLE ||
+        storageState === CHAT_STORAGE_STATE.PINS_UNAVAILABLE) && (
         <Note>{chatArchiveLabel(storageState)}</Note>
       )}
       {usingPaypal && notice && (
@@ -770,10 +773,7 @@ export function Chat({
                 auto={
                   usingX402 && x402?.state.policy && onAutoModel
                     ? {
-                        buyerModels:
-                          x402.state.policy.autoRoutes?.map(
-                            (route) => route.modelId,
-                          ) ?? [],
+                        buyerModels: autoModels ?? [],
                         paid: !!x402.state.policy.paidAuto,
                         choose: onAutoModel,
                       }

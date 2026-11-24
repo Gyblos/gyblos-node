@@ -197,6 +197,7 @@ export const CHAT_STORAGE = {
 export const CHAT_STORAGE_STATE = {
   LOADING: 'loading',
   SAVING: 'saving',
+  PINS_UNAVAILABLE: 'pins-unavailable',
   SAVED: 'saved',
   UNAVAILABLE: 'unavailable',
 } as const;

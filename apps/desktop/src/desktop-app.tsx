@@ -195,6 +195,16 @@ export function DesktopApp() {
   const found = announcedModels(announcements.searchResult, now);
   const ids = new Set(networkModels.map((item) => item.id));
   networkModels.push(...found.filter((item) => !ids.has(item.id)));
+  const autoModels =
+    x402.state.policy?.autoRoutes
+      ?.map((route) => route.modelId)
+      .filter((name) =>
+        automaticOffersAvailable(
+          name,
+          networkModels,
+          !!x402.state.policy?.paidAuto && x402.state.policy.maxAtomic !== '0',
+        ),
+      ) ?? [];
   const chatModels = [MODELS[0], ...networkModels, ...MODELS.slice(1)];
   // Transport readiness and spending permission are independently enforced by each real coordinator.
   const online = true;
@@ -496,6 +506,7 @@ export function DesktopApp() {
               models={chatModels}
               confirmedPolicy={confirmedPolicy}
               onDefaultModel={() => setModel(MODELS[0])}
+              autoModels={autoModels}
               onAutoModel={(name) => void chooseAuto(name)}
               onSelectModel={(id) => {
                 const next = chatModels.find((item) => item.id === id);
@@ -516,17 +527,7 @@ export function DesktopApp() {
               networkModels={networkModels}
               auto={
                 x402.state.policy && {
-                  buyerModels:
-                    x402.state.policy.autoRoutes
-                      ?.map((route) => route.modelId)
-                      .filter((name) =>
-                        automaticOffersAvailable(
-                          name,
-                          networkModels,
-                          !!x402.state.policy?.paidAuto &&
-                            x402.state.policy.maxAtomic !== '0',
-                        ),
-                      ) ?? [],
+                  buyerModels: autoModels,
                   paid: !!x402.state.policy.paidAuto,
                   selected: !!model.automatic,
                   choose: (name) => void chooseAuto(name),

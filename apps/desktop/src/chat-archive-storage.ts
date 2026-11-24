@@ -22,22 +22,25 @@ export function createChatArchiveStorage(profile: string) {
       return readPrivateFile(paths.state, CHAT_STORAGE.MAX_BYTES);
     },
     async readPins() {
-      try {
-        const text = await readPrivateFile(paths.pins, CHAT_STORAGE.MAX_BYTES);
-        if (!text) return [];
-        const pins: unknown = JSON.parse(text);
-        return Array.isArray(pins) &&
-          pins.length <= CHAT_STORAGE.MAX_CONVERSATIONS
-          ? pins.filter((id): id is string => typeof id === 'string')
-          : [];
-      } catch {
-        return [];
-      }
+      const text = await readPrivateFile(paths.pins, CHAT_STORAGE.MAX_BYTES);
+      if (text === undefined) return [];
+      const pins: unknown = JSON.parse(text);
+      if (
+        !Array.isArray(pins) ||
+        pins.length > CHAT_STORAGE.MAX_CONVERSATIONS ||
+        !pins.every((id): id is string => typeof id === 'string')
+      )
+        throw new Error('Pin preferences unavailable');
+      return pins;
     },
-    async write(text, pins) {
+    async write(text) {
       if (!ownership) throw new Error('Conversation storage unavailable');
       await ownership.verify();
       await writePrivateFile(paths.state, text, CHAT_STORAGE.MAX_BYTES);
+    },
+    async writePins(pins) {
+      if (!ownership) throw new Error('Conversation storage unavailable');
+      await ownership.verify();
       await writePrivateFile(
         paths.pins,
         JSON.stringify(pins),
