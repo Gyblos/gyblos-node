@@ -1,10 +1,12 @@
 import { Activity, MessagesSquare } from 'lucide-react';
+import type { ReactElement } from 'react';
 
 import { chainHistoryNote, summarizeChain } from '../lib/chain-shape';
 import { getChainStats } from '../lib/chain-stats';
 import { getCollector } from '../lib/collector';
 import { getDiscovery } from '../lib/discovery-render';
 import { count, percent, usdcDecimal } from '../lib/format';
+import { overviewLayout } from '../lib/layout';
 import { summarizeOffers } from '../lib/offers';
 import { rangeOf, type ExplorerQuery } from '../lib/paging';
 import { summarizeUsage } from '../lib/usage';
@@ -15,6 +17,22 @@ import { BuyersCard } from './buyers-card';
 import { SellersOnline } from './network-section';
 import { UsdcIcon } from './token-logo';
 import { SectionTitle } from './ui';
+
+function OverviewGrid({ cards }: { cards: ReactElement[] }) {
+  const layout = overviewLayout(cards.length);
+  return (
+    <div className={layout.grid}>
+      {cards.map((card, index) => (
+        <div
+          key={card.key ?? index}
+          className={`grid min-w-0 ${layout.spans[index]}`}
+        >
+          {card}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export async function Overview({ query }: { query: ExplorerQuery }) {
   const days = rangeOf(query, 'overview');
@@ -34,60 +52,63 @@ export async function Overview({ query }: { query: ExplorerQuery }) {
       ? summarizeChain(chainBefore).totals.paidOut
       : null;
   const offers = snapshot.error ? null : summarizeOffers(snapshot);
+  const cards = [
+    snapshot.error ? null : (
+      <SellersOnline key="sellers" snapshot={snapshot} variant="footer" />
+    ),
+    <RequestsCard key="requests" requests={requests} before={requestsBefore} />,
+    <BuyersCard
+      key="buyers"
+      variant="footer"
+      buyers={usage.buyerTotals}
+      days={days}
+    />,
+    <StatCard
+      key="paid"
+      variant="footer"
+      icon={UsdcIcon}
+      label="Paid to sellers"
+      value={
+        paid === null ? '—' : <Flow value={usdcDecimal(paid)} kind="usdc" />
+      }
+      deltas={
+        paid !== null && paidBefore !== null
+          ? [delta(paid, paidBefore)]
+          : undefined
+      }
+      money={!!paid}
+      caption={
+        paid !== null && chainHistoryNote(chain.backfillDone) ? (
+          <span className="inline-block first-letter:uppercase">
+            {chainHistoryNote(chain.backfillDone)}, partial total
+          </span>
+        ) : undefined
+      }
+    />,
+    <StatCard
+      key="uptime"
+      variant="footer"
+      icon={Activity}
+      label="Uptime 24 h"
+      value={
+        offers?.averageDayUptime == null
+          ? '—'
+          : percent(offers.averageDayUptime)
+      }
+      caption={
+        offers?.averageDayUptime == null || snapshot.error
+          ? undefined
+          : `Average of ${count(offers.sellersWithDayUptime)} ${offers.sellersWithDayUptime === 1 ? 'seller' : 'sellers'}`
+      }
+    />,
+  ].filter((card) => card !== null);
   return (
     <>
       <SectionTitle
         title={`Overview, last ${days} days`}
         range={{ section: 'overview', days }}
       />
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        {snapshot.error ? null : (
-          <SellersOnline snapshot={snapshot} variant="footer" />
-        )}
-        <RequestsCard requests={requests} before={requestsBefore} />
-        <BuyersCard
-          variant="footer"
-          className="sm:col-span-2 xl:col-span-1"
-          buyers={usage.buyerTotals}
-          days={days}
-        />
-        <StatCard
-          variant="footer"
-          icon={UsdcIcon}
-          label="Paid to sellers"
-          value={
-            paid === null ? '—' : <Flow value={usdcDecimal(paid)} kind="usdc" />
-          }
-          deltas={
-            paid !== null && paidBefore !== null
-              ? [delta(paid, paidBefore)]
-              : undefined
-          }
-          money={!!paid}
-          caption={
-            paid !== null && chainHistoryNote(chain.backfillDone) ? (
-              <span className="inline-block first-letter:uppercase">
-                {chainHistoryNote(chain.backfillDone)}, partial total
-              </span>
-            ) : undefined
-          }
-        />
-        <StatCard
-          variant="footer"
-          icon={Activity}
-          label="Uptime 24 h"
-          value={
-            offers?.averageDayUptime == null
-              ? '—'
-              : percent(offers.averageDayUptime)
-          }
-          caption={
-            offers?.averageDayUptime == null || snapshot.error
-              ? undefined
-              : `Average of ${count(offers.sellersWithDayUptime)} ${offers.sellersWithDayUptime === 1 ? 'seller' : 'sellers'}`
-          }
-        />
-      </div>
+      <OverviewGrid cards={cards} />
     </>
   );
 }

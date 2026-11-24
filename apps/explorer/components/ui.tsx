@@ -8,6 +8,7 @@ import { Skeleton } from '../boardui/components/base/skeleton/skeleton';
 import { explorerAddressUrl } from '../lib/config';
 import { DISPLAY, PAGING } from '../lib/constants';
 import { short } from '../lib/format';
+import { FULL_OVERVIEW, overviewLayout } from '../lib/layout';
 import { sortHref, type ExplorerQuery, type SortedTable } from '../lib/paging';
 import type { RangeDays, RangeSection } from '../lib/range';
 import { ModelLogo } from './model-logo';
@@ -34,12 +35,33 @@ const LOADING_CARDS = Array.from(
   (_, card) => card,
 );
 
-export function Loading({ cards = false }: { cards?: boolean }) {
+const OVERVIEW_LOADING = overviewLayout(FULL_OVERVIEW);
+
+export function Loading({
+  cards = false,
+  overview = false,
+}: {
+  cards?: boolean;
+  overview?: boolean;
+}) {
+  if (overview)
+    return (
+      <div aria-busy className="mt-10">
+        <Skeleton shape="text" className="mb-4 h-6 w-40" />
+        <div className={OVERVIEW_LOADING.grid}>
+          {OVERVIEW_LOADING.spans.map((span, card) => (
+            <div key={card} className={`grid ${span}`}>
+              <Skeleton shape="rect" className="h-36 rounded-xl" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   return (
     <div aria-busy className="mt-10">
       <Skeleton shape="text" className="mb-4 h-6 w-40" />
       {cards ? (
-        <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
           {LOADING_CARDS.map((card) => (
             <Skeleton key={card} shape="rect" className="h-28 rounded-xl" />
           ))}

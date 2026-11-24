@@ -20,6 +20,7 @@
     "./format": "./lib/format.ts",
     "./hash-target": "./lib/hash-target.ts",
     "./latency": "./lib/latency.ts",
+    "./layout": "./lib/layout.ts",
     "./model-family": "./lib/model-family.ts",
     "./model-table": "./lib/model-table.ts",
     "./network-status": "./lib/network-status.ts",
