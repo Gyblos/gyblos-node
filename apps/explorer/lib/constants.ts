@@ -208,7 +208,7 @@ export const IDENTITY = {
   verifiedValue: '1',
   bandsPerUnit: 100,
   gridSize: 5,
-  cellPx: 4,
+  cellPx: 5,
   hashOffset: 2_166_136_261,
   hashPrime: 16_777_619,
 } as const;

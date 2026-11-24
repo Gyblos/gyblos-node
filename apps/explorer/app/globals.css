@@ -106,9 +106,8 @@ body {
 }
 
 .seller-avatar-glyph {
-  width: 24px;
-  height: 24px;
   color: white;
+  shape-rendering: crispEdges;
   filter: drop-shadow(0 1px 1px #00000030);
   animation: seller-avatar-arrive 4.8s ease-in-out;
   transition: transform 220ms ease-out;
