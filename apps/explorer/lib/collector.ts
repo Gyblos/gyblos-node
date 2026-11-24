@@ -60,3 +60,28 @@ async function loadCollector(query: string): Promise<CollectorSnapshot> {
     error: null,
   };
 }
+
+export async function overviewNetwork(dates: string[]) {
+  const from = dates[0];
+  const to = dates.at(-1);
+  try {
+    const source = record(
+      await fetchJson(
+        `${COLLECTOR_URL}/stats/network?from=${from}&to=${to}`,
+        'collector network',
+      ),
+      'network',
+    );
+    if (source.from !== from || source.to !== to) return null;
+    return {
+      days: list(source.days, 'network.days').map(parseNetworkDay),
+      version:
+        typeof source.formulaVersion === 'number'
+          ? source.formulaVersion
+          : null,
+      updated: aggregatedAt(source),
+    };
+  } catch {
+    return null;
+  }
+}

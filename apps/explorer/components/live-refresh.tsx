@@ -16,7 +16,7 @@ function ago(ms: number) {
   return `${Math.floor(seconds / SECONDS_PER_MINUTE)} min ago`;
 }
 
-export function LiveRefresh() {
+export function LiveRefresh({ quiet = false }: { quiet?: boolean }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const fetchedAt = useRef(Date.now());
@@ -46,6 +46,7 @@ export function LiveRefresh() {
     };
   }, [router]);
 
+  if (quiet) return null;
   return (
     <span
       className="hidden items-center gap-2 font-mono text-xs text-dim sm:inline-flex"

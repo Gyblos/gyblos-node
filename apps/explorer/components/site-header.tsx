@@ -8,8 +8,10 @@ import { NetworkSelect } from './network-select';
 export function SiteHeader({
   title,
   crumb,
+  overview,
 }: {
   title: string;
+  overview?: boolean;
   crumb?: ReactNode;
 }) {
   return (
@@ -36,7 +38,7 @@ export function SiteHeader({
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <LiveRefresh />
+          <LiveRefresh quiet={overview} />
           <NetworkSelect />
         </div>
       </div>

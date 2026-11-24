@@ -390,3 +390,29 @@ void test('a model side reads its observations, and their absence as no data', (
     /observed\.engineSpeed/,
   );
 });
+
+void test('overview reconciles observed tokens and weekly buckets without filling gaps', async () => {
+  const { overviewActivity, groupWeeks } =
+    await import('@gyblos/explorer/overview-activity');
+  const free = { ...side(75, 75, 0, 60), authorizedAtomic: null };
+  free.tokens.input = 40;
+  free.tokens.reasoning = 12;
+  const paid = { ...side(25, 25, 0, 20), authorizedAtomic: '0' };
+  const dates = ['2026-11-15', '2026-11-16', '2026-11-17'];
+  const source = {
+    version: 4,
+    updated: Date.parse('2026-11-18'),
+    days: [{ day: dates[0]!, free, paid, observed: null, demand: [] }],
+  };
+  const current = overviewActivity(dates, source);
+  assert.equal(current.tokens, 120);
+  assert.equal(current.requests, 100);
+  assert.equal(current.complete, false);
+  assert.equal(current.demand, null);
+  assert.equal(current.free?.tokens, 100);
+  assert.deepEqual(groupWeeks(current.points), [
+    { day: dates[0], end: dates[0], tokens: 120, missing: 0 },
+    { day: dates[1], end: dates[2], tokens: null, missing: 2 },
+  ]);
+  assert.equal(overviewActivity(dates, null).requests, null);
+});

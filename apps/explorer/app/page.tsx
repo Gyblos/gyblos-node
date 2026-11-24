@@ -1,9 +1,11 @@
 import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
 
-import { ChannelTxs } from '../components/channel-txs';
-import { NetworkSection } from '../components/network-section';
 import { Overview } from '../components/overview';
+import {
+  OverviewOffers,
+  OverviewOperations,
+} from '../components/overview-evidence';
 import { PageFrame } from '../components/page-frame';
 import { Loading } from '../components/ui';
 import {
@@ -29,19 +31,21 @@ export default async function Home({
   if (canonical) redirect(canonical);
   const query = readQuery(params);
   return (
-    <PageFrame title="Gyblos Explorer">
+    <PageFrame overview title="Gyblos Explorer">
       <Suspense
         key={`overview-${rangeOf(query, 'overview')}`}
         fallback={<Loading overview />}
       >
         <Overview query={query} />
       </Suspense>
-      <Suspense fallback={<Loading />}>
-        <NetworkSection query={query} preview />
-      </Suspense>
-      <Suspense fallback={<Loading />}>
-        <ChannelTxs query={{ ...query, before: null }} preview />
-      </Suspense>
+      <div className="ov-evidence">
+        <Suspense fallback={<Loading />}>
+          <OverviewOffers query={query} />
+        </Suspense>
+        <Suspense fallback={<Loading />}>
+          <OverviewOperations />
+        </Suspense>
+      </div>
     </PageFrame>
   );
 }

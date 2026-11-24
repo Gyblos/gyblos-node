@@ -1,148 +1,220 @@
-import { Hash, MessagesSquare, type LucideIcon } from 'lucide-react';
-import type { ReactElement } from 'react';
+import {
+  Activity,
+  Hash,
+  MessagesSquare,
+  Server,
+  type LucideIcon,
+} from 'lucide-react';
 
-import { chainHistoryNote, summarizeChain } from '../lib/chain-shape';
-import { getChainStats } from '../lib/chain-stats';
-import { getCollector } from '../lib/collector';
-import { HELP_TEXT } from '../lib/config';
+import { overviewNetwork } from '../lib/collector';
 import { getDiscovery } from '../lib/discovery-render';
-import { usdcDecimal } from '../lib/format';
-import { overviewLayout } from '../lib/layout';
+import { count, percent, utc } from '../lib/format';
+import { compact, overviewActivity } from '../lib/overview-activity';
 import { rangeOf, type ExplorerQuery } from '../lib/paging';
-import { summarizeUsage } from '../lib/usage';
-import { Flow } from './board/animated-number';
-import { delta } from './board/delta';
-import { StatCard } from './board/stat-card';
-import { BuyersCard } from './buyers-card';
-import { SellersOnline } from './network-section';
-import { UsdcIcon } from './token-logo';
-import { SectionTitle } from './ui';
+import { overviewWindow } from '../lib/range';
+import { delta, type Delta } from './board/delta';
+import { DeltaChip } from './board/delta-chip';
+import { OverviewChart } from './overview-chart';
+import { RangeControl } from './range-control';
 
-function OverviewGrid({ cards }: { cards: ReactElement[] }) {
-  const layout = overviewLayout(cards.length);
+type ActivityTotals = ReturnType<typeof overviewActivity>;
+function Metric({
+  icon: Icon,
+  label,
+  value,
+  change,
+  detail,
+  caption,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: number | null;
+  change?: Delta | null;
+  detail?: string;
+  caption?: string;
+}) {
   return (
-    <div className={layout.grid}>
-      {cards.map((card, index) => (
-        <div
-          key={card.key ?? index}
-          className={`row-span-4 grid min-w-0 grid-rows-subgrid gap-y-0 ${layout.spans[index]}`}
-        >
-          {card}
+    <section className="ov-panel ov-kpi">
+      <Icon size={27} aria-hidden />
+      <h3>{label}</h3>
+      <div className="ov-value">
+        <strong>{value === null ? '—' : compact(value)}</strong>
+        {change && <DeltaChip delta={change} />}
+      </div>
+      {caption && <small>{caption}</small>}
+      {value !== null && (
+        <details>
+          <summary
+            aria-label={`Exact ${label.toLowerCase()} and source details`}
+          >
+            Details
+          </summary>
+          <small>
+            {count(value)} · {detail ?? caption}
+          </small>
+        </details>
+      )}
+    </section>
+  );
+}
+
+function Mix({
+  activity,
+  metric,
+}: {
+  activity: ActivityTotals;
+  metric: 'requests' | 'tokens';
+}) {
+  const free = activity.free?.[metric];
+  const paid = activity.paid?.[metric];
+  const total = activity[metric];
+  const known =
+    free !== undefined && paid !== undefined && total !== null && total > 0;
+  const ratio = known ? free / total : null;
+  const requests = metric === 'requests';
+  return (
+    <section className="ov-panel">
+      <h3>{requests ? 'Requests' : 'Tokens'} by mode</h3>
+      {ratio === null ? (
+        <p className="ov-empty">
+          {total === 0
+            ? 'No recorded activity.'
+            : 'Share unavailable for this period.'}
+        </p>
+      ) : requests ? (
+        <div className="ov-gauge">
+          <svg viewBox="0 0 200 110" aria-hidden>
+            <path
+              strokeLinecap="round"
+              d="M 12 100 A 88 88 0 0 1 188 100"
+              pathLength="100"
+              fill="none"
+              stroke={ratio === 1 ? 'var(--chart)' : 'var(--good)'}
+              strokeWidth="16"
+            />
+            {ratio > 0 && (
+              <path
+                strokeLinecap={ratio === 1 ? 'round' : 'butt'}
+                d="M 12 100 A 88 88 0 0 1 188 100"
+                pathLength="100"
+                fill="none"
+                stroke="var(--chart)"
+                strokeWidth="16"
+                strokeDasharray={`${ratio * 100} 100`}
+              />
+            )}
+          </svg>
+          <div>
+            <strong>{percent(ratio)}</strong>
+            <small>Free requests</small>
+          </div>
         </div>
-      ))}
-    </div>
+      ) : (
+        <div className="ov-shares">
+          {[
+            { name: 'Free', share: ratio },
+            { name: 'Paid', share: (paid ?? 0) / (total ?? 1) },
+          ].map(({ name, share }) => (
+            <div key={name} data-mode={name}>
+              <div>
+                {name}
+                <b>{percent(share)}</b>
+              </div>
+              <div className="ov-track">
+                <i style={{ width: `${share * 100}%` }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="ov-split">
+        {(['free', 'paid'] as const).map((mode) => (
+          <div key={mode} data-mode={mode}>
+            <small>{mode === 'free' ? 'Free' : 'Paid'}</small>
+            <b>{activity[mode] ? count(activity[mode][metric]) : '—'}</b>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
 export async function Overview({ query }: { query: ExplorerQuery }) {
   const days = rangeOf(query, 'overview');
-  const [snapshot, usage, usageBefore, chain, chainBefore] = await Promise.all([
+  const now = Date.now();
+  const dates = overviewWindow(days, now);
+  const prior = overviewWindow(days, now, 1);
+  const [source, before, snapshot] = await Promise.all([
+    overviewNetwork(dates),
+    overviewNetwork(prior),
     getDiscovery(),
-    getCollector(days),
-    getCollector(days, 1),
-    getChainStats(days),
-    getChainStats(days, 1),
   ]);
-  const requests = usage.error ? null : summarizeUsage(usage);
-  const requestsBefore =
-    requests && !usageBefore.error ? summarizeUsage(usageBefore) : null;
-  const paid = chain.error ? null : summarizeChain(chain).totals.paidOut;
-  const paidBefore =
-    paid !== null && !chainBefore.error && chainBefore.backfillDone
-      ? summarizeChain(chainBefore).totals.paidOut
-      : null;
-  const cards = [
-    snapshot.error ? null : (
-      <SellersOnline key="sellers" snapshot={snapshot} variant="footer" />
-    ),
-    <SideCard
-      key="requests"
-      figure="requests"
-      icon={MessagesSquare}
-      label="Requests"
-      usage={requests}
-      before={requestsBefore}
-    />,
-    <BuyersCard
-      key="buyers"
-      variant="footer"
-      buyers={usage.buyerTotals}
-      days={days}
-    />,
-    <StatCard
-      key="paid"
-      variant="footer"
-      icon={UsdcIcon}
-      label="Paid to sellers"
-      value={
-        paid === null ? '—' : <Flow value={usdcDecimal(paid)} kind="usdc" />
-      }
-      deltas={
-        paid !== null && paidBefore !== null
-          ? [delta(paid, paidBefore)]
-          : undefined
-      }
-      money={!!paid}
-      caption={
-        paid !== null && chainHistoryNote(chain.backfillDone) ? (
-          <span className="inline-block first-letter:uppercase">
-            {chainHistoryNote(chain.backfillDone)}, partial total
-          </span>
-        ) : undefined
-      }
-    />,
-    <SideCard
-      key="tokens"
-      figure="tokens"
-      icon={Hash}
-      label="Tokens processed"
-      hint={HELP_TEXT.tokens}
-      usage={requests}
-      before={requestsBefore}
-    />,
-  ].filter((card) => card !== null);
+  const current = overviewActivity(dates, source);
+  const previous = overviewActivity(prior, before);
+  const interval = (window: string[]) => `${window[0]} – ${window.at(-1)} UTC`;
+  const metric = (key: 'tokens' | 'requests' | 'demand') => {
+    const a = current[key];
+    const b = previous[key];
+    const coverage = key === 'demand' ? 'demandComplete' : 'complete';
+    const comparable =
+      current[coverage] &&
+      previous[coverage] &&
+      source?.version === before?.version &&
+      a !== null &&
+      b !== null;
+    return {
+      value: a,
+      change: comparable ? delta(a, b, key === 'demand' ? 'down' : 'up') : null,
+      detail: `${interval(dates)}. ${comparable ? `Previous: ${count(b)} · ${interval(prior)}.` : 'Comparable history unavailable.'}`,
+    };
+  };
   return (
     <>
-      <SectionTitle
-        title={`Overview, last ${days} days`}
-        range={{ section: 'overview', days }}
-      />
-      <OverviewGrid cards={cards} />
+      <div className="ov-title">
+        <h2>Network overview</h2>
+        <RangeControl section="overview" days={days} />
+      </div>
+      <p className="ov-meta">
+        {interval(dates)} <span>compared with</span> {interval(prior)}
+      </p>
+      <div className="ov-kpis">
+        <Metric icon={Hash} label="Tokens processed" {...metric('tokens')} />
+        <Metric
+          icon={MessagesSquare}
+          label="Recorded requests"
+          {...metric('requests')}
+        />
+        <Metric
+          icon={Server}
+          label="Sellers online"
+          value={
+            snapshot.error
+              ? null
+              : (snapshot.network?.counts.online ?? snapshot.sellers.length)
+          }
+          caption={
+            snapshot.error
+              ? 'Discovery unavailable'
+              : `${snapshot.network?.truncated ? 'Partial count · ' : ''}As of ${utc(snapshot.network?.generatedAt ?? snapshot.generatedAt)}`
+          }
+        />
+        <Metric
+          icon={Activity}
+          label="Unserved attempts"
+          {...metric('demand')}
+          caption="Buyer observations · up to 20 models/day"
+        />
+      </div>
+      <div className="ov-analysis">
+        <OverviewChart points={current.points} total={current.tokens} />
+        <Mix activity={current} metric="requests" />
+        <Mix activity={current} metric="tokens" />
+      </div>
+      <p className="ov-meta">
+        {source
+          ? `Published receipt totals · ${current.daysObserved} of ${days} days with observations · Aggregated ${utc(source.updated)}`
+          : 'Metrics collector unavailable.'}
+      </p>
     </>
-  );
-}
-
-type Usage = ReturnType<typeof summarizeUsage>;
-
-function SideCard({
-  usage,
-  before,
-  figure,
-  ...card
-}: {
-  usage: Usage | null;
-  before: Usage | null;
-  figure: 'requests' | 'tokens';
-  icon: LucideIcon;
-  label: string;
-  hint?: string;
-}) {
-  const kind = figure === 'tokens' ? 'compact' : 'count';
-  const side = (paid: 'free' | 'paid') =>
-    usage ? <Flow value={usage[paid][figure]} kind={kind} /> : '—';
-  return (
-    <StatCard
-      {...card}
-      variant="footer"
-      sides={{ free: side('free'), paid: side('paid') }}
-      deltas={
-        usage && before
-          ? [
-              delta(usage.free[figure], before.free[figure]),
-              delta(usage.paid[figure], before.paid[figure]),
-            ]
-          : undefined
-      }
-    />
   );
 }

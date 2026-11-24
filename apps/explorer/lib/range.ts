@@ -34,3 +34,9 @@ export function rangeQuery(
   const from = utcDay(end - (days - 1) * UNITS.msPerDay);
   return `?from=${from}&to=${utcDay(end)}`;
 }
+
+export function overviewWindow(days: RangeDays, now: number, periodsBack = 0) {
+  return Array.from({ length: days }, (_, index) =>
+    utcDay(now - ((periodsBack + 1) * days - index) * UNITS.msPerDay),
+  );
+}
