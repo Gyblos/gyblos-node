@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  CONTROL_DOMAINS,
   PUBLIC_RECORD_DOMAINS,
   PUBLIC_RECORD_ERROR_CODES,
   PUBLIC_RECORD_KINDS,
@@ -75,7 +76,7 @@ void test('public verifier rejects signatures from other domains for every recor
   for (const record of [catalog, presence, withdrawal])
     for (const domain of [
       ...Object.values(PUBLIC_RECORD_DOMAINS),
-      'gyblos/signed-inference-offer/v1\n',
+      CONTROL_DOMAINS.OFFER,
     ].filter((domain) => domain !== PUBLIC_RECORD_DOMAINS[record.kind]))
       await assert.rejects(verifyPublicRecord(signed(record, domain), linked), {
         code: PUBLIC_RECORD_ERROR_CODES.INVALID_SIGNATURE,

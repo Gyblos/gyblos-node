@@ -91,7 +91,6 @@ void test('role file and key names inside a role directory are unchanged', () =>
     journal: 'authorization.json',
     reconciliations: 'reconciliations.json',
     calls: 'calls.json',
-    offer: 'offer.json',
     identityState: 'identity-state-8004.json',
     identityStateLock: 'identity-state-8004.lock',
     sellerRegistration: 'registration-8004-v1.json',
