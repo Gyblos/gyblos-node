@@ -27,6 +27,7 @@ Routes sit at the root of the index host. The client base URL is
 | `GET /v1/uptime?node=`             | Public uptime of one NodeId over the last day, week and month ([Uptime](#uptime)).              |
 | `GET /v1/versions[?node=<NodeId>]` | Active seller counts by release, or one active seller’s declared release.                       |
 | `GET /v1/network`                  | Every known seller, online, offline or unpublished, with counts ([Network](#network)).          |
+| `GET /v1/offers/history`           | Catalog periods and their exact prices, by NodeId or model ([Offer history](#offer-history)).   |
 | `GET /v1/health`                   | `{ ok: true, records, publish }`: unexpired record count and [publish mode](#publish-modes).    |
 | `POST /v1/registrations`           | Trade an invite code for publishing, once the NodeId is bound in the 8004 agent registry.       |
 | `POST /v1/identity/github`         | Submit a node-signed GitHub claim; the index checks its gist ([GitHub claims](#github-claims)). |
@@ -44,10 +45,11 @@ Common behavior:
 - **Unknown routes** answer `404 {"error":"NOT_FOUND"}`.
 - **Headers.** Every response carries `X-Robots-Tag: noindex` and
   `X-Content-Type-Options: nosniff`. `GET` and `HEAD` on `/v1/sellers`,
-  `/v1/models`, `/v1/uptime`, `/v1/versions`, `/v1/network`, `/v1/health`,
-  `/v1/identity/github/<NodeId>` and `/v1/profile/<NodeId>` carry
-  `Access-Control-Allow-Origin: *` on every status, errors included. A `200`
-  from `/v1/sellers`, `/v1/models`, `/v1/uptime`, `/v1/versions`, `/v1/network`,
+  `/v1/models`, `/v1/uptime`, `/v1/versions`, `/v1/network`,
+  `/v1/offers/history`, `/v1/health`, `/v1/identity/github/<NodeId>` and
+  `/v1/profile/<NodeId>` carry `Access-Control-Allow-Origin: *` on every status,
+  errors included. A `200` from `/v1/sellers`, `/v1/models`, `/v1/uptime`,
+  `/v1/versions`, `/v1/network`, `/v1/offers/history`,
   `/v1/identity/github/<NodeId>` or `/v1/profile/<NodeId>` carries
   `Cache-Control: public, max-age=10`; everything else carries
   `Cache-Control: no-store`.
@@ -204,12 +206,12 @@ signed a record; clients re-verify everything.
 
 Rate limits:
 
-| Limit                               | Key                                     | Budget                                   | Consumed by                                                                                                                       |
-| ----------------------------------- | --------------------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `DISCOVERY_IP_LIMITER`              | client IPv4 address, or IPv6 /64 prefix | set in `wrangler.jsonc`                  | every request                                                                                                                     |
-| `DISCOVERY_PUBLISH_LIMITER`         | client IPv4 address, or IPv6 /64 prefix | set in `wrangler.jsonc`                  | publishes and registrations                                                                                                       |
-| `DISCOVERY_READ_LIMITER`            | constant key `global`                   | set in `wrangler.jsonc`                  | storage reads only: a `/v1/sellers`, `/v1/models`, `/v1/uptime`, `/v1/versions` or `/v1/network` cache miss, a stale health count |
-| NodeId publish quota (stored in D1) | NodeId                                  | 10 accepted records per fixed UTC minute | accepted records only                                                                                                             |
+| Limit                               | Key                                     | Budget                                   | Consumed by                                                                                                                                             |
+| ----------------------------------- | --------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DISCOVERY_IP_LIMITER`              | client IPv4 address, or IPv6 /64 prefix | set in `wrangler.jsonc`                  | every request                                                                                                                                           |
+| `DISCOVERY_PUBLISH_LIMITER`         | client IPv4 address, or IPv6 /64 prefix | set in `wrangler.jsonc`                  | publishes and registrations                                                                                                                             |
+| `DISCOVERY_READ_LIMITER`            | constant key `global`                   | set in `wrangler.jsonc`                  | storage reads only: a `/v1/sellers`, `/v1/models`, `/v1/uptime`, `/v1/versions`, `/v1/network` or `/v1/offers/history` cache miss, a stale health count |
+| NodeId publish quota (stored in D1) | NodeId                                  | 10 accepted records per fixed UTC minute | accepted records only                                                                                                                                   |
 
 - A Cloudflare limiter that refuses or fails gives `429 RATE_LIMITED` with
   `Retry-After: 60`. That `429` is `no-store` and never cached.
@@ -226,13 +228,16 @@ Rate limits:
 ## Caching
 
 - **Public reads.** `/v1/sellers`, `/v1/models`, `/v1/uptime`, `/v1/versions`,
-  `/v1/network`, `/v1/identity/github/<NodeId>` and `/v1/profile/<NodeId>` keep
-  `200` answers in the Workers Cache API (`caches.default`, per Cloudflare
-  location) for 10 seconds, matching their `max-age`. Keys are normalized:
+  `/v1/network`, `/v1/offers/history`, `/v1/identity/github/<NodeId>` and
+  `/v1/profile/<NodeId>` keep `200` answers in the Workers Cache API
+  (`caches.default`, per Cloudflare location) for 10 seconds, matching their
+  `max-age`. Keys are normalized:
   - sellers: `cursor`, the effective `limit` (so `limit=5000` and `limit=200`
     share an entry) and `model`, in that order;
   - models and network: the route alone;
   - uptime: `?node=<NodeId>`, however the query was spelled;
+  - offer history: `?node=<NodeId>` or `?model=<model>`, then the effective
+    `days`;
   - GitHub claims: the route and the NodeId. A claim's new state can therefore
     take up to 10 seconds to show at a location that cached the old one.
   - seller names: the route and the NodeId. A new or cleared name can take up to
@@ -399,6 +404,79 @@ is `400 INVALID_QUERY`):
 - In open mode (`DISCOVERY_PUBLISH_ALLOWLIST="*"`) anyone can add entries by
   publishing from new NodeIds, as with uptime; the caps bound them, but the
   public counts are not Sybil resistant.
+
+## Offer history
+
+The index keeps every catalog it accepts as a validity period, so a seller's
+past prices stay traceable after it republishes, withdraws or leaves.
+
+- **Periods.** The first accepted catalog of a NodeId opens a period. A later
+  catalog with the same models, prices and owner, accepted before the open one
+  expires, extends it (`lastSequence`, `lastPublishedAt`, `expiresAt`). Any
+  other catalog closes it with `endReason: "replaced"` at the index's clock and
+  opens a new one; a catalog that arrives after the open one expired closes it
+  with `"expired"` at its expiry. A withdrawal closes it with `"withdrawn"`. A
+  presence never touches the history: accepting a catalog clears the presence,
+  but the period stays open.
+- **Writes.** The period and its offers are written in the publish batch, under
+  the same high-water guard as the record, so a replayed or rejected record
+  writes nothing. Offers are stored once per distinct content (a SHA-256 of the
+  catalog's `models`), one row per offer with its exact atomic prices, `unit`,
+  network and asset; a renewal reads one key and writes only the period.
+- **History starts at the deploy.** Earlier catalogs were overwritten and are
+  unknown. Sellers republish at least every 10 minutes, so every listed seller
+  has a period within 10 minutes of the deploy.
+
+`GET /v1/offers/history?node=<NodeId>` or `?model=<model>` (exactly one), with
+an optional `days` from 1 to 92 (default 30), returns the periods that were
+still valid during the last `days`, newest first:
+
+```json
+{
+  "node": "<NodeId>",
+  "days": 30,
+  "from": 1797408001000,
+  "periods": [
+    {
+      "nodeId": "<NodeId>",
+      "owner": "<owner address>",
+      "firstSequence": 12,
+      "lastSequence": 40,
+      "startedAt": 1799990000000,
+      "lastPublishedAt": 1799999000000,
+      "expiresAt": 1800000200000,
+      "endedAt": null,
+      "endReason": null,
+      "offers": [
+        {
+          "modelId": "qwen3-0.6b",
+          "variant": null,
+          "quantization": "Q4_K_M",
+          "contextTokens": 2048,
+          "reasoning": ["off"],
+          "pricing": {
+            "inputAtomicPerMtok": "0",
+            "outputAtomicPerMtok": "2",
+            "unit": "million-tokens",
+            "network": "<CAIP-2 network>",
+            "asset": "<mint>"
+          }
+        }
+      ]
+    }
+  ],
+  "truncated": false,
+  "generatedAt": 1800000001000
+}
+```
+
+- A model query returns the periods of every seller that listed the model, with
+  only that model's offers.
+- An open period whose `expiresAt` has passed means the seller stopped
+  republishing without a withdrawal.
+- At most 50 periods per answer; `truncated` says more existed. A missing,
+  repeated or unknown parameter, or a `days` outside 1 to 92, answers
+  `400 INVALID_QUERY`.
 
 ## GitHub claims
 
@@ -683,6 +761,8 @@ stored or logged.
   under the high-water guard, and a catalog republish writes only the model ids
   that changed. Model insertion binds at most 68 parameters for 64 models, below
   [D1's limit of 100](https://developers.cloudflare.com/d1/platform/limits/).
+  Offer history rows come from the catalog JSON through `json_each`, one bound
+  value for up to 64 offers.
 
 The only handwritten SQL expressions live in `src/sqlite-expressions.ts`:
 
@@ -691,11 +771,11 @@ The only handwritten SQL expressions live in `src/sqlite-expressions.ts`:
 | `INDEXED BY`             | No index-hint builder. Without it SQLite reads tables holding signed JSON before pagination; a key-only `EXPLAIN` test pins it. |
 | `(VALUES (1))`           | The select builder needs a `FROM`; initial admission must still check capacity and references atomically on empty tables.       |
 | Two-argument `min`/`max` | Drizzle's versions are aggregates; retention, quota windows and uptime sightings need the scalar form inside atomic updates.    |
-| `coalesce`               | No builder; an inconclusive GitHub check moves `checked_at` forward from `NULL` in the same write.                              |
-| `CASE`                   | No conditional builder; quota resets and uptime admission use it atomically.                                                    |
+| `coalesce`               | No builder; an inconclusive GitHub check moves `checked_at` forward from `NULL`, and the history window reads a period's end.   |
+| `CASE`                   | No conditional builder; quota resets, uptime admission and closing an expired offer period use it atomically.                   |
 | `length`                 | No scalar builder; the schema keeps the database text-length checks.                                                            |
 | Bitwise OR               | No bitwise builder; concurrent uptime observations combine slot bits in one write.                                              |
-| `json_each`              | No builder; the network read matches names to the NodeIds it lists in one statement, below D1's bound-parameter limit.          |
+| `json_each`              | No builder; the network read matches names to the NodeIds it lists, and offer history rows come from one catalog JSON value.    |
 | Scalar subquery          | No correlated subquery in a SELECT list; the network read takes each NodeId's newest uptime row by primary key.                 |
 
 Migrations, applied in order:

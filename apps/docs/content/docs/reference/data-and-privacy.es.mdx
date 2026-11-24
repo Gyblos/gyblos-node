@@ -14,7 +14,7 @@ desactivar lo que es opcional.
 | Tus prompts y las respuestas                                | El vendedor que atiende la solicitud y su proveedor de motor | En cada solicitud                                                                                       | No se puede: un vendedor tiene que leer el prompt para responder |
 | [Recibos firmados](#recibos)                                | El recolector de métricas, `collector.gyblos.com`            | Versiones publicadas, más o menos una vez por minuto                                                    | No se puede                                                      |
 | [Observaciones de telemetría](#observaciones)               | El recolector de métricas                                    | Versiones publicadas, junto con los recibos                                                             | Sí: `GYBLOS_OBSERVATIONS=off`                                    |
-| [Registros públicos del vendedor](#descubrimiento)          | El índice de descubrimiento, `discovery.gyblos.com`          | Mientras el vendedor está listado; la lista de la red, más tiempo                                       | En parte: pon `publish = false`                                  |
+| [Registros públicos del vendedor](#descubrimiento)          | El índice de descubrimiento, `discovery.gyblos.com`          | Mientras el vendedor está listado; la lista de la red y el historial de precios, más tiempo             | En parte: pon `publish = false`                                  |
 | [Registro](#descubrimiento)                                 | El índice de descubrimiento y Solana devnet                  | Una vez, cuando ejecutas `gyblos seller register`                                                       | Tú decides si te registras                                       |
 | [Verificación de GitHub](#github)                           | El índice de descubrimiento, que luego lee tu gist en GitHub | Solo cuando ejecutas `gyblos seller verify github`; el índice vuelve a revisar cada 6 horas más o menos | Tú decides si verificas; `--cancel` lo quita                     |
 | [Nombre del vendedor](#nombre-del-vendedor)                 | El índice de descubrimiento                                  | Solo cuando ejecutas `gyblos seller name`                                                               | Tú decides si pones uno; `--clear` lo quita                      |
@@ -173,6 +173,12 @@ vez que el índice lo vio, y sus modelos mientras está online. Dejar de publica
 lista: un vendedor registrado sigue en ella, y cualquier otro hasta 30 días después de su última
 presencia. No muestra la dirección del dueño, el contacto, el país ni la dirección IP. Un NodeId
 revocado aparece solo mientras está online.
+
+El índice también guarda el historial de cada catálogo que acepta (`/v1/offers/history`): el NodeId, la
+dirección del dueño, cada modelo ofrecido con su precio exacto, y cuándo ese catálogo empezó, se renovó
+por última vez y terminó (reemplazado, retirado o vencido). Cualquiera puede leerlo por NodeId o por
+modelo, hasta los últimos 92 días por consulta. Se conserva aunque dejes de publicar, para que los
+precios pasados sigan siendo rastreables.
 
 Los compradores y la app de escritorio leen el índice para encontrar vendedores. `gyblos seller status
 --online` además le pide el uptime del propio vendedor por su NodeId, que el vendedor ya publica ahí. El

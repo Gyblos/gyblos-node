@@ -14,7 +14,7 @@ what is optional.
 | Your prompts and the answers            | The seller that serves the request, and its engine provider | Every request                                                                           | No. A seller has to read a prompt to answer it         |
 | [Signed receipts](#receipts)            | The metrics collector, `collector.gyblos.com`               | Release builds, about once a minute                                                     | No                                                     |
 | [Telemetry observations](#observations) | The metrics collector                                       | Release builds, with the receipts                                                       | Yes: `GYBLOS_OBSERVATIONS=off`                         |
-| [Public seller records](#discovery)     | The discovery index, `discovery.gyblos.com`                 | While a seller is listed; the network list longer                                       | Partly: set `publish = false`                          |
+| [Public seller records](#discovery)     | The discovery index, `discovery.gyblos.com`                 | While a seller is listed; the network list and the price history longer                 | Partly: set `publish = false`                          |
 | [Registration](#discovery)              | The discovery index and Solana devnet                       | Once, when you run `gyblos seller register`                                             | You choose whether to register                         |
 | [GitHub verification](#github)          | The discovery index, which then reads your gist on GitHub   | Only when you run `gyblos seller verify github`; the index rechecks about every 6 hours | You choose whether to verify; `--cancel` removes it    |
 | [Seller name](#seller-name)             | The discovery index                                         | Only when you run `gyblos seller name`                                                  | You choose whether to set one; `--clear` removes it    |
@@ -168,6 +168,11 @@ whether it is online, offline or unpublished (never published, or withdrawn), wh
 last saw it, and its models while online. Unpublishing does not take you off this list: a registered
 seller stays on it, and any other until 30 days after its last presence. It shows no owner address,
 contact, country or IP address. A revoked NodeId is listed only while it is online.
+
+The index also keeps the history of every catalog it accepts (`/v1/offers/history`): the NodeId, the
+owner address, each offered model with its exact price, and when that catalog started, was last
+renewed and ended (replaced, withdrawn or expired). Anyone can read it by NodeId or by model, for up
+to the last 92 days per request. It is kept after you unpublish, so past prices stay traceable.
 
 Buyers and the desktop app read the index to find sellers. `gyblos seller status --online` also asks it
 for the seller's own uptime by NodeId, which the seller already publishes there. The index uses IP

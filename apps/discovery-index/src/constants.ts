@@ -60,6 +60,7 @@ export const INDEX_ROUTES = {
   UPTIME: '/v1/uptime',
   VERSIONS: '/v1/versions',
   NETWORK: '/v1/network',
+  OFFER_HISTORY: '/v1/offers/history',
   // POST a signed GitHub claim here; GET `${GITHUB_IDENTITY}/<nodeId>` reads one.
   GITHUB_IDENTITY: '/v1/identity/github',
   PROFILE: '/v1/profile',
@@ -72,6 +73,7 @@ export const PUBLIC_READ_ROUTES: ReadonlySet<string> = new Set([
   INDEX_ROUTES.UPTIME,
   INDEX_ROUTES.VERSIONS,
   INDEX_ROUTES.NETWORK,
+  INDEX_ROUTES.OFFER_HISTORY,
 ]);
 // Public reads below a prefix (GET /v1/identity/github/<nodeId>), CORS-readable like the routes above.
 export const PUBLIC_READ_PREFIXES: readonly string[] = [
@@ -265,6 +267,20 @@ export const NETWORK = {
   // Bytes reserved for the counts and framing around the node entries.
   framingBytes: 256,
 } as const;
+export const OFFER_HISTORY = {
+  defaultDays: 30,
+  maxDays: 92,
+  maxPeriods: 50,
+  dayMs: 86_400_000,
+} as const;
+export const PERIOD_END_REASONS = {
+  REPLACED: 'replaced',
+  WITHDRAWN: 'withdrawn',
+  EXPIRED: 'expired',
+} as const;
+export type PeriodEndReason =
+  (typeof PERIOD_END_REASONS)[keyof typeof PERIOD_END_REASONS];
+
 export const NETWORK_STATES = {
   ONLINE: 'online',
   OFFLINE: 'offline',

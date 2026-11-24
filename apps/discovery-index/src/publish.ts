@@ -32,6 +32,20 @@ export interface PublishContext {
   markSeen: (nodeId: string, now: number) => Promise<void>;
 }
 
+const HEX_RADIX = 16;
+
+async function offerContent(models: readonly unknown[]) {
+  const json = JSON.stringify(models);
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(json),
+  );
+  const hash = Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(HEX_RADIX).padStart(2, '0'),
+  ).join('');
+  return { hash, json };
+}
+
 async function storedEntry(
   record: PublicRecordV2,
   signature: string,
@@ -56,6 +70,7 @@ async function storedEntry(
     retainUntil: record.expiresAt + DISCOVERY_INDEX_LIMITS.retentionMs,
     // Stored verbatim exactly as published (compact, checked by readPublishBody).
     json,
+    ...(catalog ? { offers: await offerContent(record.models) } : {}),
   };
 }
 

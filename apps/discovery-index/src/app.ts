@@ -29,6 +29,11 @@ import { githubClaimRoutes } from './github-claim-routes';
 import { allowed } from './limits';
 import { modelsPage, parseModelsQuery } from './models';
 import { networkPage, parseNetworkQuery } from './network';
+import {
+  offerHistoryKey,
+  offerHistoryPage,
+  parseOfferHistoryQuery,
+} from './offer-history';
 import { profileRoutes } from './profile-routes';
 import { acceptRecord, type PublishContext } from './publish';
 import { publishModeOf } from './publishers';
@@ -255,6 +260,20 @@ function readRoutes(app: Hono<IndexEnv>, settings: IndexSettings) {
   );
 }
 
+function historyRoutes(app: Hono<IndexEnv>, settings: IndexSettings) {
+  app.get(
+    INDEX_ROUTES.OFFER_HISTORY,
+    cachedRead(settings, async (context) => {
+      const query = await parseOfferHistoryQuery(context.req.url);
+      return {
+        key: offerHistoryKey(new URL(context.req.url).origin, query),
+        body: () =>
+          offerHistoryPage(context.get('storage'), query, settings.now()),
+      };
+    }),
+  );
+}
+
 export function createDiscoveryIndex(options: DiscoveryIndexOptions = {}) {
   const settings = settingsOf(options);
   const app = new Hono<IndexEnv>();
@@ -299,6 +318,7 @@ export function createDiscoveryIndex(options: DiscoveryIndexOptions = {}) {
       registrationHandler(settings, registrations, registry),
     );
   readRoutes(app, settings);
+  historyRoutes(app, settings);
   githubClaimRoutes(app, settings);
   profileRoutes(app, settings);
   // Reports the publish mode only, never the allowlisted or registered NodeIds.
