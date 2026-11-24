@@ -25,7 +25,7 @@ type State = 'empty' | 'populated' | 'unavailable';
 
 function sources(state: State) {
   const generatedAt = Date.now();
-  const modelId = 'fixture-model-qwen';
+  const modelId = 'qwen3-fixture-model';
   const model = {
     modelId,
     contextTokens: 4096,

@@ -4,10 +4,7 @@ import { test } from 'node:test';
 import { delta } from '@gyblos/explorer/board-delta';
 import { parseNetworkDay } from '@gyblos/explorer/collector-shape';
 import { pricePerMtok } from '@gyblos/explorer/format';
-import {
-  groupWeeks,
-  overviewActivity,
-} from '@gyblos/explorer/overview-activity';
+import { overviewActivity } from '@gyblos/explorer/overview-activity';
 import { overviewWindow } from '@gyblos/explorer/range';
 
 void test('overview compares consecutive closed UTC days across a leap day', () => {
@@ -121,5 +118,7 @@ void test('a fall from 100 to 80 unserved attempts is favorable', () => {
 void test('model labels name a recognized lab and leave an unknown family unattributed', async () => {
   const { modelLab } = await import('@gyblos/explorer/model-family');
   assert.equal(modelLab('qwen3-0.6b'), 'Alibaba · Qwen');
+  assert.equal(modelLab('deepseek-ai/DeepSeek-R1-Distill-Qwen-7B'), 'DeepSeek');
+  assert.equal(modelLab('acme/metadata-analyzer'), null);
   assert.equal(modelLab('custom-local-model'), null);
 });
