@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 
 import { overviewNetwork } from '../lib/collector';
+import { DISPLAY, UNITS } from '../lib/constants';
 import { getDiscovery } from '../lib/discovery-render';
 import { count, percent, utc } from '../lib/format';
 import { compact, overviewActivity } from '../lib/overview-activity';
@@ -100,7 +101,7 @@ function Mix({
                 fill="none"
                 stroke="var(--chart)"
                 strokeWidth="16"
-                strokeDasharray={`${ratio * 100} 100`}
+                strokeDasharray={`${ratio * UNITS.percent} 100`}
               />
             )}
           </svg>
@@ -121,7 +122,7 @@ function Mix({
                 <b>{percent(share)}</b>
               </div>
               <div className="ov-track">
-                <i style={{ width: `${share * 100}%` }} />
+                <i style={{ width: `${share * UNITS.percent}%` }} />
               </div>
             </div>
           ))}
@@ -153,19 +154,21 @@ export async function Overview({ query }: { query: ExplorerQuery }) {
   const previous = overviewActivity(prior, before);
   const interval = (window: string[]) => `${window[0]} – ${window.at(-1)} UTC`;
   const metric = (key: 'tokens' | 'requests' | 'demand') => {
-    const a = current[key];
-    const b = previous[key];
+    const currentValue = current[key];
+    const previousValue = previous[key];
     const coverage = key === 'demand' ? 'demandComplete' : 'complete';
     const comparable =
       current[coverage] &&
       previous[coverage] &&
       source?.version === before?.version &&
-      a !== null &&
-      b !== null;
+      currentValue !== null &&
+      previousValue !== null;
     return {
-      value: a,
-      change: comparable ? delta(a, b, key === 'demand' ? 'down' : 'up') : null,
-      detail: `${interval(dates)}. ${comparable ? `Previous: ${count(b)} · ${interval(prior)}.` : 'Comparable history unavailable.'}`,
+      value: currentValue,
+      change: comparable
+        ? delta(currentValue, previousValue, key === 'demand' ? 'down' : 'up')
+        : null,
+      detail: `${interval(dates)}. Previous observed: ${previousValue === null ? 'unavailable' : count(previousValue)} · ${interval(prior)}.${comparable ? '' : ' Complete comparison coverage unavailable.'}`,
     };
   };
   return (
@@ -195,14 +198,14 @@ export async function Overview({ query }: { query: ExplorerQuery }) {
           caption={
             snapshot.error
               ? 'Discovery unavailable'
-              : `${snapshot.network?.truncated ? 'Partial count · ' : ''}As of ${utc(snapshot.network?.generatedAt ?? snapshot.generatedAt)}`
+              : `${snapshot.network?.truncated ? 'Partial count · ' : ''}As of ${utc(snapshot.datedAt ?? snapshot.generatedAt)}`
           }
         />
         <Metric
           icon={Activity}
           label="Unserved attempts"
           {...metric('demand')}
-          caption="Buyer observations · up to 20 models/day"
+          caption={`Buyer observations · up to ${DISPLAY.demandModelsPerDay} models/day`}
         />
       </div>
       <div className="ov-analysis">

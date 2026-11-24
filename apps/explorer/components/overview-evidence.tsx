@@ -1,18 +1,26 @@
 import Link from 'next/link';
 
 import { getChainTxs } from '../lib/chain-txs';
-import { sellerOwners, txRow } from '../lib/chain-txs-shape';
+import { txRow } from '../lib/chain-txs-shape';
 import { NETWORKS } from '../lib/config';
 import { PAGES, PAGING } from '../lib/constants';
 import { getDiscovery } from '../lib/discovery-render';
 import { count, pricePerMtok, short, utc } from '../lib/format';
 import { modelKey } from '../lib/offers';
 import type { ExplorerQuery } from '../lib/paging';
-import { sellerHref } from '../lib/seller-identity';
+import {
+  emptySellersMessage,
+  githubByNode,
+  sellerHref,
+  verifiedOnly,
+} from '../lib/seller-identity';
 
 export async function OverviewOffers({ query }: { query: ExplorerQuery }) {
   const snapshot = await getDiscovery();
-  const rows = snapshot.sellers.flatMap((seller) =>
+  const sellers = query.verified
+    ? verifiedOnly(snapshot.sellers, githubByNode(snapshot.network))
+    : snapshot.sellers;
+  const rows = sellers.flatMap((seller) =>
     seller.models.map((model) => ({ seller, model })),
   );
   return (
@@ -48,7 +56,7 @@ export async function OverviewOffers({ query }: { query: ExplorerQuery }) {
               </tr>
             </thead>
             <tbody>
-              {rows.slice(0, 6).map(({ seller, model }) => (
+              {rows.slice(0, PAGING.rowsPerPage).map(({ seller, model }) => (
                 <tr key={seller.nodeId + modelKey(model)}>
                   <td>
                     {[model.modelId, model.variant, model.quantization]
@@ -72,7 +80,15 @@ export async function OverviewOffers({ query }: { query: ExplorerQuery }) {
           </table>
         </div>
       ) : (
-        !snapshot.error && <p>No published offers.</p>
+        !snapshot.error && (
+          <p>
+            {emptySellersMessage(
+              sellers,
+              query.verified,
+              snapshot.network !== null,
+            )}
+          </p>
+        )
       )}
     </section>
   );
@@ -105,8 +121,8 @@ export async function OverviewOperations() {
               </tr>
             </thead>
             <tbody>
-              {page.transactions.slice(0, 6).map((tx) => {
-                const row = txRow(tx, sellerOwners([]), page.treasury);
+              {page.transactions.slice(0, PAGING.rowsPerPage).map((tx) => {
+                const row = txRow(tx, new Map(), page.treasury);
                 return (
                   <tr key={row.key}>
                     <td>{row.time}</td>

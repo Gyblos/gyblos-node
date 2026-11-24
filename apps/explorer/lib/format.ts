@@ -56,6 +56,7 @@ export function usdcDecimal(atomic: bigint): `${number}` {
 
 // Price per million tokens, from atomic units per million tokens.
 export function pricePerMtok(atomic: string): string {
+  if (!/^\d+$/.test(atomic)) return '—';
   const value = BigInt(atomic);
   return value === 0n ? 'Free' : usdc(value);
 }

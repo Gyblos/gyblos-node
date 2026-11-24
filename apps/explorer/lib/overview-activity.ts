@@ -1,5 +1,5 @@
 import type { overviewNetwork } from './collector';
-import { UNITS } from './constants';
+import { DISPLAY } from './constants';
 
 type Source = Awaited<ReturnType<typeof overviewNetwork>>;
 export interface TokenPoint {
@@ -13,7 +13,11 @@ export const compact = (value: number) =>
     maximumFractionDigits: 1,
   }).format(value);
 
-export function overviewActivity(dates: string[], source: Source) {
+export function overviewActivity(
+  dates: string[],
+  source: Source,
+  completeThrough: string | null = null,
+) {
   const rows = new Map(source?.days.map((row) => [row.day, row]));
   const ordered = dates.map((day) => rows.get(day));
   const side = (mode: 'free' | 'paid') => {
@@ -46,7 +50,8 @@ export function overviewActivity(dates: string[], source: Source) {
   const fresh =
     !!through &&
     !!source?.version &&
-    source.updated >= Date.parse(through) + UNITS.msPerDay;
+    completeThrough !== null &&
+    completeThrough >= through;
   const demand = ordered.flatMap((row) => row?.demand ?? []);
   return {
     free,
@@ -62,7 +67,10 @@ export function overviewActivity(dates: string[], source: Source) {
     demandComplete:
       fresh &&
       ordered.every(
-        (row) => row && row.demand.length > 0 && row.demand.length < 20,
+        (row) =>
+          row &&
+          row.demand.length > 0 &&
+          row.demand.length < DISPLAY.demandModelsPerDay,
       ),
     daysObserved: points.filter((point) => point.tokens !== null).length,
   };

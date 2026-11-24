@@ -10,8 +10,10 @@ import {
   YAxis,
 } from 'recharts';
 
+import { RANGE } from '../lib/constants';
 import { count } from '../lib/format';
 import { compact, groupWeeks, type TokenPoint } from '../lib/overview-activity';
+import { CHART } from './board/constants';
 import { SegmentedControl } from './board/segmented-control';
 
 export function OverviewChart({
@@ -48,50 +50,7 @@ export function OverviewChart({
       {total === null ? (
         <p className="ov-empty">No token observations in this period.</p>
       ) : (
-        <div className="ov-plot">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={data}
-              accessibilityLayer
-              margin={{ left: 0, right: 4, top: 8, bottom: 0 }}
-            >
-              <XAxis
-                dataKey="label"
-                tickFormatter={(value: string) => value.slice(5, 10)}
-                minTickGap={22}
-                tickLine={false}
-                axisLine={false}
-                stroke="var(--dim)"
-                fontSize={11}
-              />
-              <YAxis
-                width={40}
-                tickCount={4}
-                tickFormatter={compact}
-                allowDecimals={false}
-                tickLine={false}
-                axisLine={false}
-                stroke="var(--dim)"
-                fontSize={11}
-              />
-              <Tooltip
-                contentStyle={{
-                  background: 'var(--raised)',
-                  border: 0,
-                  color: 'var(--ink)',
-                }}
-                cursor={{ fill: 'var(--raised)' }}
-                formatter={(value) => [count(Number(value)), 'Tokens']}
-              />
-              <Bar
-                dataKey="tokens"
-                fill="var(--chart)"
-                radius={[4, 4, 0, 0]}
-                isAnimationActive={false}
-              />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        <TokenPlot data={data} />
       )}
       <details>
         <summary>View data</summary>
@@ -115,5 +74,56 @@ export function OverviewChart({
         </div>
       </details>
     </section>
+  );
+}
+
+function TokenPlot({ data }: { data: (TokenPoint & { label: string })[] }) {
+  return (
+    <div className="ov-plot">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart
+          data={data}
+          accessibilityLayer
+          margin={{ left: 0, right: 4, top: 8, bottom: 0 }}
+        >
+          <XAxis
+            dataKey="label"
+            tickFormatter={(value: string) =>
+              value.slice(CHART.monthDayStart, RANGE.dayPrecision)
+            }
+            minTickGap={22}
+            tickLine={false}
+            axisLine={false}
+            stroke="var(--dim)"
+            fontSize={11}
+          />
+          <YAxis
+            width={40}
+            tickCount={4}
+            tickFormatter={compact}
+            allowDecimals={false}
+            tickLine={false}
+            axisLine={false}
+            stroke="var(--dim)"
+            fontSize={11}
+          />
+          <Tooltip
+            contentStyle={{
+              background: 'var(--raised)',
+              border: 0,
+              color: 'var(--ink)',
+            }}
+            cursor={{ fill: 'var(--raised)' }}
+            formatter={(value) => [count(Number(value)), 'Tokens']}
+          />
+          <Bar
+            dataKey="tokens"
+            fill="var(--chart)"
+            radius={[CHART.barRadius, CHART.barRadius, 0, 0]}
+            isAnimationActive={false}
+          />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
   );
 }
