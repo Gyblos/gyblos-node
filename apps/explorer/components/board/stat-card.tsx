@@ -13,9 +13,10 @@ import type { Delta } from './delta';
 const SIDES = ['free', 'paid'] as const;
 const PILL_COLORS = { good: 'lime', bad: 'rose', neutral: 'neutral' } as const;
 const COMPARED = 'vs previous period';
+const LABEL = 'text-body-medium text-balance break-words text-text-secondary';
 const VALUE = {
   footer:
-    'max-w-full min-w-0 font-mono text-[clamp(1.125rem,10cqi,1.75rem)] leading-tight tabular-nums',
+    'max-w-full min-w-0 font-mono text-[clamp(1.125rem,calc(10cqi_+_0.1rem),1.75rem)] leading-tight tabular-nums',
   plain:
     'max-w-full min-w-0 font-mono text-[clamp(1rem,11cqi,1.375rem)] leading-tight tabular-nums',
 } as const;
@@ -115,7 +116,7 @@ export function StatCard({
   const changed = deltas?.some(Boolean) ? deltas : null;
   if (variant === 'plain')
     return (
-      <section className="@container flex min-w-0 flex-col gap-3 rounded-xl bg-background-secondary-default p-4">
+      <section className="row-span-4 grid min-w-0 grid-rows-subgrid gap-y-0 rounded-xl bg-background-secondary-default p-4">
         <div className="flex items-start justify-between gap-2">
           <span className="flex items-center rounded-md bg-stat-card-icon-background p-1.5">
             <Icon
@@ -125,23 +126,25 @@ export function StatCard({
           </span>
           {hint ? <StatHint label={label} hint={hint} /> : null}
         </div>
-        <div className="mt-auto flex min-w-0 flex-col gap-1">
-          <p className="text-body-medium break-words text-balance text-text-secondary">
-            {label}
-          </p>
+        <p className={cx('mt-3', LABEL)}>{label}</p>
+        <div className="@container mt-1 flex min-w-0 items-baseline self-baseline">
           <Value variant={variant} value={value} sides={sides} money={money} />
-          {changed ? <Pills deltas={changed} sides={!!sides} /> : null}
-          {caption ? (
-            <p className="text-caption-1-medium text-text-tertiary">
-              {caption}
-            </p>
-          ) : null}
         </div>
+        {changed || caption ? (
+          <div className="mt-1 flex min-w-0 flex-col gap-1 self-start">
+            {changed ? <Pills deltas={changed} sides={!!sides} /> : null}
+            {caption ? (
+              <p className="text-caption-1-medium text-text-tertiary">
+                {caption}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
       </section>
     );
   const band = caption ?? (changed ? COMPARED : null);
   return (
-    <section className="@container flex min-w-0 flex-col rounded-xl bg-background-secondary-default p-2">
+    <section className="row-span-4 grid min-w-0 grid-rows-subgrid gap-y-0 rounded-xl bg-background-secondary-default p-2">
       <div className="flex w-full items-start justify-between gap-2.5 p-2">
         <span className="flex size-10 shrink-0 items-center justify-center rounded-2lg bg-stat-card-icon-background">
           <Icon
@@ -151,14 +154,12 @@ export function StatCard({
         </span>
         {hint ? <StatHint label={label} hint={hint} /> : null}
       </div>
-      <div className="flex flex-col gap-0.5 px-2 pt-2.5 pb-3.5">
-        <p className="text-body-medium break-words text-balance text-text-secondary">
-          {label}
-        </p>
+      <p className={cx('mx-2 mt-2.5', LABEL)}>{label}</p>
+      <div className="@container mx-2 mt-0.5 mb-3.5 flex min-w-0 items-baseline self-baseline">
         <Value variant={variant} value={value} sides={sides} money={money} />
       </div>
       {band ? (
-        <div className="mt-auto flex w-full flex-wrap items-center justify-between gap-2 rounded-2lg bg-background-inner-default py-1.5 ps-2.5 pe-1.5 shadow-card">
+        <div className="flex w-full flex-wrap items-center justify-between gap-2 self-end rounded-2lg bg-background-inner-default py-1.5 ps-2.5 pe-1.5 shadow-card">
           <p className="min-w-0 text-body-regular text-text-secondary">
             {band}
           </p>

@@ -25,7 +25,7 @@ function OverviewGrid({ cards }: { cards: ReactElement[] }) {
       {cards.map((card, index) => (
         <div
           key={card.key ?? index}
-          className={`grid min-w-0 ${layout.spans[index]}`}
+          className={`row-span-4 grid min-w-0 grid-rows-subgrid gap-y-0 ${layout.spans[index]}`}
         >
           {card}
         </div>
