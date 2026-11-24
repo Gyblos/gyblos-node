@@ -2965,7 +2965,7 @@ html[data-density='compact']
   padding-inline: 10px;
   font-size: var(--ui-detail);
 }
-html .app.desktop-frame .ui-action-button + .ui-tooltip {
+html .app.desktop-frame .ui-button.ui-action-button + .ui-tooltip {
   display: none;
 }
 @container (max-width: 600px) {
@@ -2988,7 +2988,7 @@ html .app.desktop-frame .ui-action-button + .ui-tooltip {
     clip-path: inset(50%);
     white-space: nowrap;
   }
-  html .app.desktop-frame .ui-action-button + .ui-tooltip {
+  html .app.desktop-frame .ui-button.ui-action-button + .ui-tooltip {
     display: block;
   }
 }
