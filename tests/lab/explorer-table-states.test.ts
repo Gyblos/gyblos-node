@@ -225,6 +225,14 @@ void test('Explorer shows offer and active-day rows without empty rows', async (
   assert.ok(daily.includes(activeDay));
   assert.ok(!daily.includes(inactiveDay));
   assert.doesNotMatch(sellers + daily, /colSpan=/i);
+  const tables = [...populated.matchAll(/<table\b/g)];
+  const hints = [
+    ...populated.matchAll(
+      /<\/table><\/div><p class="explorer-table-hint\b[^\"]*"><span aria-hidden="true">↔<\/span>Scroll horizontally to see all columns\.<\/p>/g,
+    ),
+  ];
+  assert.ok(tables.length > 0);
+  assert.equal(hints.length, tables.length);
 });
 
 void test('Explorer keeps the unavailable panels when the sources fail', async () => {
