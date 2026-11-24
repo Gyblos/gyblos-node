@@ -50,6 +50,22 @@ export function conversationSummary(session: ChatSession) {
   };
 }
 
+function closeMarkdownFence(text: string) {
+  let fence = '';
+  for (const line of text.split(/\r?\n/)) {
+    const match = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+    if (!match?.[1]) continue;
+    const marker = match[1];
+    const suffix = match[2] ?? '';
+    if (fence) {
+      if (marker.startsWith(fence) && !suffix.trim()) fence = '';
+    } else if (marker.startsWith('~') || !suffix.includes('`')) {
+      fence = marker;
+    }
+  }
+  return fence ? text + '\n' + fence : text;
+}
+
 export function conversationMarkdown(
   title: string,
   messages: readonly Pick<ChatMessage, 'role' | 'text'>[],
@@ -60,7 +76,7 @@ export function conversationMarkdown(
       (message) =>
         (message.role === CHAT_ROLE.USER ? '**You:**' : '**Gyblos:**') +
         '\n\n' +
-        message.text,
+        closeMarkdownFence(message.text),
     ),
   ].join('\n\n');
 }

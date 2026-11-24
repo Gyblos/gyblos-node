@@ -190,6 +190,11 @@ void test('usage remains accessible after a send error and payment links select 
 });
 
 void test('both payment wallet views use the same payer-scoped observation', async () => {
+  const methods = await readFile(
+    'apps/desktop/src/ui/PaymentMethods.tsx',
+    'utf8',
+  );
+  assert.match(methods, /observation.refresh\(\);\s*onDetails\(\)/);
   for (const name of ['WalletDetails', 'PaymentMethods']) {
     const source = await readFile(
       'apps/desktop/src/ui/' + name + '.tsx',
@@ -217,6 +222,21 @@ void test('Markdown export keeps a leading code fence on its own line', async ()
     conversationMarkdown('Example', [{ role: 'assistant', text: fence }]),
     '# Example\n\n**Gyblos:**\n\n' + fence,
   );
+  for (const opener of ['```ts', '~~~~js', '````']) {
+    const stopped = opener + '\ncode';
+    const closing = opener.replace(/[a-z]+$/, '');
+    assert.equal(
+      conversationMarkdown('Example', [
+        { role: 'assistant', text: stopped },
+        { role: 'user', text: 'Next?' },
+      ]),
+      '# Example\n\n**Gyblos:**\n\n' +
+        stopped +
+        '\n' +
+        closing +
+        '\n\n**You:**\n\nNext?',
+    );
+  }
 });
 
 void test('paid seller maximum names its currency and pending activity shows the Gyblos mark', async () => {

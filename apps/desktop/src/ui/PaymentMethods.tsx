@@ -59,7 +59,14 @@ export function WalletOverview({
         >
           Add funds
         </Button>
-        <Button onClick={onDetails}>Details</Button>
+        <Button
+          onClick={() => {
+            observation.refresh();
+            onDetails();
+          }}
+        >
+          Details
+        </Button>
       </div>
     </li>
   );

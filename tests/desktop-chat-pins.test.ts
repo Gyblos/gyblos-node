@@ -72,3 +72,31 @@ void test('editing a draft preserves existing pins when their initial read faile
   assert.match((await io.read()) ?? '', /Changed draft/);
   await store.close();
 });
+
+void test('a saved draft retains legacy embedded pins across a failed migration and restart', async () => {
+  const chat = conversation();
+  chat.pinChat(chat.getSnapshot().activeId, true);
+  const io = files();
+  await io.write(JSON.stringify(projectChatArchive(chat.getSnapshot())));
+  const storage = {
+    ...io,
+    readPins: async () => [],
+    writePins: async () => {
+      throw new Error('Pin write unavailable');
+    },
+  };
+  const store = new ChatArchiveStore(storage);
+  const loaded = await store.load();
+  chat.setDraft('Edited during migration');
+  store.save({
+    generation: loaded.generation,
+    sequence: 1,
+    archive: projectChatArchive(chat.getSnapshot()),
+  });
+  await store.close();
+  const reopened = new ChatArchiveStore(storage);
+  const session = (await reopened.load()).archive?.sessions[0];
+  assert.equal(session?.draft, 'Edited during migration');
+  assert.equal(session?.pinned, true);
+  await reopened.close();
+});
