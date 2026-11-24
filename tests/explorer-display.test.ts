@@ -10,7 +10,7 @@ import test, { afterEach } from 'node:test';
 import { barAxis } from '@gyblos/explorer/board-bar-axis';
 import { delta } from '@gyblos/explorer/board-delta';
 import { hoveredPoint } from '@gyblos/explorer/board-hovered';
-import { dailySettled } from '@gyblos/explorer/chain-shape';
+import { chainHistoryNote, dailySettled } from '@gyblos/explorer/chain-shape';
 import { FETCH } from '@gyblos/explorer/constants';
 import { fetchJson } from '@gyblos/explorer/fetch-json';
 import {
@@ -313,4 +313,10 @@ void test('a chart hover picks a bar only at a real index, never the first day o
   assert.equal(hoveredPoint(days, ''), null);
   assert.equal(hoveredPoint(days, 5), null);
   assert.equal(hoveredPoint(days, 1.5), null);
+});
+
+void test('chain figures say when the chain history is still being read', () => {
+  assert.equal(chainHistoryNote(null), 'chain index starting');
+  assert.equal(chainHistoryNote(false), 'reading chain history');
+  assert.equal(chainHistoryNote(true), null);
 });

@@ -198,6 +198,8 @@ function splitNotes(tx: ChainTx): string[] {
   if (!tx.split) return [];
   const notes =
     tx.split.channels > 1 ? [`total of ${tx.split.channels} channels`] : [];
+  if (MAIN_PART[tx.kind] !== 'paidOut' && tx.split.paidOut)
+    notes.push(`to sellers ${usdcFixed(tx.split.paidOut)}`);
   return tx.split.unclassified
     ? [...notes, `unclassified ${usdcFixed(tx.split.unclassified)}`]
     : notes;

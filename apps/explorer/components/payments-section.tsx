@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 
 import {
+  chainHistoryNote,
   dailySettled,
   summarizeChain,
   type ChainSnapshot,
@@ -40,11 +41,8 @@ const money = (atomic: bigint) => (
   <Flow value={usdcDecimal(atomic)} kind="usdc" />
 );
 
-function meta(backfillDone: boolean | null, aggregatedAt: number | null) {
-  if (backfillDone === null) return 'chain index starting';
-  if (!backfillDone) return 'reading chain history';
-  return `updated ${utc(aggregatedAt)}`;
-}
+const meta = (backfillDone: boolean | null, aggregatedAt: number | null) =>
+  chainHistoryNote(backfillDone) ?? `updated ${utc(aggregatedAt)}`;
 
 // Each figure's change against the span just before the range; none when it cannot be read or the
 // chain history is still being read (an incomplete earlier span would overstate every change).

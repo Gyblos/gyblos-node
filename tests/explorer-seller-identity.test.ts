@@ -311,5 +311,17 @@ void test('the seller list decides who is online, so the count, the Sellers tabl
     offline: 1,
     unpublished: 1,
   });
+  const partial = {
+    ...status,
+    counts: { total: 10, online: 6, offline: 3, unpublished: 1 },
+    nodes: [node(NODE_A, 'offline')],
+    truncated: true,
+  };
+  assert.deepEqual(listedOnline(partial, [NODE_A, NODE_B, NODE_C])?.counts, {
+    total: 10,
+    online: 3,
+    offline: 6,
+    unpublished: 1,
+  });
   assert.equal(listedOnline(null, [NODE_A]), null);
 });

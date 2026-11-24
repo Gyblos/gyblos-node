@@ -331,6 +331,14 @@ void test('a refunded row shows just its refund, and a zero payout is muted', ()
     [refund.label, refund.amount, refund.parts, refund.detail],
     ['Refunded', '0.000500', parts(null, null, null), []],
   );
+  const mixed = payout('reclaim', '10', {
+    ...SPLIT,
+    paidOut: '2',
+    refunded: '10',
+  });
+  assert.ok(
+    txRow(mixed, new Map(), TREASURY).detail.includes('to sellers 0.000002'),
+  );
   const nothing = txRow(
     payout('distribute', '0', { ...SPLIT, paidOut: '0' }),
     new Map(),

@@ -132,6 +132,10 @@ export function listedOnline(
   if (!status.truncated) {
     counts.online += unknown;
     counts.total += unknown;
+    return { ...status, counts, nodes };
   }
+  counts.online = online.size;
+  counts.total = Math.max(counts.total, online.size + counts.unpublished);
+  counts.offline = counts.total - online.size - counts.unpublished;
   return { ...status, counts, nodes };
 }

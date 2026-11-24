@@ -1,6 +1,6 @@
 import { Activity, MessagesSquare } from 'lucide-react';
 
-import { summarizeChain } from '../lib/chain-shape';
+import { chainHistoryNote, summarizeChain } from '../lib/chain-shape';
 import { getChainStats } from '../lib/chain-stats';
 import { getCollector } from '../lib/collector';
 import { getDiscovery } from '../lib/discovery-render';
@@ -57,6 +57,13 @@ export async function Overview({ query }: { query: ExplorerQuery }) {
               : undefined
           }
           money={!!paid}
+          caption={
+            paid !== null && chainHistoryNote(chain.backfillDone) ? (
+              <span className="inline-block first-letter:uppercase">
+                {chainHistoryNote(chain.backfillDone)}, partial total
+              </span>
+            ) : undefined
+          }
         />
         <StatCard
           variant="footer"
