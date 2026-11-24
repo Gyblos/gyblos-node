@@ -134,6 +134,7 @@ export async function ModelsSection({ query }: { query: ExplorerQuery }) {
         )}
         {page.rows.map((row) => (
           <ModelRowView
+            days={days}
             key={`${row.modelId}:${row.variant}:${row.quantization}`}
             row={row}
             offersKnown={offersKnown}
@@ -162,9 +163,11 @@ export async function ModelsSection({ query }: { query: ExplorerQuery }) {
 // One model: what is offered now, then what was served on each side. Without the discovery index's
 // answer, what is offered now reads unknown, never "not offered".
 function ModelRowView({
+  days,
   row,
   offersKnown,
 }: {
+  days: ExplorerQuery['days'];
   row: ModelRow;
   offersKnown: boolean;
 }) {
@@ -172,6 +175,7 @@ function ModelRowView({
     <tr className="border-t border-line">
       <td className={td}>
         <ModelName
+          days={days}
           modelId={row.modelId}
           variant={row.variant}
           quantization={row.quantization}

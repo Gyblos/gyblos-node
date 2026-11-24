@@ -41,6 +41,7 @@ export interface ChainSnapshot {
   aggregatedAt: number | null;
   // Whether the program's history is fully read; null before the index ever ran.
   backfillDone: boolean | null;
+  indexedAt?: number | null;
   days: ChainDay[];
   error: string | null;
 }
@@ -79,6 +80,11 @@ export function parseChainStats(value: unknown): Omit<ChainSnapshot, 'error'> {
     aggregatedAt: nullable(body.aggregatedAt, (present) =>
       num(present, 'chain.aggregatedAt'),
     ),
+    indexedAt: index
+      ? nullable(index.updatedAt, (value) =>
+          num(value, 'chain.index.updatedAt'),
+        )
+      : null,
     backfillDone: index
       ? flag(index.backfillDone, 'chain.index.backfillDone')
       : null,
@@ -187,3 +193,25 @@ export const chainHistoryNote = (backfillDone: boolean | null) =>
     : backfillDone
       ? null
       : 'reading chain history';
+
+export function dailyPayouts(dates: string[], chain: ChainSnapshot) {
+  const rows = new Map(chain.days.map((day) => [day.day, day]));
+  const covered = (date: string) =>
+    chain.backfillDone === true &&
+    chain.indexedAt != null &&
+    chain.indexedAt >= Date.parse(date) + UNITS.msPerDay;
+  const points = dates.map((date) => {
+    const row = rows.get(date);
+    if (!row || chain.error) return null;
+    return row.gyblos?.paidOut ?? (covered(date) ? 0n : null);
+  });
+  const observed = points.filter((amount) => amount !== null);
+  const complete = dates.every(covered) && observed.length === dates.length;
+  return {
+    points,
+    total: observed.length
+      ? observed.reduce((sum, amount) => sum + amount, 0n)
+      : null,
+    complete,
+  };
+}

@@ -83,6 +83,26 @@ function hash(value: string): number {
   return state;
 }
 
+const FACE = {
+  fold: 16,
+  paletteMask: 3,
+  mouthShift: 2,
+  mouthMask: 3,
+  wink: 16,
+  antenna: 32,
+} as const;
+
+export function sellerFace(nodeId: string) {
+  const bits = hash(nodeId);
+  const seed = bits ^ (bits >>> FACE.fold);
+  return {
+    color: seed & FACE.paletteMask,
+    mouth: (seed >>> FACE.mouthShift) & FACE.mouthMask,
+    wink: Boolean(seed & FACE.wink),
+    antenna: Boolean(seed & FACE.antenna),
+  };
+}
+
 export function identicon(nodeId: string): boolean[][] {
   const bits = hash(nodeId);
   const half = Math.ceil(IDENTITY.gridSize / 2);

@@ -11,6 +11,7 @@ import {
   type CollectorSnapshot,
 } from './collector-shape';
 import { COLLECTOR_URL } from './config';
+import { UNITS } from './constants';
 import { fetchJson } from './fetch-json';
 import { rangeQuery, type RangeDays } from './range';
 import { list, record } from './validate';
@@ -26,13 +27,26 @@ export type {
 // The last `days` UTC days of network totals and models, as aggregated by the collector, or the
 // span just before them with `periodsBack` 1. Read once per render and span: the Models and Usage
 // sections share the answer.
-export const getCollector = (days: RangeDays, periodsBack = 0) =>
-  readCollector(days, periodsBack);
+export const getCollector = (
+  days: RangeDays,
+  periodsBack = 0,
+  closed = false,
+) => readCollector(days, periodsBack, closed);
 // Memoized on both arguments always passed, so a default and an explicit 0 share one read.
 const readCollector = cache(
-  async (days: RangeDays, periodsBack: number): Promise<CollectorSnapshot> => {
+  async (
+    days: RangeDays,
+    periodsBack: number,
+    closed: boolean,
+  ): Promise<CollectorSnapshot> => {
     try {
-      return await loadCollector(rangeQuery(days, Date.now(), periodsBack));
+      return await loadCollector(
+        rangeQuery(
+          days,
+          Date.now() - (closed ? UNITS.msPerDay : 0),
+          periodsBack,
+        ),
+      );
     } catch (error) {
       return {
         aggregatedAt: null,

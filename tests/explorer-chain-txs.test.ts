@@ -180,7 +180,7 @@ void test('only a well-formed single canonical cursor is passed on to the collec
     assert.equal(txCursor(value), null);
 });
 
-void test('a row is labeled plainly with a fixed six-decimal amount and a Solana explorer link', () => {
+void test('a row is labeled plainly with a fixed six-decimal amount and an internal operation link', () => {
   const row = txRow(distribute(), sellerOwners([SELLER]), TREASURY);
   assert.deepEqual(row, {
     key: `${SIGNATURE}:1`,
@@ -196,7 +196,7 @@ void test('a row is labeled plainly with a fixed six-decimal amount and a Solana
     detail: [],
     shared: false,
     signature: `${SIGNATURE.slice(0, 6)}…${SIGNATURE.slice(-6)}`,
-    href: `https://explorer.solana.com/tx/${SIGNATURE}?cluster=devnet`,
+    href: `/transactions/${CURSOR}`,
   });
   const seal = txRow(parsed().transactions[1]!, new Map(), TREASURY);
   assert.deepEqual(

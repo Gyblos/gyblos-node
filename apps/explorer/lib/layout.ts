@@ -1,10 +1,13 @@
 import { PAGE_LINKS, PAGES } from './constants';
 
+const detailSections = new Set<string>([
+  PAGES.sellers,
+  PAGES.models,
+  PAGES.transactions,
+]);
 export const isCurrentPage = (pathname: string, href: string) =>
-  href === PAGES.network
-    ? pathname === href
-    : pathname === href ||
-      (href === PAGES.sellers && pathname.startsWith(`${PAGES.sellers}/`));
+  pathname === href ||
+  (detailSections.has(href) && pathname.startsWith(`${href}/`));
 
 export const currentPage = (pathname: string) =>
   PAGE_LINKS.find((link) => isCurrentPage(pathname, link.href));

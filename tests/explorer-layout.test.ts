@@ -11,6 +11,12 @@ void test('the page menu names the page the path belongs to, and nothing for an 
   assert.equal(currentPage('/')?.label, 'Network');
   assert.equal(currentPage('/sellers')?.label, 'Sellers');
   assert.equal(currentPage(`/sellers/${'a'.repeat(64)}`)?.label, 'Sellers');
+  assert.equal(currentPage('/models/qwen')?.label, 'Models');
+  assert.equal(
+    currentPage('/transactions/95-signature-1')?.label,
+    'Transactions',
+  );
+  assert.equal(currentPage('/stats/unknown'), undefined);
   assert.equal(currentPage('/stats')?.label, 'Stats');
   assert.equal(currentPage('/transactions')?.label, 'Transactions');
   assert.equal(currentPage('/nowhere'), undefined);

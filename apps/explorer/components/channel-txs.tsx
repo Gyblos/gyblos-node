@@ -1,11 +1,12 @@
 import { ArrowUpRight } from 'lucide-react';
+import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 import { Chip, type ChipColor } from '../boardui/components/base/badges/chip';
 import { getChainTxs } from '../lib/chain-txs';
 import { sellerOwners, txRow, type ChainTxKind } from '../lib/chain-txs-shape';
 import {
-  explorerAddressUrl,
+  addressHref,
   HELP_TEXT,
   PAYMENT_PROGRAM_SOURCE_URL,
 } from '../lib/config';
@@ -53,10 +54,9 @@ function Meta({ programId }: { programId: string }) {
   return (
     <span className="flex flex-wrap gap-4">
       <span>Newest first, all time, not filtered by range</span>
-      <a className={link} href={explorerAddressUrl(programId)}>
+      <Link className={link} href={addressHref(programId)}>
         Payments program
-        <ArrowUpRight aria-hidden className="size-3" />
-      </a>
+      </Link>
       <a className={link} href={PAYMENT_PROGRAM_SOURCE_URL}>
         Upstream source
         <ArrowUpRight aria-hidden className="size-3" />
@@ -94,7 +94,7 @@ function Seller({
     );
   return (
     <span className="text-muted" title={row.payTo ?? undefined}>
-      Unlisted seller
+      Unlisted seller {row.payTo && <Addr value={row.payTo} />}
     </span>
   );
 }
@@ -109,6 +109,14 @@ const KIND_COLORS: Record<ChainTxKind, ChipColor> = {
   distribute: 'lime',
   reclaim: 'neutral',
 };
+
+export function OperationChip({ row }: { row: Row }) {
+  return (
+    <Chip variant="caption" color={KIND_COLORS[row.kind]}>
+      {row.label}
+    </Chip>
+  );
+}
 
 export function TxAmount({ row }: { row: Row }) {
   const part = (value: string | null) => (
@@ -139,16 +147,13 @@ export function TxLine({ row, seller }: { row: Row; seller?: ReactNode }) {
     <tr className="border-t border-line">
       <td className={timeCell}>{row.time}</td>
       <td className={td} title={row.kind}>
-        <Chip variant="caption" color={KIND_COLORS[row.kind]}>
-          {row.label}
-        </Chip>
+        <OperationChip row={row} />
       </td>
       <TxAmount row={row} />
       <td className={`${td} font-mono`}>
-        <a className={link} href={row.href}>
+        <Link className={link} href={row.href}>
           {row.signature}
-          <ArrowUpRight aria-hidden className="size-3" />
-        </a>
+        </Link>
       </td>
       {seller === undefined ? null : <td className={td}>{seller}</td>}
       <td className={`${td} font-mono`}>

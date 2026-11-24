@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { operationBefore } from '@gyblos/explorer/chain-txs-shape';
 import { CHAIN_TXS, PAGING, RANGE } from '@gyblos/explorer/constants';
 import {
   canonicalPageHref,
@@ -347,4 +348,18 @@ void test('a home link to a table that moved to its own page redirects there wit
   assert.equal(movedHomeHref({ overviewRange: '7', verified: '1' }), null);
   assert.equal(movedHomeHref({}), null);
   assert.deepEqual(PAGING.sortKeys.models, ['input', 'output', 'context']);
+});
+
+void test('overview table links keep the range and paginate inside Network', () => {
+  const query = { ...readQuery({ overviewRange: '7' }), overviewTables: true };
+  const view = tablePager(query, 'sellers', pageOf(rows(8), 1));
+  const url = new URL(view!.hrefs[2]!, 'https://example.org');
+  assert.equal(movedHomeHref(url.searchParams), null);
+  assert.equal(readQuery(url.searchParams).pages.sellers, 2);
+  assert.equal(readQuery(url.searchParams).ranges.overview, 7);
+});
+
+void test('an operation opens the indexed instruction through the exclusive collector cursor', () => {
+  assert.equal(operationBefore(CURSOR), `140-${SIGNATURE}-2`);
+  assert.equal(operationBefore('invalid'), null);
 });

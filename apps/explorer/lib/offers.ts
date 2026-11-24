@@ -1,4 +1,6 @@
+import { PAGES, RANGE } from './constants';
 import type { DiscoverySnapshot, OfferedModel, Seller } from './discovery';
+import type { RangeDays } from './range';
 
 export interface ModelOffers {
   modelId: string;
@@ -16,6 +18,44 @@ export const modelKey = (model: {
   variant: string | null;
   quantization: string | null;
 }) => JSON.stringify([model.modelId, model.variant, model.quantization]);
+type ModelIdentity = Pick<OfferedModel, 'modelId' | 'variant' | 'quantization'>;
+
+export function modelHref(
+  model: ModelIdentity,
+  days?: RangeDays,
+  closed = false,
+) {
+  const slug = encodeURIComponent(modelKey(model))
+    .replaceAll('~', '%7E')
+    .replaceAll('%', '~');
+  const params = new URLSearchParams();
+  if (days && days !== RANGE.defaultDays) params.set(RANGE.param, String(days));
+  if (closed) params.set(RANGE.closedParam, '1');
+  const search = params.toString();
+  return `${PAGES.models}/${slug}${search ? `?${search}` : ''}`;
+}
+
+const MODEL_FIELDS = 3;
+
+export function modelFromSlug(slug: string): ModelIdentity | null {
+  try {
+    const fields: unknown = JSON.parse(
+      decodeURIComponent(slug.replaceAll('~', '%')),
+    );
+    if (!Array.isArray(fields) || fields.length !== MODEL_FIELDS) return null;
+    const [modelId, variant, quantization]: unknown[] = fields;
+    if (
+      typeof modelId !== 'string' ||
+      !modelId ||
+      (variant !== null && typeof variant !== 'string') ||
+      (quantization !== null && typeof quantization !== 'string')
+    )
+      return null;
+    return { modelId, variant, quantization };
+  } catch {
+    return null;
+  }
+}
 const isFree = (model: OfferedModel) =>
   model.pricing.inputAtomicPerMtok === '0' &&
   model.pricing.outputAtomicPerMtok === '0';

@@ -1,5 +1,4 @@
-import { explorerTxUrl } from './config';
-import { CHAIN_TXS, DISPLAY, TX_TEXT } from './constants';
+import { CHAIN_TXS, DISPLAY, PAGES, TX_TEXT } from './constants';
 import { short, usdcFixed, utcMinute } from './format';
 import {
   flag,
@@ -77,6 +76,19 @@ const CURSOR =
 
 export function txCursor(value: unknown): string | null {
   return typeof value === 'string' && CURSOR.test(value) ? value : null;
+}
+
+export const operationId = (
+  tx: Pick<ChainTx, 'slot' | 'signature' | 'instructionIndex'>,
+) => `${tx.slot}-${tx.signature}-${tx.instructionIndex}`;
+
+export const operationHref = (tx: ChainTx) =>
+  `${PAGES.transactions}/${operationId(tx)}`;
+
+export function operationBefore(id: string): string | null {
+  if (!txCursor(id)) return null;
+  const [slot, signature, position] = id.split('-');
+  return txCursor(`${slot}-${signature}-${Number(position) + 1}`);
 }
 
 function kind(value: unknown): ChainTxKind {
@@ -241,6 +253,6 @@ export function txRow(
       DISPLAY.signatureEdge,
       DISPLAY.signatureEdge,
     ),
-    href: explorerTxUrl(tx.signature),
+    href: operationHref(tx),
   };
 }

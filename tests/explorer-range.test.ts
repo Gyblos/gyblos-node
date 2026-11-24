@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { delta } from '@gyblos/explorer/board-delta';
+import { dailyPayouts, parseChainStats } from '@gyblos/explorer/chain-shape';
 import { parseNetworkDay } from '@gyblos/explorer/collector-shape';
 import { pricePerMtok } from '@gyblos/explorer/format';
 import { overviewActivity } from '@gyblos/explorer/overview-activity';
@@ -64,6 +65,10 @@ void test('overview reconciles observed tokens and daily points without filling 
     ],
   };
   const current = overviewActivity(dates, source);
+  assert.deepEqual(
+    current.points.map((point) => point.requests),
+    [100, null, null],
+  );
   assert.equal(current.tokens, 120);
   assert.equal(current.requests, 100);
   assert.equal(current.complete, false);
@@ -121,4 +126,26 @@ void test('model labels name a recognized lab and leave an unknown family unattr
   assert.equal(modelLab('deepseek-ai/DeepSeek-R1-Distill-Qwen-7B'), 'DeepSeek');
   assert.equal(modelLab('acme/metadata-analyzer'), null);
   assert.equal(modelLab('custom-local-model'), null);
+});
+
+void test('zero payouts require a closed and indexed day', () => {
+  const dates = ['2026-11-17', '2026-11-18'];
+  const chain = {
+    ...parseChainStats({
+      days: dates.map((day) => ({ day, gyblosClaimed: null, program: null })),
+      index: { backfillDone: true, updatedAt: Date.parse('2026-11-18') },
+      aggregatedAt: null,
+    }),
+    error: null,
+  };
+  const stale = dailyPayouts(dates, chain);
+  assert.equal(stale.complete, false);
+  assert.deepEqual(stale.points, [0n, null]);
+  assert.equal(stale.total, 0n);
+  const fresh = dailyPayouts(dates, {
+    ...chain,
+    indexedAt: Date.parse('2026-11-19'),
+  });
+  assert.equal(fresh.complete, true);
+  assert.deepEqual(fresh.points, [0n, 0n]);
 });

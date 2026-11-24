@@ -103,6 +103,16 @@ function RequestCharts({ days }: { days: SellerDay[] }) {
   );
 }
 
+const MODELS_HEAD = [
+  { label: 'Model' },
+  { label: 'Context', right: true },
+  { label: 'Input / 1M', right: true },
+  { label: 'Output / 1M', right: true },
+  ...sideColumns('Requests'),
+  ...sideColumns('Success'),
+  ...sideColumns('Seller first token p50'),
+];
+
 function ModelsTable({
   query,
   rows,
@@ -114,15 +124,6 @@ function ModelsTable({
   served: boolean;
   offersKnown: boolean;
 }) {
-  const head = [
-    { label: 'Model' },
-    { label: 'Context', right: true },
-    { label: 'Input / 1M', right: true },
-    { label: 'Output / 1M', right: true },
-    ...sideColumns('Requests'),
-    ...sideColumns('Success'),
-    ...sideColumns('Seller first token p50'),
-  ];
   const shown = pagedRows(query, 'models', rows);
   const figure = (row: (typeof rows)[number], name: Figure) => (
     <FigureCells
@@ -140,14 +141,14 @@ function ModelsTable({
       </p>
       <Table
         minWidth={DISPLAY.modelsTable}
-        head={head}
+        head={MODELS_HEAD}
         footer={
           <Pager label="Models" view={tablePager(query, 'models', shown)} />
         }
       >
         {rows.length ? null : (
           <tr>
-            <td className={muted} colSpan={head.length}>
+            <td className={muted} colSpan={MODELS_HEAD.length}>
               No models offered now or served in this range.
             </td>
           </tr>
@@ -156,6 +157,8 @@ function ModelsTable({
           <tr key={row.key} className="border-t border-line">
             <td className={td}>
               <ModelName
+                days={rangeOf(query, 'activity')}
+                closed={query.closed}
                 modelId={row.modelId}
                 variant={row.variant}
                 quantization={row.quantization}
@@ -309,7 +312,7 @@ export async function SellerActivity({
 }) {
   const days = rangeOf(query, 'activity');
   const [stats, snapshot] = await Promise.all([
-    getSellerStats(nodeId, days),
+    getSellerStats(nodeId, days, query.closed),
     getDiscovery(),
   ]);
   const offers = snapshot.error ? [] : sellerProfile(nodeId, snapshot).offers;
@@ -325,7 +328,7 @@ export async function SellerActivity({
         <>
           <SectionTitle
             title={`Activity, last ${days} days`}
-            meta={usageMeta(days, stats.aggregatedAt, false)}
+            meta={`${query.closed ? 'Completed UTC days · ' : ''}${usageMeta(days, stats.aggregatedAt, false)}`}
             range={{ section: 'activity', days }}
           />
           <Figures totals={totals} served={stats.models.length} />

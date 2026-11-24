@@ -77,7 +77,7 @@ export function Pagination({
   nextLabel = 'Next',
   'aria-label': ariaLabel = 'Pagination',
 }: PaginationProps) {
-  if (totalPages <= 1) return null;
+  if (totalPages < 1) return null;
   return (
     <nav
       aria-label={ariaLabel}

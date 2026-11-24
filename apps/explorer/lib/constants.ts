@@ -98,6 +98,8 @@ export const CHAIN_TXS = {
 } as const;
 
 export const PAGING = {
+  overviewParam: 'view',
+  overviewValue: 'network',
   rowsPerPage: 5,
   maxPageDigits: 6,
   params: {
@@ -182,6 +184,7 @@ export const SELLER_STATUS = {
 // (AGGREGATES.maxRangeDays) and 30 by default.
 export const RANGE = {
   param: 'range',
+  closedParam: 'closed',
   sections: {
     overview: { param: 'overviewRange', tables: [] },
     models: { param: 'modelsRange', tables: ['models'] },
@@ -218,3 +221,5 @@ export const SELLER_NAME = {
   hint: 'self-chosen name, not verified',
   unsafe: /[@✓✔✅☑\p{Cc}\p{Cf}]/u,
 } as const;
+
+export const SEARCH_TERM_LIMIT = 160;

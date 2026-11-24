@@ -1,6 +1,8 @@
+import { Search } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
+import { SEARCH_TERM_LIMIT } from '../lib/constants';
 import { LiveRefresh } from './live-refresh';
 import { NavLinks } from './nav-links';
 import { NetworkSelect } from './network-select';
@@ -42,9 +44,33 @@ export function SiteHeader({
           <NetworkSelect />
         </div>
       </div>
-      <nav aria-label="Explorer" className="pb-3">
-        <NavLinks />
-      </nav>
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] items-start gap-3 pb-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+        <nav aria-label="Explorer" className="min-w-0">
+          <NavLinks />
+        </nav>
+        <form
+          action="/search"
+          role="search"
+          className="flex min-h-10 items-center gap-2 rounded-lg border border-line bg-panel px-3 focus-within:border-signal sm:min-h-8"
+        >
+          <button
+            type="submit"
+            aria-label="Search Explorer"
+            className="text-dim hover:text-ink"
+          >
+            <Search aria-hidden size={15} />
+          </button>
+          <input
+            aria-label="Search models, labs, sellers, addresses or recent signatures"
+            type="search"
+            name="q"
+            placeholder="Search Explorer"
+            maxLength={SEARCH_TERM_LIMIT}
+            required
+            className="min-w-0 w-full bg-transparent text-sm outline-none sm:w-36"
+          />
+        </form>
+      </div>
     </header>
   );
 }

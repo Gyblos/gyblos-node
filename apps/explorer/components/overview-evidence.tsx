@@ -1,13 +1,18 @@
 import Link from 'next/link';
 
 import { getChainTxs } from '../lib/chain-txs';
-import { txRow } from '../lib/chain-txs-shape';
-import { NETWORKS } from '../lib/config';
+import { operationHref, txRow } from '../lib/chain-txs-shape';
 import { PAGES, PAGING } from '../lib/constants';
+import type { OfferedModel } from '../lib/discovery';
 import { getDiscovery } from '../lib/discovery-render';
 import { count, pricePerMtok, utc } from '../lib/format';
 import { modelKey } from '../lib/offers';
-import type { ExplorerQuery } from '../lib/paging';
+import {
+  rangeOf,
+  tablePager,
+  txPager,
+  type ExplorerQuery,
+} from '../lib/paging';
 import {
   emptySellersMessage,
   githubByNode,
@@ -15,11 +20,98 @@ import {
   sellerHref,
   verifiedOnly,
 } from '../lib/seller-identity';
+import { OperationChip } from './channel-txs';
+import { pagedRows, Pager } from './pager';
 import { SellerCell } from './seller-cell';
-import { Addr, ModelName } from './ui';
+import {
+  Addr,
+  ModelName,
+  moneyCell,
+  numberCell,
+  SectionTitle,
+  Table,
+  td,
+  timeCell,
+  Unavailable,
+} from './ui';
+
+const OFFERS = 'Current offers';
+const OPERATIONS = 'Latest operations';
+const OFFERS_HEAD = [
+  { label: 'Model / variant' },
+  { label: 'Seller' },
+  { label: 'Context', right: true, sort: 'context' },
+  {
+    label: 'Input',
+    group: 'USDC / 1M tokens',
+    right: true,
+    sort: 'input',
+    ascendingFirst: true,
+  },
+  {
+    label: 'Output',
+    group: 'USDC / 1M tokens',
+    right: true,
+    sort: 'output',
+    ascendingFirst: true,
+  },
+];
+const sortOffers = {
+  context: ({ model }: { model: OfferedModel }) => model.contextTokens,
+  input: ({ model }: { model: OfferedModel }) =>
+    BigInt(model.pricing.inputAtomicPerMtok),
+  output: ({ model }: { model: OfferedModel }) =>
+    BigInt(model.pricing.outputAtomicPerMtok),
+};
+const OPERATION_HEAD = [
+  { label: 'Time (UTC)' },
+  { label: 'Type' },
+  { label: 'USDC', right: true },
+  { label: 'Signature' },
+];
+
+function TableTitle({
+  id,
+  title,
+  href,
+  label,
+}: {
+  id: string;
+  title: string;
+  href: string;
+  label: string;
+}) {
+  return (
+    <SectionTitle
+      id={id}
+      title={title}
+      meta={
+        <Link className="hover:text-ink" href={href}>
+          {label} →
+        </Link>
+      }
+    />
+  );
+}
+
+function OfferTerms({ model }: { model: OfferedModel }) {
+  return (
+    <>
+      <td className={numberCell}>{count(model.contextTokens)}</td>
+      <td className={moneyCell}>
+        {pricePerMtok(model.pricing.inputAtomicPerMtok)}
+      </td>
+      <td className={moneyCell}>
+        {pricePerMtok(model.pricing.outputAtomicPerMtok)}
+      </td>
+    </>
+  );
+}
 
 export async function OverviewOffers({ query }: { query: ExplorerQuery }) {
   const snapshot = await getDiscovery();
+  if (snapshot.error)
+    return <Unavailable title={OFFERS} anchors={[PAGING.anchors.sellers]} />;
   const accounts = githubByNode(snapshot.network);
   const names = namesByNode(snapshot.network);
   const sellers = query.verified
@@ -28,131 +120,129 @@ export async function OverviewOffers({ query }: { query: ExplorerQuery }) {
   const rows = sellers.flatMap((seller) =>
     seller.models.map((model) => ({ seller, model })),
   );
+  const models = new Set(rows.map(({ model }) => modelKey(model))).size;
+  const known = !!snapshot.network && !snapshot.network.truncated;
+  const page = pagedRows(
+    query,
+    'sellers',
+    rows,
+    !query.verified || known,
+    sortOffers,
+  );
+  const days = rangeOf(query, 'overview');
   return (
-    <section className="ov-panel" id={PAGING.anchors.sellers}>
-      <div className="ov-heading">
-        <h3>Inference offers</h3>
-        <Link href={PAGES.models}>All models ↗</Link>
-      </div>
-      <p className="ov-meta">
-        {snapshot.error
-          ? 'Discovery unavailable'
-          : `Published as of ${utc(snapshot.datedAt ?? snapshot.generatedAt)}`}
+    <section>
+      <TableTitle
+        id={PAGING.anchors.sellers}
+        title={OFFERS}
+        href={PAGES.models}
+        label="All models"
+      />
+      <p className="text-sm text-muted">
+        {count(models)} {models === 1 ? 'model' : 'models'} ·{' '}
+        {count(sellers.length)} {query.verified ? 'verified ' : ''}
+        {sellers.length === 1 ? 'seller' : 'sellers'} online · Updated{' '}
+        {utc(snapshot.datedAt ?? snapshot.generatedAt)}
       </p>
-      {rows.length ? (
-        <div
-          className="ov-scroll"
-          tabIndex={0}
-          role="region"
-          aria-label="Inference offers"
-        >
-          <table>
-            <thead>
-              <tr>
-                {[
-                  'Model / variant',
-                  'Seller',
-                  'Context',
-                  'Input USDC / 1M',
-                  'Output USDC / 1M',
-                ].map((label) => (
-                  <th key={label}>{label}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.slice(0, PAGING.rowsPerPage).map(({ seller, model }) => (
-                <tr key={seller.nodeId + modelKey(model)}>
-                  <td>
-                    <ModelName {...model} />
-                  </td>
-                  <td>
-                    <SellerCell
-                      nodeId={seller.nodeId}
-                      github={accounts.get(seller.nodeId) ?? null}
-                      name={names.get(seller.nodeId)}
-                      href={sellerHref(seller.nodeId, query)}
-                    >
-                      <Addr value={seller.owner} />
-                    </SellerCell>
-                  </td>
-                  <td>{count(model.contextTokens)}</td>
-                  <td>{pricePerMtok(model.pricing.inputAtomicPerMtok)}</td>
-                  <td>{pricePerMtok(model.pricing.outputAtomicPerMtok)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        !snapshot.error && (
-          <p>
-            {emptySellersMessage(
-              sellers,
-              query.verified,
-              !!snapshot.network && !snapshot.network.truncated,
-            )}
-          </p>
-        )
-      )}
+      <Table
+        head={OFFERS_HEAD}
+        sorting={{ query, table: 'sellers' }}
+        footer={
+          <Pager label={OFFERS} view={tablePager(query, 'sellers', page)} />
+        }
+      >
+        {page.rows.map(({ seller, model }) => (
+          <tr
+            key={seller.nodeId + modelKey(model)}
+            className="border-t border-line"
+          >
+            <td className={td}>
+              <ModelName {...model} days={days} closed />
+            </td>
+            <td className={td}>
+              <SellerCell
+                nodeId={seller.nodeId}
+                github={accounts.get(seller.nodeId) ?? null}
+                name={names.get(seller.nodeId)}
+                href={sellerHref(seller.nodeId, {
+                  ...query,
+                  days,
+                  closed: true,
+                })}
+              >
+                <Addr value={seller.owner} />
+              </SellerCell>
+            </td>
+            <OfferTerms model={model} />
+          </tr>
+        ))}
+        {!rows.length && (
+          <tr>
+            <td className={td} colSpan={OFFERS_HEAD.length}>
+              {emptySellersMessage(sellers, query.verified, known) ??
+                'No current offers.'}
+            </td>
+          </tr>
+        )}
+      </Table>
     </section>
   );
 }
-export async function OverviewOperations() {
-  const page = await getChainTxs(null);
+
+export async function OverviewOperations({ query }: { query: ExplorerQuery }) {
+  const page = await getChainTxs(query.before);
+  if (page.error)
+    return (
+      <Unavailable title={OPERATIONS} anchors={[PAGING.anchors.transactions]} />
+    );
   return (
-    <section className="ov-panel" id={PAGING.anchors.transactions}>
-      <div className="ov-heading">
-        <h3>Latest operations</h3>
-        <Link href={PAGES.transactions}>All transactions ↗</Link>
-      </div>
-      <p className="ov-meta">
-        {NETWORKS.find((network) => network.live)?.label} · All time
-      </p>
-      {page.transactions.length ? (
-        <div
-          className="ov-scroll"
-          tabIndex={0}
-          role="region"
-          aria-label="Latest operations"
-        >
-          <table>
-            <thead>
-              <tr>
-                <th>Time (UTC)</th>
-                <th>Type</th>
-                <th>USDC</th>
-                <th>Signature</th>
-              </tr>
-            </thead>
-            <tbody>
-              {page.transactions.slice(0, PAGING.rowsPerPage).map((tx) => {
-                const row = txRow(tx, new Map(), page.treasury);
-                return (
-                  <tr key={row.key}>
-                    <td>{row.time}</td>
-                    <td>
-                      <span className="ov-kind">{row.label}</span>
-                    </td>
-                    <td>{row.amount}</td>
-                    <td>
-                      <a href={row.href} title={tx.signature}>
-                        {row.signature} ↗
-                      </a>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <p>
-          {page.error
-            ? 'Transaction history unavailable.'
-            : 'No channel transactions.'}
-        </p>
-      )}
+    <section>
+      <TableTitle
+        id={PAGING.anchors.transactions}
+        title={OPERATIONS}
+        href={PAGES.transactions}
+        label="All transactions"
+      />
+      <Table
+        head={OPERATION_HEAD}
+        footer={
+          <Pager
+            label={OPERATIONS}
+            view={txPager(query, page.transactions.length, page.next)}
+          />
+        }
+      >
+        {page.transactions.map((tx) => {
+          const row = txRow(tx, new Map(), page.treasury);
+          return (
+            <tr key={row.key} className="border-t border-line">
+              <td className={timeCell}>{row.time}</td>
+              <td className={td}>
+                <OperationChip row={row} />
+              </td>
+              <td className={row.muted ? numberCell : moneyCell}>
+                {row.amount}
+              </td>
+              <td className={td}>
+                <Link
+                  className="font-mono underline decoration-line underline-offset-2 hover:decoration-current"
+                  href={operationHref(tx)}
+                  title={tx.signature}
+                >
+                  {row.signature}
+                </Link>
+              </td>
+            </tr>
+          );
+        })}
+        {!page.transactions.length && (
+          <tr>
+            <td className={td} colSpan={OPERATION_HEAD.length}>
+              No channel transactions.
+            </td>
+          </tr>
+        )}
+      </Table>
     </section>
   );
 }

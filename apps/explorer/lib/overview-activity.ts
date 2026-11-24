@@ -5,6 +5,7 @@ type Source = Awaited<ReturnType<typeof overviewNetwork>>;
 export interface TokenPoint {
   day: string;
   tokens: number | null;
+  requests: number | null;
 }
 
 export const compact = (value: number) =>
@@ -38,6 +39,9 @@ export function overviewActivity(
     const sides = [row?.free, row?.paid].flatMap((value) => value ?? []);
     return {
       day,
+      requests: sides.length
+        ? sides.reduce((sum, value) => sum + value.requests.headline, 0)
+        : null,
       tokens: sides.length
         ? sides.reduce(
             (sum, value) => sum + value.tokens.input + value.tokens.output,

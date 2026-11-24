@@ -31,6 +31,9 @@ export const NETWORKS = [
 
 const SOLANA_EXPLORER = 'https://explorer.solana.com';
 
+export const addressHref = (address: string) =>
+  `/addresses/${encodeURIComponent(address)}`;
+
 export const explorerAddressUrl = (address: string) =>
   `${SOLANA_EXPLORER}/address/${address}?cluster=devnet`;
 

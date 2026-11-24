@@ -62,8 +62,8 @@ function changes(current: ChainSummary['totals'], before: ChainSnapshot) {
 export async function PaymentsSection({ query }: { query: ExplorerQuery }) {
   const days = rangeOf(query, 'payments');
   const [chain, before] = await Promise.all([
-    getChainStats(days),
-    getChainStats(days, 1),
+    getChainStats(days, 0, query.closed),
+    getChainStats(days, 1, query.closed),
   ]);
   if (chain.error)
     return (

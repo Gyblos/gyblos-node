@@ -29,7 +29,7 @@ export default async function Home({
   if (moved) redirect(moved);
   const canonical = canonicalPageHref(params);
   if (canonical) redirect(canonical);
-  const query = readQuery(params);
+  const query = { ...readQuery(params), overviewTables: true };
   return (
     <PageFrame overview title="Gyblos Explorer">
       <Suspense
@@ -38,12 +38,12 @@ export default async function Home({
       >
         <Overview query={query} />
       </Suspense>
-      <div className="ov-evidence">
+      <div>
         <Suspense fallback={<Loading />}>
           <OverviewOffers query={query} />
         </Suspense>
         <Suspense fallback={<Loading />}>
-          <OverviewOperations />
+          <OverviewOperations query={query} />
         </Suspense>
       </div>
     </PageFrame>

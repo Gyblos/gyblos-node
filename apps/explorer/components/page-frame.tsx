@@ -16,11 +16,7 @@ export function PageFrame({
   children: ReactNode;
 }) {
   return (
-    <div
-      className={
-        overview ? 'network-overview' : 'mx-auto w-full max-w-6xl px-4 sm:px-6'
-      }
-    >
+    <div className="mx-auto w-full min-w-0 max-w-7xl px-4 sm:px-6 lg:px-8">
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:rounded-md focus:bg-bg focus:px-4 focus:py-2 focus:text-ink focus:outline-2 focus:outline-offset-2 focus:outline-signal"

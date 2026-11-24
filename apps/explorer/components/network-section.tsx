@@ -220,6 +220,7 @@ const sellerOffers = (sellers: Seller[]) =>
   );
 
 function OfferRow({
+  days,
   seller,
   model,
   cell,
@@ -227,6 +228,7 @@ function OfferRow({
   seller: Seller;
   model: Seller['models'][number];
   cell: ReactNode;
+  days: ExplorerQuery['days'];
 }) {
   return (
     <tr className="border-t border-line">
@@ -241,6 +243,7 @@ function OfferRow({
       </td>
       <td className={td}>
         <ModelName
+          days={days}
           modelId={model.modelId}
           variant={model.variant}
           quantization={model.quantization}
@@ -305,6 +308,7 @@ function SellersTable({
         ) : null}
         {page.rows.map(({ seller, model }) => (
           <OfferRow
+            days={query.days}
             key={`${seller.nodeId}:${model.modelId}:${model.variant}:${model.quantization}`}
             seller={seller}
             model={model}

@@ -5,11 +5,12 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 import { Skeleton } from '../boardui/components/base/skeleton/skeleton';
-import { explorerAddressUrl } from '../lib/config';
+import { addressHref } from '../lib/config';
 import { DISPLAY, PAGING } from '../lib/constants';
 import { short } from '../lib/format';
 import { FULL_OVERVIEW, overviewLayout } from '../lib/layout';
 import { modelLab } from '../lib/model-family';
+import { modelHref } from '../lib/offers';
 import { sortHref, type ExplorerQuery, type SortedTable } from '../lib/paging';
 import type { RangeDays, RangeSection } from '../lib/range';
 import { ModelLogo } from './model-logo';
@@ -328,30 +329,35 @@ export function MoreLink({ href, label }: { href: string; label: string }) {
 export function Addr({ value }: { value: string | null }) {
   if (!value) return <>—</>;
   return (
-    <a
+    <Link
       className="underline decoration-line underline-offset-2 hover:text-ink hover:decoration-current"
-      href={explorerAddressUrl(value)}
+      href={addressHref(value)}
       title={value}
     >
       {short(value)}
-    </a>
+    </Link>
   );
 }
 
 // A model as published: its maker's mark, the id, then variant and quantization when present.
 export function ModelName({
+  closed,
+  days,
   modelId,
   variant,
   quantization,
 }: {
+  days?: RangeDays;
+  closed?: boolean;
   modelId: string;
   variant: string | null;
   quantization: string | null;
 }) {
   const detail = [variant, quantization].filter(Boolean).join(' ');
   return (
-    <span
-      className="inline-flex max-w-full items-center gap-2"
+    <Link
+      href={modelHref({ modelId, variant, quantization }, days, closed)}
+      className="hover:underline underline-offset-2 inline-flex max-w-full items-center gap-2"
       title={[modelId, detail].filter(Boolean).join(' ')}
     >
       <ModelLogo modelId={modelId} />
@@ -364,6 +370,6 @@ export function ModelName({
           <span className="ml-2 font-mono text-xs text-dim">{detail}</span>
         ) : null}
       </span>
-    </span>
+    </Link>
   );
 }

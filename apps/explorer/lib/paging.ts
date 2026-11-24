@@ -24,9 +24,11 @@ export type TableSorts = Partial<Record<SortedTable, TableSort>>;
 export type Sortable = number | bigint | string | null | undefined;
 
 export interface ExplorerQuery {
+  overviewTables?: boolean;
   path: string;
   days: RangeDays;
   ranges: SectionRanges;
+  closed?: boolean;
   sorts: TableSorts;
   verified: boolean;
   before: string | null;
@@ -105,6 +107,7 @@ export function movedHomeHref(source: SearchSource): string | null {
     source instanceof URLSearchParams ? [...source] : Object.entries(source);
   for (const [name, value] of entries)
     for (const item of [value ?? []].flat()) search.append(name, item);
+  if (search.get(PAGING.overviewParam) === PAGING.overviewValue) return null;
   const moved = MOVED_PARAMS.find(([name]) => search.has(name));
   return moved ? `${moved[1]}?${search.toString()}` : null;
 }
@@ -139,9 +142,18 @@ export function readQuery(source: SearchSource, path = '/'): ExplorerQuery {
     if (sort) sorts[table] = sort;
   }
   return {
+    ...(readParam(source, PAGING.overviewParam) === PAGING.overviewValue
+      ? { overviewTables: true }
+      : {}),
     path,
     days: parseRange(readParam(source, RANGE.param)),
     ranges,
+    ...((path === PAGES.stats ||
+      path.startsWith(`${PAGES.models}/`) ||
+      path.startsWith(`${PAGES.sellers}/`)) &&
+    readParam(source, RANGE.closedParam) === '1'
+      ? { closed: true }
+      : {}),
     sorts,
     verified:
       readParam(source, IDENTITY.verifiedParam) === IDENTITY.verifiedValue,
@@ -161,6 +173,7 @@ export function queryHref(
   const ranges = { ...query.ranges, ...change.ranges };
   const sorts = { ...query.sorts, ...change.sorts };
   const params = new URLSearchParams();
+  if (query.closed) params.set(RANGE.closedParam, '1');
   if (days !== RANGE.defaultDays) params.set(RANGE.param, String(days));
   for (const section of RANGE_SECTIONS) {
     const shown = ranges[section];
@@ -179,6 +192,12 @@ export function queryHref(
     if (sort) params.set(PAGING.sortParams[table], sortText(sort));
     else delete sorts[table];
   }
+  if (
+    query.path === PAGES.network &&
+    query.overviewTables &&
+    (before || pages.sellers || sorts.sellers)
+  )
+    params.set(PAGING.overviewParam, PAGING.overviewValue);
   const search = params.toString();
   return search ? `${query.path}?${search}` : query.path;
 }
@@ -311,7 +330,7 @@ export function tablePager(
   table: PagedTable,
   page: Page<unknown>,
 ): PagerView | null {
-  if (page.pages <= 1) return null;
+  if (page.pages <= 1 && !query.overviewTables) return null;
   const targets = new Set<number>();
   for (let offset = 0; offset < PAGER_EDGE; offset++) {
     targets.add(1 + offset);

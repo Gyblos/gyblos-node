@@ -4,6 +4,7 @@
 
 import { parseChainStats, type ChainSnapshot } from './chain-shape';
 import { COLLECTOR_URL } from './config';
+import { UNITS } from './constants';
 import { fetchJson } from './fetch-json';
 import { rangeQuery, type RangeDays } from './range';
 
@@ -13,9 +14,18 @@ export type { ChainSnapshot } from './chain-shape';
 export async function getChainStats(
   days: RangeDays,
   periodsBack = 0,
+  closed = false,
+  now = Date.now(),
 ): Promise<ChainSnapshot> {
   try {
-    return { ...(await loadChainStats(days, periodsBack)), error: null };
+    return {
+      ...(await loadChainStats(
+        days,
+        periodsBack,
+        now - (closed ? UNITS.msPerDay : 0),
+      )),
+      error: null,
+    };
   } catch (error) {
     return {
       aggregatedAt: null,
@@ -26,10 +36,14 @@ export async function getChainStats(
   }
 }
 
-async function loadChainStats(days: RangeDays, periodsBack: number) {
+async function loadChainStats(
+  days: RangeDays,
+  periodsBack: number,
+  now: number,
+) {
   return parseChainStats(
     await fetchJson(
-      `${COLLECTOR_URL}/stats/chain${rangeQuery(days, Date.now(), periodsBack)}`,
+      `${COLLECTOR_URL}/stats/chain${rangeQuery(days, now, periodsBack)}`,
       'collector chain',
     ),
   );

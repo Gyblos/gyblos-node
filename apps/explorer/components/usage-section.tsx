@@ -169,8 +169,8 @@ function UsageCards({
 export async function UsageSection({ query }: { query: ExplorerQuery }) {
   const days = rangeOf(query, 'usage');
   const [snapshot, before] = await Promise.all([
-    getCollector(days),
-    getCollector(days, 1),
+    getCollector(days, 0, query.closed),
+    getCollector(days, 1, query.closed),
   ]);
   if (snapshot.error)
     return (
@@ -251,6 +251,7 @@ function DailyTable({
   const head = [
     { label: 'Day (UTC)', sort: 'day', ascendingFirst: true },
     ...figureHead('Seller first token'),
+    ...sideColumns('Input tokens'),
     ...sideColumns('Buyers'),
     { label: 'Relay', right: true },
   ];
@@ -277,6 +278,11 @@ function DailyTable({
               free={sideFigures([day.free])}
               paid={sideFigures([day.paid])}
               latency="firstToken"
+            />
+            <SideCells
+              free={day.free?.tokens.input ?? null}
+              paid={day.paid?.tokens.input ?? null}
+              show={(value) => (value === null ? '—' : countText(value))}
             />
             <SideCells free={day.free} paid={day.paid} show={buyersText} />
             <td className={numberCell}>{relayText(day)}</td>
@@ -323,7 +329,13 @@ function DemandTable({
         {page.rows.map(([model, requests]) => (
           <tr key={model} className="border-t border-line">
             <td className={td}>
-              <ModelName modelId={model} variant={null} quantization={null} />
+              <ModelName
+                days={rangeOf(query, 'usage')}
+                closed={query.closed}
+                modelId={model}
+                variant={null}
+                quantization={null}
+              />
             </td>
             <td className={numberCell}>{count(requests)}</td>
           </tr>
