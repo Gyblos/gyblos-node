@@ -64,10 +64,8 @@ export function TableScroll({
       wrapper.removeAttribute('data-overflow');
       const overflow = wrapper.scrollWidth > wrapper.clientWidth;
       wrapper.toggleAttribute('data-overflow', overflow);
-      wrapper.toggleAttribute(
-        'data-scrollable',
-        wrapper.scrollWidth > wrapper.clientWidth,
-      );
+      const scrollable = wrapper.scrollWidth > wrapper.clientWidth;
+      wrapper.toggleAttribute('data-scrollable', scrollable);
     };
     measure();
     const observer = new ResizeObserver(measure);
