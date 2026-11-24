@@ -180,7 +180,7 @@ export async function checkWideDialogAction() {
       'dialog button[aria-label="Spending limits"]',
     );
     const text = action?.querySelector('.ui-action-label');
-    if (text?.getBoundingClientRect().width) {
+    if (text && text.getBoundingClientRect().width > 1) {
       const tip = action?.nextElementSibling;
       if (!tip?.matches('.ui-tooltip'))
         throw new Error('Missing tooltip Spending limits');
