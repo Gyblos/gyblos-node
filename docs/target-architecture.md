@@ -159,7 +159,9 @@ command that exists when the step lands, under the names decided there:
   `gyblos start` is removed, not kept as an alias. The release that renames it
   makes the update path (`install.sh update`, `gyblos seller service restart`)
   rewrite an installed service definition, so a seller who updates is not
-  interrupted.
+  interrupted. Every other place that starts the seller changes in the same
+  release: the seller image's default command and entrypoint, the compose file
+  the installer writes, and the documented commands.
 - Every command accepts `--json` and then prints exactly one JSON document, the
   operation result, on standard output. Without it, the command prints text for
   a person.
