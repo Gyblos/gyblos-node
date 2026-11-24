@@ -2972,7 +2972,8 @@ html .app.desktop-frame .ui-action-button + .ui-tooltip {
   html
     .app.desktop-frame
     .content
-    .ui-button.ui-action-button:not(dialog .ui-button) {
+    .ui-button.ui-action-button:not(dialog .ui-button),
+  html .app.desktop-frame dialog .ui-button.ui-action-button {
     --control-size: inherit;
     width: var(--control-size);
     min-width: var(--control-size);
