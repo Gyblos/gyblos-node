@@ -11,7 +11,7 @@ import { barAxis } from '@gyblos/explorer/board-bar-axis';
 import { delta } from '@gyblos/explorer/board-delta';
 import { hoveredPoint } from '@gyblos/explorer/board-hovered';
 import { chainHistoryNote, dailySettled } from '@gyblos/explorer/chain-shape';
-import { FETCH } from '@gyblos/explorer/constants';
+import { FETCH, HELP_TRIGGER } from '@gyblos/explorer/constants';
 import { fetchJson } from '@gyblos/explorer/fetch-json';
 import {
   percent,
@@ -319,4 +319,8 @@ void test('chain figures say when the chain history is still being read', () => 
   assert.equal(chainHistoryNote(null), 'chain index starting');
   assert.equal(chainHistoryNote(false), 'reading chain history');
   assert.equal(chainHistoryNote(true), null);
+});
+
+void test('a help tap toggles its tooltip: the press itself never closes it', () => {
+  assert.equal(HELP_TRIGGER.shouldCloseOnPress, false);
 });

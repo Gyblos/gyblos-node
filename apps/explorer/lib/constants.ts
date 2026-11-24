@@ -145,6 +145,11 @@ export const PAGES = {
   stats: '/stats',
 } as const;
 
+export const HELP_TRIGGER = {
+  delay: 150,
+  shouldCloseOnPress: false,
+} as const;
+
 export const PAGE_LINKS = [
   { label: 'Network', href: PAGES.network },
   { label: 'Sellers', href: PAGES.sellers },

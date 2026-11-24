@@ -81,7 +81,12 @@ export function DeltaPill({
 export function StatHint({ label, hint }: { label: string; hint: string }) {
   const [open, setOpen] = useState(false);
   return (
-    <TooltipTrigger delay={200} isOpen={open} onOpenChange={setOpen}>
+    <TooltipTrigger
+      delay={200}
+      shouldCloseOnPress={false}
+      isOpen={open}
+      onOpenChange={setOpen}
+    >
       <Focusable>
         <button
           type="button"

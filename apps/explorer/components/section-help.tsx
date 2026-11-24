@@ -8,11 +8,12 @@ import {
   Tooltip,
   TooltipTrigger,
 } from '../boardui/components/base/tooltip/tooltip';
+import { HELP_TRIGGER } from '../lib/constants';
 
 export function SectionHelp({ title, text }: { title: string; text: string }) {
   const [open, setOpen] = useState(false);
   return (
-    <TooltipTrigger delay={150} isOpen={open} onOpenChange={setOpen}>
+    <TooltipTrigger {...HELP_TRIGGER} isOpen={open} onOpenChange={setOpen}>
       <Focusable>
         <button
           type="button"
