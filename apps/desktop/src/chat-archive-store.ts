@@ -17,6 +17,7 @@ export class ChatArchiveStore {
   private archive: ChatArchive | null = null;
   private available = true;
   private pinsUnavailable = false;
+  private pinsReadFailed = false;
   private storedPins: string | undefined;
   private generation = 0;
   private acceptedSequence = 0;
@@ -50,6 +51,7 @@ export class ChatArchiveStore {
               for (const session of this.archive.sessions)
                 if (pins.has(session.id)) session.pinned = true;
             } catch {
+              this.pinsReadFailed = true;
               this.pinsUnavailable = true;
             }
           }
@@ -142,7 +144,12 @@ export class ChatArchiveStore {
   }
   private async savePins(pins: readonly string[]) {
     const encoded = JSON.stringify(pins);
-    if (!this.files.writePins || encoded === this.storedPins) return;
+    if (
+      this.pinsReadFailed ||
+      !this.files.writePins ||
+      encoded === this.storedPins
+    )
+      return;
     try {
       await this.files.writePins(pins);
       this.storedPins = encoded;

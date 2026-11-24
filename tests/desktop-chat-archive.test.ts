@@ -387,3 +387,31 @@ void test('an unwritable pin file allows later transcript saves and deletions', 
     await rm(profile, { recursive: true, force: true });
   }
 });
+
+void test('editing a draft preserves existing pins when their initial read failed', async () => {
+  const chat = conversation();
+  const io = files();
+  await io.write(JSON.stringify(projectChatArchive(chat.getSnapshot())));
+  let storedPins: readonly string[] = [chat.getSnapshot().activeId];
+  const store = new ChatArchiveStore({
+    ...io,
+    readPins: async () => {
+      throw new Error('Pin metadata unavailable');
+    },
+    writePins: async (ids) => {
+      storedPins = ids;
+    },
+  });
+  const loaded = await store.load();
+  chat.setDraft('Changed draft');
+  store.save({
+    generation: loaded.generation,
+    sequence: 1,
+    archive: projectChatArchive(chat.getSnapshot()),
+  });
+  await store.settled();
+  assert.deepEqual(storedPins, [chat.getSnapshot().activeId]);
+  assert.equal(store.status().pinsUnavailable, true);
+  assert.match((await io.read()) ?? '', /Changed draft/);
+  await store.close();
+});
