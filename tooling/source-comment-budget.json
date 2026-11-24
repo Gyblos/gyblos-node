@@ -92,7 +92,7 @@
   "packages/buyer/src/session-routing.ts": 4,
   "packages/buyer/src/session-seller-choice.ts": 1,
   "packages/buyer/src/session-startup.ts": 1,
-  "packages/buyer/src/setup.ts": 1,
+  "apps/buyer/src/setup.ts": 1,
   "packages/buyer/src/slow-seller.ts": 6,
   "packages/buyer/src/startup-diagnostics.ts": 1,
   "apps/buyer/src/withdraw-paid.ts": 4,

@@ -9,7 +9,8 @@
     "./withdraw-paid": "./src/withdraw-paid.ts",
     "./agent-cli": "./src/agent-cli.ts",
     "./free-main": "./src/free-main.ts",
-    "./init": "./src/init.ts"
+    "./init": "./src/init.ts",
+    "./setup": "./src/setup.ts"
   },
   "dependencies": {
     "@gyblos/buyer": "workspace:*",

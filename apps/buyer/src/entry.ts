@@ -28,8 +28,7 @@ export const BUYER_ROUTES: BuyerRoutes = {
   [BUYER_COMMANDS.CHAT]: async () => (await import('./chat-cli')).main(),
   [BUYER_COMMANDS.INIT]: async (args) =>
     (await import('./init')).main([...args]),
-  [BUYER_COMMANDS.SETUP]: async () =>
-    (await import('@gyblos/buyer/setup')).main(),
+  [BUYER_COMMANDS.SETUP]: async () => (await import('./setup')).main(),
   [BUYER_COMMANDS.AUTO]: async (args) =>
     (await import('./auto-cli')).main([...args]),
   [BUYER_COMMANDS.AGENT]: async (args) =>

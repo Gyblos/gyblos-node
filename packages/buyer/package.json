@@ -16,7 +16,6 @@
     "./diagnostics": "./src/diagnostics.ts",
     "./http-diagnostics": "./src/http-diagnostics.ts",
     "./slow-seller": "./src/slow-seller.ts",
-    "./setup": "./src/setup.ts",
     "./control": "./src/control.ts",
     "./selection": "./src/selection.ts",
     "./input-size": "./src/input-size.ts",
