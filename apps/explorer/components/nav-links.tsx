@@ -1,8 +1,9 @@
 'use client';
 
-import { ArrowUpRight } from 'lucide-react';
+import { ArrowUpRight, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useState } from 'react';
 
 import { SITE_LINKS } from '../lib/config';
 import { PAGE_LINKS, PAGES } from '../lib/constants';
@@ -16,21 +17,35 @@ const isCurrent = (pathname: string, href: string) =>
     : pathname === href ||
       (href === PAGES.sellers && pathname.startsWith(`${PAGES.sellers}/`));
 
-export function NavLinks() {
-  const pathname = usePathname();
+function Items({
+  pathname,
+  onPick,
+  stacked,
+}: {
+  pathname: string;
+  onPick?: () => void;
+  stacked: boolean;
+}) {
   return (
-    <ul className="-mx-3 flex gap-1 overflow-x-auto text-sm whitespace-nowrap">
+    <ul
+      className={cx(
+        'text-sm whitespace-nowrap',
+        stacked ? 'flex flex-col gap-0.5' : '-mx-3 flex gap-1',
+      )}
+    >
       {PAGE_LINKS.map((link) => {
         const current = isCurrent(pathname, link.href);
         return (
           <li key={link.href}>
             <Link
               href={link.href}
+              onClick={onPick}
               aria-current={
                 pathname === link.href ? 'page' : current ? 'true' : undefined
               }
               className={cx(
                 ITEM,
+                stacked && 'py-2',
                 current ? 'bg-raised text-ink' : 'text-muted',
               )}
             >
@@ -44,12 +59,55 @@ export function NavLinks() {
           href={SITE_LINKS.docs}
           target="_blank"
           rel="noopener noreferrer"
-          className={cx(ITEM, 'inline-flex items-center gap-1 text-muted')}
+          onClick={onPick}
+          className={cx(
+            ITEM,
+            stacked && 'py-2',
+            'inline-flex items-center gap-1 text-muted',
+          )}
         >
           Docs
           <ArrowUpRight aria-hidden className="size-3" />
         </a>
       </li>
     </ul>
+  );
+}
+
+export function NavLinks() {
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+  const here =
+    PAGE_LINKS.find((link) => isCurrent(pathname, link.href))?.label ??
+    PAGE_LINKS[0].label;
+  return (
+    <>
+      <div className="hidden sm:block">
+        <Items pathname={pathname} stacked={false} />
+      </div>
+      <div className="sm:hidden">
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls="explorer-menu"
+          onClick={() => setOpen((isOpen) => !isOpen)}
+          className="flex w-full items-center justify-between rounded-lg bg-raised px-3 py-2 text-sm text-ink"
+        >
+          {here}
+          <ChevronDown
+            aria-hidden
+            className={cx(
+              'size-4 text-muted transition-transform',
+              open && 'rotate-180',
+            )}
+          />
+        </button>
+        {open ? (
+          <div id="explorer-menu" className="mt-2">
+            <Items pathname={pathname} stacked onPick={() => setOpen(false)} />
+          </div>
+        ) : null}
+      </div>
+    </>
   );
 }
