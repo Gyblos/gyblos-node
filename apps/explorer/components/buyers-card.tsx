@@ -21,7 +21,7 @@ export function BuyersCard({
   const side = (figure: 'free' | 'paid') =>
     buyersText(buyers?.[figure].allTime ?? null);
   return (
-    <div className={`grid ${className}`}>
+    <div className={`row-span-4 grid grid-rows-subgrid gap-y-0 ${className}`}>
       <StatCard
         variant={variant}
         icon={Users}
