@@ -86,7 +86,10 @@ export async function checkMinimumLayout() {
       getComputedStyle(frame).getPropertyValue('--control-size'),
     );
     const box = action.getBoundingClientRect();
-    if (Math.abs(box.width - size) > 0.5 || Math.abs(box.height - size) > 0.5)
+    if (
+      Math.round(box.width) !== Math.round(size) ||
+      Math.round(box.height) !== Math.round(size)
+    )
       throw new Error(
         'Text action ' + label + ' ' + box.width + 'x' + box.height,
       );
