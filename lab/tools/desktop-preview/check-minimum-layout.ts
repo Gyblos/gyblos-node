@@ -78,6 +78,49 @@ export async function checkMinimumLayout() {
     throw new Error('Key row overflow');
   if (document.documentElement.scrollWidth > innerWidth)
     throw new Error('Document overflow');
+  const iconOnlyWidth = 36;
+  async function iconOnly(label: string) {
+    const action = await visible('button[aria-label="' + label + '"]');
+    if (action.getBoundingClientRect().width > iconOnlyWidth)
+      throw new Error('Text action ' + label);
+  }
+  function apart(cells: Element[]) {
+    const boxes = cells.map((cell) => cell.getBoundingClientRect());
+    for (const [index, box] of boxes.entries())
+      for (const other of boxes.slice(index + 1))
+        if (
+          box.left < other.right - 1 &&
+          other.left < box.right - 1 &&
+          box.top < other.bottom - 1 &&
+          other.top < box.bottom - 1
+        )
+          throw new Error('Overlapping cells');
+  }
+  await iconOnly('Manage keys');
+  (await visible('#preview-tab-overview')).click();
+  await iconOnly('Spending limits');
+  const copies = Array.from(
+    document.querySelectorAll('.preview-method-copy'),
+    (copy) => copy.getBoundingClientRect().left,
+  )
+    .filter((left) => left < innerWidth)
+    .map(Math.round);
+  if (new Set(copies).size > 1) throw new Error('Misaligned payment methods');
+  (await visible('#preview-tab-history')).click();
+  await visible('.ui-table-region tbody tr');
+  for (const row of Array.from(
+    document.querySelectorAll('.ui-table-region tbody tr'),
+  ))
+    apart(Array.from(row.children));
+  (await visible('button[aria-label="Models"]')).click();
+  await iconOnly('Find network models');
+  const toolbar = await visible('.ui-page .ui-toolbar');
+  for (const control of Array.from(
+    toolbar.querySelectorAll(':scope > :is(.ui-search, button)'),
+  ))
+    fits(control, toolbar);
+  if (document.documentElement.scrollWidth > innerWidth)
+    throw new Error('Models overflow');
   (await visible('button[aria-label="Chat"]')).click();
   const expand = document.querySelector<HTMLButtonElement>(
     'button[aria-label="Expand sidebar"]',
