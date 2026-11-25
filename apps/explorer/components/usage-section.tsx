@@ -80,12 +80,7 @@ function changes(
     sides.map((side) => {
       const now = current[side][key];
       const then = previous[side][key];
-      if (
-        !current.active.some((row) => row[side]) ||
-        typeof now !== 'number' ||
-        typeof then !== 'number' ||
-        then <= 0
-      )
+      if (typeof now !== 'number' || typeof then !== 'number' || then <= 0)
         return null;
       return delta(now, then, key === 'firstToken' ? 'down' : 'up');
     });
@@ -95,7 +90,8 @@ function changes(
     successRate: sidesChange('successRate'),
     firstToken: sidesChange('firstToken'),
     authorized: [
-      current.active.some((row) => row.paid?.authorizedAtomic != null) &&
+      current.authorized !== null &&
+      previous.authorized !== null &&
       previous.authorized > 0n
         ? delta(current.authorized, previous.authorized)
         : null,
@@ -122,16 +118,16 @@ function UsageCards({
   days: RangeDays;
 }) {
   const { free, paid } = usage;
-  const hasFree = usage.active.some((row) => row.free);
-  const hasPaid = usage.active.some((row) => row.paid);
+  const authorized =
+    usage.authorized === null ? null : usdcDecimal(usage.authorized);
   return (
     <div className="grid grid-cols-1 gap-3 min-[390px]:grid-cols-2 lg:grid-cols-4">
       <StatCard
         icon={MessagesSquare}
         label="Requests"
         sides={{
-          free: counted(hasFree ? free.requests : null),
-          paid: counted(hasPaid ? paid.requests : null),
+          free: counted(free.requests),
+          paid: counted(paid.requests),
         }}
         deltas={change?.requests ?? [null]}
       />
@@ -154,8 +150,8 @@ function UsageCards({
         icon={Hash}
         label="Output tokens"
         sides={{
-          free: counted(hasFree ? free.outputTokens : null),
-          paid: counted(hasPaid ? paid.outputTokens : null),
+          free: counted(free.outputTokens),
+          paid: counted(paid.outputTokens),
         }}
         deltas={change?.outputTokens ?? [null]}
       />
@@ -172,12 +168,7 @@ function UsageCards({
         icon={Wallet}
         label="Authorized (paid)"
         hint="Paid usage that buyer and seller both signed for in receipts. It is not settled USDC: that is under Payments."
-        value={
-          <Flow
-            value={hasPaid ? usdcDecimal(usage.authorized) : null}
-            kind="usdc"
-          />
-        }
+        value={<Flow value={authorized} kind="usdc" />}
         deltas={change?.authorized ?? [null]}
         money
       />

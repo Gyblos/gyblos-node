@@ -8,6 +8,7 @@ import {
   type ExplorerQuery,
   type StatsMetric,
 } from '../lib/paging';
+import { dailyRequests } from '../lib/usage';
 import type { readComparison } from './activity-report';
 import { BarChartCard } from './board/bar-chart-card';
 import { pagedRows, Pager } from './pager';
@@ -28,15 +29,13 @@ const LABELS = {
 
 type Report = Awaited<ReturnType<typeof readComparison>>;
 function breakdownRows(period: Report['period'], metric: StatsMetric) {
-  const sides = new Map(period.source?.days.map((day) => [day.day, day]));
+  const requests = dailyRequests(period.source?.days ?? [], period.dates);
   return period.dates
     .map((day, index) => {
-      const row = sides.get(day);
+      const row = requests[index];
       const point = period.activity.points[index];
-      const left =
-        metric === 'tokens' ? point?.input : row?.free?.requests.headline;
-      const right =
-        metric === 'tokens' ? point?.output : row?.paid?.requests.headline;
+      const left = metric === 'tokens' ? point?.input : row?.free;
+      const right = metric === 'tokens' ? point?.output : row?.paid;
       const paidOut = period.paid.points[index] ?? null;
       const value = metric === 'paidOut' ? paidOut : (point?.[metric] ?? null);
       return { day, left: left ?? null, right: right ?? null, value, paidOut };

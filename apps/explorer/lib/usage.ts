@@ -79,14 +79,30 @@ export function summarizeUsage(snapshot: Pick<CollectorSnapshot, 'days'>) {
         model.modelId,
         (demand.get(model.modelId) ?? 0) + model.requests,
       );
+  const series = dailyRequests(snapshot.days);
+  const summarizeSide = (side: 'free' | 'paid') => {
+    const totals = sideFigures(active.map((day) => day[side]));
+    const requests = observedSum(series.map((row) => row[side]));
+    return {
+      ...totals,
+      requests,
+      outputTokens: requests === null ? null : totals.outputTokens,
+    };
+  };
+  const authorized = snapshot.days.flatMap((day) =>
+    day.paid?.authorizedAtomic != null
+      ? [BigInt(day.paid.authorizedAtomic)]
+      : !day.paid && day.coverage === COVERAGE_STATES.FINAL
+        ? [0n]
+        : [],
+  );
   return {
     active,
-    free: sideFigures(active.map((day) => day.free)),
-    paid: sideFigures(active.map((day) => day.paid)),
-    authorized: active.reduce(
-      (sum, day) => sum + BigInt(day.paid?.authorizedAtomic ?? '0'),
-      0n,
-    ),
+    free: summarizeSide('free'),
+    paid: summarizeSide('paid'),
+    authorized: authorized.length
+      ? authorized.reduce((sum, value) => sum + value)
+      : null,
     unserved: [...demand.values()].reduce((sum, value) => sum + value, 0),
     demand: [...demand].sort((left, right) => right[1] - left[1]),
   };

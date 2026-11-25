@@ -11,6 +11,7 @@ import { createMetricsCollector } from '@gyblos/metrics-collector/app';
 import { runChainIndex } from '@gyblos/metrics-collector/chain/indexer';
 import {
   AGGREGATES,
+  CHAIN_INDEX,
   COLLECTOR_LIMITERS,
 } from '@gyblos/metrics-collector/constants';
 import type { ChainStats } from '@gyblos/metrics-collector/stats-chain';
@@ -276,7 +277,11 @@ void test('GET /v1/stats/chain answers every day with program counts, Gyblos det
       AGGREGATES.formulaVersion,
       2000,
       DEVNET_USDC,
-      { backfillDone: true, updatedAt: 1000 },
+      {
+        backfillDone: true,
+        updatedAt: 1000,
+        historyFloorMs: CHAIN_INDEX.historyFloorMs,
+      },
     ],
   );
   assert.deepEqual(

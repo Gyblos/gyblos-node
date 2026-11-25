@@ -395,3 +395,22 @@ void test('a cold deep link reads one operation page and its recipient-scoped to
   assert.equal(table.pager.pages, 20001);
   assert.equal(table.transactions[0]?.signature, SIGNATURE);
 });
+
+void test('saved operation links retain their cursor when newer rows shift numbered pages', async (t) => {
+  const urls: URL[] = [];
+  t.mock.method(globalThis, 'fetch', async (input: string) => {
+    urls.push(new URL(input));
+    return Response.json({
+      programId: 'program',
+      treasury: 'treasury',
+      total: 0,
+      page: 1,
+      transactions: [],
+      next: null,
+    });
+  });
+  await getTransactionTable(readQuery({ before: CURSOR, txPage: '2' }));
+  assert.equal(urls.length, 1);
+  assert.equal(urls[0]?.searchParams.get('before'), CURSOR);
+  assert.equal(urls[0]?.searchParams.has('page'), false);
+});

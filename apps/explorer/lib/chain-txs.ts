@@ -63,7 +63,7 @@ export async function getTransactionTable(
   recipient: string | null = null,
 ) {
   const requested = query.pages.transactions ?? 1;
-  if (!query.before || query.pages.transactions) {
+  if (!query.before) {
     const url = new URL(chainTxsUrl(COLLECTOR_URL, null, recipient));
     url.searchParams.set(CHAIN_TXS.pageParam, String(requested));
     try {

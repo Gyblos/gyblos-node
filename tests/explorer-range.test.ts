@@ -2,7 +2,11 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { delta } from '@gyblos/explorer/board-delta';
-import { dailyPayouts, parseChainStats } from '@gyblos/explorer/chain-shape';
+import {
+  dailyPayouts,
+  dailySettled,
+  parseChainStats,
+} from '@gyblos/explorer/chain-shape';
 import { parseNetworkDay } from '@gyblos/explorer/collector-shape';
 import { pricePerMtok } from '@gyblos/explorer/format';
 import { overviewActivity } from '@gyblos/explorer/overview-activity';
@@ -152,7 +156,11 @@ void test('zero payouts require a closed and indexed day', () => {
   const chain = {
     ...parseChainStats({
       days: dates.map((day) => ({ day, gyblosClaimed: null, program: null })),
-      index: { backfillDone: true, updatedAt: Date.parse('2026-11-18') },
+      index: {
+        backfillDone: true,
+        historyFloorMs: Date.parse('2026-11-17'),
+        updatedAt: Date.parse('2026-11-18'),
+      },
       aggregatedAt: null,
     }),
     error: null,
@@ -167,6 +175,38 @@ void test('zero payouts require a closed and indexed day', () => {
   });
   assert.equal(fresh.complete, true);
   assert.deepEqual(fresh.points, [0n, 0n]);
+});
+
+void test('an empty day before the chain history floor stays unknown', () => {
+  const dates = ['2026-10-31', '2026-11-01'];
+  const read = (floor: { historyFloorMs?: number }) => ({
+    ...parseChainStats({
+      aggregatedAt: null,
+      index: {
+        backfillDone: true,
+        updatedAt: Date.parse('2026-11-03'),
+        ...floor,
+      },
+      days: dates.map((day) => ({ day, gyblosClaimed: null, program: null })),
+    }),
+    error: null,
+  });
+  const covered = read({ historyFloorMs: Date.parse(dates[1]!) });
+  assert.deepEqual(dailyPayouts(dates, covered), {
+    complete: false,
+    points: [null, 0n],
+    total: 0n,
+  });
+  assert.deepEqual(
+    dailySettled(covered).map((row) => row.settled),
+    [null, 0n],
+  );
+  const legacy = read({});
+  assert.deepEqual(dailyPayouts(dates, legacy).points, [null, null]);
+  assert.deepEqual(
+    dailySettled(legacy).map((row) => row.settles),
+    [null, null],
+  );
 });
 
 void test('lifetime activity begins at the oldest observed day, skipping empty padding', async () => {

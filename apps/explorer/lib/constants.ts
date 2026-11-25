@@ -222,7 +222,6 @@ export const IDENTITY = {
   verifiedParam: 'verified',
   verifiedValue: '1',
   bandsPerUnit: 100,
-  gridSize: 5,
   cellPx: 4,
   hashOffset: 2_166_136_261,
   hashPrime: 16_777_619,

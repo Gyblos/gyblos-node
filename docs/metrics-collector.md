@@ -524,10 +524,11 @@ interval a count of one can reveal the token total of a single request.
 
 `GET /v1/stats/chain` takes the same range and envelope, plus `network` (the
 CAIP-2 devnet id), `programId`, `mint` (devnet USDC) and `index`: whether the
-program's history is fully read (`backfillDone`) and when the index last moved
-(`updatedAt`), or `null` before its first run. Until `backfillDone`, older days
-may still be missing. `days` lists every day of the range with `program` and
-`gyblosClaimed`, each `null` without activity that day:
+indexer's configured history start (`historyFloorMs`, epoch milliseconds),
+whether it finished reading back to that start (`backfillDone`), and when the
+index last moved (`updatedAt`). The index is `null` before its first run. Until
+`backfillDone`, older days may still be missing. `days` lists every day of the
+range with `program` and `gyblosClaimed`, each `null` without activity that day:
 
 - `program` (anyone's traffic, from the signature list only): `transactions`
   (successful and failed) and `failed`;

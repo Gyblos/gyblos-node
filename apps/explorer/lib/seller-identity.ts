@@ -103,18 +103,6 @@ export function sellerFace(nodeId: string) {
   };
 }
 
-export function identicon(nodeId: string): boolean[][] {
-  const bits = hash(nodeId);
-  const half = Math.ceil(IDENTITY.gridSize / 2);
-  return Array.from({ length: IDENTITY.gridSize }, (_, row) => {
-    const left = Array.from(
-      { length: half },
-      (_, column) => ((bits >>> (row * half + column)) & 1) === 1,
-    );
-    return [...left, ...left.slice(0, IDENTITY.gridSize - half).reverse()];
-  });
-}
-
 export const SELLERS_EMPTY = {
   noOffers: 'No offers from online sellers.',
   noVerified: 'No online seller has a verified GitHub account yet.',

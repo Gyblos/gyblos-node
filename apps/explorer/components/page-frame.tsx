@@ -34,10 +34,10 @@ export function PageFrame({
             {toolbar}
           </div>
           {children}
+          <HashScroll />
         </QueryRegion>
       </main>
       <SiteFooter />
-      <HashScroll />
     </div>
   );
 }

@@ -42,6 +42,7 @@ export interface ChainSnapshot {
   // Whether the program's history is fully read; null before the index ever ran.
   backfillDone: boolean | null;
   indexedAt?: number | null;
+  historyFloorMs?: number | null;
   days: ChainDay[];
   error: string | null;
 }
@@ -80,6 +81,12 @@ export function parseChainStats(value: unknown): Omit<ChainSnapshot, 'error'> {
     aggregatedAt: nullable(body.aggregatedAt, (present) =>
       num(present, 'chain.aggregatedAt'),
     ),
+    historyFloorMs:
+      typeof index?.historyFloorMs === 'number' &&
+      Number.isSafeInteger(index.historyFloorMs) &&
+      index.historyFloorMs >= 0
+        ? index.historyFloorMs
+        : null,
     indexedAt: index
       ? nullable(index.updatedAt, (value) =>
           num(value, 'chain.index.updatedAt'),
@@ -180,11 +187,14 @@ export function summarizeChain(snapshot: ChainSnapshot): ChainSummary {
 // One point per day of the range, oldest first: what Gyblos channels settled that day (0 without
 // activity), for the daily chart.
 function indexedDay(chain: ChainSnapshot, date: string) {
+  const start = Date.parse(date);
   return (
     !chain.error &&
     chain.backfillDone === true &&
+    chain.historyFloorMs != null &&
+    start >= chain.historyFloorMs &&
     chain.indexedAt != null &&
-    chain.indexedAt >= Date.parse(date) + UNITS.msPerDay
+    chain.indexedAt >= start + UNITS.msPerDay
   );
 }
 

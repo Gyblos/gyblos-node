@@ -10,12 +10,19 @@ import {
   useTransition,
   type MouseEvent,
   type ReactNode,
+  type RefObject,
 } from 'react';
 import { createPortal } from 'react-dom';
 
 import { Skeleton } from '../boardui/components/base/skeleton/skeleton';
 
 const Busy = createContext(false);
+const ScrollIntent = createContext<RefObject<string | null> | null>(null);
+
+export function useInPlaceDestination() {
+  return useContext(ScrollIntent);
+}
+
 const Navigate = createContext<((href: string) => void) | null>(null);
 
 export function useQueryNavigation() {
@@ -90,10 +97,14 @@ export function PagedSurface({
 export function QueryRegion({ children }: { children: ReactNode }) {
   const ancestorBusy = useContext(Busy);
   const router = useRouter();
+  const localDestination = useRef<string | null>(null);
+  const destination = useInPlaceDestination() ?? localDestination;
   const root = useRef<HTMLDivElement>(null);
   const [pending, start] = useTransition();
-  const navigate = (href: string) =>
+  const navigate = (href: string) => {
+    destination.current = new URL(href, location.href).href;
     start(() => router.push(href, { scroll: false }));
+  };
   function capture(event: MouseEvent<HTMLDivElement>) {
     if (
       event.button ||
@@ -114,25 +125,29 @@ export function QueryRegion({ children }: { children: ReactNode }) {
     const url = new URL(link.href);
     if (url.origin !== location.origin || url.pathname !== location.pathname)
       return;
+    if (url.search === location.search && url.hash !== location.hash) return;
     event.preventDefault();
-    if (url.search !== location.search) navigate(url.pathname + url.search);
+    if (url.search !== location.search)
+      navigate(url.pathname + url.search + url.hash);
   }
   return (
-    <Navigate.Provider value={navigate}>
-      <Busy.Provider value={pending || ancestorBusy}>
-        <div
-          className="contents"
-          data-query-region=""
-          aria-busy={pending}
-          ref={root}
-          onClickCapture={capture}
-        >
-          {children}
-          {pending && !ancestorBusy && root.current && (
-            <PendingFields root={root.current} />
-          )}
-        </div>
-      </Busy.Provider>
-    </Navigate.Provider>
+    <ScrollIntent.Provider value={destination}>
+      <Navigate.Provider value={navigate}>
+        <Busy.Provider value={pending || ancestorBusy}>
+          <div
+            className="contents"
+            data-query-region=""
+            aria-busy={pending}
+            ref={root}
+            onClickCapture={capture}
+          >
+            {children}
+            {pending && !ancestorBusy && root.current && (
+              <PendingFields root={root.current} />
+            )}
+          </div>
+        </Busy.Provider>
+      </Navigate.Provider>
+    </ScrollIntent.Provider>
   );
 }

@@ -17,7 +17,6 @@ import { sectionRangeHref } from '@gyblos/explorer/paging';
 import {
   emptySellersMessage,
   githubByNode,
-  identicon,
   notOnlineMeta,
   orderSellers,
   verifiedOnly,
@@ -152,21 +151,6 @@ void test('the verified filter keeps only sellers with a verified account', () =
     ).map((entry) => entry.nodeId),
     [NODE_B],
   );
-});
-
-void test('the identicon is symmetric, stable per NodeId and differs between nodes', () => {
-  const first = identicon(NODE_A);
-  assert.deepEqual(identicon(NODE_A), first);
-  assert.equal(first.length, 5);
-  for (const row of first) {
-    assert.equal(row.length, 5);
-    assert.equal(row[0], row[4]);
-    assert.equal(row[1], row[3]);
-  }
-  const other = identicon(
-    '0d1463f81260071aeda372efb2958da7719ffa2671a7e7fd30d6c181c33a4d40',
-  );
-  assert.notDeepEqual(other, first);
 });
 
 void test('the empty sellers message says what is known', () => {
