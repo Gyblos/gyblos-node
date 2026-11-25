@@ -138,7 +138,7 @@ void test('docs handbook: seller pages never ask the reader to run a repository 
     for (const locale of ['en', 'es']) {
       assert.doesNotMatch(
         await page(slug, locale),
-        /^pnpm /m,
+        /(?:^|`)\s*\$?\s*pnpm\s/m,
         `${locale}/${slug}`,
       );
     }
