@@ -332,14 +332,6 @@ html
     transform: none;
   }
 }
-.desktop-frame .preview-model-mode {
-  padding: 2px 8px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  color: var(--muted);
-  font-size: 11px;
-  white-space: nowrap;
-}
 .desktop-frame .preview-seller-panel {
   display: grid;
   margin: 0 14px 12px 50px;

@@ -265,7 +265,7 @@ void test('model catalog rows name one model and show a mode only for the model 
   ).replace(/\s+/g, ' ');
   assert.match(
     css,
-    /\.preview-model-summary \.preview-model-mode:not\(:empty\) \{[^}]*border-radius: 999px/,
+    /\.desktop-frame \.preview-model-mode:not\(:empty\) \{[^}]*border-radius: 999px/,
   );
 });
 

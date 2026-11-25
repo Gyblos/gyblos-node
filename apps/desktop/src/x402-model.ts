@@ -257,9 +257,15 @@ export function x402StatAmount(
   policy: Pick<BuyerApiPolicy, 'mint'>,
 ) {
   if (policy.mint !== DEVNET_USDC) return atomic + ' ' + x402Asset(policy);
-  return (
-    x402Amount(atomic, policy).replace(/0+$/, '').replace(/\.$/, '') + ' USDC'
-  );
+  return x402ShortAmount(atomic, policy) + ' USDC';
+}
+export function x402ShortAmount(
+  atomic: string,
+  policy: Pick<BuyerApiPolicy, 'mint'>,
+) {
+  const [whole, fraction] = x402Amount(atomic, policy).split('.');
+  const decimals = fraction?.replace(/0+$/, '');
+  return decimals ? whole + '.' + decimals : whole;
 }
 export function x402BudgetInput(
   value: string,

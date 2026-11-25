@@ -1685,7 +1685,7 @@ html .app.desktop-frame .content .preview-model-summary {
   gap: 4px;
   min-width: 0;
 }
-.desktop-frame .preview-model-summary .preview-model-mode:not(:empty) {
+.desktop-frame .preview-model-mode:not(:empty) {
   padding: 2px 8px;
   border: 1px solid var(--line);
   border-radius: 999px;
