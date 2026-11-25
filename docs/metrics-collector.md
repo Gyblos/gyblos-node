@@ -390,14 +390,14 @@ with an optional inclusive `to`. The collector discovers the earliest available
 day per resource, including the requested node on seller reads. All-time
 responses include `range: "all"` and `historyAvailable`. When the resource has
 no history through the cutoff, `historyAvailable` is false and `from` equals
-`to`. Combining `range=all` with `from` or a future `to` is invalid.
-A malformed, impossible, reversed or too long bounded range, or
-a NodeId that is not 64 lowercase hex characters, answers `400 INVALID_QUERY`.
-Without a database the stats routes answer `503 COLLECTOR_UNAVAILABLE`. Reads
-spend their own per-address budget (`COLLECTOR_READ_LIMITER`, 120 per minute). A
-successful answer is `Cache-Control: public, max-age=300` and the Worker keeps
-it in the edge cache, keyed by URL, so repeated reads cost no database query;
-errors are never cached.
+`to`. Combining `range=all` with `from` or a future `to` is invalid. A
+malformed, impossible, reversed or too long bounded range, or a NodeId that is
+not 64 lowercase hex characters, answers `400 INVALID_QUERY`. Without a database
+the stats routes answer `503 COLLECTOR_UNAVAILABLE`. Reads spend their own
+per-address budget (`COLLECTOR_READ_LIMITER`, 120 per minute). A successful
+answer is `Cache-Control: public, max-age=300` and the Worker keeps it in the
+edge cache, keyed by URL, so repeated reads cost no database query; errors are
+never cached.
 
 Every answer has `from`, `to`, `formulaVersion` (the version every row in the
 answer was computed with, or `null` when there is no data or a recompute after a

@@ -48,16 +48,44 @@ const meta = (backfillDone: boolean | null, aggregatedAt: number | null) =>
 
 // Each figure's change against the span just before the range; none when it cannot be read or the
 // chain history is still being read (an incomplete earlier span would overstate every change).
-function changes(current: ChainSummary['totals'], before: ChainSnapshot) {
+function changes(period: ChainSummary, before: ChainSnapshot) {
   if (before.error || !before.backfillDone) return null;
-  const previous = summarizeChain(before).totals;
+  const current = period.totals;
+  const baseline = summarizeChain(before);
+  const previous = baseline.totals;
   return {
-    settled: [delta(current.settled, previous.settled)],
-    paidOut: [delta(current.paidOut, previous.paidOut)],
-    gyblosFees: [delta(current.gyblosFees, previous.gyblosFees)],
-    opens: [delta(current.opens, previous.opens)],
-    deposited: [delta(current.deposited, previous.deposited)],
-    refunded: [delta(current.refunded, previous.refunded, 'none')],
+    transactions: [
+      previous.transactions > 0
+        ? delta(current.transactions, previous.transactions)
+        : null,
+    ],
+    feeShare: [
+      period.feeShare !== null && baseline.feeShare && baseline.feeShare > 0
+        ? delta(period.feeShare, baseline.feeShare, 'none')
+        : null,
+    ],
+    settled: [
+      previous.settled > 0 ? delta(current.settled, previous.settled) : null,
+    ],
+    paidOut: [
+      previous.paidOut > 0 ? delta(current.paidOut, previous.paidOut) : null,
+    ],
+    gyblosFees: [
+      previous.gyblosFees > 0
+        ? delta(current.gyblosFees, previous.gyblosFees)
+        : null,
+    ],
+    opens: [previous.opens > 0 ? delta(current.opens, previous.opens) : null],
+    deposited: [
+      previous.deposited > 0
+        ? delta(current.deposited, previous.deposited)
+        : null,
+    ],
+    refunded: [
+      previous.refunded > 0
+        ? delta(current.refunded, previous.refunded, 'none')
+        : null,
+    ],
   };
 }
 
@@ -74,7 +102,7 @@ export async function PaymentsSection({ query }: { query: ExplorerQuery }) {
   const { totals } = summary;
   const change =
     report.compared.paid.complete && report.previous.paid.complete
-      ? changes(summarizeChain(report.compared.chain).totals, before)
+      ? changes(summarizeChain(report.compared.chain), before)
       : null;
   return (
     <>
@@ -124,26 +152,27 @@ function PaymentStats({
         icon={Coins}
         label="Settled"
         value={money(totals.settled)}
-        deltas={change?.settled}
+        deltas={change?.settled ?? [null]}
         money
       />
       <StatCard
         icon={ArrowUpRight}
         label="Paid to sellers"
         value={paidOut === null ? '—' : money(paidOut)}
-        deltas={change?.paidOut}
+        deltas={change?.paidOut ?? [null]}
         money
       />
       <StatCard
         icon={Landmark}
         label="Gyblos fees"
         value={money(totals.gyblosFees)}
-        deltas={change?.gyblosFees}
+        deltas={change?.gyblosFees ?? [null]}
         money
       />
       <StatCard
         icon={Percent}
         label="Effective fee"
+        deltas={change?.feeShare ?? [null]}
         hint="Gyblos fees as a share of what buyers paid out: fees divided by fees plus what sellers received."
         value={<Flow value={summary.feeShare} kind="percent" />}
       />
@@ -151,24 +180,25 @@ function PaymentStats({
         icon={Unlock}
         label="Channels opened"
         value={<Flow value={totals.opens} kind="count" />}
-        deltas={change?.opens}
+        deltas={change?.opens ?? [null]}
       />
       <StatCard
         icon={ArrowDownToLine}
         label="Deposited"
         value={money(totals.deposited)}
-        deltas={change?.deposited}
+        deltas={change?.deposited ?? [null]}
         money
       />
       <StatCard
         icon={Undo2}
         label="Refunded"
         value={money(totals.refunded)}
-        deltas={change?.refunded}
+        deltas={change?.refunded ?? [null]}
       />
       <StatCard
         icon={ListOrdered}
         label="Gyblos transactions"
+        deltas={change?.transactions ?? [null]}
         value={count(totals.transactions)}
         caption={`of ${count(summary.programTransactions)} in the payments program`}
       />

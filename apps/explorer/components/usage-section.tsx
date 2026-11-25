@@ -82,21 +82,38 @@ function changes(
   previous: ReturnType<typeof summarizeUsage> | null,
 ) {
   if (!previous) return null;
+  const sides = ['free', 'paid'] as const;
+  const sidesChange = (
+    key: 'requests' | 'outputTokens' | 'successRate' | 'firstToken',
+  ) =>
+    sides.map((side) => {
+      const now = current[side][key];
+      const then = previous[side][key];
+      if (
+        !current.active.some((row) => row[side]) ||
+        typeof now !== 'number' ||
+        typeof then !== 'number' ||
+        then <= 0
+      )
+        return null;
+      return delta(now, then, key === 'firstToken' ? 'down' : 'up');
+    });
   return {
-    requests: (['free', 'paid'] as const).map((side) =>
-      current.active.some((row) => row[side]) &&
-      previous.active.some((row) => row[side])
-        ? delta(current[side].requests, previous[side].requests)
+    requests: sidesChange('requests'),
+    outputTokens: sidesChange('outputTokens'),
+    successRate: sidesChange('successRate'),
+    firstToken: sidesChange('firstToken'),
+    authorized: [
+      current.active.some((row) => row.paid?.authorizedAtomic != null) &&
+      previous.authorized > 0n
+        ? delta(current.authorized, previous.authorized)
         : null,
-    ),
-    outputTokens: (['free', 'paid'] as const).map((side) =>
-      current.active.some((row) => row[side]) &&
-      previous.active.some((row) => row[side])
-        ? delta(current[side].outputTokens, previous[side].outputTokens)
+    ],
+    unserved: [
+      current.active.some((row) => row.demand.length) && previous.unserved > 0
+        ? delta(current.unserved, previous.unserved, 'down')
         : null,
-    ),
-    authorized: [delta(current.authorized, previous.authorized)],
-    unserved: [delta(current.unserved, previous.unserved, 'down')],
+    ],
   };
 }
 
@@ -123,11 +140,12 @@ function UsageCards({
           free: <Flow value={hasFree ? free.requests : null} kind="count" />,
           paid: <Flow value={hasPaid ? paid.requests : null} kind="count" />,
         }}
-        deltas={change?.requests}
+        deltas={change?.requests ?? [null]}
       />
       <StatCard
         icon={CircleCheck}
         label="Success"
+        deltas={change?.successRate ?? [null]}
         sides={{
           free: <Flow value={free.successRate} kind="percent" />,
           paid: <Flow value={paid.successRate} kind="percent" />,
@@ -146,11 +164,12 @@ function UsageCards({
             <Flow value={hasPaid ? paid.outputTokens : null} kind="count" />
           ),
         }}
-        deltas={change?.outputTokens}
+        deltas={change?.outputTokens ?? [null]}
       />
       <StatCard
         icon={Timer}
         label="Seller first token p50"
+        deltas={change?.firstToken ?? [null]}
         sides={{
           free: latencyText(free.firstToken),
           paid: latencyText(paid.firstToken),
@@ -166,7 +185,7 @@ function UsageCards({
             kind="usdc"
           />
         }
-        deltas={change?.authorized}
+        deltas={change?.authorized ?? [null]}
         money
       />
       <StatCard
@@ -174,7 +193,7 @@ function UsageCards({
         label="Unserved demand"
         hint="Requests buyers could not get served: no seller offered the model, or the seller refused."
         value={<Flow value={usage.unserved} kind="count" />}
-        deltas={change?.unserved}
+        deltas={change?.unserved ?? [null]}
       />
     </div>
   );

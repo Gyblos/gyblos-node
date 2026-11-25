@@ -4,6 +4,7 @@
 import type { ComponentType, ReactNode } from 'react';
 
 import { StatHint } from '../../boardui/components/application/dashboard/stat-cards';
+import { Chip } from './chip';
 import { cx } from './cx';
 import type { Delta } from './delta';
 import { DeltaChip } from './delta-chip';
@@ -28,6 +29,7 @@ function Pills({
   deltas: (Delta | null)[];
   sides: boolean;
 }) {
+  if (!deltas.some(Boolean)) return <Chip>No baseline</Chip>;
   return (
     <span className="flex flex-wrap items-center gap-1">
       {deltas.map((delta, index) =>
@@ -37,7 +39,11 @@ function Pills({
             delta={delta}
             side={sides ? SIDES[index] : undefined}
           />
-        ) : null,
+        ) : (
+          <Chip key={index}>
+            {sides ? SIDES[index] + ' · ' : ''}No baseline
+          </Chip>
+        ),
       )}
     </span>
   );
@@ -167,7 +173,7 @@ export function StatCard({
   selection,
   comparison,
 }: CardProps) {
-  const changed = deltas?.some(Boolean) ? deltas : null;
+  const changed = deltas ?? null;
   if (variant === 'plain')
     return (
       <PlainCard

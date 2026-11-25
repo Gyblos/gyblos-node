@@ -9,17 +9,21 @@ explorer shows a short version of it.
 
 ## Pages [#pages]
 
-| Page            | What it shows                                                                       |
-| --------------- | ----------------------------------------------------------------------------------- |
-| Network (`/`)   | Recorded tokens and requests, payments to sellers, current offers and recent operations.     |
-| `/sellers`      | Every seller online now, and the ones offline or not published.                     |
-| `/models`       | Each model offered now, its lowest paid prices, and what was served over the range. |
-| `/transactions` | Every Gyblos channel transaction, newest first.                                     |
-| `/stats`        | Usage and payments over the range, with their daily tables and unserved demand.     |
+| Page            | What it shows                                                                            |
+| --------------- | ---------------------------------------------------------------------------------------- |
+| Network (`/`)   | Recorded tokens and requests, payments to sellers, current offers and recent operations. |
+| `/sellers`      | Every seller online now, and the ones offline or not published.                          |
+| `/models`       | Each model offered now, its lowest paid prices, and what was served over the range.      |
+| `/transactions` | Every Gyblos channel transaction, newest first.                                          |
+| `/stats`        | Usage and payments over the range, with their daily tables and unserved demand.          |
 
-A seller counts as online when the discovery index lists it, so the overview count and the tables agree. Each section that covers a span of days (Overview, Models, Usage, Payments and a seller's Activity) has its own period selector, saved in the page address. It defaults to **All** for the available history. Choose **24h**, **7d** or **30d** for a recent window. Across all pages, **24h** covers the last completed UTC calendar day. For example, on March 1, 2024 it covers February 29 UTC. Columns with arrows sort the table: highest first, then lowest first, then the default order. The day columns and Unserved demand already show newest or most requests first, so their first click shows oldest or fewest first.
+All historical periods end at the last completed UTC calendar day. **All** opens the available history. **24h** opens the last completed UTC day, and **7d** and **30d** open that many completed days. Each chart date represents one UTC day. An observed zero and a day without observations have different marks.
 
-Network Overview adds input and output tokens across free and paid receipts for the selected closed UTC days. Select a metric to see its daily values. Every chart date represents one UTC day. For a 24h, 7-day or 30-day period, the comparison covers the immediately preceding window. The collector publishes the latest aggregation timestamp without certifying that a whole window is complete, so the overview omits percentage changes when coverage cannot be established. The current offers table remains independent of the period.
+On Network, select tokens, requests or seller payouts. The chart follows the page period unless you change its own selector. **Daily breakdown** opens that metric and period in Stats. The daily tokens table divides the total into input and output, the requests table into free and paid. Payments shows the amount received by sellers separately from settlements. Usage and Payments share the period selector. All-time totals compare the latest two closed seven-day windows when a baseline is available. Receipt comparisons show the number of observed days on each side.
+
+Current offers have their own update time. Open the model, seller or wallet address from an offer row, or the individual operation from its transaction row. Tables keep their headers and pagination; on narrow screens the daily tables let you choose a column group or all columns.
+
+A seller counts as online when the discovery index lists it. Column headers with arrows cycle through descending, ascending and default order. Dates and demand start with the newest days and highest demand respectively. For a fixed period, the comparison uses the immediately preceding period of equal length.
 
 ## Check mark and names [#verified]
 
