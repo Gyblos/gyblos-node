@@ -11,7 +11,7 @@ import {
   type BrowserWindow,
 } from 'electron';
 
-import { desktopX402Paths } from '@gyblos/config/home';
+import { desktopX402Paths } from '@gyblos/config/home-desktop';
 import { reviewDesktopCharge } from '@gyblos/node/buyer-funding';
 import { desktopOpening } from '@gyblos/node/desktop-opening';
 import {

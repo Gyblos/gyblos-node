@@ -5,7 +5,7 @@ import { lstat, mkdir, readdir, rename, rmdir } from 'node:fs/promises';
 import {
   DESKTOP_WALLET_LIBRARY,
   desktopWalletLibraryPaths,
-} from '@gyblos/config/home';
+} from '@gyblos/config/home-desktop';
 
 import { readBackupFile, writeBackupFile } from './backup-files';
 import { WALLET, WALLET_LIBRARY, WALLET_LIBRARY_ERROR } from './constants';

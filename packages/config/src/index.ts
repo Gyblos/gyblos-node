@@ -7,6 +7,12 @@ export * from './paths';
 
 export * from './home';
 
+export * from './home-desktop';
+
+export * from './home-payments';
+
+export * from './home-paypal';
+
 export * from './versions';
 
 export * from './limits';

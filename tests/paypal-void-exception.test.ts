@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 
-import { paypalSandboxPaths } from '@gyblos/config/home';
+import { paypalSandboxPaths } from '@gyblos/config/home-paypal';
 import { openPaypalJournal } from '@gyblos/node/paypal-journal';
 import { createPaypalSession } from '@gyblos/node/paypal-session';
 import { canonicalJson } from '@gyblos/protocol';

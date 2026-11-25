@@ -24,7 +24,7 @@ layer of each package comes from `tooling/boundaries/config.ts`.
 | ---------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `packages/protocol`          | protocol   | Wire contracts: canonical JSON, signing domains, Iroh ALPNs, error codes, the model catalog, golden vectors. Ports: `Engine`, `PaymentClient`, `PaymentServer`, `ExecutionPolicy`, telemetry. No SDKs.         |
 | `packages/core`              | core       | Pure policy: pricing and metering, offer trust (`offers`), free admission, control admission and quotes, seller selection (`seller-selection*`), public receipt policy, shared engine HTTP helpers. No SDKs.   |
-| `packages/config`            | config     | Operator values: devnet addresses, ports, limits, relay, discovery index and collector URLs, `GYBLOS_*` variable names, and the local home layout (`home.ts`).                                                 |
+| `packages/config`            | config     | Operator values: devnet addresses, ports, limits, relay, discovery index and collector URLs, `GYBLOS_*` variable names, and the local home layout (`home*.ts`).                                                |
 | `packages/runtime`           | runtime    | Platform helpers: atomic JSON writes, private rotating logs, processes, memory probes, the loopback `Host` guard, rate-limit IP keys (`ip-key`), the diagnostic envelope.                                      |
 | `packages/inference`         | inference  | The SDK-free execution lifecycle and conversation pipeline over protocol ports. Node supplies engines, economic policy and observation.                                                                        |
 | `packages/engine-ollama`     | adapter    | Ollama client as an `Engine`, with the pinned tokenizer and model constants.                                                                                                                                   |
@@ -238,8 +238,29 @@ name and its validation rule; the discovery index stores and lists it.
 
 ## Local data
 
-`packages/config/src/home.ts` owns every local path as a pure function of the
-environment. No other module builds `.local/...` paths.
+The `packages/config/src/home*.ts` files own every local path as pure functions
+of the environment or of a directory their caller passes. No other module builds
+`.local/...` paths. `home.ts` holds the homes, the role directories and their
+file names and the lab home; the other files hold one area each:
+
+- `home-payments.ts`: receipts stay in the private per-role receipt directory.
+  The seller's upto payment ledger and the buyer's journal of the channels it
+  authorized stay in the private per-role payments directory. Each role has one
+  bounded reusable channel journal with no prompts, answers or signing keys. The
+  buyer keeps a buyer-wide budget catalog with a deterministic private slot per
+  seller, and the seller a bounded directory per buyer; legacy journals stay at
+  their original private paths.
+- `home-desktop.ts`: the wallet library is isolated from the node role homes and
+  names identities by public base58 address. Desktop activity is private,
+  descriptive history, separate from payment journals. Conversations live in the
+  persistent desktop profile, outside disposable Chromium sessions. The chat
+  payment permission file holds confirmed payment references, never wallet keys.
+  The desktop and its managed buyer arbitrate one outstanding chat under a
+  private process lock in the buyer's payments directory.
+- `home-paypal.ts`: the PayPal sandbox uses an explicit, isolated directory and
+  never shares a journal with the chain payment adapter.
+- `home-model-verifier.ts`: the model verifier's key and results, under
+  `model-verifier/` in the product home.
 
 ```text
 $GYBLOS_HOME (default .local/gyblos from a checkout, ~/.gyblos for the packaged

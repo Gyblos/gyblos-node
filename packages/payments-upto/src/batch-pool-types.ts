@@ -1,5 +1,5 @@
 // Private buyer portfolio ports; each slot retains one original session and independently observed refund.
-import type { BatchPoolPaths } from '@gyblos/config/home';
+import type { BatchPoolPaths } from '@gyblos/config/home-payments';
 import type { PaymentSessionTerms } from '@gyblos/protocol/payment-session';
 
 import type { openBatchBuyerBackend } from './batch-session-backend';

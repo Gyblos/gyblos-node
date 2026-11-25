@@ -6,7 +6,7 @@ import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
 import {
   batchSellerBuyerPaths,
   type BatchSellerPaths,
-} from '@gyblos/config/home';
+} from '@gyblos/config/home-payments';
 import { canonicalJson } from '@gyblos/protocol';
 import {
   controlArray,
