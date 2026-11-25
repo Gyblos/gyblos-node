@@ -114,7 +114,7 @@ for (const [
   deviations,
   exitCode,
 ] of evidenceCases) {
-  void test(`check ${name}`, async () => {
+  void test(`check ${name}`, async (context) => {
     await withHome(async (home) => {
       const key = await loadVerifierKey(join(home, 'verifier.key'), true);
       const digest = 'cd'.repeat(32);
@@ -161,7 +161,20 @@ for (const [
       );
       const resultFile = join(home, 'result.json');
       await writeFile(resultFile, JSON.stringify(signed));
+      const reportError = context.mock.method(console, 'error', () => {});
       assert.equal(await main(['check', resultFile]), exitCode);
+      if (exitCode === 1)
+        assert.deepEqual(
+          reportError.mock.calls.map((call) => call.arguments),
+          [
+            [
+              JSON.stringify({
+                ok: false,
+                code: MODEL_VERIFIER_CODES.INVALID_RESULT,
+              }),
+            ],
+          ],
+        );
     });
   });
 }
