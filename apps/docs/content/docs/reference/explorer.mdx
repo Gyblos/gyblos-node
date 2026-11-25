@@ -23,6 +23,8 @@ On Network, select tokens, requests or seller payouts. The chart follows the pag
 
 Current offers have their own update time. Open the model, seller or wallet address from an offer row, or the individual operation from its transaction row. Tables keep their headers and pagination; on narrow screens the daily tables let you choose a column group or all columns.
 
+Model and seller pages show published input and output prices in USDC per million tokens. Each bar is one indexed offer period. The selector switches between sellers or model variants and context sizes. The dates show the window returned by the index. A partial-history notice means that older matching periods may be missing.
+
 A seller counts as online when the discovery index lists it. Column headers with arrows cycle through descending, ascending and default order. Dates and demand start with the newest days and highest demand respectively. For a fixed period, the comparison uses the immediately preceding period of equal length.
 
 In the requests-per-day charts on Stats, hovering a day shows how complete it is: "so far" for today, "pending" for a day the collector has not counted yet (today too, for up to 10 minutes after new requests; its bar may still show the earlier count), and "not captured" for a day before the collector started, which is not a zero. A day without a note is final, so an empty one is a real zero, unless the collector reported no state for it (an older collector), which also shows no note.

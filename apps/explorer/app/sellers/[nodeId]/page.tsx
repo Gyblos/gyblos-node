@@ -3,9 +3,9 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 
+import { OfferPriceHistory } from '../../../components/offer-price-history';
 import { PageFrame } from '../../../components/page-frame';
 import { QueryRegion } from '../../../components/query-region';
-import { ReceiptPriceHistory } from '../../../components/receipt-price-history';
 import { SellerActivity } from '../../../components/seller-activity';
 import { SellerProfileSection } from '../../../components/seller-profile';
 import { SellerTxs } from '../../../components/seller-txs';
@@ -13,6 +13,7 @@ import { Loading } from '../../../components/ui';
 import { ALL_TIME, PAGES, SELLER_STATUS } from '../../../lib/constants';
 import { getDiscovery } from '../../../lib/discovery-render';
 import { short } from '../../../lib/format';
+import { getOfferPriceHistory } from '../../../lib/offer-price-history';
 import { directoryHref, rangeOf, readQuery } from '../../../lib/paging';
 import { sellerHref } from '../../../lib/seller-identity';
 import { sellerNodeId } from '../../../lib/seller-page';
@@ -51,11 +52,17 @@ export default async function SellerPage({ params, searchParams }: Props) {
   const nodeId = sellerNodeId((await params).nodeId);
   if (!nodeId) notFound();
   const query = readQuery(await searchParams, sellerHref(nodeId));
-  const [snapshot, stats] = await Promise.all([
+  const [snapshot, stats, history] = await Promise.all([
     getDiscovery(),
     getSellerStats(nodeId, ALL_TIME),
+    getOfferPriceHistory({ nodeId, days: rangeOf(query, 'activity') }),
   ]);
-  if (unknownSeller(nodeId, snapshot, stats)) notFound();
+  if (
+    !history.series.length &&
+    !history.error &&
+    unknownSeller(nodeId, snapshot, stats)
+  )
+    notFound();
   return (
     <PageFrame
       title={`Seller ${short(nodeId)}`}
@@ -78,10 +85,7 @@ export default async function SellerPage({ params, searchParams }: Props) {
         <Suspense fallback={<Loading cards />}>
           <SellerActivity nodeId={nodeId} query={query} />
         </Suspense>
-        <ReceiptPriceHistory
-          nodeId={nodeId}
-          days={rangeOf(query, 'activity')}
-        />
+        <OfferPriceHistory history={history} />
       </QueryRegion>
       <Suspense fallback={<Loading />}>
         <SellerTxs nodeId={nodeId} query={query} />

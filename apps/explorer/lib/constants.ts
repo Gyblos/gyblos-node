@@ -44,6 +44,12 @@ export const DISCOVERY = {
   reuseMs: 30 * 1000,
 } as const;
 
+export const OFFER_HISTORY = {
+  maxDays: 92,
+  maxPeriods: 50,
+  maxBytes: 1_048_576,
+} as const;
+
 export const UNITS = {
   usdcDecimals: 6,
   atomicPerUsdc: 1_000_000,

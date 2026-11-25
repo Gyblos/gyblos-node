@@ -2,9 +2,9 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { ModelLogo } from '../../../components/model-logo';
+import { OfferPriceHistory } from '../../../components/offer-price-history';
 import { PageFrame } from '../../../components/page-frame';
 import { pagedRows, Pager } from '../../../components/pager';
-import { ReceiptPriceHistory } from '../../../components/receipt-price-history';
 import { SellerCell } from '../../../components/seller-cell';
 import {
   Addr,
@@ -38,6 +38,7 @@ import {
 } from '../../../lib/format';
 import { mergedLatency } from '../../../lib/latency';
 import { modelLab } from '../../../lib/model-family';
+import { getOfferPriceHistory } from '../../../lib/offer-price-history';
 import { modelFromSlug, modelHref, modelKey } from '../../../lib/offers';
 import {
   directoryHref,
@@ -286,9 +287,10 @@ export default async function ModelPage({
   if (!model) notFound();
   const query = readQuery(await searchParams, modelHref(model));
   const days = rangeOf(query, 'models');
-  const [discovery, collector] = await Promise.all([
+  const [discovery, collector, history] = await Promise.all([
     getDiscovery(),
     getCollector(days, 0, query.closed),
+    getOfferPriceHistory({ model, days }),
   ]);
   const key = modelKey(model);
   const offers = discovery.sellers.flatMap((seller) =>
@@ -320,7 +322,7 @@ export default async function ModelPage({
       ) : (
         <OffersTable discovery={discovery} offers={offers} query={query} />
       )}
-      <ReceiptPriceHistory model={model} days={days} />
+      <OfferPriceHistory history={history} bySeller />
       <SectionTitle
         id={PAGING.anchors.models}
         title={`Recorded activity, ${displayRange(days)}`}

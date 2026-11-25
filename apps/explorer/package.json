@@ -26,6 +26,7 @@
     "./model-family": "./lib/model-family.ts",
     "./model-table": "./lib/model-table.ts",
     "./network-status": "./lib/network-status.ts",
+    "./offer-price-history": "./lib/offer-price-history.ts",
     "./offers": "./lib/offers.ts",
     "./overview-activity": "./lib/overview-activity.ts",
     "./period-bars": "./lib/period-bars.ts",
@@ -44,6 +45,7 @@
     "start": "next start --port 4190"
   },
   "dependencies": {
+    "@gyblos/config": "workspace:*",
     "@gyblos/protocol": "workspace:*",
     "@number-flow/react": "0.6.2",
     "@remixicon/react": "4.9.0",

@@ -22,6 +22,7 @@ export function BarChartCard({
   change,
   countAxis = true,
   comparison,
+  summary,
 }: {
   title: string;
   kind: FlowKind;
@@ -32,6 +33,7 @@ export function BarChartCard({
   // A count axis (whole numbers); amounts hide it and read from the headline instead.
   countAxis?: boolean;
   comparison?: string;
+  summary?: string;
 }) {
   const [index, setIndex] = useState<number | null>(null);
   const active = index === null ? null : points[index];
@@ -61,7 +63,7 @@ export function BarChartCard({
               ]
                 .filter(Boolean)
                 .join(', ')
-            : `${points.length} days`
+            : (summary ?? `${points.length} days`)
         }
       />
       <div className="flex min-w-0 gap-2">
