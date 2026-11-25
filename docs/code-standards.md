@@ -132,7 +132,7 @@ definition: named constants or an `as const` catalog in the owning package's
 ## Config and constants
 
 `packages/config` holds operator-changeable values (ports, limits, timeouts,
-relays, index URLs) and the local home layout. the `config/src/home*.ts` files
+relays, index URLs) and the local home layout. The `config/src/home*.ts` files
 are the only modules that build local paths (`config/src/paths.ts` holds HTTP
 routes, not file paths). Fixed operational values live in the owning module or
 its `constants.ts`; config is not a place for unrelated constants. Dependency

@@ -3,7 +3,6 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import { CONFIG_PATH_ERROR } from './constants';
 import { RUN_MODES, runMode } from './environment';
 
 export const HOME_ENVIRONMENT = {

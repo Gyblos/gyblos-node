@@ -244,12 +244,13 @@ of the environment or of a directory their caller passes. No other module builds
 file names and the lab home; the other files hold one area each:
 
 - `home-payments.ts`: receipts stay in the private per-role receipt directory.
-  The seller's upto payment ledger and the buyer's journal of the channels it
-  authorized stay in the private per-role payments directory. Each role has one
-  bounded reusable channel journal with no prompts, answers or signing keys. The
-  buyer keeps a buyer-wide budget catalog with a deterministic private slot per
-  seller, and the seller a bounded directory per buyer; legacy journals stay at
-  their original private paths.
+  The seller's durable upto payment ledger and the buyer's journal of the
+  channels it authorized stay in the private per-role payments directory. Each
+  role has one bounded reusable channel journal with no prompts, answers or
+  signing keys. The buyer keeps a buyer-wide budget catalog with a deterministic
+  private slot per seller, and its legacy root files stay in place. The seller
+  keeps a bounded financial directory, and its legacy journals remain at their
+  original private path.
 - `home-desktop.ts`: the wallet library is isolated from the node role homes and
   names identities by public base58 address. Desktop activity is private,
   descriptive history, separate from payment journals. Conversations live in the
