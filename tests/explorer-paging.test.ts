@@ -219,46 +219,21 @@ void test('an invalid page parameter is dropped from the URL', () => {
   assert.equal(canonicalPageHref({}), null);
 });
 
-void test('the transaction pager counts rows without a total and keeps its cursor paging', () => {
-  const anchor = `#${PAGING.anchors.transactions}`;
-  assert.equal(PAGING.cursorTable, 'transactions');
+void test('operations show the real last page and link back to the immediately preceding page', () => {
   assert.equal(CHAIN_TXS.pageRows, PAGING.rowsPerPage);
-  assert.ok(CHAIN_TXS.pageRows <= CHAIN_TX_PAGE.maxLimit);
-  assert.equal(txPager(readQuery({}), 3, null)?.rows, 'Rows 1–3');
-  assert.equal(txPager(readQuery({}), 0, null)?.rows, '0 rows');
-  assert.deepEqual(txPager(readQuery({ sellersPage: '2' }), 5, OLDER), {
-    rows: 'Rows 1–5',
-    page: 1,
-    pages: 2,
-    hrefs: { 2: `/?before=${OLDER}&sellersPage=2&txPage=2${anchor}` },
-    showPages: false,
-    previousLabel: 'Newest',
-    nextLabel: 'Older',
-  });
-  assert.deepEqual(
-    txPager(readQuery({ before: CURSOR, txPage: '2', range: '7' }), 5, OLDER),
-    {
-      rows: 'Rows 6–10',
-      page: 2,
-      pages: 3,
-      hrefs: {
-        1: `/?range=7${anchor}`,
-        3: `/?range=7&before=${OLDER}&txPage=3${anchor}`,
-      },
-      showPages: false,
-      previousLabel: 'Newest',
-      nextLabel: 'Older',
-    },
+  assert.ok(CHAIN_TXS.indexBatchRows <= CHAIN_TX_PAGE.maxLimit);
+  const boundaries = [null, CURSOR, OLDER];
+  const pager = txPager(
+    readQuery({ before: OLDER, txPage: '3' }),
+    pageOf(rows(13), 3),
+    boundaries,
   );
-  assert.deepEqual(txPager(readQuery({ before: CURSOR }), 4, null), {
-    rows: null,
-    page: 2,
-    pages: 2,
-    hrefs: { 1: `/${anchor}` },
-    showPages: false,
-    previousLabel: 'Newest',
-    nextLabel: 'Older',
-  });
+  assert.equal(pager.rows, 'Rows 11–13 of 13');
+  assert.equal(pager.pages, 3);
+  assert.equal(pager.showPages, true);
+  assert.match(pager.hrefs[2] ?? '', /txPage=2/);
+  assert.ok(pager.hrefs[2]?.includes(CURSOR));
+  assert.equal(txPager(readQuery({}), pageOf([], 1), [null]).pages, 1);
 });
 
 void test('the Sellers caption counts offers and sellers apart from rows', () => {

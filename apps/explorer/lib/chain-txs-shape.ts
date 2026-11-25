@@ -156,10 +156,11 @@ export function parseChainTxs(value: unknown): Omit<ChainTxPage, 'error'> {
 export function chainTxsQuery(
   before: string | null,
   recipient: string | null = null,
+  limit: number = CHAIN_TXS.pageRows,
 ) {
   const params = new URLSearchParams();
   if (before) params.set(CHAIN_TXS.param, before);
-  params.set(CHAIN_TXS.limitParam, String(CHAIN_TXS.pageRows));
+  params.set(CHAIN_TXS.limitParam, String(limit));
   if (recipient) params.set(CHAIN_TXS.recipientParam, recipient);
   return params.toString();
 }
@@ -168,8 +169,9 @@ export function chainTxsUrl(
   collector: string,
   before: string | null,
   recipient: string | null = null,
+  limit: number = CHAIN_TXS.pageRows,
 ) {
-  const query = chainTxsQuery(before, recipient);
+  const query = chainTxsQuery(before, recipient, limit);
   return `${collector}/stats/chain/txs?${query}`;
 }
 

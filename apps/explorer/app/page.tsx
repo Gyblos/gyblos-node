@@ -7,13 +7,9 @@ import {
   OverviewOperations,
 } from '../components/overview-evidence';
 import { PageFrame } from '../components/page-frame';
+import { QueryRegion } from '../components/query-region';
 import { Loading } from '../components/ui';
-import {
-  canonicalPageHref,
-  movedHomeHref,
-  rangeOf,
-  readQuery,
-} from '../lib/paging';
+import { canonicalPageHref, movedHomeHref, readQuery } from '../lib/paging';
 
 // Every request renders. The collector caches its answers at its own edge (5 minutes); the discovery
 // index is read into KV by the Worker's scheduled run, and renders read KV (lib/discovery-render.ts).
@@ -31,13 +27,12 @@ export default async function Home({
   if (canonical) redirect(canonical);
   const query = { ...readQuery(params), overviewTables: true };
   return (
-    <PageFrame overview title="Network">
-      <Suspense
-        key={`overview-${rangeOf(query, 'overview')}`}
-        fallback={<Loading overview />}
-      >
-        <Overview query={query} />
-      </Suspense>
+    <PageFrame title="Network">
+      <QueryRegion>
+        <Suspense fallback={<Loading overview />}>
+          <Overview query={query} />
+        </Suspense>
+      </QueryRegion>
       <div>
         <Suspense fallback={<Loading />}>
           <OverviewOffers query={query} />

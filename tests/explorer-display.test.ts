@@ -9,6 +9,7 @@ import { FETCH, HELP_TRIGGER } from '@gyblos/explorer/constants';
 import { fetchJson } from '@gyblos/explorer/fetch-json';
 import {
   percent,
+  refreshAge,
   settlementCount,
   tokensPerSecond,
   usdcDecimal,
@@ -23,6 +24,15 @@ const realTimeout = AbortSignal.timeout.bind(AbortSignal);
 afterEach(() => {
   globalThis.fetch = realFetch;
   AbortSignal.timeout = realTimeout;
+});
+
+void test('last update displays elapsed time from the last server render', () => {
+  assert.equal(refreshAge(-100), 'just now');
+  assert.equal(refreshAge(0), 'just now');
+  assert.equal(refreshAge(5_100), '5s ago');
+  assert.equal(refreshAge(62_000), '1m ago');
+  assert.equal(refreshAge(7_200_000), '2h ago');
+  assert.equal(refreshAge(86_400_000), '1d ago');
 });
 
 void test('settlement counts use singular only for one settlement', () => {

@@ -82,6 +82,8 @@ pending wait on disk for the next start; observations not sent by then are dropp
 model and per-seller daily totals, keyed by NodeId. It uses your IP address for rate limiting and does
 not store it.
 
+For completed UTC days, the network activity endpoint groups requests, tokens and indexed payouts to sellers in half-hour intervals. It publishes totals for the whole network and accepts up to seven days per query. If an interval contains only one request, the token count of that request can be inferred. The response contains no identifiers or per-model or per-seller breakdown.
+
 The network totals also count distinct buyers: free buyers by NodeId and paid buyers by wallet (or by
 NodeId when a paid receipt names no wallet), never added together. Each count is published for all
 time and for the buyers whose first receipt reported by the seller and not disputed by the buyer falls in the chosen days. A buyer stays counted even if that receipt is disputed later.

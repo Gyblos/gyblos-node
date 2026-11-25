@@ -28,6 +28,7 @@ rules. The local receipt receiver for private testing is a different app
 | `POST /v1/observations`         | Upload one signed envelope of 1 to 200 content-free telemetry events.    |
 | `GET /v1/health`                | `{ "ok": true }` once storage and every limiter exist.                   |
 | `GET /v1/stats/network`         | Network totals per UTC day ([public stats](#public-stats-api)).          |
+| `GET /v1/stats/intraday`        | Network requests, tokens and seller payouts per closed UTC half hour.    |
 | `GET /v1/stats/models`          | Totals per model over a day range.                                       |
 | `GET /v1/stats/sellers/:nodeId` | One seller's totals per day and per model.                               |
 | `GET /v1/stats/chain`           | Payment-channels program activity per UTC day ([chain](#chain-stats)).   |
@@ -399,12 +400,12 @@ answer is `Cache-Control: public, max-age=300` and the Worker keeps it in the
 edge cache, keyed by URL, so repeated reads cost no database query; errors are
 never cached.
 
-Every answer has `from`, `to`, `formulaVersion` (the version every row in the
-answer was computed with, or `null` when there is no data or a recompute after a
-formula change is under way) and `aggregatedAt` (when the newest row in the
-answer was computed, or `null` without data). Totals come in a `free` and a
-`paid` section, each `null` when there is no data; they are never summed. Each
-section has:
+Every daily aggregate answer has `from`, `to`, `formulaVersion` (the version
+every row in the answer was computed with, or `null` when there is no data or a
+recompute after a formula change is under way) and `aggregatedAt` (when the
+newest row in the answer was computed, or `null` without data). Totals come in a
+`free` and a `paid` section, each `null` when there is no data; they are never
+summed. Each section has:
 
 - `requests`: `headline`, `bilateral`, `sellerOnly`, `disputed`;
 - `outcomes`: `completed`, `failed`, `cancelled`, and `successRate` (`null`
@@ -451,12 +452,36 @@ answer whose days have no data can still carry `buyerTotals`.
 | `GET /v1/stats/models`          | `models`: up to 100 models (model, variant and quantization) with the most completed requests, free and paid together, each with `free` and `paid` (plus `sellers`, and `observed`: `buyerFirstToken` as a latency, and `engineSpeed` with `samples`, `p50MinTokensPerSecond` (the lower bound of the median's bucket; `null` only without samples), `bucketsTokensPerSecond` and `counts`; `observed` is `null` without any observation joined to a receipt of that side, and either metric is empty, with `samples` 0, when only the other has data).                                                                                                                                                                                                   |
 | `GET /v1/stats/sellers/:nodeId` | `days`: every day of the range with `free` and `paid` plus `buyers` and `withheld`; `models`: up to 100 of the seller's models over the range, ordered as above.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 
-Each stats request is one batch of reads over aggregate tables: six statements
-for the network answer, three for the seller answer, two in one batch for
-models, two for chain, whatever the range; the chain transaction list is one
+Each daily stats request is one batch of reads over aggregate tables: six
+statements for the network answer, three for the seller answer, two in one batch
+for models, two for chain, whatever the range; the chain transaction list is one
 statement per page. Histograms are summed and lists are capped in SQL. The one
 read whose cost grows with history is the network answer's buyer totals: one
 grouped count over every first-seen buyer row, whatever the range.
+
+### Intraday network activity
+
+`GET /v1/stats/intraday?from=2026-11-10&to=2026-11-16` requires those two
+parameters in that order. Both bounds are inclusive UTC dates and the range can
+cover one to seven completed days. An open day, extra query field or
+noncanonical query returns `400 INVALID_QUERY`.
+
+The response is
+`{"rows":[{"at":1794268800000,"tokens":17,"requests":2,"paidOut":"80"}]}`. `at`
+is the inclusive half-hour start in epoch milliseconds. Rows are sorted oldest
+first. Each headline receipt counts once at the seller's signed `receivedAt`;
+tokens sum input and output across paid and free receipts. `paidOut` is decimal
+integer text in atomic devnet USDC, using the same balanced, Gyblos-attributed
+payout calculation as the daily chain totals. Block time assigns the payout to a
+half hour. Bins without a headline receipt or an attributed seller payout are
+omitted. A missing bin does not establish source coverage. Late uploads, index
+backfill and daily aggregation lag can cause temporary differences from the
+published daily totals.
+
+A read groups the indexed receipts and chain rows in one database batch. Only
+network-level counts and amounts leave the database. There are no seller, buyer,
+model, signature or receipt identifiers and no per-entity filters. In a quiet
+interval a count of one can reveal the token total of a single request.
 
 ### Chain stats
 

@@ -82,6 +82,7 @@ body {
 }
 
 .explorer-table-scroll {
+  container-type: inline-size;
   scroll-timeline: --table-scroll inline;
 }
 
@@ -138,6 +139,21 @@ body {
 
 .explorer-table tbody td {
   transition: box-shadow 80ms ease-out;
+}
+
+.explorer-table td.explorer-table-empty {
+  padding: 0;
+  text-align: center;
+  color: var(--dim);
+  white-space: normal;
+}
+
+.explorer-table-empty > span {
+  position: sticky;
+  inset-inline-start: 0;
+  display: block;
+  inline-size: min(100%, 100cqi);
+  padding: 1.5rem 1rem;
 }
 
 .explorer-table [data-cross] {
@@ -200,4 +216,34 @@ body {
   [data-overflow] > .explorer-table tr > :first-child:not([colspan]) > span {
     max-width: calc(55vw - 2rem);
   }
+}
+
+[data-loading-active] {
+  position: relative;
+  visibility: hidden;
+}
+
+[data-loading-active] > .contents > .query-skeleton {
+  position: absolute;
+  visibility: visible;
+  inset-inline: 0;
+  top: 50%;
+  height: 1em;
+  max-width: 12em;
+  transform: translateY(-50%);
+}
+
+td[data-loading-active] > .contents > .query-skeleton {
+  inset-inline: 1rem;
+}
+
+td.text-right[data-loading-active] > .contents > .query-skeleton {
+  margin-inline-start: auto;
+}
+
+[data-loading-active=""][data-loading-field="plot"] > .contents > .query-skeleton {
+  inset: 0;
+  max-width: none;
+  height: auto;
+  transform: none;
 }

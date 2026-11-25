@@ -13,7 +13,14 @@ import { SELLER_STATUS_LABELS } from '../lib/seller-profile';
 import { Chip } from './board/chip';
 import { pagedRows, Pager } from './pager';
 import { SellerCell } from './seller-cell';
-import { SectionTitle, Table, td, timeCell } from './ui';
+import {
+  EmptyRow,
+  prefixedColumn,
+  SectionTitle,
+  Table,
+  td,
+  timeCell,
+} from './ui';
 
 export function NotOnline({
   query,
@@ -73,8 +80,8 @@ function NotOnlineTable({
         minWidth={DISPLAY.defaultTable}
         sorting={{ query, table: 'offline' }}
         head={[
-          { label: 'Node' },
-          { label: 'Status' },
+          prefixedColumn('Node', 'seller'),
+          prefixedColumn('Status', 'chip'),
           { label: 'Last seen', sort: 'lastSeen' },
           { label: 'First seen', sort: 'firstSeen' },
         ]}
@@ -83,11 +90,9 @@ function NotOnlineTable({
         }
       >
         {!nodes.length && (
-          <tr>
-            <td className={td} colSpan={4}>
-              No offline or unpublished sellers in this list.
-            </td>
-          </tr>
+          <EmptyRow columns={4}>
+            No offline or unpublished sellers in this list.
+          </EmptyRow>
         )}
         {page.rows.map((node) => (
           <tr key={node.nodeId} className="border-t border-line">

@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 
-import { Flow, type FlowKind, type FlowValue } from './animated-number';
+import type { FlowKind, FlowValue } from './animated-number';
 import { barAxis } from './bar-axis';
+import { ChartReadout } from './chart-readout';
 import { Chip } from './chip';
 import { cx } from './cx';
 import { DayBars, type BarPoint } from './day-bars';
@@ -41,23 +42,28 @@ export function BarChartCard({
   return (
     <div className={cx('min-w-0 p-4 sm:p-5', SURFACE.card)}>
       <div className="text-sm text-muted">{title}</div>
-      <div className="mt-1 flex flex-wrap items-baseline gap-2">
-        <span className="font-mono text-2xl">
-          <Flow value={active ? active.amount : total} kind={kind} />
-        </span>
-        {change && !active ? <DeltaChip delta={change} /> : null}
-        {!active && comparison && !change && <Chip>No baseline</Chip>}
-        <span className="font-mono text-xs text-dim">
-          {active
+      <ChartReadout
+        kind={kind}
+        value={active ? active.amount : total}
+        badge={
+          !active &&
+          (change ? (
+            <DeltaChip delta={change} />
+          ) : comparison ? (
+            <Chip>No baseline</Chip>
+          ) : null)
+        }
+        detail={
+          active
             ? [
                 active.day,
                 active.amount === null ? 'No observation' : active.detail,
               ]
                 .filter(Boolean)
                 .join(', ')
-            : (comparison ?? `${points.length} days`)}
-        </span>
-      </div>
+            : `${points.length} days`
+        }
+      />
       <div className="flex min-w-0 gap-2">
         {!barAxis(countAxis).hide && maximum > 0 && (
           <div
@@ -79,9 +85,10 @@ export function BarChartCard({
           />
         </div>
       </div>
-      {points.some((row) => row.value === null) && (
-        <p className="mt-2 text-xs text-dim">Dashed mark · No observation</p>
-      )}
+      <p className="mt-2 min-h-4 text-xs text-dim">
+        {points.some((row) => row.value === null) &&
+          'Dashed mark · No observation'}
+      </p>
     </div>
   );
 }

@@ -1,18 +1,13 @@
 import Link from 'next/link';
 
-import { getChainTxs } from '../lib/chain-txs';
+import { getTransactionTable } from '../lib/chain-txs';
 import { operationHref, txRow } from '../lib/chain-txs-shape';
 import { PAGES, PAGING } from '../lib/constants';
 import type { OfferedModel } from '../lib/discovery';
 import { getDiscovery } from '../lib/discovery-render';
 import { count, pricePerMtok, utc } from '../lib/format';
 import { modelKey } from '../lib/offers';
-import {
-  rangeOf,
-  tablePager,
-  txPager,
-  type ExplorerQuery,
-} from '../lib/paging';
+import { rangeOf, tablePager, type ExplorerQuery } from '../lib/paging';
 import {
   emptySellersMessage,
   githubByNode,
@@ -25,9 +20,11 @@ import { pagedRows, Pager } from './pager';
 import { SellerCell } from './seller-cell';
 import {
   Addr,
+  EmptyRow,
   ModelName,
   moneyCell,
   numberCell,
+  prefixedColumn,
   SectionTitle,
   Table,
   td,
@@ -38,8 +35,8 @@ import {
 const OFFERS = 'Current offers';
 const OPERATIONS = 'Latest operations';
 const OFFERS_HEAD = [
-  { label: 'Model / variant' },
-  { label: 'Seller' },
+  prefixedColumn('Model / variant', 'model'),
+  prefixedColumn('Seller', 'seller'),
   { label: 'Context', right: true, sort: 'context' },
   {
     label: 'Input',
@@ -65,7 +62,7 @@ const sortOffers = {
 };
 const OPERATION_HEAD = [
   { label: 'Time (UTC)' },
-  { label: 'Type' },
+  prefixedColumn('Type', 'operation'),
   { label: 'USDC', right: true },
   { label: 'Signature' },
 ];
@@ -177,12 +174,10 @@ export async function OverviewOffers({ query }: { query: ExplorerQuery }) {
           </tr>
         ))}
         {!rows.length && (
-          <tr>
-            <td className={td} colSpan={OFFERS_HEAD.length}>
-              {emptySellersMessage(sellers, query.verified, known) ??
-                'No current offers.'}
-            </td>
-          </tr>
+          <EmptyRow columns={OFFERS_HEAD.length}>
+            {emptySellersMessage(sellers, query.verified, known) ??
+              'No current offers.'}
+          </EmptyRow>
         )}
       </Table>
     </section>
@@ -190,7 +185,7 @@ export async function OverviewOffers({ query }: { query: ExplorerQuery }) {
 }
 
 export async function OverviewOperations({ query }: { query: ExplorerQuery }) {
-  const page = await getChainTxs(query.before);
+  const page = await getTransactionTable(query);
   if (page.error)
     return (
       <Unavailable title={OPERATIONS} anchors={[PAGING.anchors.transactions]} />
@@ -205,12 +200,7 @@ export async function OverviewOperations({ query }: { query: ExplorerQuery }) {
       />
       <Table
         head={OPERATION_HEAD}
-        footer={
-          <Pager
-            label={OPERATIONS}
-            view={txPager(query, page.transactions.length, page.next)}
-          />
-        }
+        footer={<Pager label={OPERATIONS} view={page.pager} />}
       >
         {page.transactions.map((tx) => {
           const row = txRow(tx, new Map(), page.treasury);
@@ -218,7 +208,7 @@ export async function OverviewOperations({ query }: { query: ExplorerQuery }) {
             <tr key={row.key} className="border-t border-line">
               <td className={timeCell}>{row.time}</td>
               <td className={td}>
-                <OperationChip row={row} />
+                <OperationChip kind={row.kind} />
               </td>
               <td className={row.muted ? numberCell : moneyCell}>
                 {row.amount}
@@ -236,11 +226,9 @@ export async function OverviewOperations({ query }: { query: ExplorerQuery }) {
           );
         })}
         {!page.transactions.length && (
-          <tr>
-            <td className={td} colSpan={OPERATION_HEAD.length}>
-              No channel transactions.
-            </td>
-          </tr>
+          <EmptyRow columns={OPERATION_HEAD.length}>
+            No channel transactions.
+          </EmptyRow>
         )}
       </Table>
     </section>

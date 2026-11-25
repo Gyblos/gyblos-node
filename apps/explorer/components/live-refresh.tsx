@@ -3,28 +3,23 @@
 // Owns the page's live refresh: while the tab is visible, the server sections are re-rendered in place
 // once a minute (router.refresh: no reload, no scroll jump; figures roll to new values), and a tab
 // that comes back after longer than that refreshes at once. Shows when the data was last fetched.
+import { Clock3 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useTransition } from 'react';
 
-import { LIVE, UNITS } from '../lib/constants';
+import { LIVE } from '../lib/constants';
+import { refreshAge, utc } from '../lib/format';
 
-const SECONDS_PER_MINUTE = 60;
-
-function ago(ms: number) {
-  const seconds = Math.max(0, Math.round(ms / UNITS.msPerSecond));
-  if (seconds < SECONDS_PER_MINUTE) return `${seconds} s ago`;
-  return `${Math.floor(seconds / SECONDS_PER_MINUTE)} min ago`;
-}
-
-export function LiveRefresh({ quiet = false }: { quiet?: boolean }) {
+export function LiveRefresh({ updatedAt }: { updatedAt: number }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const fetchedAt = useRef(Date.now());
-  const [now, setNow] = useState(() => Date.now());
+  const attemptedAt = useRef(updatedAt);
+  const [now, setNow] = useState(updatedAt);
 
   useEffect(() => {
+    attemptedAt.current = updatedAt;
     const refresh = () => {
-      fetchedAt.current = Date.now();
+      attemptedAt.current = Date.now();
       startTransition(() => router.refresh());
     };
     const timer = window.setInterval(() => {
@@ -34,7 +29,7 @@ export function LiveRefresh({ quiet = false }: { quiet?: boolean }) {
     const onVisible = () => {
       if (
         document.visibilityState === 'visible' &&
-        Date.now() - fetchedAt.current >= LIVE.refreshMs
+        Date.now() - attemptedAt.current >= LIVE.refreshMs
       )
         refresh();
     };
@@ -44,25 +39,23 @@ export function LiveRefresh({ quiet = false }: { quiet?: boolean }) {
       window.clearInterval(label);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [router]);
+  }, [router, updatedAt]);
 
-  if (quiet) return null;
   return (
     <span
-      className="hidden items-center gap-2 font-mono text-xs text-dim sm:inline-flex"
+      className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs text-dim"
       aria-live="off"
+      aria-busy={pending}
     >
-      <span className="relative flex size-2">
-        <span
-          aria-hidden
-          className={`absolute inline-flex size-full rounded-full bg-signal opacity-60 ${pending ? 'animate-ping' : ''}`}
-        />
-        <span
-          aria-hidden
-          className="relative inline-flex size-2 rounded-full bg-signal"
-        />
-      </span>
-      {pending ? 'Updating…' : `Live, updated ${ago(now - fetchedAt.current)}`}
+      <Clock3 aria-hidden className="size-3.5 shrink-0" />
+      Last update
+      <time
+        dateTime={new Date(updatedAt).toISOString()}
+        title={utc(updatedAt)}
+        className="tabular-nums"
+      >
+        {refreshAge(now - updatedAt)}
+      </time>
     </span>
   );
 }

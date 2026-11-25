@@ -10,8 +10,8 @@ import {
 import { type NetworkBuyers, type NetworkDay } from '../lib/collector';
 import { DISPLAY, PAGING } from '../lib/constants';
 import { count, usdcDecimal } from '../lib/format';
-import { rangeOf, tablePager, type ExplorerQuery } from '../lib/paging';
-import { displayRange, type RangeDays } from '../lib/range';
+import { tablePager, type ExplorerQuery } from '../lib/paging';
+import type { RangeDays } from '../lib/range';
 import {
   buyersText,
   countText,
@@ -24,17 +24,19 @@ import {
   summarizeUsage,
   type SideFigures,
 } from '../lib/usage';
-import { interval, readComparison } from './activity-report';
+import type { readComparison } from './activity-report';
 import { Flow } from './board/animated-number';
 import { BarChartCard } from './board/bar-chart-card';
 import { delta, type Delta } from './board/delta';
 import { StatCard } from './board/stat-card';
 import { BuyersCard } from './buyers-card';
 import { pagedRows, Pager } from './pager';
-import { BreakdownLinks, StatsBreakdown } from './stats-breakdown';
+import { StatsBreakdown } from './stats-breakdown';
 import {
+  EmptyRow,
   ModelName,
   numberCell,
+  prefixedColumn,
   SectionTitle,
   SideCells,
   sideColumns,
@@ -123,7 +125,7 @@ function UsageCards({
   const hasFree = usage.active.some((row) => row.free);
   const hasPaid = usage.active.some((row) => row.paid);
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div className="grid grid-cols-1 gap-3 min-[390px]:grid-cols-2 lg:grid-cols-4">
       <StatCard
         icon={MessagesSquare}
         label="Requests"
@@ -143,7 +145,11 @@ function UsageCards({
         }}
         hint="Completed requests out of completed and failed ones. Cancellations are not counted as failures."
       />
-      <BuyersCard className="col-span-2" buyers={buyers} days={days} />
+      <BuyersCard
+        className="min-[390px]:col-span-2"
+        buyers={buyers}
+        days={days}
+      />
       <StatCard
         icon={Hash}
         label="Output tokens"
@@ -186,9 +192,19 @@ function UsageCards({
   );
 }
 
-export async function UsageSection({ query }: { query: ExplorerQuery }) {
-  const days = rangeOf(query, 'usage');
-  const report = await readComparison(days, Date.now());
+export async function UsageSection({
+  query,
+  reportPromise,
+}: {
+  query: ExplorerQuery;
+  reportPromise: ReturnType<typeof readComparison>;
+}) {
+  const days = query.days;
+  const report = await reportPromise;
+  const focus =
+    query.metric === 'tokens' || query.metric === 'requests'
+      ? query.metric
+      : undefined;
   const snapshot = report.period.source;
   if (!snapshot)
     return (
@@ -206,20 +222,14 @@ export async function UsageSection({ query }: { query: ExplorerQuery }) {
       : null,
   );
   return (
-    <>
-      <SectionTitle
-        title={`Usage, ${displayRange(days)}`}
-        meta={
-          interval(report.period.dates) +
-          ' · ' +
-          report.metrics.requests.comparison +
-          ' · ' +
-          report.metrics.requests.sample
-        }
-      />
-      <BreakdownLinks query={query} />
-      {query.metric && (
-        <StatsBreakdown query={query} report={report} metric={query.metric} />
+    <section aria-labelledby="usage">
+      <h2 id="usage" className="mb-5 text-title-2-medium">
+        Usage
+      </h2>
+      {focus && (
+        <div className="mb-6">
+          <StatsBreakdown query={query} report={report} metric={focus} />
+        </div>
       )}
       <UsageCards
         usage={usage}
@@ -232,9 +242,9 @@ export async function UsageSection({ query }: { query: ExplorerQuery }) {
         dates={report.period.dates}
         change={change?.requests ?? null}
       />
-      {!query.metric && <DailyTable query={query} days={usage.active} />}
+      {!focus && <DailyTable query={query} days={usage.active} />}
       <DemandTable query={query} demand={usage.demand} />
-    </>
+    </section>
   );
 }
 
@@ -258,7 +268,7 @@ function RequestCharts({
   const total = (side: 'free' | 'paid') =>
     observedSum(series.map((day) => day[side]));
   return (
-    <div className="mt-4 grid gap-3 md:grid-cols-2">
+    <div className="mt-6 grid gap-3 sm:mt-8 md:grid-cols-2">
       <BarChartCard
         title="Free requests per day"
         kind="count"
@@ -298,9 +308,9 @@ function DailyTable({
     { label: 'Relay', right: true },
   ];
   return (
-    <>
-      <SectionTitle id={PAGING.anchors.daily} title="Daily" />
+    <section id={PAGING.anchors.daily} className="mt-10 scroll-mt-4">
       <Table
+        heading={<h2 className="text-xl font-medium">Daily</h2>}
         compactLabel="Daily usage metrics"
         minWidth={DISPLAY.dailyTable}
         head={head}
@@ -308,11 +318,9 @@ function DailyTable({
         footer={<Pager label="Daily" view={tablePager(query, 'daily', page)} />}
       >
         {days.length ? null : (
-          <tr>
-            <td className={`${td} text-muted`} colSpan={head.length}>
-              No daily activity in this range.
-            </td>
-          </tr>
+          <EmptyRow columns={head.length}>
+            No daily activity in this range.
+          </EmptyRow>
         )}
         {page.rows.map((day) => (
           <tr key={day.day} className="border-t border-line">
@@ -331,7 +339,7 @@ function DailyTable({
           </tr>
         ))}
       </Table>
-    </>
+    </section>
   );
 }
 
@@ -352,7 +360,7 @@ function DemandTable({
         minWidth={DISPLAY.narrowTable}
         sorting={{ query, table: 'demand' }}
         head={[
-          { label: 'Requested model' },
+          prefixedColumn('Requested model', 'model'),
           {
             label: 'Requests',
             right: true,
@@ -368,17 +376,15 @@ function DemandTable({
         }
       >
         {!page.total && (
-          <tr>
-            <td className={td} colSpan={2}>
-              No published unserved demand in this period.
-            </td>
-          </tr>
+          <EmptyRow columns={2}>
+            No published unserved demand in this period.
+          </EmptyRow>
         )}
         {page.rows.map(([model, requests]) => (
           <tr key={model} className="border-t border-line">
             <td className={td}>
               <ModelName
-                days={rangeOf(query, 'usage')}
+                days={query.days}
                 closed={query.closed}
                 modelId={model}
                 variant={null}

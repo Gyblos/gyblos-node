@@ -27,6 +27,7 @@
     "./network-status": "./lib/network-status.ts",
     "./offers": "./lib/offers.ts",
     "./overview-activity": "./lib/overview-activity.ts",
+    "./period-bars": "./lib/period-bars.ts",
     "./paging": "./lib/paging.ts",
     "./range": "./lib/range.ts",
     "./seller-identity": "./lib/seller-identity.ts",

@@ -4,12 +4,15 @@ import { notFound } from 'next/navigation';
 import { ModelLogo } from '../../../components/model-logo';
 import { PageFrame } from '../../../components/page-frame';
 import { pagedRows, Pager } from '../../../components/pager';
+import { ReceiptPriceHistory } from '../../../components/receipt-price-history';
 import { SellerCell } from '../../../components/seller-cell';
 import {
   Addr,
+  EmptyRow,
   ModelName,
   moneyCell,
   numberCell,
+  prefixedColumn,
   SectionTitle,
   Table,
   td,
@@ -153,11 +156,9 @@ function ActivityTable({
       ]}
     >
       {!stat && (
-        <tr>
-          <td className={td} colSpan={3}>
-            No published aggregate for this variant in the selected period.
-          </td>
-        </tr>
+        <EmptyRow columns={3}>
+          No published aggregate for this variant in the selected period.
+        </EmptyRow>
       )}
       {page.rows.map(({ label, value }) => (
         <tr key={label} className="border-t border-line">
@@ -171,7 +172,7 @@ function ActivityTable({
 }
 
 const OFFER_HEAD = [
-  { label: 'Seller' },
+  prefixedColumn('Seller', 'seller'),
   { label: 'Context', right: true, sort: 'context' },
   {
     label: 'Input / 1M',
@@ -246,11 +247,7 @@ function OffersTable({
           </tr>
         ))}
         {!offers.length && (
-          <tr>
-            <td colSpan={4} className={td}>
-              No current offers for this variant.
-            </td>
-          </tr>
+          <EmptyRow columns={4}>No current offers for this variant.</EmptyRow>
         )}
       </Table>
     </>
@@ -323,6 +320,7 @@ export default async function ModelPage({
       ) : (
         <OffersTable discovery={discovery} offers={offers} query={query} />
       )}
+      <ReceiptPriceHistory model={model} days={days} />
       <SectionTitle
         id={PAGING.anchors.models}
         title={`Recorded activity, ${displayRange(days)}`}

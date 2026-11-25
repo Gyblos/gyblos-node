@@ -1,15 +1,24 @@
 'use client';
 
-import { ArrowUpRight, Coins, Hash, MessagesSquare } from 'lucide-react';
+import {
+  ArrowUpRight,
+  ChevronLeft,
+  ChevronRight,
+  Coins,
+  Hash,
+  MessagesSquare,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 
-import { STATS } from '../lib/constants';
-import { compact, type TokenPoint } from '../lib/overview-activity';
+import { DISPLAY, STATS } from '../lib/constants';
+import { compact } from '../lib/overview-activity';
 import { readQuery } from '../lib/paging';
+import type { PeriodBar } from '../lib/period-bars';
 import type { RangeDays } from '../lib/range';
 import { Flow, type FlowValue } from './board/animated-number';
+import { ChartReadout } from './board/chart-readout';
 import { Chip } from './board/chip';
 import { cx } from './board/cx';
 import { DayBars, dayLabel } from './board/day-bars';
@@ -18,6 +27,7 @@ import { DeltaChip } from './board/delta-chip';
 import { StatCard } from './board/stat-card';
 import { SURFACE } from './board/styles';
 import { ChartRange } from './chart-range';
+import { QueryRegion } from './query-region';
 
 const METRICS = {
   tokens: { label: 'Tokens processed', kind: 'count', icon: Hash },
@@ -29,12 +39,9 @@ const keys = Object.keys(METRICS) as Metric[];
 type MetricData = {
   total: FlowValue;
   change: Delta | null;
-  comparison: string;
-  sample: string;
-  detail: string;
 };
 type Metrics = Record<Metric, MetricData>;
-type Point = TokenPoint & { paidOut: FlowValue };
+type Point = PeriodBar;
 
 interface OverviewChartProps {
   points: Point[];
@@ -61,81 +68,182 @@ function useMetric() {
   return { selected, select };
 }
 
-export function OverviewChart({
-  points,
-  metrics,
-  chartMetrics,
-  globalDays,
-  chartOverride,
-  chartDates,
-  links,
-  receiptNote,
-  paymentNote,
-}: OverviewChartProps) {
+function MonthControl({
+  months,
+  current,
+  select,
+}: {
+  months: string[];
+  current: string;
+  select: (value: string) => void;
+}) {
+  const index = months.indexOf(current);
+  return (
+    <div className="sticky left-0 flex h-11 items-center gap-2 text-sm text-muted">
+      <span className="font-medium">{current}</span>
+      {months.length > 1 && (
+        <div className="flex gap-1">
+          <button
+            type="button"
+            aria-label="Previous month"
+            disabled={index <= 0}
+            className="grid size-11 place-items-center rounded-md hover:bg-raised disabled:opacity-30"
+            onClick={() => select(months[index - 1]!)}
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <button
+            type="button"
+            aria-label="Next month"
+            disabled={index >= months.length - 1}
+            className="grid size-11 place-items-center rounded-md hover:bg-raised disabled:opacity-30"
+            onClick={() => select(months[index + 1]!)}
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function useChartMonth(series: Point[], duration: RangeDays) {
+  const monthly = duration !== 1 && duration !== DISPLAY.weekWindow;
+  const months = monthly ? [...new Set(series.map((row) => row.band))] : [];
+  const [month, setMonth] = useState('');
+  const currentMonth = months.includes(month) ? month : months.at(-1);
+  const points = currentMonth
+    ? series.filter((row) => row.band === currentMonth)
+    : series;
+  return { currentMonth, months, points, setMonth };
+}
+
+function peakValue(points: PeriodBar[], selected: Metric) {
+  return points.reduce((max, row) => Math.max(max, Number(row[selected])), 0);
+}
+
+function pointDetail(
+  point: Point | null | undefined,
+  metric: Metric,
+  props: OverviewChartProps,
+) {
+  if (!point)
+    return metric === 'paidOut' ? props.paymentNote : props.receiptNote;
+  const status = point.outside
+    ? 'Outside period'
+    : point[metric] === null
+      ? 'No observation'
+      : '';
+  return [point.day + ' UTC', status].filter(Boolean).join(' · ');
+}
+
+function chartFrequency(duration: RangeDays) {
+  if (duration === 1) return '30 min';
+  return duration === DISPLAY.weekWindow ? '3h' : 'day';
+}
+
+export function OverviewChart(props: OverviewChartProps) {
+  const { globalDays, chartOverride } = props;
   const { selected, select } = useMetric();
   const [active, setActive] = useState<number | null>(null);
+  const duration = chartOverride ?? globalDays;
+  const { currentMonth, months, points, setMonth } = useChartMonth(
+    props.points,
+    duration,
+  );
   const point = active === null ? null : points[active];
   const { label, kind } = METRICS[selected];
-  const maximum = Math.max(0, ...points.map((row) => Number(row[selected])));
-  const money = selected === 'paidOut';
-  const metric = chartMetrics[selected];
+  const maximum = peakValue(points, selected);
+  const metric = props.chartMetrics[selected];
   const value = point ? point[selected] : metric.total;
+  function selectMonth(next: string) {
+    setActive(null);
+    setMonth(next);
+  }
   return (
     <>
       <MetricSelector
-        metrics={metrics}
+        metrics={props.metrics}
         selected={selected}
         onSelect={(metric) => {
           select(metric);
           setActive(null);
         }}
       />
-      <section
-        id="period-chart"
-        className={cx(SURFACE.card, 'mt-3 min-w-0 p-4 sm:p-5')}
-        aria-label={`Daily ${label.toLowerCase()}`}
-      >
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="text-base font-medium">{label} by day</h3>
-          <ChartRange
+      <QueryRegion>
+        <section
+          id="period-chart"
+          className={cx(SURFACE.card, 'mt-3 min-w-0 p-4 sm:p-5')}
+          aria-label={label + ' by ' + chartFrequency(duration)}
+        >
+          <ChartHeading
+            label={label}
+            frequency={chartFrequency(duration)}
             globalDays={globalDays}
-            override={chartOverride}
-            onSelect={() => setActive(null)}
+            chartOverride={chartOverride}
+            reset={() => selectMonth('')}
           />
-        </div>
-        <div className="mt-2 flex flex-wrap items-baseline gap-3">
-          <span className="font-mono text-2xl tabular-nums">
-            <Flow kind={kind} value={value} />
-          </span>
-          {!point && <ComparisonChip metric={metric} />}
-          <span className="text-xs text-muted">
-            {point
-              ? `${point.day} UTC${value === null ? ' · No observation' : ''}`
-              : money
-                ? paymentNote
-                : receiptNote}
-          </span>
-        </div>
-        <DayBars
-          points={points.map((row) => ({
-            day: row.day,
-            value: row[selected] === null ? null : Number(row[selected]),
-            amount: row[selected],
-          }))}
-          label={label}
-          kind={kind}
-          maximum={maximum}
-          active={active}
-          setActive={setActive}
-        />
-        <ChartScale points={points} selected={selected} maximum={maximum} />
-        <ChartFooter
-          chartDates={chartDates}
-          comparison={metric.comparison}
-          href={links[selected]}
-        />
-      </section>
+          <ChartReadout
+            kind={kind}
+            value={value}
+            badge={!point && <ComparisonChip metric={metric} />}
+            detail={pointDetail(point, selected, props)}
+          />
+          <DayBars
+            calendar={
+              currentMonth && (
+                <MonthControl
+                  current={currentMonth}
+                  months={months}
+                  select={selectMonth}
+                />
+              )
+            }
+            points={points.map((row) => ({
+              ...row,
+              band: currentMonth ? undefined : row.band,
+              value: row[selected] === null ? null : Number(row[selected]),
+              amount: row[selected],
+            }))}
+            label={label}
+            kind={kind}
+            maximum={maximum}
+            active={active}
+            setActive={setActive}
+          />
+          <ChartScale points={points} selected={selected} maximum={maximum} />
+          <ChartFooter
+            chartDates={props.chartDates}
+            href={props.links[selected]}
+          />
+        </section>
+      </QueryRegion>
     </>
+  );
+}
+
+function ChartHeading({
+  label,
+  frequency,
+  globalDays,
+  chartOverride,
+  reset,
+}: Pick<OverviewChartProps, 'globalDays' | 'chartOverride'> & {
+  label: string;
+  frequency: string;
+  reset: () => void;
+}) {
+  return (
+    <div className="flex flex-col items-start gap-2 min-[400px]:flex-row min-[400px]:items-baseline min-[400px]:justify-between">
+      <h3 className="text-base font-medium">
+        {label} by {frequency}
+      </h3>
+      <ChartRange
+        globalDays={globalDays}
+        override={chartOverride}
+        onSelect={reset}
+      />
+    </div>
   );
 }
 
@@ -169,11 +277,6 @@ function MetricSelector({
             }}
             value={<Flow kind={format} value={metric.total} />}
             comparison={<ComparisonChip metric={metric} />}
-            caption={
-              <span title={metric.detail}>
-                {metric.comparison} · {metric.sample}
-              </span>
-            }
           />
         );
       })}
@@ -183,18 +286,14 @@ function MetricSelector({
 
 function ChartFooter({
   chartDates,
-  comparison,
   href,
 }: {
   chartDates: string;
-  comparison: string;
   href: string;
 }) {
   return (
     <div className="mt-3 flex flex-wrap items-baseline justify-between gap-2 border-t border-line pt-3 text-xs text-muted">
-      <span>
-        {chartDates} · {comparison}
-      </span>
+      <span>{chartDates}</span>
       <Link
         className="inline-flex items-center gap-1 text-sm text-muted hover:text-ink hover:underline"
         href={href}
@@ -219,13 +318,13 @@ function ChartScale({
   return (
     <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-muted">
       <span>
-        {points.some((row) => row[selected] === null)
+        {points.some((row) => !row.outside && row[selected] === null)
           ? 'Dashed mark · No observation'
-          : 'UTC days'}
+          : 'UTC'}
       </span>
       {maximum > 0 && (
         <span>
-          Daily peak ·{' '}
+          Peak ·{' '}
           {money
             ? dayLabel(
                 points.find((row) => Number(row[selected]) === maximum)?.[
@@ -241,16 +340,9 @@ function ChartScale({
 }
 
 function ComparisonChip({ metric }: { metric: MetricData }) {
-  return (
-    <span
-      title={`${metric.detail} · ${metric.sample}`}
-      aria-label={`${metric.change?.label ?? 'No comparison'} · ${metric.comparison} · ${metric.sample}`}
-    >
-      {metric.change ? (
-        <DeltaChip delta={metric.change} />
-      ) : (
-        <Chip>No baseline</Chip>
-      )}
-    </span>
+  return metric.change ? (
+    <DeltaChip delta={metric.change} />
+  ) : (
+    <Chip>No baseline</Chip>
   );
 }

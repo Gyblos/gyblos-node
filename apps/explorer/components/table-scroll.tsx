@@ -4,6 +4,7 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 
 import { Select } from './board/select';
+import { PagedSurface, QueryRegion } from './query-region';
 
 const ALL_COLUMNS = 'All columns';
 
@@ -107,9 +108,11 @@ export function TableScroll({
   children,
   footer,
   compact,
+  heading,
 }: {
   children: ReactNode;
   footer?: ReactNode;
+  heading?: ReactNode;
   compact?: { label: string; columns: (string | null)[] };
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -138,35 +141,42 @@ export function TableScroll({
   }, [children]);
 
   return (
-    <section className="mt-4 overflow-hidden rounded-xl border border-line bg-panel">
-      {compact && (
-        <div className="flex items-center justify-between gap-2 border-b border-line px-3 py-2 xl:hidden">
-          <span className="text-caption-1-medium text-text-secondary">
-            Columns
-          </span>
-          <Select
-            label={compact.label}
-            selected={selected}
-            options={[...groups, ALL_COLUMNS].map((label) => ({
-              id: label,
-              label,
-            }))}
-            onChange={pick}
-          />
+    <QueryRegion>
+      {heading && (
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          {heading}
+          {compact && (
+            <div className="xl:hidden">
+              <Select
+                size="sm"
+                label={compact.label}
+                selected={selected}
+                options={[...groups, ALL_COLUMNS].map((label) => ({
+                  id: label,
+                  label,
+                }))}
+                onChange={pick}
+              />
+            </div>
+          )}
         </div>
       )}
-      <div className="relative">
-        <div
-          ref={ref}
-          role="group"
-          aria-label={compact?.label ?? 'Table'}
-          className="explorer-table-scroll overflow-x-auto focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-signal"
-        >
-          {children}
-        </div>
-        <div aria-hidden="true" className="explorer-table-edge" />
-      </div>
-      {footer}
-    </section>
+      <section
+        className={`${heading ? '' : 'mt-4'} overflow-hidden rounded-xl border border-line bg-panel`}
+      >
+        <PagedSurface className="relative">
+          <div
+            ref={ref}
+            role="group"
+            aria-label={compact?.label ?? 'Table'}
+            className="explorer-table-scroll overflow-x-auto focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-signal"
+          >
+            {children}
+          </div>
+          <div aria-hidden="true" className="explorer-table-edge" />
+        </PagedSurface>
+        {footer}
+      </section>
+    </QueryRegion>
   );
 }

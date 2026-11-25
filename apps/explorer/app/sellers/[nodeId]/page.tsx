@@ -4,6 +4,8 @@ import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 
 import { PageFrame } from '../../../components/page-frame';
+import { QueryRegion } from '../../../components/query-region';
+import { ReceiptPriceHistory } from '../../../components/receipt-price-history';
 import { SellerActivity } from '../../../components/seller-activity';
 import { SellerProfileSection } from '../../../components/seller-profile';
 import { SellerTxs } from '../../../components/seller-txs';
@@ -72,12 +74,15 @@ export default async function SellerPage({ params, searchParams }: Props) {
           }
         />
       </Suspense>
-      <Suspense
-        key={`activity-${rangeOf(query, 'activity')}`}
-        fallback={<Loading cards />}
-      >
-        <SellerActivity nodeId={nodeId} query={query} />
-      </Suspense>
+      <QueryRegion>
+        <Suspense fallback={<Loading cards />}>
+          <SellerActivity nodeId={nodeId} query={query} />
+        </Suspense>
+        <ReceiptPriceHistory
+          nodeId={nodeId}
+          days={rangeOf(query, 'activity')}
+        />
+      </QueryRegion>
       <Suspense fallback={<Loading />}>
         <SellerTxs nodeId={nodeId} query={query} />
       </Suspense>

@@ -1,6 +1,6 @@
 'use client';
 
-import type { KeyboardEvent } from 'react';
+import type { KeyboardEvent, ReactNode } from 'react';
 
 import type { FlowKind, FlowValue } from './animated-number';
 import { CHART, DELTA } from './constants';
@@ -11,8 +11,12 @@ export interface BarPoint {
   value: number | null;
   amount: FlowValue;
   detail?: string;
+  band?: string;
+  tick?: string;
+  outside?: boolean;
 }
 const DAY_WIDTH = 24;
+const COMPACT_WIDTH = 14;
 function moveDay(event: KeyboardEvent<HTMLButtonElement>) {
   const next =
     event.key === 'ArrowRight'
@@ -33,6 +37,45 @@ export function dayLabel(value: FlowValue, kind: FlowKind) {
     : Number(value).toLocaleString('en-US');
 }
 
+function axisBands(points: BarPoint[]) {
+  const bands: { label: string; size: number }[] = [];
+  for (const row of points) {
+    if (!row.band) continue;
+    const previous = bands.at(-1);
+    if (previous?.label === row.band) previous.size++;
+    else bands.push({ label: row.band, size: 1 });
+  }
+  return bands;
+}
+
+function AxisLabels({
+  points,
+  minWidth,
+}: {
+  points: BarPoint[];
+  minWidth: number;
+}) {
+  const bands = axisBands(points);
+  return (
+    bands.length > 0 && (
+      <div
+        className="flex h-11 items-center text-xs text-muted"
+        style={{ minWidth }}
+      >
+        {bands.map((band) => (
+          <span
+            key={band.label}
+            className="truncate"
+            style={{ flex: band.size + ' 0 0%', minWidth: 0 }}
+          >
+            {band.label}
+          </span>
+        ))}
+      </div>
+    )
+  );
+}
+
 export function DayBars({
   points,
   kind,
@@ -40,7 +83,9 @@ export function DayBars({
   maximum,
   active,
   setActive,
+  calendar,
 }: {
+  calendar?: ReactNode;
   points: BarPoint[];
   label: string;
   kind: FlowKind;
@@ -48,10 +93,14 @@ export function DayBars({
   active: number | null;
   setActive: (index: number | null) => void;
 }) {
+  const minWidth =
+    points.length * (points[0]?.tick ? COMPACT_WIDTH : DAY_WIDTH);
   return (
     <div className="mt-4 overflow-x-auto" onMouseLeave={() => setActive(null)}>
+      {calendar || <AxisLabels points={points} minWidth={minWidth} />}
       <div
-        style={{ minWidth: points.length * DAY_WIDTH }}
+        data-loading-field="plot"
+        style={{ minWidth }}
         className="flex gap-px"
       >
         {points.map((row, index) => {
@@ -65,8 +114,9 @@ export function DayBars({
               className={cx(
                 'flex min-w-0 flex-1 cursor-crosshair flex-col items-center rounded-sm focus-visible:outline-signal',
                 index === active && 'bg-raised',
+                row.outside && 'opacity-40',
               )}
-              aria-label={`${row.day} UTC, ${label}, ${dayLabel(amount, kind)}`}
+              aria-label={`${row.day} UTC, ${label}, ${row.outside ? 'Outside selected period' : dayLabel(amount, kind)}`}
               tabIndex={index === (active ?? 0) ? 0 : -1}
               onKeyDown={moveDay}
               onMouseEnter={() => setActive(index)}
@@ -75,7 +125,7 @@ export function DayBars({
               onClick={() => setActive(index)}
             >
               <span className="flex h-32 w-full items-end justify-center">
-                {amount === null ? (
+                {row.outside ? null : amount === null ? (
                   <span className="mb-px h-0 w-1/2 border-t border-dashed border-dim" />
                 ) : (
                   <span
@@ -84,8 +134,8 @@ export function DayBars({
                   />
                 )}
               </span>
-              <span className="mt-2 font-mono text-[10px] whitespace-nowrap text-dim [writing-mode:vertical-rl]">
-                {row.day.slice(CHART.monthDayStart)}
+              <span className="mt-2 h-9 font-mono text-[10px] whitespace-nowrap text-dim [writing-mode:vertical-rl]">
+                {row.tick ?? row.day.slice(CHART.monthDayStart)}
               </span>
             </button>
           );

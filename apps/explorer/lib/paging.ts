@@ -1,6 +1,6 @@
 import { txCursor } from './chain-txs-shape';
 import { CHAIN_TXS, IDENTITY, PAGES, PAGING, RANGE, STATS } from './constants';
-import { numberedPager, rowSpan } from './pager-view';
+import { numberedPager } from './pager-view';
 import { pageOf, type Page, type TableSort } from './paging-rows';
 import {
   hasRangeAlias,
@@ -238,16 +238,6 @@ export function statsBreakdownHref(metric: StatsMetric, days: RangeDays) {
   );
 }
 
-export function statsTabHref(query: ExplorerQuery, tab: StatsTab) {
-  const { metric, ...rest } = query;
-  return queryHref({
-    ...rest,
-    ranges: {},
-    tab,
-    ...(metric && STATS.metrics[metric] === tab ? { metric } : {}),
-  });
-}
-
 export function canonicalPageHref(
   source: SearchSource,
   path = '/',
@@ -355,35 +345,17 @@ export function tablePager(
 
 export function txPager(
   query: ExplorerQuery,
-  shown: number,
-  older: string | null,
+  page: Page<unknown>,
+  boundaries: readonly (string | null)[],
 ): PagerView {
-  const page = query.before ? (query.pages.transactions ?? null) : 1;
   const table = PAGING.cursorTable;
-  const current = page ?? 2;
-  const hrefs: Record<number, string> = {};
-  if (query.before)
-    hrefs[current - 1] = anchored(queryHref(query, { before: null }), table);
-  if (older)
-    hrefs[current + 1] = anchored(
+  return numberedPager(page, (target) =>
+    anchored(
       queryHref(query, {
-        before: older,
-        pages: { [table]: page === null ? 1 : page + 1 },
+        before: boundaries[target - 1] ?? null,
+        pages: { [table]: target },
       }),
       table,
-    );
-  const first = page === null ? 0 : (page - 1) * CHAIN_TXS.pageRows + 1;
-  return {
-    rows: !shown
-      ? '0 rows'
-      : page === null
-        ? null
-        : rowSpan(first, first + shown - 1),
-    page: current,
-    pages: older ? current + 1 : current,
-    hrefs,
-    showPages: !query.before && !older,
-    previousLabel: 'Newest',
-    nextLabel: 'Older',
-  };
+    ),
+  );
 }

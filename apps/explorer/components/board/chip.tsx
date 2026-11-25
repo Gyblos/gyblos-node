@@ -6,14 +6,14 @@ export function Chip({
   tone = 'neutral',
   children,
 }: {
-  tone?: 'neutral' | 'brand';
+  tone?: 'neutral' | 'online';
   children: ReactNode;
 }) {
   return (
     <BoardChip
       variant="caption"
-      color={tone === 'brand' ? 'blue' : 'neutral'}
-      className="gap-1.5 py-0.5 font-mono"
+      color={tone === 'online' ? 'lime' : 'neutral'}
+      className="font-mono"
     >
       {children}
     </BoardChip>

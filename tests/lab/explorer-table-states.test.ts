@@ -290,11 +290,11 @@ void test('Explorer gives offerless Sellers and inactive Daily one spanning row 
   const { html: empty } = await pageHtml(dir, 'empty');
   assert.match(
     emptyBody(empty, 'Online since'),
-    /^<tr><td[^>]*\btext-muted\b[^>]*\bcolSpan="\d+"[^>]*>No offers from online sellers\.<\/td><\/tr>$/i,
+    /^<tr><td[^>]*\bexplorer-table-empty\b[^>]*\bcolSpan="\d+"[^>]*><span>No offers from online sellers\.<\/span><\/td><\/tr>$/i,
   );
   assert.match(
     emptyBody(empty, 'Seller first token p50'),
-    /^<tr><td[^>]*\btext-muted\b[^>]*\bcolSpan="\d+"[^>]*>No daily activity in this range\.<\/td><\/tr>$/i,
+    /^<tr><td[^>]*\bexplorer-table-empty\b[^>]*\bcolSpan="\d+"[^>]*><span>No daily activity in this range\.<\/span><\/td><\/tr>$/i,
   );
 });
 
@@ -309,6 +309,13 @@ void test('Explorer shows offer and active-day rows without empty rows', async (
   const daily = tableFor(populated, 'Seller first token p50').body;
   assert.match(sellers, /fixture-model/);
   assert.match(populated, /Through the last complete UTC day/);
+  assert.match(populated, /id="usage"/);
+  assert.match(populated, /id="payments"/);
+  assert.match(populated, /id="daily-on-chain"/);
+  assert.doesNotMatch(
+    populated,
+    /aria-label="Daily breakdowns"|role="tablist"/,
+  );
   assert.equal(daily.match(/<tr\b/g)?.length, 1);
   assert.ok(daily.includes(activeDay));
   assert.match(daily, />42\.9%<\/td>/);

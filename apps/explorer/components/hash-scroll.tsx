@@ -1,11 +1,10 @@
 'use client';
 
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
-import { HASH_SCROLL, PAGES, PAGING } from '../lib/constants';
+import { HASH_SCROLL, PAGES, STATS } from '../lib/constants';
 import { hashTarget } from '../lib/hash-target';
-import { readQuery, statsTabHref } from '../lib/paging';
 
 const USER_INPUT = ['wheel', 'touchstart', 'keydown', 'pointerdown'] as const;
 
@@ -21,28 +20,18 @@ function useHash() {
 }
 
 export function HashScroll() {
-  const router = useRouter();
   const pathname = usePathname();
   const search = useSearchParams().toString();
   const hash = useHash();
   useEffect(() => {
-    const id = hashTarget(window.location.hash);
+    const tab =
+      pathname === PAGES.stats
+        ? new URLSearchParams(search).get(STATS.tabParam)
+        : null;
+    const id =
+      hashTarget(window.location.hash) ??
+      STATS.tabs.find((section) => section === tab);
     if (!id) return;
-    if (pathname === PAGES.stats) {
-      const query = readQuery(new URLSearchParams(search), pathname);
-      const target =
-        id === PAGING.anchors.chainDaily
-          ? 'payments'
-          : id === PAGING.anchors.daily || id === PAGING.anchors.demand
-            ? 'usage'
-            : null;
-      if (target && target !== query.tab) {
-        router.replace(statsTabHref(query, target) + '#' + id, {
-          scroll: false,
-        });
-        return;
-      }
-    }
     const reach = () => document.getElementById(id)?.scrollIntoView();
     const observer = new MutationObserver(reach);
     const stop = () => {
@@ -56,6 +45,6 @@ export function HashScroll() {
     observer.observe(document.body, { childList: true, subtree: true });
     reach();
     return stop;
-  }, [pathname, search, hash, router]);
+  }, [pathname, search, hash]);
   return null;
 }

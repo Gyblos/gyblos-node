@@ -49,9 +49,7 @@ export const interval = (dates: string[]) =>
 
 function metrics(period: Period, compared: Period, previous: Period) {
   const days = compared.dates.length;
-  const comparison =
-    days === 1 ? 'Last UTC day vs previous' : `Last ${days}d vs prior ${days}d`;
-  const intervalNote = `${interval(compared.dates)} compared with ${interval(previous.dates)}`;
+  const comparison = days === 1 ? 'Daily change' : `${days}d change`;
   const receipt = (key: 'tokens' | 'requests') => {
     const { activity: current } = compared;
     const baseline = observedBaseline(
@@ -69,8 +67,6 @@ function metrics(period: Period, compared: Period, previous: Period) {
       total: period.activity[key],
       change,
       comparison,
-      sample: `${current.daysObserved}/${days} vs ${previous.activity.daysObserved}/${days} days observed`,
-      detail: `Published receipt totals · ${intervalNote}`,
     };
   };
   const recent = compared.paid;
@@ -89,11 +85,6 @@ function metrics(period: Period, compared: Period, previous: Period) {
           ? delta(recent.total, earlier.total)
           : null,
       comparison,
-      sample:
-        recent.complete && earlier.complete
-          ? 'Indexed payouts'
-          : 'Partial chain history',
-      detail: intervalNote,
     },
   };
 }

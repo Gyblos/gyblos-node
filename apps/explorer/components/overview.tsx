@@ -1,5 +1,8 @@
+import { DISPLAY } from '../lib/constants';
 import { usdcDecimal } from '../lib/format';
+import { readHalfHours } from '../lib/intraday';
 import { rangeOf, statsBreakdownHref, type ExplorerQuery } from '../lib/paging';
+import { periodBars } from '../lib/period-bars';
 import { interval, readComparison } from './activity-report';
 import { OverviewChart } from './overview-chart';
 import { SectionTitle } from './ui';
@@ -13,6 +16,10 @@ export async function Overview({ query }: { query: ExplorerQuery }) {
     readComparison(chartRange, now),
   ]);
   const { dates, source, activity, paid, chain } = chart.period;
+  const samples =
+    chartRange === 1 || chartRange === DISPLAY.weekWindow
+      ? await readHalfHours(dates)
+      : [];
   return (
     <section aria-label="Period activity">
       <SectionTitle
@@ -23,13 +30,17 @@ export async function Overview({ query }: { query: ExplorerQuery }) {
         range={{ section: 'overview', days }}
       />
       <OverviewChart
-        points={activity.points.map((point, index) => {
-          const amount = paid.points[index];
-          return {
-            ...point,
-            paidOut: amount == null ? null : usdcDecimal(amount),
-          };
-        })}
+        points={periodBars(
+          activity.points.map((point, index) => {
+            const amount = paid.points[index];
+            return {
+              ...point,
+              paidOut: amount == null ? null : usdcDecimal(amount),
+            };
+          }),
+          chartRange,
+          samples,
+        )}
         metrics={cards.metrics}
         chartMetrics={chart.metrics}
         globalDays={days}

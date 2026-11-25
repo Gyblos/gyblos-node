@@ -4,7 +4,6 @@ import { PAGING, STATS } from '../lib/constants';
 import { count, usdcDecimal } from '../lib/format';
 import {
   queryHref,
-  statsBreakdownHref,
   tablePager,
   type ExplorerQuery,
   type StatsMetric,
@@ -12,35 +11,20 @@ import {
 import type { readComparison } from './activity-report';
 import { BarChartCard } from './board/bar-chart-card';
 import { pagedRows, Pager } from './pager';
-import { numberCell, SectionTitle, Table, td, type Column } from './ui';
+import {
+  EmptyRow,
+  numberCell,
+  SectionTitle,
+  Table,
+  td,
+  type Column,
+} from './ui';
 
 const LABELS = {
   tokens: 'Tokens processed',
   requests: 'Recorded requests',
   paidOut: 'Paid to sellers',
 } as const;
-
-export function BreakdownLinks({ query }: { query: ExplorerQuery }) {
-  const metrics: StatsMetric[] =
-    query.tab === 'payments' ? ['paidOut'] : ['tokens', 'requests'];
-  return (
-    <nav
-      aria-label="Daily breakdowns"
-      className="my-4 flex flex-wrap gap-x-4 gap-y-2 text-sm"
-    >
-      {metrics.map((metric) => (
-        <Link
-          key={metric}
-          aria-current={query.metric === metric ? 'page' : undefined}
-          className="text-muted underline underline-offset-4 hover:text-ink"
-          href={statsBreakdownHref(metric, query.days)}
-        >
-          {LABELS[metric]} by day
-        </Link>
-      ))}
-    </nav>
-  );
-}
 
 type Report = Awaited<ReturnType<typeof readComparison>>;
 function breakdownRows(period: Report['period'], metric: StatsMetric) {
@@ -132,7 +116,7 @@ export function StatsBreakdown({
           change={data.change}
           points={chartPoints}
           countAxis={!payments}
-          comparison={data.comparison + ' · ' + data.sample}
+          comparison={data.comparison}
         />
       </div>
       <BreakdownTable query={query} rows={rows} metric={metric} />
@@ -188,11 +172,9 @@ function BreakdownTable({
         </tr>
       ))}
       {!page.total && (
-        <tr>
-          <td className={td} colSpan={head.length}>
-            No observations in this period.
-          </td>
-        </tr>
+        <EmptyRow columns={head.length}>
+          No observations in this period.
+        </EmptyRow>
       )}
     </Table>
   );

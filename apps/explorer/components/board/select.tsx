@@ -39,9 +39,11 @@ export function Select<Id extends string>({
   selected,
   onChange,
   leadingIcon,
+  size = 'md',
 }: {
   label: string;
   leadingIcon?: ReactNode;
+  size?: 'sm' | 'md';
   options: SelectOption<Id>[];
   selected: Id;
   onChange?: (id: Id) => void;
@@ -49,12 +51,17 @@ export function Select<Id extends string>({
   const active = options.find((option) => option.id === selected);
   return (
     <BoardSelect
+      size={size}
       aria-label={label}
       selectedKey={selected}
       disabledKeys={options
         .filter((option) => option.disabled)
         .map((option) => option.id)}
-      triggerClassName={cx(SURFACE.control, 'font-mono text-xs')}
+      triggerClassName={cx(
+        SURFACE.control,
+        size === 'sm' && 'pointer-fine:h-7 sm:pointer-fine:h-7',
+        'font-mono text-xs',
+      )}
       renderValue={() => (
         <>
           {leadingIcon}

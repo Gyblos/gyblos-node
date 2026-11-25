@@ -36,9 +36,11 @@ import { BarChartCard } from './board/bar-chart-card';
 import { StatCard } from './board/stat-card';
 import { pagedRows, Pager } from './pager';
 import {
+  EmptyRow,
   ModelName,
   moneyCell,
   numberCell,
+  prefixedColumn,
   SectionTitle,
   SideCells,
   sideColumns,
@@ -49,7 +51,6 @@ import {
 
 type Section = Parameters<typeof sideFigures>[0][number];
 type Figure = 'requests' | 'successRate' | 'outputTokens' | 'firstToken';
-const muted = `${td} text-muted`;
 const FIGURE_TEXT: Record<Figure, (value: never) => string> = {
   requests: countText,
   successRate: rateText,
@@ -106,7 +107,7 @@ function RequestCharts({ days }: { days: SellerDay[] }) {
 }
 
 const MODELS_HEAD = [
-  { label: 'Model' },
+  prefixedColumn('Model', 'model'),
   { label: 'Context', right: true },
   { label: 'Input / 1M', right: true },
   { label: 'Output / 1M', right: true },
@@ -149,11 +150,9 @@ function ModelsTable({
         }
       >
         {rows.length ? null : (
-          <tr>
-            <td className={muted} colSpan={MODELS_HEAD.length}>
-              No models offered now or served in this range.
-            </td>
-          </tr>
+          <EmptyRow columns={MODELS_HEAD.length}>
+            No models offered now or served in this range.
+          </EmptyRow>
         )}
         {shown.rows.map((row) => (
           <tr key={row.key} className="border-t border-line">
@@ -216,11 +215,9 @@ function DailyTable({
         }
       >
         {active.length ? null : (
-          <tr>
-            <td className={muted} colSpan={head.length}>
-              No daily activity in this range.
-            </td>
-          </tr>
+          <EmptyRow columns={head.length}>
+            No daily activity in this range.
+          </EmptyRow>
         )}
         {shown.rows.map((day) => (
           <tr key={day.day} className="border-t border-line">
@@ -254,7 +251,7 @@ function Figures({
 }) {
   const { free, paid } = totals;
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-3 min-[390px]:grid-cols-2 lg:grid-cols-3">
       <StatCard
         icon={MessagesSquare}
         label="Requests"
@@ -329,7 +326,7 @@ export async function SellerActivity({
       ) : (
         <>
           <SectionTitle
-            title={`Activity, ${displayRange(days)}`}
+            title="Activity"
             meta={`${query.closed ? 'Completed UTC days · ' : ''}${usageMeta(days, stats.aggregatedAt, false)}`}
             range={{ section: 'activity', days }}
           />

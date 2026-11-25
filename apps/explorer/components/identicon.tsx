@@ -2,10 +2,10 @@ import { sellerFace } from '../lib/seller-identity';
 
 const COLORS = ['#b7e577', '#b5a2f6', '#f0b97b', '#8cd0ce'] as const;
 const MOUTHS = [
-  'M11 18v2h6v-2',
-  'M12 20h4v-2h2',
-  'M11 19h7',
-  'M12 18h5v2h-5z',
+  'M11 18q3 4 6 0',
+  'M12 19q3 1 5-2',
+  'M12 18.5h4',
+  'M12 18h4q0 4-4 0z',
 ] as const;
 
 export function Identicon({ nodeId }: { nodeId: string }) {
@@ -15,32 +15,50 @@ export function Identicon({ nodeId }: { nodeId: string }) {
     <span
       className="seller-avatar"
       aria-hidden="true"
-      style={{
-        backgroundColor: `color-mix(in srgb, ${color} 13%, var(--panel))`,
-      }}
+      style={{ backgroundColor: color }}
     >
-      <svg
-        width="26"
-        height="26"
-        viewBox="0 0 28 28"
-        fill="none"
-        stroke={color}
-        strokeWidth="1.65"
-        strokeLinejoin="round"
-      >
-        {face.antenna ? <path d="M14 7V4h4" /> : <path d="M10 7V5m8 2V5" />}
-        <path d="M7 7h14v2h2v12h-2v2H7v-2H5V9h2z" />
-        <g fill={color} stroke="none">
-          <rect
-            x="9"
-            y={face.wink ? '13' : '11'}
-            width="3"
-            height={face.wink ? '2' : '4'}
-            rx=".5"
-          />
-          <rect x="16" y="11" width="3" height="4" rx=".5" />
+      <svg width="26" height="26" viewBox="0 0 28 28" fill="none">
+        <g stroke="#242532" strokeWidth="2" strokeLinecap="round">
+          {face.antenna ? (
+            <path d="m14 9 2-5" />
+          ) : (
+            <path d="m8 10-2-4m14 4 2-4" />
+          )}
         </g>
-        <path d={MOUTHS[face.mouth]} />
+        <rect x="2" y="13" width="24" height="5" rx="2.5" fill="#454452" />
+        <rect
+          x="4"
+          y="8"
+          width="20"
+          height="15"
+          rx={face.antenna ? 6 : 4}
+          fill="#242532"
+        />
+        {face.wink ? (
+          <path
+            d="m8 14 1.5-1 1.5 1"
+            stroke="white"
+            strokeWidth="1.7"
+            strokeLinecap="round"
+          />
+        ) : (
+          <rect x="8" y="11.5" width="3.5" height="4.5" rx="1.6" fill="white" />
+        )}
+        <rect
+          x="16.5"
+          y="11.5"
+          width="3.5"
+          height="4.5"
+          rx="1.6"
+          fill="white"
+        />
+        <path
+          d={MOUTHS[face.mouth]}
+          stroke={color}
+          strokeWidth="1.7"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
       </svg>
     </span>
   );

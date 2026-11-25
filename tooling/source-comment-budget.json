@@ -514,7 +514,7 @@
   "apps/metrics-collector/src/sql-primitives.ts": 16,
   "apps/metrics-collector/src/stats-breakdowns.ts": 8,
   "apps/metrics-collector/src/stats-chain.ts": 11,
-  "apps/metrics-collector/src/stats-read.ts": 12,
+  "apps/metrics-collector/src/stats-read.ts": 9,
   "apps/metrics-collector/src/stats-routes.ts": 2,
   "apps/metrics-collector/src/stats-shape.ts": 19,
   "apps/metrics-collector/src/stats-store.ts": 13,

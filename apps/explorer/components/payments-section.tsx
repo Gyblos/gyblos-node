@@ -13,38 +13,26 @@ import {
 } from 'lucide-react';
 
 import {
-  chainHistoryNote,
   dailySettled,
   summarizeChain,
   type ChainSnapshot,
   type ChainSummary,
 } from '../lib/chain-shape';
-import { DISPLAY, PAGING, UNITS } from '../lib/constants';
-import { count, settlementCount, usdc, usdcDecimal, utc } from '../lib/format';
-import { rangeOf, tablePager, type ExplorerQuery } from '../lib/paging';
-import { displayRange } from '../lib/range';
-import { interval, readComparison } from './activity-report';
+import { PAGING, UNITS } from '../lib/constants';
+import { count, settlementCount, usdc, usdcDecimal } from '../lib/format';
+import { tablePager, type ExplorerQuery } from '../lib/paging';
+import type { readComparison } from './activity-report';
 import { Flow } from './board/animated-number';
 import { BarChartCard } from './board/bar-chart-card';
 import { delta, type Delta } from './board/delta';
 import { StatCard } from './board/stat-card';
 import { pagedRows, Pager } from './pager';
-import { BreakdownLinks, StatsBreakdown } from './stats-breakdown';
-import {
-  amountCell,
-  numberCell,
-  SectionTitle,
-  Table,
-  td,
-  Unavailable,
-} from './ui';
+import { StatsBreakdown } from './stats-breakdown';
+import { EmptyRow, numberCell, Table, timeCell, Unavailable } from './ui';
 
 const money = (atomic: bigint) => (
   <Flow value={usdcDecimal(atomic)} kind="usdc" />
 );
-
-const meta = (backfillDone: boolean | null, aggregatedAt: number | null) =>
-  chainHistoryNote(backfillDone) ?? `updated ${utc(aggregatedAt)}`;
 
 // Each figure's change against the span just before the range; none when it cannot be read or the
 // chain history is still being read (an incomplete earlier span would overstate every change).
@@ -89,9 +77,15 @@ function changes(period: ChainSummary, before: ChainSnapshot) {
   };
 }
 
-export async function PaymentsSection({ query }: { query: ExplorerQuery }) {
-  const days = rangeOf(query, 'payments');
-  const report = await readComparison(days, Date.now());
+export async function PaymentsSection({
+  query,
+  reportPromise,
+}: {
+  query: ExplorerQuery;
+  reportPromise: ReturnType<typeof readComparison>;
+}) {
+  const report = await reportPromise;
+  const focus = query.metric === 'paidOut';
   const chain = report.period.chain;
   const before = report.previous.chain;
   if (chain.error)
@@ -105,14 +99,14 @@ export async function PaymentsSection({ query }: { query: ExplorerQuery }) {
       ? changes(summarizeChain(report.compared.chain), before)
       : null;
   return (
-    <>
-      <SectionTitle
-        title={`Payments, ${displayRange(days)}`}
-        meta={`${interval(report.period.dates)} · ${report.metrics.paidOut.comparison} · ${meta(chain.backfillDone, chain.aggregatedAt)}`}
-      />
-      <BreakdownLinks query={query} />
-      {query.metric && (
-        <StatsBreakdown query={query} report={report} metric={query.metric} />
+    <section aria-labelledby="payments">
+      <h2 id="payments" className="mb-5 text-title-2-medium">
+        Payments
+      </h2>
+      {focus && (
+        <div className="mb-6">
+          <StatsBreakdown query={query} report={report} metric="paidOut" />
+        </div>
       )}
       <PaymentStats
         summary={summary}
@@ -125,14 +119,14 @@ export async function PaymentsSection({ query }: { query: ExplorerQuery }) {
         total={totals.settled}
         change={change?.settled[0]}
       />
-      {!query.metric && (
-        <DailyTable
+      {!focus && (
+        <ChainHistory
           query={query}
           summary={summary}
           complete={chain.backfillDone === true}
         />
       )}
-    </>
+    </section>
   );
 }
 
@@ -147,7 +141,7 @@ function PaymentStats({
 }) {
   const { totals } = summary;
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div className="grid grid-cols-1 gap-3 min-[390px]:grid-cols-2 lg:grid-cols-4">
       <StatCard
         icon={Coins}
         label="Settled"
@@ -227,7 +221,7 @@ function SettledChart({
   }));
   if (!points.length) return null;
   return (
-    <div className="mt-4">
+    <div className="mt-6 sm:mt-8">
       <BarChartCard
         title="Settled per day"
         kind="usdc"
@@ -242,32 +236,18 @@ function SettledChart({
   );
 }
 
-const DAILY_PAYMENT_COLUMNS = [
+const CHAIN_HEAD = [
   { label: 'Day (UTC)', sort: 'day', ascendingFirst: true },
-  { label: 'Opens', compactGroup: 'Channels', right: true },
-  { label: 'Settlements', compactGroup: 'Channels', right: true },
-  {
-    label: 'Settled',
-    compactGroup: 'Settlement amounts',
-    right: true,
-    sort: 'settled',
-  },
-  {
-    label: 'To sellers',
-    compactGroup: 'Settlement amounts',
-    right: true,
-    sort: 'paidOut',
-  },
-  { label: 'Fees', compactGroup: 'Fees and refunds', right: true },
-  { label: 'Refunded', compactGroup: 'Fees and refunds', right: true },
-  {
-    label: 'All program txs',
-    compactGroup: 'Transactions',
-    right: true,
-  },
+  { label: 'Settled', right: true, group: 'USDC', sort: 'settled' },
+  { label: 'To sellers', right: true, group: 'USDC', sort: 'paidOut' },
+  { label: 'Gyblos fees', right: true, group: 'USDC' },
+  { label: 'Refunded', right: true, group: 'USDC' },
+  { label: 'Channels opened', right: true, group: 'Activity' },
+  { label: 'Settlements', right: true, group: 'Activity' },
+  { label: 'All program txs', right: true, group: 'Activity' },
 ];
 
-function DailyTable({
+function ChainHistory({
   query,
   summary,
   complete,
@@ -288,13 +268,20 @@ function DailyTable({
     },
   );
   return (
-    <>
-      <SectionTitle id={PAGING.anchors.chainDaily} title="Daily on chain" />
+    <section
+      aria-labelledby="chain-history-title"
+      id={PAGING.anchors.chainDaily}
+      className="mt-8 scroll-mt-4"
+    >
       <Table
-        compactLabel="Daily payment metrics"
-        minWidth={DISPLAY.dailyTable}
+        heading={
+          <h3 id="chain-history-title" className="text-title-3-medium">
+            Daily on chain
+          </h3>
+        }
+        head={CHAIN_HEAD}
         sorting={{ query, table: 'chainDaily' }}
-        head={DAILY_PAYMENT_COLUMNS}
+        compactLabel="Daily on-chain columns"
         footer={
           <Pager
             label="Daily on chain"
@@ -302,36 +289,28 @@ function DailyTable({
           />
         }
       >
-        {!page.total && (
-          <tr>
-            <td className={td} colSpan={8}>
-              No indexed channel activity in this period.
-            </td>
-          </tr>
-        )}
         {page.rows.map(({ day, gyblos, program }) => (
           <tr key={day} className="border-t border-line">
-            <td className={`${td} font-mono`}>{day}</td>
+            <td className={timeCell}>
+              <time dateTime={day}>{day}</time>
+            </td>
+            <td className={numberCell}>{usdc(gyblos.settled)}</td>
+            <td className={numberCell}>{usdc(gyblos.paidOut)}</td>
+            <td className={numberCell}>{usdc(gyblos.gyblosFees)}</td>
+            <td className={numberCell}>{usdc(gyblos.refunded)}</td>
             <td className={numberCell}>{count(gyblos.opens)}</td>
             <td className={numberCell}>{count(gyblos.settles)}</td>
-            <td className={amountCell(gyblos.settled)}>
-              {usdc(gyblos.settled)}
-            </td>
-            <td className={amountCell(gyblos.paidOut)}>
-              {usdc(gyblos.paidOut)}
-            </td>
-            <td className={amountCell(gyblos.gyblosFees)}>
-              {usdc(gyblos.gyblosFees)}
-            </td>
-            <td className={`${numberCell} text-muted`}>
-              {usdc(gyblos.refunded)}
-            </td>
-            <td className={`${numberCell} text-muted`}>
+            <td className={numberCell}>
               {program ? count(program.transactions) : '—'}
             </td>
           </tr>
         ))}
+        {!page.total && (
+          <EmptyRow columns={CHAIN_HEAD.length}>
+            No indexed channel activity in this period.
+          </EmptyRow>
+        )}
       </Table>
-    </>
+    </section>
   );
 }

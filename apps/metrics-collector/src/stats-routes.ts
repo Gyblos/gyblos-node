@@ -24,6 +24,7 @@ import {
   parseChainTxQuery,
   type ChainTxReader,
 } from './stats-chain-txs';
+import { intradayBounds } from './stats-intraday';
 import type { StatsReader, StatsResource } from './stats-store';
 
 const NODE_ID = /^[0-9a-f]{64}$/;
@@ -87,6 +88,18 @@ export function statsRoutes(
       return context.json(body, COLLECTOR_STATUS.OK);
     });
   }
+  app.get(COLLECTOR_ROUTES.STATS_INTRADAY, async (context) => {
+    if (!reader?.intraday)
+      return rejection(context, COLLECTOR_ERRORS.UNAVAILABLE);
+    const bounds = intradayBounds(new URL(context.req.url), now());
+    if (!bounds) return rejection(context, COLLECTOR_ERRORS.INVALID_QUERY);
+    const rows = await reader.intraday(bounds);
+    context.header(
+      COLLECTOR_HEADERS.CACHE_CONTROL,
+      COLLECTOR_HEADER_VALUES.PUBLIC_STATS,
+    );
+    return context.json({ rows }, COLLECTOR_STATUS.OK);
+  });
   register(COLLECTOR_ROUTES.STATS_NETWORK, (stats, range) =>
     networkStats(stats, range, dayOfTime(now())),
   );

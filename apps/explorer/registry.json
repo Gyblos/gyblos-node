@@ -188,6 +188,11 @@
           "target": "components/board/bar-chart-card.tsx"
         },
         {
+          "path": "components/board/chart-readout.tsx",
+          "type": "registry:component",
+          "target": "components/board/chart-readout.tsx"
+        },
+        {
           "path": "components/board/bar-axis.ts",
           "type": "registry:lib",
           "target": "components/board/bar-axis.ts"

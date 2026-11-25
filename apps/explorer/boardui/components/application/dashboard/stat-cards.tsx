@@ -62,14 +62,14 @@ export function DeltaPill({
   return (
     <span
       className={cx(
-        'flex shrink-0 items-center gap-1 rounded-full py-0.5 pe-2 ps-1',
+        'flex shrink-0 items-center gap-1 rounded-full py-px pe-1.5 ps-1',
         pill,
       )}
     >
-      <Icon className={cx('size-4 shrink-0', className)} aria-hidden />
+      <Icon className={cx('size-3 shrink-0', className)} aria-hidden />
       <span
         className={cx(
-          'text-body-medium whitespace-nowrap tabular-nums',
+          'text-caption-1-medium whitespace-nowrap tabular-nums',
           className,
         )}
       >

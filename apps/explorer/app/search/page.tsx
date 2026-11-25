@@ -1,12 +1,21 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
+import { OperationChip } from '../../components/channel-txs';
 import { PageFrame } from '../../components/page-frame';
 import { Pager } from '../../components/pager';
 import { SellerCell } from '../../components/seller-cell';
-import { Addr, ModelName, SectionTitle, Table, td } from '../../components/ui';
+import {
+  Addr,
+  EmptyRow,
+  ModelName,
+  prefixedColumn,
+  SectionTitle,
+  Table,
+  td,
+} from '../../components/ui';
 import { getChainTxs } from '../../lib/chain-txs';
-import { CHAIN_TX_LABELS, operationHref } from '../../lib/chain-txs-shape';
+import { operationHref } from '../../lib/chain-txs-shape';
 import { getCollector } from '../../lib/collector';
 import { DISPLAY, RANGE, SEARCH_TERM_LIMIT } from '../../lib/constants';
 import { getDiscovery } from '../../lib/discovery-render';
@@ -70,7 +79,7 @@ export default async function SearchPage({
       <SectionTitle title="Search results" meta={term} />
       <Table
         minWidth={DISPLAY.narrowTable}
-        head={[{ label: 'Type' }, { label: 'Match' }]}
+        head={[{ label: 'Type' }, prefixedColumn('Match', 'seller')]}
         footer={
           <Pager
             label="Search results"
@@ -80,12 +89,10 @@ export default async function SearchPage({
       >
         {page.rows}
         {page.total === 0 && (
-          <tr>
-            <td colSpan={2} className={td}>
-              No matches in the model catalog, seller directory or recent
-              operations.
-            </td>
-          </tr>
+          <EmptyRow columns={2}>
+            No matches in the model catalog, seller directory or recent
+            operations.
+          </EmptyRow>
         )}
       </Table>
       {partial && (
@@ -123,7 +130,9 @@ function chainResults(
                 : 'Address'}
           </td>
           <td className={td}>
-            <Addr value={address} />
+            <span className="block ps-9">
+              <Addr value={address} />
+            </span>
           </td>
         </tr>,
       );
@@ -131,12 +140,14 @@ function chainResults(
     if (tx.signature.includes(term))
       results.push(
         <tr key={operationHref(tx)} className="border-t border-line">
-          <td className={td}>{CHAIN_TX_LABELS[tx.kind]}</td>
+          <td className={td}>
+            <OperationChip kind={tx.kind} />
+          </td>
           <td className={td}>
             <Link
               href={operationHref(tx)}
               title={tx.signature}
-              className="font-mono underline decoration-line underline-offset-2"
+              className="inline-block ps-9 font-mono underline decoration-line underline-offset-2"
             >
               {short(tx.signature)} · instruction {tx.instructionIndex}
             </Link>
@@ -166,7 +177,9 @@ function catalogResults(
       <tr key={modelKey(model)} className="border-t border-line">
         <td className={td}>Model</td>
         <td className={td}>
-          <ModelName {...model} />
+          <span className="block ps-2">
+            <ModelName {...model} />
+          </span>
         </td>
       </tr>
     ));

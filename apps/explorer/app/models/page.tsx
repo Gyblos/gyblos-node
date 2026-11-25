@@ -7,7 +7,7 @@ import { PageFrame } from '../../components/page-frame';
 import { Loading } from '../../components/ui';
 import { PAGES } from '../../lib/constants';
 import { pageMetadata } from '../../lib/page-meta';
-import { canonicalPageHref, rangeOf, readQuery } from '../../lib/paging';
+import { canonicalPageHref, readQuery } from '../../lib/paging';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,10 +28,7 @@ export default async function ModelsPage({
   const query = readQuery(params, PAGES.models);
   return (
     <PageFrame title="Gyblos models">
-      <Suspense
-        key={`models-${rangeOf(query, 'models')}`}
-        fallback={<Loading />}
-      >
+      <Suspense fallback={<Loading />}>
         <ModelsSection query={query} />
       </Suspense>
     </PageFrame>

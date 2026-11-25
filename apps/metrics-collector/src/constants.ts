@@ -47,6 +47,7 @@ export const COLLECTOR_ROUTES = {
   // Every public stats route starts with this; it selects the read limiter.
   STATS_PREFIX: '/v1/stats/',
   STATS_NETWORK: '/v1/stats/network',
+  STATS_INTRADAY: '/v1/stats/intraday',
   STATS_MODELS: '/v1/stats/models',
   STATS_SELLER: '/v1/stats/sellers/:nodeId',
   STATS_CHAIN: '/v1/stats/chain',
@@ -154,6 +155,8 @@ export const AGGREGATES = {
   maxPublicDemandPerDay: 20,
   // Public day ranges.
   allTimeRange: 'all',
+  maxIntradayDays: 7,
+  halfHourMs: 1_800_000,
   maxRangeDays: 92,
   defaultRangeDays: 30,
   dayMs: 86_400_000,
