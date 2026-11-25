@@ -165,15 +165,12 @@ void test('free client cuts oversized prefixes before reading the body', async (
 });
 void test('free client cancels a slow dial and closes a late connection without sending', async () => {
   const item = await fixture();
-  let resolve = (_connection: Connection) => {};
   const dialed = batchDeferred<void>();
-  item.setConnect(
-    () =>
-      new Promise<Connection>((done) => {
-        resolve = done;
-        dialed.resolve();
-      }),
-  );
+  const late = batchDeferred<Connection>();
+  item.setConnect(() => {
+    dialed.resolve();
+    return late.promise;
+  });
   const controller = new AbortController();
   const operation = item.client.execute(item.request, controller.signal);
   await dialed.promise;
@@ -182,7 +179,7 @@ void test('free client cancels a slow dial and closes a late connection without 
     code: FREE_EXECUTION_CODES.CANCELLED,
     sent: false,
   });
-  resolve(item.connection);
+  late.resolve(item.connection);
   await item.client.settled();
   assert.equal(item.writes(), 0);
   assert.equal(item.closes(), 1);
@@ -292,7 +289,7 @@ void test('free client exposes settlement until a cancelled native write actuall
   const finished = item.client.settled().then(() => {
     settled = true;
   });
-  await new Promise((resolve) => setTimeout(resolve, 5));
+  await new Promise((resolve) => setImmediate(resolve));
   assert.equal(settled, false);
   released.resolve();
   await finished;
@@ -332,16 +329,20 @@ void test('relay-only free client sends over a same-machine loopback path only',
 });
 void test('free client cuts slow frames at the absolute deadline and suppresses late writes', async (context) => {
   const item = await fixture({ requestMs: 30 });
+  const dial = batchDeferred<void>();
   const began = batchDeferred<void>();
   const released = batchDeferred<void>();
+  item.setConnect(() => dial.promise.then(() => item.connection));
   item.setWrite(async () => {
     began.resolve();
     await released.promise;
   });
   context.mock.timers.enable({ apis: ['setTimeout'] });
   const operation = item.client.execute(item.request);
+  context.mock.timers.tick(20);
+  dial.resolve();
   await began.promise;
-  context.mock.timers.tick(30);
+  context.mock.timers.tick(10);
   await assert.rejects(operation, {
     code: FREE_EXECUTION_CODES.TIMEOUT,
     sent: true,
