@@ -118,6 +118,10 @@ Assumptions behind the bound:
 - The rate holds among scored answers. Answers are excluded only when they are
   blank, carry a chat template marker, fail in transport or leave no point to
   check, none of which depends on whether their checked points deviate.
+- Partial runs are not measured separately. Excluded answers tend to be short,
+  and a longer answer has more chances to deviate, so the worst case restricted
+  to full-length answers (24 checks) is the relevant one: 17 deviant answers in
+  208, upper bound 12.0 %, which the assumed rate still covers.
 
 What the rule catches, and what it does not:
 
@@ -223,7 +227,7 @@ per answer) and the verdict, signed with the verifier's Ed25519 key. The parser
 recomputes `failAt` and the verdict from the evidence and refuses any result
 that does not match; a consumer still compares the signed rule with the
 challenge set's. The evidence file next to it keeps the prompts, answers and
-every check.
+every check, and each reply that could not be scored with its reason.
 
 ## Limits
 
