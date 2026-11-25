@@ -1,5 +1,3 @@
-// Owns the date range the page shows: a preset number of closed UTC days, read from the `range`
-// search parameter, and the collector query it maps to. Pure, no I/O.
 import { ALL_TIME, RANGE, UNITS } from './constants';
 
 export type RangeDays = (typeof RANGE.presets)[number];

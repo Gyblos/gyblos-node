@@ -42,10 +42,6 @@ const day = (
 
 void test('tokens processed add input and output, each side apart', () => {
   const usage = summarizeUsage({
-    aggregatedAt: 1,
-    models: [],
-    buyerTotals: null,
-    error: null,
     days: [
       day('2026-11-16', side(20_000, 50_000, false), side(300, 400, true)),
       day('2026-11-17', side(1, 2, false), null),

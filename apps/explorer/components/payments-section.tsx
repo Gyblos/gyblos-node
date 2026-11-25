@@ -92,6 +92,7 @@ export async function PaymentsSection({ query }: { query: ExplorerQuery }) {
         paidOut={report.period.paid.total}
       />
       <SettledChart
+        dates={report.period.dates}
         chain={chain}
         total={totals.settled}
         change={change?.settled[0]}
@@ -177,15 +178,17 @@ function PaymentStats({
 
 // Settled USDC per day; the bar height is approximate, the labels exact.
 function SettledChart({
+  dates,
   chain,
   total,
   change,
 }: {
   chain: ChainSnapshot;
+  dates: string[];
   total: bigint;
   change?: Delta | null;
 }) {
-  const points = dailySettled(chain).map((day) => ({
+  const points = dailySettled(chain, dates).map((day) => ({
     day: day.day,
     value:
       day.settled === null ? null : Number(day.settled) / UNITS.atomicPerUsdc,

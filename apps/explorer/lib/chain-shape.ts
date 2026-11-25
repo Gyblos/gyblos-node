@@ -188,12 +188,20 @@ function indexedDay(chain: ChainSnapshot, date: string) {
   );
 }
 
-export function dailySettled(snapshot: ChainSnapshot) {
-  return snapshot.days.map((day) => ({
-    day: day.day,
-    settled: day.gyblos?.settled ?? (indexedDay(snapshot, day.day) ? 0n : null),
-    settles: day.gyblos?.settles ?? (indexedDay(snapshot, day.day) ? 0 : null),
-  }));
+export function dailySettled(
+  snapshot: ChainSnapshot,
+  dates = snapshot.days.map((row) => row.day),
+) {
+  const rows = new Map(snapshot.days.map((row) => [row.day, row]));
+  return dates.map((day) => {
+    const row = rows.get(day);
+    const covered = !!row && indexedDay(snapshot, day);
+    return {
+      day,
+      settled: row?.gyblos?.settled ?? (covered ? 0n : null),
+      settles: row?.gyblos?.settles ?? (covered ? 0 : null),
+    };
+  });
 }
 
 export const chainHistoryNote = (backfillDone: boolean | null) =>

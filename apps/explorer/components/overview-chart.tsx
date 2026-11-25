@@ -48,6 +48,19 @@ interface OverviewChartProps {
   paymentNote: string;
 }
 
+function useMetric() {
+  const search = useSearchParams();
+  const selected =
+    readQuery(new URLSearchParams(search.toString())).metric ?? 'tokens';
+  const select = (metric: Metric) => {
+    const url = new URL(window.location.href);
+    if (metric === 'tokens') url.searchParams.delete(STATS.metricParam);
+    else url.searchParams.set(STATS.metricParam, metric);
+    window.history.replaceState(null, '', url);
+  };
+  return { selected, select };
+}
+
 export function OverviewChart({
   points,
   metrics,
@@ -59,15 +72,7 @@ export function OverviewChart({
   receiptNote,
   paymentNote,
 }: OverviewChartProps) {
-  const search = useSearchParams();
-  const selected =
-    readQuery(new URLSearchParams(search.toString())).metric ?? 'tokens';
-  const select = (metric: Metric) => {
-    const url = new URL(window.location.href);
-    if (metric === 'tokens') url.searchParams.delete(STATS.metricParam);
-    else url.searchParams.set(STATS.metricParam, metric);
-    window.history.replaceState(null, '', url);
-  };
+  const { selected, select } = useMetric();
   const [active, setActive] = useState<number | null>(null);
   const point = active === null ? null : points[active];
   const { label, kind } = METRICS[selected];
@@ -124,17 +129,11 @@ export function OverviewChart({
           setActive={setActive}
         />
         <ChartScale points={points} selected={selected} maximum={maximum} />
-        <div className="mt-3 flex flex-wrap items-baseline justify-between gap-2 border-t border-line pt-3 text-xs text-muted">
-          <span>
-            {chartDates} · {metric.comparison}
-          </span>
-          <Link
-            className="inline-flex items-center gap-1 text-sm text-muted hover:text-ink hover:underline"
-            href={links[selected]}
-          >
-            Daily breakdown <ArrowUpRight size={14} aria-hidden />
-          </Link>
-        </div>
+        <ChartFooter
+          chartDates={chartDates}
+          comparison={metric.comparison}
+          href={links[selected]}
+        />
       </section>
     </>
   );
@@ -178,6 +177,30 @@ function MetricSelector({
           />
         );
       })}
+    </div>
+  );
+}
+
+function ChartFooter({
+  chartDates,
+  comparison,
+  href,
+}: {
+  chartDates: string;
+  comparison: string;
+  href: string;
+}) {
+  return (
+    <div className="mt-3 flex flex-wrap items-baseline justify-between gap-2 border-t border-line pt-3 text-xs text-muted">
+      <span>
+        {chartDates} · {comparison}
+      </span>
+      <Link
+        className="inline-flex items-center gap-1 text-sm text-muted hover:text-ink hover:underline"
+        href={href}
+      >
+        Daily breakdown <ArrowUpRight size={14} aria-hidden />
+      </Link>
     </div>
   );
 }

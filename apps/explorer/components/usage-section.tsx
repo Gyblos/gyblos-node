@@ -192,7 +192,6 @@ export async function UsageSection({ query }: { query: ExplorerQuery }) {
       />
     );
   const usage = summarizeUsage(snapshot);
-  const calendar = new Set(report.period.dates);
   const change = changes(
     summarizeUsage({ days: report.compared.source?.days ?? [] }),
     report.compared.source?.version &&
@@ -223,7 +222,8 @@ export async function UsageSection({ query }: { query: ExplorerQuery }) {
         days={days}
       />
       <RequestCharts
-        days={snapshot.days.filter((row) => calendar.has(row.day))}
+        days={snapshot.days}
+        dates={report.period.dates}
         change={change?.requests ?? null}
       />
       {!query.metric && <DailyTable query={query} days={usage.active} />}
@@ -235,12 +235,14 @@ export async function UsageSection({ query }: { query: ExplorerQuery }) {
 // Small multiples, never stacked: free and paid requests per day, each in its own chart.
 function RequestCharts({
   days,
+  dates,
   change,
 }: {
   days: NetworkDay[];
+  dates: string[];
   change: (Delta | null)[] | null;
 }) {
-  const series = dailyRequests(days);
+  const series = dailyRequests(days, dates);
   const chart = (side: 'free' | 'paid') =>
     series.map((day) => ({
       day: day.day,

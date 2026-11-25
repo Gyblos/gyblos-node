@@ -95,12 +95,17 @@ export function relayText(day: NetworkDay): string {
 
 export function dailyRequests(
   days: readonly { day: string; free: Section; paid: Section }[],
+  dates = days.map((row) => row.day),
 ) {
-  return days.map((day) => ({
-    day: day.day,
-    free: day.free?.requests.headline ?? null,
-    paid: day.paid?.requests.headline ?? null,
-  }));
+  const rows = new Map(days.map((row) => [row.day, row]));
+  return dates.map((day) => {
+    const row = rows.get(day);
+    return {
+      day,
+      free: row?.free?.requests.headline ?? null,
+      paid: row?.paid?.requests.headline ?? null,
+    };
+  });
 }
 
 export function observedSum(values: readonly (number | null)[]) {

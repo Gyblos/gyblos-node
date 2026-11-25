@@ -4,8 +4,8 @@ import { Suspense } from 'react';
 
 import { PageFrame } from '../../components/page-frame';
 import { PaymentsSection } from '../../components/payments-section';
-import { StatsTabs } from '../../components/stats-tabs';
 import { RangeControl } from '../../components/range-control';
+import { StatsTabs } from '../../components/stats-tabs';
 import { Loading } from '../../components/ui';
 import { UsageSection } from '../../components/usage-section';
 import { PAGES } from '../../lib/constants';
@@ -32,7 +32,9 @@ export default async function StatsPage({
   return (
     <PageFrame title="Stats">
       <div className="my-4 flex flex-wrap items-center justify-between gap-3">
-        <span className="text-sm text-muted">Through the last complete UTC day</span>
+        <span className="text-sm text-muted">
+          Through the last complete UTC day
+        </span>
         <RangeControl section="usage" days={query.days} />
       </div>
       <StatsTabs

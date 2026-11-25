@@ -303,3 +303,24 @@ void test('chain figures say when the chain history is still being read', () => 
 void test('a help tap toggles its tooltip: the press itself never closes it', () => {
   assert.equal(HELP_TRIGGER.shouldCloseOnPress, false);
 });
+
+void test('both Stats series preserve UTC dates omitted by the source', () => {
+  const dates = ['2026-11-20', '2026-11-21'];
+  assert.deepEqual(
+    dailyRequests([], dates),
+    dates.map((day) => ({ day, free: null, paid: null })),
+  );
+  assert.deepEqual(
+    dailySettled(
+      {
+        days: [],
+        aggregatedAt: null,
+        backfillDone: true,
+        indexedAt: Date.parse('2026-11-22'),
+        error: null,
+      },
+      dates,
+    ),
+    dates.map((day) => ({ day, settled: null, settles: null })),
+  );
+});

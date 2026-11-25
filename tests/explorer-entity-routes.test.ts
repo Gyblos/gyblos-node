@@ -91,7 +91,7 @@ void test('seller search matches the verified account, public name, node and cas
 });
 
 void test('entity directory links retain the viewed activity window and discard detail pagination', () => {
-  for (const path of ['/models', '/sellers']) {
+  for (const path of ['/models', '/sellers'] as const) {
     const detail = readQuery(
       { closed: '1', modelsRange: '7', modelsPage: '2' },
       '/models/example',
