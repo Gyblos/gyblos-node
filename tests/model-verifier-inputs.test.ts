@@ -15,6 +15,7 @@ import {
 import { loadVerifierKey } from '@gyblos/model-verifier/key';
 import { main } from '@gyblos/model-verifier/main';
 import { parseSellerTarget } from '@gyblos/model-verifier/seller';
+import { MODEL_IDS } from '@gyblos/protocol';
 import {
   MODEL_VERIFICATION,
   modelVerificationFailAt,
@@ -143,7 +144,7 @@ for (const [
           verifier: key.address,
           seller: { owner: TARGET.owner, nodeId: TARGET.nodeId },
           selection: {
-            modelId: 'qwen3-1.7b',
+            modelId: MODEL_IDS.QWEN3_1_7B,
             variant: null,
             quantization: null,
           },
