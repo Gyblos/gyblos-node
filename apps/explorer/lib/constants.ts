@@ -95,7 +95,7 @@ export const CHAIN_TXS = {
   limitParam: 'limit',
   recipientParam: 'recipient',
   pageRows: 5,
-  indexBatchRows: 50,
+  pageParam: 'page',
 } as const;
 
 export const PAGING = {

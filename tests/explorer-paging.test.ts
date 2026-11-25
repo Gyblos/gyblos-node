@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { getTransactionTable } from '@gyblos/explorer/chain-txs';
 import { operationBefore } from '@gyblos/explorer/chain-txs-shape';
 import { CHAIN_TXS, PAGING, RANGE } from '@gyblos/explorer/constants';
 import {
@@ -81,7 +82,9 @@ void test('the query reads every table page and drops invalid values', () => {
     before: CURSOR,
     pages: { sellers: 2, transactions: 3 },
   });
-  assert.deepEqual(readQuery(new URLSearchParams('txPage=4')).pages, {});
+  assert.deepEqual(readQuery(new URLSearchParams('txPage=4')).pages, {
+    transactions: 4,
+  });
 });
 
 void test('every link keeps the range, the filter, the cursor and the other tables pages', () => {
@@ -213,7 +216,7 @@ void test('an invalid page parameter is dropped from the URL', () => {
     canonicalPageHref({ dailyPage: '1', sellersPage: '2' }),
     '/?sellersPage=2',
   );
-  assert.equal(canonicalPageHref({ txPage: '2' }), '/');
+  assert.equal(canonicalPageHref({ txPage: '2' }), null);
   assert.equal(canonicalPageHref({ sellersPage: '2', other: 'x' }), null);
   assert.equal(canonicalPageHref({ before: CURSOR, txPage: '2' }), null);
   assert.equal(canonicalPageHref({}), null);
@@ -221,19 +224,17 @@ void test('an invalid page parameter is dropped from the URL', () => {
 
 void test('operations show the real last page and link back to the immediately preceding page', () => {
   assert.equal(CHAIN_TXS.pageRows, PAGING.rowsPerPage);
-  assert.ok(CHAIN_TXS.indexBatchRows <= CHAIN_TX_PAGE.maxLimit);
-  const boundaries = [null, CURSOR, OLDER];
+  assert.ok(CHAIN_TXS.pageRows <= CHAIN_TX_PAGE.maxLimit);
   const pager = txPager(
     readQuery({ before: OLDER, txPage: '3' }),
     pageOf(rows(13), 3),
-    boundaries,
   );
   assert.equal(pager.rows, 'Rows 11–13 of 13');
   assert.equal(pager.pages, 3);
   assert.equal(pager.showPages, true);
   assert.match(pager.hrefs[2] ?? '', /txPage=2/);
-  assert.ok(pager.hrefs[2]?.includes(CURSOR));
-  assert.equal(txPager(readQuery({}), pageOf([], 1), [null]).pages, 1);
+  assert.ok(!pager.hrefs[2]?.includes('before='));
+  assert.equal(txPager(readQuery({}), pageOf([], 1)).pages, 1);
 });
 
 void test('the Sellers caption counts offers and sellers apart from rows', () => {
@@ -357,4 +358,40 @@ void test('legacy 90-day bookmarks become All while retaining the surrounding pa
     '/models?range=7&modelsRange=all&modelsPage=2',
   );
   assert.equal(readQuery({}).days, 'all');
+});
+
+void test('a cold deep link reads one operation page and its recipient-scoped total', async (t) => {
+  const urls: URL[] = [];
+  t.mock.method(globalThis, 'fetch', async (input: string) => {
+    urls.push(new URL(input));
+    return Response.json({
+      programId: 'program',
+      treasury: 'treasury',
+      total: 100001,
+      page: 20001,
+      next: null,
+      transactions: [
+        {
+          signature: SIGNATURE,
+          instructionIndex: 0,
+          slot: 100,
+          blockTime: null,
+          kind: 'open',
+          channel: 'channel',
+          recipients: [],
+          amountAtomic: '1',
+        },
+      ],
+    });
+  });
+  const table = await getTransactionTable(
+    readQuery({ txPage: '20001' }),
+    'recipient',
+  );
+  assert.equal(urls.length, 1);
+  assert.equal(urls[0]?.searchParams.get('page'), '20001');
+  assert.equal(urls[0]?.searchParams.get('recipient'), 'recipient');
+  assert.equal(table.pager.page, 20001);
+  assert.equal(table.pager.pages, 20001);
+  assert.equal(table.transactions[0]?.signature, SIGNATURE);
 });

@@ -27,12 +27,12 @@ export function PageFrame({
       <SiteHeader crumb={crumb} />
       <main id="main-content" tabIndex={-1}>
         <QueryRegion>
-          <header className="mt-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
             <h1 className="text-title-2-medium break-words text-text-primary">
               {title}
             </h1>
             {toolbar}
-          </header>
+          </div>
           {children}
         </QueryRegion>
       </main>

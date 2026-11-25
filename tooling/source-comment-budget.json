@@ -429,7 +429,6 @@
   "apps/explorer/components/board/hovered.ts": 3,
   "apps/explorer/components/board/select.tsx": 4,
   "apps/explorer/components/board/stat-card.tsx": 3,
-  "apps/explorer/components/board/status-dot.tsx": 2,
   "apps/explorer/components/board/styles.ts": 1,
   "apps/explorer/components/live-refresh.tsx": 3,
   "apps/explorer/components/model-logo.tsx": 2,

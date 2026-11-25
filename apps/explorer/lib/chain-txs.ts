@@ -1,16 +1,13 @@
-import { unstable_cache } from 'next/cache';
-
 import {
   chainTxsUrl,
-  operationBefore,
-  operationId,
   parseChainTxs,
   type ChainTxPage,
 } from './chain-txs-shape';
 import { COLLECTOR_URL } from './config';
-import { CHAIN_TXS } from './constants';
+import { CHAIN_TXS, PAGING } from './constants';
 import { fetchJson } from './fetch-json';
-import { txPager, type ExplorerQuery } from './paging';
+import { queryHref, txPager, type ExplorerQuery } from './paging';
+import { num, record, SourceShapeError } from './validate';
 
 export async function getChainTxs(
   before: string | null,
@@ -41,96 +38,70 @@ export async function getChainTxs(
   }
 }
 
-const transactionIndex = unstable_cache(
-  async (recipient: string | null, collector: string) => {
-    const boundaries: (string | null)[] = [null];
-    const visited = new Set<string>();
-    let total = 0;
-    let first: string | null = null;
-    let cursor: string | null = null;
-    let previous: string | null = null;
-    do {
-      const batch = parseChainTxs(
-        await fetchJson(
-          chainTxsUrl(collector, cursor, recipient, CHAIN_TXS.indexBatchRows),
-          'collector transaction index',
-        ),
-      );
-      for (const tx of batch.transactions) {
-        if (total && total % CHAIN_TXS.pageRows === 0)
-          boundaries.push(previous);
-        previous = operationId(tx);
-        first ??= previous;
-        total++;
-      }
-      cursor = batch.next;
-      if (cursor && visited.has(cursor))
-        throw new Error('Repeated transaction cursor');
-      if (cursor) visited.add(cursor);
-    } while (cursor);
-    return { boundaries, first, total };
-  },
-  ['explorer-operation-pages'],
-  { revalidate: 60 },
-);
-
-function precedes(left: string, right: string) {
-  const [slot, signature, instruction] = left.split('-');
-  const [otherSlot, otherSignature, otherInstruction] = right.split('-');
-  if (slot !== otherSlot) return Number(slot) > Number(otherSlot);
-  if (signature !== otherSignature) return signature! > otherSignature!;
-  return Number(instruction) > Number(otherInstruction);
+function cursorPager(query: ExplorerQuery, batch: ChainTxPage) {
+  const page = query.before ? Math.max(2, query.pages.transactions ?? 2) : 1;
+  const href = (before: string | null, target: number) =>
+    queryHref(query, { before, pages: { transactions: target } }) +
+    '#' +
+    PAGING.anchors.transactions;
+  const hrefs: Record<number, string> = {};
+  if (query.before) hrefs[page - 1] = href(null, 1);
+  if (batch.next) hrefs[page + 1] = href(batch.next, page + 1);
+  return {
+    page,
+    pages: page + Number(Boolean(batch.next)),
+    rows: null,
+    hrefs,
+    previousLabel: 'Newest',
+    nextLabel: 'Older',
+    showPages: !batch.next && !query.before,
+  };
 }
 
 export async function getTransactionTable(
   query: ExplorerQuery,
   recipient: string | null = null,
 ) {
-  try {
-    const { boundaries, first, total } = await transactionIndex(
-      recipient,
-      COLLECTOR_URL,
-    );
-    const before = query.before;
-    const following = before
-      ? boundaries.findIndex(
-          (boundary) => boundary && precedes(before, boundary),
-        )
-      : 1;
-    const current = following < 0 ? boundaries.length : following;
-    const cursor = boundaries[current - 1];
-    const batch = await getChainTxs(
-      cursor ?? (first && operationBefore(first)),
-      recipient,
-    );
-    const start = (current - 1) * CHAIN_TXS.pageRows;
-    const page = {
-      page: current,
-      pages: boundaries.length,
-      requested: current,
-      rows: batch.transactions,
-      total,
-      first: start + 1,
-      last: start + batch.transactions.length,
-    };
-    return { ...batch, pager: txPager(query, page, boundaries) };
-  } catch {
-    const page = {
-      page: 1,
-      pages: 1,
-      requested: 1,
-      rows: [],
-      total: 0,
-      first: 0,
-      last: 0,
-    };
-    return {
-      programId: '',
-      treasury: '',
-      transactions: [],
-      next: null,
-      error: 'Transaction index unavailable',
-      pager: txPager(query, page, [null]),
-    };
+  const requested = query.pages.transactions ?? 1;
+  if (!query.before || query.pages.transactions) {
+    const url = new URL(chainTxsUrl(COLLECTOR_URL, null, recipient));
+    url.searchParams.set(CHAIN_TXS.pageParam, String(requested));
+    try {
+      const raw = await fetchJson(url.href, 'collector operation page');
+      const body = record(raw, 'txs');
+      const total = num(body.total, 'txs.total');
+      const current = num(body.page, 'txs.page');
+      const batch = parseChainTxs(body);
+      const pages = Math.max(1, Math.ceil(total / CHAIN_TXS.pageRows));
+      const start = (current - 1) * CHAIN_TXS.pageRows;
+      if (
+        !Number.isSafeInteger(total) ||
+        total < 0 ||
+        !Number.isSafeInteger(current) ||
+        current < 1 ||
+        current > pages ||
+        batch.transactions.length !==
+          Math.min(CHAIN_TXS.pageRows, total - start)
+      )
+        throw new SourceShapeError('txs.page');
+      const page = {
+        page: current,
+        total,
+        requested,
+        pages,
+        rows: batch.transactions,
+        first: start + 1,
+        last: start + batch.transactions.length,
+      };
+      return { ...batch, error: null, pager: txPager(query, page) };
+    } catch {
+      return getCursorTable(query, recipient);
+    }
   }
+  return getCursorTable(query, recipient);
+}
+
+async function getCursorTable(query: ExplorerQuery, recipient: string | null) {
+  const batch = await getChainTxs(query.before, recipient);
+  return { ...batch, pager: cursorPager(query, batch) };
 }

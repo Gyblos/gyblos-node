@@ -241,7 +241,9 @@ td.text-right[data-loading-active] > .contents > .query-skeleton {
   margin-inline-start: auto;
 }
 
-[data-loading-active=""][data-loading-field="plot"] > .contents > .query-skeleton {
+[data-loading-active=''][data-loading-field='plot']
+  > .contents
+  > .query-skeleton {
   inset: 0;
   max-width: none;
   height: auto;

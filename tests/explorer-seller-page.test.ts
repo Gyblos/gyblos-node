@@ -72,7 +72,7 @@ void test('seller page links stay on the seller page and keep every other parame
     sectionRangeHref('verified=1', 'overview', 7),
     '/?overviewRange=7&verified=1',
   );
-  const pager = txPager(query, pageOf([1, 2, 3, 4, 5, 6], 2), [null, CURSOR]);
+  const pager = txPager(query, pageOf([1, 2, 3, 4, 5, 6], 2));
   assert.ok(
     Object.values(pager?.hrefs ?? {}).every((href) =>
       href.startsWith(`${PATH}?`),

@@ -7,6 +7,8 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import postcss from 'postcss';
+
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const ITEM_SCHEMA = 'https://ui.shadcn.com/schema/registry-item.json';
 const output = resolve(root, 'public/r');
@@ -69,6 +71,26 @@ function isRegistry(value: unknown): value is Registry {
   );
 }
 
+async function boardTheme() {
+  const theme: Record<string, string> = {};
+  for (const sheet of ['tokens', 'typography']) {
+    const source = await readFile(
+      resolve(root, 'boardui/styles', sheet + '.css'),
+      'utf8',
+    );
+    postcss.parse(source).walkAtRules('theme', (rule) => {
+      rule.walkDecls((decl) => {
+        theme[decl.prop.slice(2)] = decl.value;
+      });
+    });
+  }
+  return {
+    theme,
+    light: { 'boardui-inner': 'var(--bg)' },
+    dark: { 'boardui-inner': 'var(--raised)' },
+  };
+}
+
 const parsed: unknown = JSON.parse(
   await readFile(resolve(root, 'registry.json'), 'utf8'),
 );
@@ -93,6 +115,7 @@ for (const item of registry.items) {
   const built = {
     $schema: ITEM_SCHEMA,
     ...item,
+    ...(item.name === 'board-base' ? { cssVars: await boardTheme() } : {}),
     ...(item.registryDependencies
       ? { registryDependencies: item.registryDependencies.map(url) }
       : {}),

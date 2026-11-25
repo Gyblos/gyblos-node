@@ -47,7 +47,9 @@ function RecipientTable({
           { label: 'Transaction' },
           { label: 'Channel' },
         ]}
-        footer={<Pager label="First-recipient transactions" view={page.pager} />}
+        footer={
+          <Pager label="First-recipient transactions" view={page.pager} />
+        }
       >
         {page.transactions.map((tx) => (
           <TxLine
@@ -57,7 +59,8 @@ function RecipientTable({
         ))}
         {!page.transactions.length && (
           <EmptyRow columns={8}>
-            No indexed channel operations listing this address as the first recipient.
+            No indexed channel operations listing this address as the first
+            recipient.
           </EmptyRow>
         )}
       </Table>

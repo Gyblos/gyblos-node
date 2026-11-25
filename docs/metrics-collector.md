@@ -416,10 +416,10 @@ answer is `Cache-Control: public, max-age=300` and the Worker keeps it in the
 edge cache, keyed by URL, so repeated reads cost no database query; errors are
 never cached.
 
-Every daily aggregate answer has `from`, `to`, `formulaVersion` (the version every row in the
-answer was computed with, or `null` when there is no data or a recompute after a
-formula change is under way) and `aggregatedAt` (when the newest row in the
-answer was computed, or `null` without data).
+Every daily aggregate answer has `from`, `to`, `formulaVersion` (the version
+every row in the answer was computed with, or `null` when there is no data or a
+recompute after a formula change is under way) and `aggregatedAt` (when the
+newest row in the answer was computed, or `null` without data).
 
 The network answer also says how complete each day is, so a reader can tell a
 real zero from a day not counted yet. Each day has `coverage`:
@@ -562,10 +562,16 @@ at most once and in this order:
   channels whose first split recipient as opened (`recipients[0]`, the seller's
   payout address for Gyblos sessions) is that owner. Channels whose open was not
   read never match. The filter goes into the page's row selection, so the page
-  stays one bounded read-only statement. It has no index of its own: it reads
-  Gyblos instructions newest first until the page is full, so a rare recipient
-  costs a scan of the history, which grows with it as the unfiltered page's
-  does.
+  uses one read-only statement in cursor mode. It has no index of its own: it
+  reads Gyblos instructions newest first until the page is full, so a rare
+  recipient costs a scan of the history, which grows with it as the unfiltered
+  page's does.
+- `page`: a one-based page number from 1 to 999999, mutually exclusive with
+  `before`. The answer adds `total` (matching instructions) and `page` (the page
+  returned). An empty feed or a page beyond the end returns page 1. The count
+  and the page come from one database snapshot. SQL applies the offset before
+  calculating amounts, so only the selected page and its one lookahead row
+  require amount calculations.
 
 Numbers are canonical (`0` or no leading zero). Any other parameter (an unnamed
 one included), a repeated one, another order, `limit=25` (the default is sent by

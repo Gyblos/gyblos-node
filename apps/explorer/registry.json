@@ -301,7 +301,7 @@
       "name": "status-dot",
       "type": "registry:component",
       "title": "Status dot",
-      "description": "A 12 px status indicator in the signal blue.",
+      "description": "A 12 px status indicator in the online status green.",
       "files": [
         {
           "path": "components/board/status-dot.tsx",

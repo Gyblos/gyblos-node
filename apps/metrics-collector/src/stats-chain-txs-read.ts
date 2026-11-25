@@ -1,5 +1,6 @@
 import {
   and,
+  count,
   desc,
   eq,
   gt,
@@ -37,7 +38,11 @@ import {
   chainTxs,
 } from './schema';
 import { literal } from './sql-primitives';
-import type { ChainTxCursor, ChainTxReader } from './stats-chain-txs';
+import type {
+  ChainTxCursor,
+  ChainTxQuery,
+  ChainTxReader,
+} from './stats-chain-txs';
 
 type ChainTxPageQuery = Parameters<ChainTxReader['transactions']>[0];
 
@@ -50,9 +55,17 @@ const firstRecipient = (owner: string) =>
 const earlierThan = (cursor: ChainTxCursor) =>
   sql`(${chainTxs.slot}, ${ins.signature}, ${ins.instructionIndex}) < (${cursor.slot}, ${cursor.signature}, ${cursor.instructionIndex})`;
 
+const inFeed = (recipient: string | null) =>
+  and(
+    eq(chainChannels.gyblos, 1),
+    eq(chainTxs.failed, 0),
+    recipient ? firstRecipient(recipient) : undefined,
+  );
+
 function pageKeys(
   orm: CollectorDatabase,
   { before, rows, recipient }: ChainTxPageQuery,
+  offset: number,
 ) {
   return orm.$with('page').as(
     orm
@@ -74,20 +87,14 @@ function pageKeys(
       .from(ins)
       .innerJoin(chainTxs, eq(chainTxs.signature, ins.signature))
       .innerJoin(chainChannels, eq(chainChannels.channel, ins.channel))
-      .where(
-        and(
-          eq(chainChannels.gyblos, 1),
-          eq(chainTxs.failed, 0),
-          before ? earlierThan(before) : undefined,
-          recipient ? firstRecipient(recipient) : undefined,
-        ),
-      )
+      .where(and(inFeed(recipient), before ? earlierThan(before) : undefined))
       .orderBy(
         desc(chainTxs.slot),
         desc(ins.signature),
         desc(ins.instructionIndex),
       )
-      .limit(rows),
+      .limit(rows)
+      .offset(offset),
   );
 }
 
@@ -228,50 +235,78 @@ function amountOf(
   end`;
 }
 
+function transactionRows(
+  orm: CollectorDatabase,
+  query: ChainTxPageQuery,
+  offset = 0,
+) {
+  const page = pageKeys(orm, query, offset);
+  const settles = settleIncrements(orm, page);
+  const splits = payoutSplits(orm, page);
+  const payout = payoutFields(page, splits, query.recipient);
+  return orm
+    .with(page)
+    .select({
+      signature: page.signature,
+      instructionIndex: page.instructionIndex,
+      slot: page.slot,
+      blockTime: page.blockTime,
+      kind: page.kind,
+      channel: page.channel,
+      payee: page.payee,
+      recipientsJson: page.recipientsJson,
+      amountAtomic: amountOf(page, settles, payout),
+      splitPaidOut: payout.paidOut.as('split_paid_out'),
+      splitGyblosFees: payout.gyblosFees.as('split_gyblos_fees'),
+      splitProgramTreasury: payout.programTreasury.as('split_program_treasury'),
+      splitRefunded: payout.refunded.as('split_refunded'),
+      splitChannels: payout.channels.as('split_channels'),
+      splitUnclassified: payout.unclassified.as('split_unclassified'),
+      batched: payout.batched.as('batched'),
+    })
+    .from(page)
+    .leftJoin(
+      settles,
+      and(
+        eq(settles.signature, page.signature),
+        eq(settles.position, page.instructionIndex),
+      ),
+    )
+    .leftJoin(splits, eq(splits.signature, page.signature))
+    .orderBy(
+      desc(page.slot),
+      desc(page.signature),
+      desc(page.instructionIndex),
+    );
+}
+
 export function chainTxReader(database: D1Database): ChainTxReader {
   const orm = createD1Orm(database);
+  const numbered = async (query: ChainTxQuery, page: number) => {
+    const { recipient, limit } = query;
+    const read = (position: number) =>
+      orm.batch([
+        orm
+          .select({ total: count() })
+          .from(ins)
+          .innerJoin(chainTxs, eq(chainTxs.signature, ins.signature))
+          .innerJoin(chainChannels, eq(chainChannels.channel, ins.channel))
+          .where(inFeed(recipient)),
+        transactionRows(
+          orm,
+          { before: null, recipient, rows: limit + 1 },
+          (position - 1) * limit,
+        ),
+      ]);
+    const [counts, rows] = await read(page);
+    const total = counts[0]!.total;
+    if (page === 1 || rows.length) return { rows, total, page };
+    if (!total) return { rows, total, page: 1 };
+    const [firstCount, firstRows] = await read(1);
+    return { rows: firstRows, total: firstCount[0]!.total, page: 1 };
+  };
   return {
-    transactions: (query) => {
-      const page = pageKeys(orm, query);
-      const settles = settleIncrements(orm, page);
-      const splits = payoutSplits(orm, page);
-      const payout = payoutFields(page, splits, query.recipient);
-      return orm
-        .with(page)
-        .select({
-          signature: page.signature,
-          instructionIndex: page.instructionIndex,
-          slot: page.slot,
-          blockTime: page.blockTime,
-          kind: page.kind,
-          channel: page.channel,
-          payee: page.payee,
-          recipientsJson: page.recipientsJson,
-          amountAtomic: amountOf(page, settles, payout),
-          splitPaidOut: payout.paidOut.as('split_paid_out'),
-          splitGyblosFees: payout.gyblosFees.as('split_gyblos_fees'),
-          splitProgramTreasury: payout.programTreasury.as(
-            'split_program_treasury',
-          ),
-          splitRefunded: payout.refunded.as('split_refunded'),
-          splitChannels: payout.channels.as('split_channels'),
-          splitUnclassified: payout.unclassified.as('split_unclassified'),
-          batched: payout.batched.as('batched'),
-        })
-        .from(page)
-        .leftJoin(
-          settles,
-          and(
-            eq(settles.signature, page.signature),
-            eq(settles.position, page.instructionIndex),
-          ),
-        )
-        .leftJoin(splits, eq(splits.signature, page.signature))
-        .orderBy(
-          desc(page.slot),
-          desc(page.signature),
-          desc(page.instructionIndex),
-        );
-    },
+    numberedTransactions: numbered,
+    transactions: (query) => transactionRows(orm, query),
   };
 }

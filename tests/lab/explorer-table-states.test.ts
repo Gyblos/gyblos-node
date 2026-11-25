@@ -308,7 +308,7 @@ void test('Explorer shows offer and active-day rows without empty rows', async (
   const sellers = tableFor(populated, 'Online since').body;
   const daily = tableFor(populated, 'Seller first token p50').body;
   assert.match(sellers, /fixture-model/);
-  assert.match(populated, /Through the last complete UTC day/);
+  assert.match(populated, /Complete UTC days/);
   assert.match(populated, /id="usage"/);
   assert.match(populated, /id="payments"/);
   assert.match(populated, /id="daily-on-chain"/);

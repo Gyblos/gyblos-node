@@ -133,8 +133,7 @@ export function readQuery(source: SearchSource, path = '/'): ExplorerQuery {
   const pages: TablePages = {};
   for (const table of PAGED_TABLES) {
     const page = parsePage(readParam(source, PAGING.params[table]));
-    if (page > 1 && (table !== PAGING.cursorTable || before))
-      pages[table] = page;
+    if (page > 1) pages[table] = page;
   }
   const ranges: SectionRanges = {};
   for (const section of RANGE_SECTIONS) {
@@ -195,6 +194,8 @@ export function queryHref(
   const verified = change.verified ?? query.verified;
   const before = change.before === undefined ? query.before : change.before;
   const pages = { ...query.pages, ...change.pages };
+  if (change.before === null && !change.pages?.transactions)
+    delete pages.transactions;
   const ranges = { ...query.ranges, ...change.ranges };
   const sorts = { ...query.sorts, ...change.sorts };
   const params = new URLSearchParams();
@@ -211,8 +212,7 @@ export function queryHref(
   if (before) params.set(CHAIN_TXS.param, before);
   for (const table of PAGED_TABLES) {
     const page = pages[table] ?? 1;
-    if (page > 1 && (table !== PAGING.cursorTable || before))
-      params.set(PAGING.params[table], String(page));
+    if (page > 1) params.set(PAGING.params[table], String(page));
   }
   for (const table of SORTED_TABLES) {
     const sort = sorts[table];
@@ -222,7 +222,7 @@ export function queryHref(
   if (
     query.path === PAGES.network &&
     query.overviewTables &&
-    (before || pages.sellers || sorts.sellers)
+    (before || (pages.transactions ?? 1) > 1 || pages.sellers || sorts.sellers)
   )
     params.set(PAGING.overviewParam, PAGING.overviewValue);
   const search = params.toString();
@@ -343,16 +343,12 @@ export function tablePager(
   );
 }
 
-export function txPager(
-  query: ExplorerQuery,
-  page: Page<unknown>,
-  boundaries: readonly (string | null)[],
-): PagerView {
+export function txPager(query: ExplorerQuery, page: Page<unknown>): PagerView {
   const table = PAGING.cursorTable;
   return numberedPager(page, (target) =>
     anchored(
       queryHref(query, {
-        before: boundaries[target - 1] ?? null,
+        before: null,
         pages: { [table]: target },
       }),
       table,
