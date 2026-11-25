@@ -14,10 +14,10 @@ import {
   tokensPerSecond,
   usdcDecimal,
 } from '@gyblos/explorer/format';
-import { modelFamily } from '@gyblos/explorer/model-family';
 import { notOnline, parseNetworkStatus } from '@gyblos/explorer/network-status';
 import { displayRange, parseRange, rangeQuery } from '@gyblos/explorer/range';
 import { dailyRequests, usageMeta } from '@gyblos/explorer/usage';
+import { modelFamily } from '@gyblos/protocol/model-family';
 
 const realFetch = globalThis.fetch;
 const realTimeout = AbortSignal.timeout.bind(AbortSignal);

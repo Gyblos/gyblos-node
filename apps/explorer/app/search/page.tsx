@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
+import { modelLab } from '@gyblos/protocol/model-family';
+
 import { OperationChip } from '../../components/channel-txs';
 import { PageFrame } from '../../components/page-frame';
 import { Pager } from '../../components/pager';
@@ -25,7 +27,6 @@ import {
   sellerMatches,
 } from '../../lib/entity-search';
 import { short } from '../../lib/format';
-import { modelLab } from '../../lib/model-family';
 import { modelRows } from '../../lib/model-table';
 import { modelKey, summarizeOffers } from '../../lib/offers';
 import { numberedPager, pageOf, parsePage } from '../../lib/paging';

@@ -239,7 +239,7 @@ Rate limits:
   `max-age`. Keys are normalized:
   - sellers: `cursor`, the effective `limit` (so `limit=5000` and `limit=200`
     share an entry) and `model`, in that order;
-  - models and network: the route alone;
+  - models, model catalog and network: the route alone;
   - uptime: `?node=<NodeId>`, however the query was spelled;
   - network history: the effective `days`;
   - offer history: `?node=<NodeId>` or `?model=<model>`, then the effective
@@ -431,11 +431,12 @@ with two more fields per model:
 ```
 
 `family` and `lab` are read from the model id itself
-(`@gyblos/protocol/model-family`), never from a seller's claim. An id with a
-publisher (`meta-llama/Llama-3.1-8B`) resolves by publisher; a bare id
-(`qwen3-0.6b`) by its leading name. An unknown id has `null` for both.
-`/v1/models` keeps its two fields, because released buyers reject extra keys
-there.
+(`@gyblos/protocol/model-family`), never from a seller's claim, ignoring case.
+An id with a publisher (`meta-llama/Llama-3.1-8B`) resolves by publisher only,
+so an unknown publisher gives `null` even for a known name (`unsloth/Qwen3-8B`);
+`google/gemma-…` is family `gemma`. A bare id (`qwen3-0.6b`) resolves by its
+leading name. An unknown id has `null` for both. `/v1/models` keeps its two
+fields, because released buyers reject extra keys there.
 
 ## Network history
 

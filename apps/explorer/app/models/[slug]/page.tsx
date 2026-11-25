@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { modelLab } from '@gyblos/protocol/model-family';
+
 import { ModelLogo } from '../../../components/model-logo';
 import { OfferPriceHistory } from '../../../components/offer-price-history';
 import { PageFrame } from '../../../components/page-frame';
@@ -37,7 +39,6 @@ import {
   utc,
 } from '../../../lib/format';
 import { mergedLatency } from '../../../lib/latency';
-import { modelLab } from '../../../lib/model-family';
 import { getOfferPriceHistory } from '../../../lib/offer-price-history';
 import { modelFromSlug, modelHref, modelKey } from '../../../lib/offers';
 import {
