@@ -421,12 +421,12 @@ were online on average and at peak:
   "history": [
     {
       "day": "2026-11-24",
+      "state": "final",
       "averageOnline": 1.9861,
       "peak": 2,
       "nodeSlots": 572,
       "coveredSlots": 288,
-      "expectedSlots": 288,
-      "partial": false
+      "expectedSlots": 288
     }
   ],
   "generatedAt": 1800000001000
@@ -439,18 +439,27 @@ were online on average and at peak:
 - `nodeSlots` is the sum over the day's slots of the NodeIds seen in each;
   `averageOnline` is `nodeSlots / expectedSlots`, rounded to four decimals, and
   `peak` is the most NodeIds seen in one slot.
-- `expectedSlots` is 288 for a past day. Today is `partial: true` and counts
-  only the slots so far, the current one included.
-- `coveredSlots` counts the slots in which the index itself was running. The
-  ten-minute cron writes a heartbeat (`discovery_index_heartbeat`, one row per
-  hour with one bit per slot) for its own slot and the one before. An empty
-  covered slot is a real zero; an uncovered one is unknown. Days before the
-  heartbeat was deployed have `coveredSlots: 0`.
-- Heartbeat rows are kept and pruned with the uptime rows. A failed heartbeat
-  write logs the static code `DISCOVERY_HEARTBEAT_FAILED` and nothing else.
-- **Cost.** One cache miss reads the uptime rows of the requested days (one per
-  NodeId and hour seen) through the `discovery_uptime_by_hour` index, plus at
-  most 24 heartbeat rows per day.
+- `state` is `final` for a past day already summarized, `partial` for today
+  (counted live, `expectedSlots` is the slots so far, the current one included),
+  and `pending` for a past day not summarized yet (every number but
+  `expectedSlots` is `null`).
+- `coveredSlots` counts the slots vouched for by the ten-minute cron, which
+  writes a heartbeat (`discovery_index_heartbeat`, one row per hour with one bit
+  per slot) for its own slot and the one before. It shows that the scheduled run
+  happened, not that every request was served. An empty covered slot is a zero;
+  an uncovered one is unknown. Days before the heartbeat was deployed have
+  `coveredSlots: 0`.
+- **Daily summary.** After its heartbeat, each cron run summarizes up to four
+  missing past days of the last 90, newest first, into `discovery_network_days`
+  (one row per day). A day is summarized once the run that vouches for its last
+  slot has passed, so a summary is final. After a deploy, the 90 days fill in
+  within about four hours.
+- Failures log only the static codes `DISCOVERY_HEARTBEAT_FAILED` or
+  `DISCOVERY_NETWORK_ROLLUP_FAILED`. Heartbeat and summary rows are pruned with
+  the uptime rows, after them, so a missing table never stops uptime pruning.
+- **Cost.** One cache miss reads at most 90 summary rows, plus today's uptime
+  rows (one per NodeId and hour seen today) and at most 24 heartbeat rows. A
+  cron run reads the same for at most four past days.
 
 ## Offer history
 

@@ -272,10 +272,19 @@ export const NETWORK = {
 export const NETWORK_HISTORY = {
   dayOptions: [7, 30, 90],
   defaultDays: 7,
+  maxDays: 90,
   slotsPerDay: UPTIME.dayMs / UPTIME.slotMs,
+  hoursPerDay: UPTIME.dayMs / UPTIME.hourMs,
   heartbeatSlots: 2,
+  rollupDaysPerRun: 4,
+} as const;
+export const NETWORK_DAY_STATES = {
+  FINAL: 'final',
+  PARTIAL: 'partial',
+  PENDING: 'pending',
 } as const;
 export const HEARTBEAT_FAILED = 'DISCOVERY_HEARTBEAT_FAILED';
+export const NETWORK_ROLLUP_FAILED = 'DISCOVERY_NETWORK_ROLLUP_FAILED';
 export const OFFER_HISTORY = {
   defaultDays: 30,
   maxDays: 92,

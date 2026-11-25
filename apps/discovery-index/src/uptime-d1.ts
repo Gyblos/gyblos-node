@@ -3,7 +3,7 @@ import { and, asc, desc, eq, exists, gte, lt } from 'drizzle-orm';
 
 import { DISCOVERY_INDEX_LIMITS } from './constants';
 import type { DiscoveryDatabase } from './d1-client';
-import { indexHeartbeat, uptimeNodes, uptimeSlots } from './schema';
+import { uptimeNodes, uptimeSlots } from './schema';
 import {
   capacityAdmission,
   maximum,
@@ -11,15 +11,13 @@ import {
   minimum,
   scalarSubquery,
   singleRow,
-  slotCount,
   valueField,
 } from './sqlite-expressions';
 import {
   hourOf,
   retainedHour,
   slotBit,
-  UPTIME,
-  vouchedSlots,
+  type NetworkHistoryStorage,
   type UptimeStorage,
 } from './uptime';
 
@@ -90,59 +88,10 @@ function seenQueries(
   return [first, slot] as const;
 }
 
-function d1Heartbeat(database: DiscoveryDatabase) {
+export function createD1Uptime(
+  database: DiscoveryDatabase,
+): Omit<UptimeStorage, keyof NetworkHistoryStorage> {
   return {
-    async markAlive(now: number) {
-      const [first, ...rest] = vouchedSlots(now).map((at) =>
-        database
-          .insert(indexHeartbeat)
-          .values({ hour: hourOf(at), slots: slotBit(at) })
-          .onConflictDoUpdate({
-            target: indexHeartbeat.hour,
-            set: { slots: mergedBits(indexHeartbeat.slots, slotBit(at)) },
-          }),
-      );
-      await database.batch([first!, ...rest]);
-    },
-    async aliveSlots(sinceHour: number) {
-      const rows = await database
-        .select({ hour: indexHeartbeat.hour, slots: indexHeartbeat.slots })
-        .from(indexHeartbeat)
-        .where(gte(indexHeartbeat.hour, sinceHour))
-        .orderBy(asc(indexHeartbeat.hour));
-      return rows.map((row) => ({
-        hour: integer(row.hour),
-        slots: integer(row.slots),
-      }));
-    },
-    async onlineSlots(sinceHour: number) {
-      const bits = Array.from({ length: UPTIME.slotsPerHour }, (_, bit) =>
-        slotCount(uptimeSlots.slots, bit).as(`slot${bit}`),
-      );
-      const rows = await database
-        .select({
-          hour: uptimeSlots.hour,
-          ...Object.fromEntries(
-            bits.map((bit, index) => [`slot${index}`, bit]),
-          ),
-        })
-        .from(uptimeSlots)
-        .where(gte(uptimeSlots.hour, sinceHour))
-        .groupBy(uptimeSlots.hour)
-        .orderBy(asc(uptimeSlots.hour));
-      return rows.map((row) => ({
-        hour: integer(row.hour),
-        counts: bits.map((_, index) =>
-          integer(Reflect.get(row, `slot${index}`)),
-        ),
-      }));
-    },
-  };
-}
-
-export function createD1Uptime(database: DiscoveryDatabase): UptimeStorage {
-  return {
-    ...d1Heartbeat(database),
     async markSeen(nodeId, now, maxNodes = DISCOVERY_INDEX_LIMITS.maxNodes) {
       const [first, slot] = seenQueries(database, nodeId, now, maxNodes);
       await database.batch([first, slot]);
@@ -204,14 +153,9 @@ export function createD1Uptime(database: DiscoveryDatabase): UptimeStorage {
       return row ? integer(row.firstAt) : null;
     },
     async pruneUptime(now) {
-      await database.batch([
-        database
-          .delete(uptimeSlots)
-          .where(lt(uptimeSlots.hour, retainedHour(now))),
-        database
-          .delete(indexHeartbeat)
-          .where(lt(indexHeartbeat.hour, retainedHour(now))),
-      ]);
+      await database
+        .delete(uptimeSlots)
+        .where(lt(uptimeSlots.hour, retainedHour(now)));
     },
   };
 }

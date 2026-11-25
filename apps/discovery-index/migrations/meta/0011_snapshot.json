@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "7b608ef8-06a7-4d97-a353-fc1bf0451dc8",
+  "id": "32b35740-e854-4f3d-acdc-86f9022e5e83",
   "prevId": "1ecf96ef-fb6f-4625-9cd6-c3af467227dd",
   "tables": {
     "discovery_catalog_periods": {
@@ -435,6 +435,44 @@
           "name": "discovery_catalog_models_node_id_model_id_pk"
         }
       },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "discovery_network_days": {
+      "name": "discovery_network_days",
+      "columns": {
+        "day": {
+          "name": "day",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "node_slots": {
+          "name": "node_slots",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "peak": {
+          "name": "peak",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "covered_slots": {
+          "name": "covered_slots",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
     },

@@ -71,13 +71,21 @@ function countingStorage(storage: DiscoveryStorage) {
     seen: (nodeId, since) => (calls.push('seen'), storage.seen(nodeId, since)),
     pruneUptime: (now) => (calls.push('pruneUptime'), storage.pruneUptime(now)),
     markAlive: (now) => (calls.push('markAlive'), storage.markAlive(now)),
-    aliveSlots: (since) => (
+    aliveSlots: (since, until) => (
       calls.push('aliveSlots'),
-      storage.aliveSlots(since)
+      storage.aliveSlots(since, until)
     ),
-    onlineSlots: (since) => (
+    onlineSlots: (since, until) => (
       calls.push('onlineSlots'),
-      storage.onlineSlots(since)
+      storage.onlineSlots(since, until)
+    ),
+    networkDays: (first) => (
+      calls.push('networkDays'),
+      storage.networkDays(first)
+    ),
+    saveNetworkDay: (row) => (
+      calls.push('saveNetworkDay'),
+      storage.saveNetworkDay(row)
     ),
     firstSeen: (nodeId) => (calls.push('firstSeen'), storage.firstSeen(nodeId)),
     sightings: (since, limit) => (

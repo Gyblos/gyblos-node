@@ -277,6 +277,13 @@ export const indexHeartbeat = sqliteTable(
   ],
 );
 
+export const networkDays = sqliteTable('discovery_network_days', {
+  day: integer('day').primaryKey(),
+  nodeSlots: integer('node_slots').notNull(),
+  peak: integer('peak').notNull(),
+  coveredSlots: integer('covered_slots').notNull(),
+});
+
 export const githubClaims = sqliteTable(
   'discovery_github_claims',
   {

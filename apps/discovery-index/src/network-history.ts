@@ -1,22 +1,25 @@
 import {
   INDEX_ERRORS,
   INDEX_ROUTES,
+  NETWORK_DAY_STATES,
   NETWORK_HISTORY,
   UPTIME,
 } from './constants';
 import { indexFail } from './errors';
-import { hourOf, slotOf, type UptimeStorage } from './uptime';
+import {
+  slotBits,
+  slotOf,
+  type NetworkDayRow,
+  type NetworkHistoryStorage,
+} from './uptime';
 
-const hoursPerDay = UPTIME.dayMs / UPTIME.hourMs;
-const dayOf = (hour: number) => Math.floor(hour / hoursPerDay);
+const dayOfTime = (now: number) => Math.floor(now / UPTIME.dayMs);
 const isoDay = (day: number) =>
   new Date(day * UPTIME.dayMs).toISOString().split('T')[0]!;
-const bitsSet = (slots: number) => {
-  let count = 0;
-  for (let bit = 0; bit < UPTIME.slotsPerHour; bit++)
-    count += (slots >> bit) & 1;
-  return count;
-};
+const sum = (values: readonly number[]) =>
+  values.reduce((total, value) => total + value, 0);
+const ratio = (part: number, whole: number) =>
+  Math.round((part / whole) * UPTIME.ratioScale) / UPTIME.ratioScale;
 
 export function parseNetworkHistoryQuery(url: string): number {
   const params = new URL(url).searchParams;
@@ -33,58 +36,90 @@ export function parseNetworkHistoryQuery(url: string): number {
 export const networkHistoryKey = (origin: string, days: number) =>
   `${origin}${INDEX_ROUTES.NETWORK_HISTORY}?days=${days}`;
 
+export async function summarizeDay(
+  storage: NetworkHistoryStorage,
+  day: number,
+): Promise<NetworkDayRow> {
+  const sinceHour = day * NETWORK_HISTORY.hoursPerDay;
+  const untilHour = sinceHour + NETWORK_HISTORY.hoursPerDay;
+  const [online, alive] = await Promise.all([
+    storage.onlineSlots(sinceHour, untilHour),
+    storage.aliveSlots(sinceHour, untilHour),
+  ]);
+  const counts = online.flatMap((row) => row.counts);
+  return {
+    day,
+    nodeSlots: sum(counts),
+    peak: Math.max(0, ...counts),
+    coveredSlots: sum(alive.flatMap((row) => slotBits(row.slots))),
+  };
+}
+
+const lastSettledDay = (now: number) =>
+  dayOfTime(now - NETWORK_HISTORY.heartbeatSlots * UPTIME.slotMs) - 1;
+
+export async function rollupNetworkDays(
+  storage: NetworkHistoryStorage,
+  now: number,
+) {
+  const firstDay = dayOfTime(now) - NETWORK_HISTORY.maxDays + 1;
+  const done = new Set(
+    (await storage.networkDays(firstDay)).map((row) => row.day),
+  );
+  const missing: number[] = [];
+  for (let day = lastSettledDay(now); day >= firstDay; day--)
+    if (!done.has(day)) missing.push(day);
+  const batch = missing.slice(0, NETWORK_HISTORY.rollupDaysPerRun);
+  for (const day of batch)
+    await storage.saveNetworkDay(await summarizeDay(storage, day));
+  return batch.length;
+}
+
+function dayEntry(
+  day: number,
+  row: NetworkDayRow | undefined,
+  state: (typeof NETWORK_DAY_STATES)[keyof typeof NETWORK_DAY_STATES],
+  expectedSlots: number,
+) {
+  return {
+    day: isoDay(day),
+    state,
+    averageOnline: row ? ratio(row.nodeSlots, expectedSlots) : null,
+    peak: row?.peak ?? null,
+    nodeSlots: row?.nodeSlots ?? null,
+    coveredSlots: row?.coveredSlots ?? null,
+    expectedSlots,
+  };
+}
+
 export async function networkHistoryPage(
-  storage: UptimeStorage,
+  storage: NetworkHistoryStorage,
   days: number,
   now: number,
 ) {
-  const today = Math.floor(now / UPTIME.dayMs);
+  const today = dayOfTime(now);
   const firstDay = today - days + 1;
-  const sinceHour = firstDay * hoursPerDay;
-  const [online, alive] = await Promise.all([
-    storage.onlineSlots(sinceHour),
-    storage.aliveSlots(sinceHour),
+  const [rolled, current] = await Promise.all([
+    storage.networkDays(firstDay),
+    summarizeDay(storage, today),
   ]);
-  const history = Array.from({ length: days }, (_, index) => ({
-    day: firstDay + index,
-    nodeSlots: 0,
-    peak: 0,
-    coveredSlots: 0,
-  }));
-  for (const row of online) {
-    const entry = history[dayOf(row.hour) - firstDay];
-    if (!entry || row.hour > hourOf(now)) continue;
-    for (const count of row.counts) {
-      entry.nodeSlots += count;
-      entry.peak = Math.max(entry.peak, count);
-    }
-  }
-  for (const row of alive) {
-    const entry = history[dayOf(row.hour) - firstDay];
-    if (entry && row.hour <= hourOf(now))
-      entry.coveredSlots += bitsSet(row.slots);
-  }
-  const elapsedToday = slotOf(now) - today * NETWORK_HISTORY.slotsPerDay + 1;
+  const byDay = new Map(rolled.map((row) => [row.day, row]));
+  const history = Array.from({ length: days - 1 }, (_, index) => {
+    const day = firstDay + index;
+    const row = byDay.get(day);
+    return dayEntry(
+      day,
+      row,
+      row ? NETWORK_DAY_STATES.FINAL : NETWORK_DAY_STATES.PENDING,
+      NETWORK_HISTORY.slotsPerDay,
+    );
+  });
+  const elapsed = slotOf(now) - today * NETWORK_HISTORY.slotsPerDay + 1;
+  history.push(dayEntry(today, current, NETWORK_DAY_STATES.PARTIAL, elapsed));
   return JSON.stringify({
     days,
     slotMs: UPTIME.slotMs,
-    history: history.map(({ day, nodeSlots, peak, coveredSlots }) => {
-      const partial = day === today;
-      const expectedSlots = partial
-        ? elapsedToday
-        : NETWORK_HISTORY.slotsPerDay;
-      return {
-        day: isoDay(day),
-        averageOnline:
-          Math.round((nodeSlots / expectedSlots) * UPTIME.ratioScale) /
-          UPTIME.ratioScale,
-        peak,
-        nodeSlots,
-        coveredSlots,
-        expectedSlots,
-        partial,
-      };
-    }),
+    history,
     generatedAt: now,
   });
 }
