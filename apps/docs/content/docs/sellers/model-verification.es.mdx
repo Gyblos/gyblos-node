@@ -34,6 +34,10 @@ muestreo y las diferencias entre GPU y CPU, mientras que un modelo más chico ve
 Un resultado cubre un vendedor, un modelo y una versión del conjunto de preguntas. Es evidencia de un
 verificador, no una sanción: hoy no cambia nada en el descubrimiento, la selección de vendedores ni los pagos.
 
+Si el Ollama de referencia devuelve una lista vacía de candidatos y los reintentos no lo resuelven, el comando
+se detiene con `REFERENCE_UNAVAILABLE` y no emite un resultado firmado. Es un error de la referencia, no un
+veredicto sobre el vendedor.
+
 Por ahora solo se verifican ofertas gratis de modelos Qwen3 del catálogo que tienen una etiqueta pública en
 Ollama. La cuantización no se comprueba.
 

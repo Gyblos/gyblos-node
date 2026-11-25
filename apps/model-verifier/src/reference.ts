@@ -82,7 +82,7 @@ function parseCandidates(body: Record<string, unknown>): Candidate[] | null {
     return null;
   const first = Array.isArray(logprobs) ? record(logprobs[0]) : {};
   const top = first.top_logprobs;
-  if (!Array.isArray(top)) throw unavailable();
+  if (!Array.isArray(top) || top.length === 0) throw unavailable();
   return top.map((item) => {
     const candidate = record(item);
     if (
