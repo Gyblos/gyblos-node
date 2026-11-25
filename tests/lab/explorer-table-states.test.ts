@@ -181,14 +181,25 @@ async function pageHtml(dir: string, state: State) {
   }
 }
 
-function bodyFor(html: string, column: string) {
+function tableFor(html: string, column: string) {
   const tables = html.matchAll(/<table\b[^>]*>(.*?)<\/table>/gs);
   for (const [, contents = ''] of tables) {
     const [head, body] = contents.split('<tbody>');
     if (head?.includes('>' + column + '<') && body !== undefined)
-      return body.replace(/<\/tbody>$/, '');
+      return { head, body: body.replace(/<\/tbody>$/, '') };
   }
   assert.fail('Table missing: ' + column);
+}
+
+function emptyBody(html: string, column: string) {
+  const { head, body } = tableFor(html, column);
+  const firstRow = head.split('</tr>')[0] ?? '';
+  const width = [...firstRow.matchAll(/<th\b[^>]*>/g)].reduce(
+    (sum, [cell]) => sum + Number(/colSpan="(\d+)"/i.exec(cell)?.[1] ?? 1),
+    0,
+  );
+  assert.equal(/colSpan="(\d+)"/i.exec(body)?.[1], String(width));
+  return body;
 }
 
 let dir: string;
@@ -230,6 +241,10 @@ void test('Explorer pages expose one focusable main target after the first skip 
     assert.equal(html.match(/\bid="main-content"/g)?.length, 1);
     const main = /<main\b[^>]*>(.*?)<\/main>/s.exec(html)?.[0];
     assert.ok(main);
+    assert.equal(html.match(/<h1\b/g)?.length, 1);
+    const heading = /<h1\b[^>]*>/.exec(main)?.[0];
+    assert.ok(heading);
+    assert.doesNotMatch(heading, /\b(?:hidden|sr-only)\b/);
     assert.match(main, /^<main\b[^>]*\bid="main-content"/);
     assert.match(main, /^<main\b[^>]*\btabindex="-1"/i);
     assert.doesNotMatch(main, /<(header|footer)\b/);
@@ -246,24 +261,24 @@ void test('Explorer pages expose one focusable main target after the first skip 
 void test('Explorer gives offerless Sellers and inactive Daily one spanning row each', async () => {
   const { html: empty } = await pageHtml(dir, 'empty');
   assert.match(
-    bodyFor(empty, 'Online since'),
-    /^<tr><td[^>]*\btext-muted\b[^>]*\bcolSpan="9"[^>]*>No offers from online sellers\.<\/td><\/tr>$/i,
+    emptyBody(empty, 'Online since'),
+    /^<tr><td[^>]*\btext-muted\b[^>]*\bcolSpan="\d+"[^>]*>No offers from online sellers\.<\/td><\/tr>$/i,
   );
   assert.match(
-    bodyFor(empty, 'Seller first token p50'),
-    /^<tr><td[^>]*\btext-muted\b[^>]*\bcolSpan="12"[^>]*>No daily activity in this range\.<\/td><\/tr>$/i,
+    emptyBody(empty, 'Seller first token p50'),
+    /^<tr><td[^>]*\btext-muted\b[^>]*\bcolSpan="\d+"[^>]*>No daily activity in this range\.<\/td><\/tr>$/i,
   );
 });
 
 void test('Explorer shows offer and active-day rows without empty rows', async () => {
   const { overview, html: populated, css } = await pageHtml(dir, 'populated');
-  const offers = bodyFor(overview, 'Model / variant');
+  const offers = tableFor(overview, 'Model / variant').body;
   assert.match(offers, /fixture-model/);
   assert.match(offers, /Alibaba · Qwen/);
   assert.match(offers, /href="\/sellers\/fixture-node/);
   assert.doesNotMatch(overview, />Details<|>Weeks</);
-  const sellers = bodyFor(populated, 'Online since');
-  const daily = bodyFor(populated, 'Seller first token p50');
+  const sellers = tableFor(populated, 'Online since').body;
+  const daily = tableFor(populated, 'Seller first token p50').body;
   assert.match(sellers, /fixture-model/);
   assert.ok(daily.includes(activeDay));
   assert.ok(!daily.includes(inactiveDay));
@@ -290,9 +305,15 @@ void test('Explorer shows offer and active-day rows without empty rows', async (
 
 void test('Explorer keeps the unavailable panels when the sources fail', async () => {
   const { overview, html: unavailable } = await pageHtml(dir, 'unavailable');
-  assert.match(overview, /Metrics collector unavailable/);
-  assert.match(overview, /Discovery unavailable/);
-  assert.match(overview, /Transaction history unavailable/);
+  assert.match(overview, /Receipt data unavailable/);
+  assert.match(
+    overview,
+    />Current offers<\/h2><\/div><\/div><div[^>]*>Source unavailable\.<\/div>/,
+  );
+  assert.match(
+    overview,
+    />Latest operations<\/h2><\/div><\/div><div[^>]*>Source unavailable\.<\/div>/,
+  );
   assert.match(
     unavailable,
     />Network<\/h2><\/div><\/div><div[^>]*>Source unavailable\.<\/div>/,
