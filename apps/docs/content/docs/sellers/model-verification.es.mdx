@@ -65,6 +65,7 @@ pnpm model-verifier check RESULT_DIRECTORY/result.json
 ```
 
 `verify` muestra el veredicto y escribe `result.json` (el resultado firmado) y `evidence.json` (las preguntas,
-las respuestas y cada comprobación, más cada respuesta que no se pudo puntuar y por qué) en un directorio nuevo. `check` verifica la firma de un resultado y muestra
-su veredicto. `pnpm model-verifier address` muestra la dirección pública del verificador. La llave del
+las respuestas y cada comprobación, más cada respuesta que no se pudo puntuar y por qué) en un directorio nuevo.
+`check` verifica la firma y que la regla y los recuentos de evidencia se ajusten al conjunto de pruebas publicado antes de mostrar el veredicto.
+`pnpm model-verifier address` muestra la dirección pública del verificador. La llave del
 verificador se crea la primera vez en `model-verifier/verifier.key`, dentro del directorio de datos de Gyblos.
