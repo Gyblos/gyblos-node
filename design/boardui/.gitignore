@@ -1,0 +1,9 @@
+/boardui/
+/app/
+/public/
+/.cursor/
+/AGENTS.md
+/preview/.next/
+/preview/next-env.d.ts
+/preview/AGENTS.md
+/preview/tsconfig.tsbuildinfo

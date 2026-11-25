@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "paths": { "@boardui/*": ["../boardui/*"] },
+    "plugins": [{ "name": "next" }]
+  },
+  "include": [
+    "app/**/*.tsx",
+    "next-env.d.ts",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts"
+  ]
+}
