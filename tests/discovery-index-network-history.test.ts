@@ -265,7 +265,7 @@ void test('each slot count has its own column name, as D1 keys rows by name', as
   const queries: string[] = [];
   const storage = createD1Storage({
     prepare: (sql) => (queries.push(sql), database.prepare(sql)),
-    batch: (statements) => database.batch(statements as never),
+    batch: (statements) => database.batch(statements),
   });
   await storage.onlineSlots(0, 1);
   const query = queries.find((sql) => sql.includes('group by'));
