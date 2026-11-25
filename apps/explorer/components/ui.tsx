@@ -8,7 +8,11 @@ import { Skeleton } from '../boardui/components/base/skeleton/skeleton';
 import { addressHref } from '../lib/config';
 import { DISPLAY, PAGING } from '../lib/constants';
 import { short } from '../lib/format';
-import { FULL_OVERVIEW, overviewLayout } from '../lib/layout';
+import {
+  compactColumnGroups,
+  FULL_OVERVIEW,
+  overviewLayout,
+} from '../lib/layout';
 import { modelLab } from '../lib/model-family';
 import { modelHref } from '../lib/offers';
 import { sortHref, type ExplorerQuery, type SortedTable } from '../lib/paging';
@@ -145,6 +149,7 @@ export interface Column {
   label: string;
   right?: boolean;
   group?: string;
+  compactGroup?: string;
   sort?: string;
   ascendingFirst?: boolean;
 }
@@ -220,6 +225,8 @@ function TableHead({ head, sorting }: { head: Column[]; sorting?: Sorting }) {
             <th
               key={index}
               colSpan={run.columns.length}
+              scope="colgroup"
+              data-metric={run.group}
               data-group=""
               data-edge={edge(index, true, true)}
               className={`${th} text-center`}
@@ -234,6 +241,12 @@ function TableHead({ head, sorting }: { head: Column[]; sorting?: Sorting }) {
           ) : (
             <th
               key={index}
+              scope="col"
+              data-metric={
+                index
+                  ? (run.columns[0]!.compactGroup ?? run.columns[0]!.label)
+                  : undefined
+              }
               rowSpan={grouped ? 2 : undefined}
               aria-sort={ariaSort(run.columns[0]!, sorting)}
               className={`${th} ${align(run.columns[0]!)} align-middle`}
@@ -251,6 +264,8 @@ function TableHead({ head, sorting }: { head: Column[]; sorting?: Sorting }) {
                   <th
                     key={`${index}-${position}`}
                     colSpan={1}
+                    scope="col"
+                    data-metric={run.group}
                     data-edge={edge(
                       index,
                       position === 0,
@@ -275,19 +290,28 @@ export function Table({
   children,
   footer,
   sorting,
+  compactLabel,
   minWidth = DISPLAY.defaultTable,
 }: {
   head: Column[];
   children: ReactNode;
   footer: ReactElement;
   sorting?: Sorting;
+  compactLabel?: string;
   minWidth?: number;
 }) {
   return (
-    <TableScroll footer={footer}>
+    <TableScroll
+      footer={footer}
+      compact={
+        compactLabel
+          ? { label: compactLabel, columns: compactColumnGroups(head) }
+          : undefined
+      }
+    >
       <table
         className="bui-table explorer-table w-full text-left whitespace-nowrap"
-        style={{ minWidth }}
+        style={{ minWidth: `var(--table-min-width, ${minWidth}px)` }}
       >
         <TableHead head={head} sorting={sorting} />
         <tbody>{children}</tbody>

@@ -10,7 +10,7 @@ export function PageFrame({
   overview,
   children,
 }: {
-  title: string;
+  title: ReactNode;
   overview?: boolean;
   crumb?: ReactNode;
   children: ReactNode;
@@ -23,8 +23,11 @@ export function PageFrame({
       >
         Skip to content
       </a>
-      <SiteHeader overview={overview} title={title} crumb={crumb} />
+      <SiteHeader overview={overview} crumb={crumb} />
       <main id="main-content" tabIndex={-1}>
+        <h1 className="mt-6 text-title-1-medium break-words text-text-primary sm:mt-8">
+          {title}
+        </h1>
         {children}
       </main>
       <SiteFooter />

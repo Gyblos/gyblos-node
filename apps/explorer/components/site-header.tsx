@@ -8,17 +8,14 @@ import { NavLinks } from './nav-links';
 import { NetworkSelect } from './network-select';
 
 export function SiteHeader({
-  title,
   crumb,
   overview,
 }: {
-  title: string;
   overview?: boolean;
   crumb?: ReactNode;
 }) {
   return (
     <header className="border-b border-line">
-      <h1 className="sr-only">{title}</h1>
       <div className="flex flex-wrap items-center justify-between gap-3 py-5">
         <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
           <Link href="/" className="flex items-baseline gap-3">
@@ -51,12 +48,12 @@ export function SiteHeader({
         <form
           action="/search"
           role="search"
-          className="flex min-h-10 items-center gap-2 rounded-lg border border-line bg-panel px-3 focus-within:border-signal sm:min-h-8"
+          className="flex min-h-11 items-center rounded-lg border border-line bg-panel pr-2 focus-within:border-signal sm:pointer-fine:min-h-8"
         >
           <button
             type="submit"
             aria-label="Search Explorer"
-            className="text-dim hover:text-ink"
+            className="flex size-11 shrink-0 items-center justify-center text-dim hover:text-ink sm:pointer-fine:size-8"
           >
             <Search aria-hidden size={15} />
           </button>
@@ -67,7 +64,7 @@ export function SiteHeader({
             placeholder="Search Explorer"
             maxLength={SEARCH_TERM_LIMIT}
             required
-            className="min-w-0 w-full bg-transparent text-sm outline-none sm:w-36"
+            className="min-h-11 min-w-0 w-full bg-transparent text-base sm:pointer-fine:min-h-8 sm:text-sm outline-none sm:w-36"
           />
         </form>
       </div>

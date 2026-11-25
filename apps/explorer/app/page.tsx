@@ -31,7 +31,7 @@ export default async function Home({
   if (canonical) redirect(canonical);
   const query = { ...readQuery(params), overviewTables: true };
   return (
-    <PageFrame overview title="Gyblos Explorer">
+    <PageFrame overview title="Network">
       <Suspense
         key={`overview-${rangeOf(query, 'overview')}`}
         fallback={<Loading overview />}

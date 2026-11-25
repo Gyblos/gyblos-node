@@ -12,6 +12,18 @@ export const isCurrentPage = (pathname: string, href: string) =>
 export const currentPage = (pathname: string) =>
   PAGE_LINKS.find((link) => isCurrentPage(pathname, link.href));
 
+interface MetricColumn {
+  label: string;
+  group?: string;
+  compactGroup?: string;
+}
+
+export function compactColumnGroups(columns: readonly MetricColumn[]) {
+  return columns.map((column, index) =>
+    index === 0 ? null : (column.compactGroup ?? column.group ?? column.label),
+  );
+}
+
 const FIVE_SPANS = [
   'col-span-2 lg:col-span-2 xl:col-span-1',
   'lg:col-span-2 xl:col-span-1',

@@ -186,6 +186,16 @@ body {
   }
 }
 
+@media (width < theme(--breakpoint-xl)) {
+  .explorer-table[data-compact] {
+    --table-min-width: 100%;
+  }
+
+  .explorer-table[data-compact] [data-compact-hidden] {
+    display: none;
+  }
+}
+
 @media (width < theme(--breakpoint-md)) {
   [data-overflow] > .explorer-table tr > :first-child:not([colspan]) > span {
     max-width: calc(55vw - 2rem);

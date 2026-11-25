@@ -92,7 +92,7 @@ export function StatHint({ label, hint }: { label: string; hint: string }) {
           type="button"
           aria-label={`About ${label}`}
           onClick={() => setOpen((isOpen) => !isOpen)}
-          className="flex shrink-0 cursor-pointer items-center justify-center rounded-full text-foreground-icon-secondary outline-none transition-colors duration-150 ease hover:text-foreground-icon-primary focus-visible:ring-2 focus-visible:ring-border-focus-ring"
+          className="flex size-11 shrink-0 cursor-pointer items-center sm:pointer-fine:size-auto justify-center rounded-full text-foreground-icon-secondary outline-none transition-colors duration-150 ease hover:text-foreground-icon-primary focus-visible:ring-2 focus-visible:ring-border-focus-ring"
         >
           <RiInformationFill className="size-5" aria-hidden />
         </button>

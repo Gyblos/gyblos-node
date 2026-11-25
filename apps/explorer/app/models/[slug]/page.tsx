@@ -263,18 +263,18 @@ function ModelHeading({
   model: NonNullable<ReturnType<typeof modelFromSlug>>;
 }) {
   return (
-    <div className="mt-8 flex items-center gap-3">
+    <span className="flex items-center gap-3">
       <ModelLogo modelId={model.modelId} />
-      <div className="min-w-0">
-        <p className="text-sm text-muted">
+      <span className="min-w-0">
+        <span className="block text-sm text-muted">
           {modelLab(model.modelId) ?? 'Lab unknown'}
-        </p>
-        <h2 className="text-2xl font-medium break-all">{model.modelId}</h2>
-        <p className="font-mono text-sm text-muted">
+        </span>
+        <span className="block break-all">{model.modelId}</span>
+        <span className="block font-mono text-sm text-muted">
           {[model.variant, model.quantization].filter(Boolean).join(' · ')}
-        </p>
-      </div>
-    </div>
+        </span>
+      </span>
+    </span>
   );
 }
 
@@ -311,8 +311,7 @@ export default async function ModelPage({
       .map((item) => [modelKey(item), item]),
   );
   return (
-    <PageFrame title={model.modelId} crumb="Model">
-      <ModelHeading model={model} />
+    <PageFrame title={<ModelHeading model={model} />} crumb="Model">
       <Link
         className="mt-2 inline-block text-sm text-muted hover:text-ink hover:underline"
         href={directoryHref(PAGES.models, query, 'models')}

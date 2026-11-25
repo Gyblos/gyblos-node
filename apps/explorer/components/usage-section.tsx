@@ -290,6 +290,7 @@ function DailyTable({
     <>
       <SectionTitle id={PAGING.anchors.daily} title="Daily" />
       <Table
+        compactLabel="Daily usage metrics"
         minWidth={DISPLAY.dailyTable}
         head={head}
         sorting={{ query, table: 'daily' }}

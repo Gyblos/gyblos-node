@@ -56,7 +56,7 @@ export default async function SellerPage({ params, searchParams }: Props) {
   if (unknownSeller(nodeId, snapshot, stats)) notFound();
   return (
     <PageFrame
-      title={`Gyblos seller ${nodeId}`}
+      title={`Seller ${short(nodeId)}`}
       crumb={`Seller ${short(nodeId)}`}
     >
       <Suspense fallback={<Loading />}>

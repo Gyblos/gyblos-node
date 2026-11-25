@@ -5,7 +5,8 @@ import { Suspense } from 'react';
 import { PageFrame } from '../../components/page-frame';
 import { PaymentsSection } from '../../components/payments-section';
 import { StatsTabs } from '../../components/stats-tabs';
-import { Loading, SectionTitle } from '../../components/ui';
+import { RangeControl } from '../../components/range-control';
+import { Loading } from '../../components/ui';
 import { UsageSection } from '../../components/usage-section';
 import { PAGES } from '../../lib/constants';
 import { pageMetadata } from '../../lib/page-meta';
@@ -29,12 +30,11 @@ export default async function StatsPage({
   if (canonical) redirect(canonical);
   const query = readQuery(params, PAGES.stats);
   return (
-    <PageFrame title="Gyblos network stats">
-      <SectionTitle
-        title="Network stats"
-        meta="Through the last complete UTC day"
-        range={{ section: 'usage', days: query.days }}
-      />
+    <PageFrame title="Stats">
+      <div className="my-4 flex flex-wrap items-center justify-between gap-3">
+        <span className="text-sm text-muted">Through the last complete UTC day</span>
+        <RangeControl section="usage" days={query.days} />
+      </div>
       <StatsTabs
         selected={query.tab ?? 'usage'}
         usageHref={statsTabHref(query, 'usage')}

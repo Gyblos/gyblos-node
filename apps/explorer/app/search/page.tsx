@@ -35,7 +35,6 @@ export default async function SearchPage({
   if (!term)
     return (
       <PageFrame title="Search Explorer">
-        <SectionTitle title="Search Explorer" />
         <p>
           Enter a model, lab, seller, wallet address or recent signature in the
           search field.

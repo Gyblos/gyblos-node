@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  compactColumnGroups,
   currentPage,
   FULL_OVERVIEW,
   overviewLayout,
@@ -36,4 +37,18 @@ void test('overview cards never leave one alone in a row', () => {
   const four = overviewLayout(4);
   assert.match(four.grid, /xl:grid-cols-4/);
   assert.deepEqual(four.spans, ['', '', '', '']);
+});
+
+void test('narrow daily tables retain the date and use the same metric groups as their headers', () => {
+  assert.deepEqual(
+    compactColumnGroups([
+      { label: 'Day (UTC)' },
+      { label: 'Free', group: 'Requests' },
+      { label: 'Paid', group: 'Requests' },
+      { label: 'Opens', compactGroup: 'Channels' },
+      { label: 'Settlements', compactGroup: 'Channels' },
+      { label: 'Relay' },
+    ]),
+    [null, 'Requests', 'Requests', 'Channels', 'Channels', 'Relay'],
+  );
 });

@@ -209,6 +209,31 @@ function SettledChart({
   );
 }
 
+const DAILY_PAYMENT_COLUMNS = [
+  { label: 'Day (UTC)', sort: 'day', ascendingFirst: true },
+  { label: 'Opens', compactGroup: 'Channels', right: true },
+  { label: 'Settlements', compactGroup: 'Channels', right: true },
+  {
+    label: 'Settled',
+    compactGroup: 'Settlement amounts',
+    right: true,
+    sort: 'settled',
+  },
+  {
+    label: 'To sellers',
+    compactGroup: 'Settlement amounts',
+    right: true,
+    sort: 'paidOut',
+  },
+  { label: 'Fees', compactGroup: 'Fees and refunds', right: true },
+  { label: 'Refunded', compactGroup: 'Fees and refunds', right: true },
+  {
+    label: 'All program txs',
+    compactGroup: 'Transactions',
+    right: true,
+  },
+];
+
 function DailyTable({
   query,
   summary,
@@ -233,18 +258,10 @@ function DailyTable({
     <>
       <SectionTitle id={PAGING.anchors.chainDaily} title="Daily on chain" />
       <Table
+        compactLabel="Daily payment metrics"
         minWidth={DISPLAY.dailyTable}
         sorting={{ query, table: 'chainDaily' }}
-        head={[
-          { label: 'Day (UTC)', sort: 'day', ascendingFirst: true },
-          { label: 'Opens', right: true },
-          { label: 'Settlements', right: true },
-          { label: 'Settled', right: true, sort: 'settled' },
-          { label: 'To sellers', right: true, sort: 'paidOut' },
-          { label: 'Fees', right: true },
-          { label: 'Refunded', right: true },
-          { label: 'All program txs', right: true },
-        ]}
+        head={DAILY_PAYMENT_COLUMNS}
         footer={
           <Pager
             label="Daily on chain"
