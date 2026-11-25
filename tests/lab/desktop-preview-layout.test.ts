@@ -375,3 +375,8 @@ void test('conversation details total spend in each charge unit', async () => {
   assert.doesNotMatch(details, /' USDC'/);
   assert.match(details, /totals\[cost\.unit\]/);
 });
+
+void test('the model list names a single result in the singular', async () => {
+  const row = await read('views/ModelRow.tsx.preview');
+  assert.doesNotMatch(row, /\{rows\.length\} models/);
+});

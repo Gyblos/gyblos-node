@@ -1,4 +1,4 @@
-import { ArrowUpRight, Key } from '@phosphor-icons/react';
+import { ArrowUpRight, Gauge, Key } from '@phosphor-icons/react';
 import { useState } from 'react';
 
 import { DEVNET_USDC } from '@gyblos/config/network';
@@ -156,9 +156,12 @@ function LimitControl({ buyer, policy, open }: LimitControlProps) {
             </small>
           </div>
           <div className="preview-setting-control">
-            <Button disabled={buyer.busy} onClick={() => open('')}>
-              Manage chat budget
-            </Button>
+            <ActionButton
+              icon={<Gauge size={16} />}
+              label="Manage chat budget"
+              disabled={buyer.busy}
+              onClick={() => open('')}
+            />
             <AmountField
               compact
               disabled={!available}

@@ -11,6 +11,7 @@ const buyerScreens = [
   'apps/desktop/src/ui/Connections.tsx',
   'apps/desktop/src/ui/Chat.tsx',
   'apps/desktop/src/ui/ChatPaymentSelector.tsx',
+  'apps/desktop/src/ui/SpendingHistory.tsx',
 ];
 
 void test('buyer screens keep content visible without accordions', async () => {
@@ -250,4 +251,31 @@ void test('paid seller maximum names its currency and pending activity shows the
   );
   const turn = await readFile('apps/desktop/src/ui/TurnActivity.tsx', 'utf8');
   assert.match(turn, /state === MESSAGE_STATE.PENDING && <SignalMark/);
+});
+
+void test('model catalog rows name one model and show a mode only for the model in use', async () => {
+  const source = await readFile(
+    'apps/desktop/src/ui/CatalogOffers.tsx',
+    'utf8',
+  );
+  assert.doesNotMatch(source, /\{groups\.size\} models/);
+  assert.doesNotMatch(source, /: '—'/);
+  const css = (
+    await readFile('apps/desktop/src/ui/desktop-design.css', 'utf8')
+  ).replace(/\s+/g, ' ');
+  assert.match(
+    css,
+    /\.preview-model-summary \.preview-model-mode:not\(:empty\) \{[^}]*border-radius: 999px/,
+  );
+});
+
+void test('spending limit actions share the compact action button', async () => {
+  const source = await readFile(
+    'apps/desktop/src/ui/SpendingLimits.tsx',
+    'utf8',
+  );
+  assert.match(
+    source,
+    /<ActionButton\s+icon=\{<\w+ size=\{16\} \/>\}\s+label="Manage chat budget"/,
+  );
 });

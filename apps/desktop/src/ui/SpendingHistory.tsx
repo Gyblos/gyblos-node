@@ -136,8 +136,7 @@ export function SpendingHistory(props: Props) {
         />
       )}
       {method !== HISTORY_METHOD.USDC && activity.state?.available && (
-        <details>
-          <summary>PayPal spending summary</summary>
+        <Section title="PayPal spending summary">
           <HistorySummary
             method={HISTORY_METHOD.PAYPAL}
             source={source}
@@ -146,7 +145,7 @@ export function SpendingHistory(props: Props) {
               'entry' in row ? [row.entry] : [],
             )}
           />
-        </details>
+        </Section>
       )}
     </Section>
   );

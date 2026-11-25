@@ -1,6 +1,6 @@
 import { Gauge, Wallet } from '@phosphor-icons/react';
 
-import { x402Amount, x402Asset } from '../x402-model';
+import { x402StatAmount } from '../x402-model';
 import { ActionButton } from './ActionButton';
 import { Section } from './Management';
 import { StatCard, StatGrid } from './UI';
@@ -19,7 +19,7 @@ export function SpendingOverview({
   const known =
     !!policy && !!summary?.available && !summary.blocked && !state?.error;
   const format = (atomic: string) =>
-    policy ? x402Amount(atomic, policy) + ' ' + x402Asset(policy) : null;
+    policy ? x402StatAmount(atomic, policy) : null;
   const remaining =
     known && summary.active
       ? BigInt(summary.limitAtomic) - BigInt(summary.spentAtomic)

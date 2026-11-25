@@ -252,6 +252,15 @@ export function x402Amount(
     String(BigInt(atomic) % scale).padStart(DESKTOP_X402.ATOMIC_DECIMALS, '0')
   );
 }
+export function x402StatAmount(
+  atomic: string,
+  policy: Pick<BuyerApiPolicy, 'mint'>,
+) {
+  if (policy.mint !== DEVNET_USDC) return atomic + ' ' + x402Asset(policy);
+  return (
+    x402Amount(atomic, policy).replace(/0+$/, '').replace(/\.$/, '') + ' USDC'
+  );
+}
 export function x402BudgetInput(
   value: string,
   policy: Pick<BuyerApiPolicy, 'mint'>,
