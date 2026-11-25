@@ -61,6 +61,12 @@ export const PUBLIC_RECORD_DOMAINS = {
   [PUBLIC_RECORD_KINDS.WITHDRAWAL]: 'gyblos/withdrawal/v1\n',
 } as const satisfies Record<PublicRecordKind, string>;
 
+export const DISCOVERY_READ_LIMITS = {
+  maxResponseBytes: 1_048_576,
+  maxOfferHistoryDays: 92,
+  maxOfferHistoryPeriods: 50,
+} as const;
+
 export const PUBLIC_RECORD_LIMITS = {
   schemaVersion: 1,
   maxModels: 64,

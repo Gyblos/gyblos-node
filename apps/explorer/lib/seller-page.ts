@@ -1,5 +1,7 @@
-import { PAGES } from './constants';
+import { ALL_TIME, PAGES } from './constants';
+import type { OfferPriceHistory } from './offer-price-history';
 import { modelFromSlug } from './offers';
+import type { RangeDays } from './range';
 
 const NODE_ID = /^[0-9a-f]{64}$/;
 
@@ -19,4 +21,20 @@ export function pagePath(pathname: string) {
     : null;
   const page = Object.values(PAGES).find((path) => path === pathname);
   return nodeId ? pathname : (page ?? PAGES.network);
+}
+
+type HistoryAvailability = Pick<
+  OfferPriceHistory,
+  'hasPeriods' | 'truncated' | 'error'
+>;
+
+export async function missingSellerHistory(
+  selected: HistoryAvailability,
+  days: RangeDays,
+  readRetained: () => Promise<HistoryAvailability>,
+) {
+  const completeAndEmpty = (history: HistoryAvailability) =>
+    !history.hasPeriods && !history.error && !history.truncated;
+  if (!completeAndEmpty(selected)) return false;
+  return days === ALL_TIME || completeAndEmpty(await readRetained());
 }

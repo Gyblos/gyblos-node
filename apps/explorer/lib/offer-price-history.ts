@@ -1,5 +1,9 @@
 import { DEVNET, DEVNET_USDC } from '@gyblos/config/network';
-import { PUBLIC_RECORD_LIMITS, V2_PRICING } from '@gyblos/protocol/constants';
+import {
+  DISCOVERY_READ_LIMITS,
+  PUBLIC_RECORD_LIMITS,
+  V2_PRICING,
+} from '@gyblos/protocol/constants';
 import {
   controlArray,
   controlAtomic,
@@ -9,9 +13,9 @@ import {
 } from '@gyblos/protocol/control-validation';
 
 import { DISCOVERY_URL } from './config';
-import { ALL_TIME, FETCH, OFFER_HISTORY, UNITS } from './constants';
+import { ALL_TIME, FETCH, UNITS } from './constants';
 import type { OfferedModel } from './discovery-shape';
-import type { RangeDays } from './range';
+import { rangeEnd, type RangeDays } from './range';
 import { flag, record, SourceShapeError } from './validate';
 
 type Identity = Pick<OfferedModel, 'modelId' | 'variant' | 'quantization'>;
@@ -19,6 +23,7 @@ interface HistoryQuery {
   model?: Identity;
   nodeId?: string;
   days: RangeDays;
+  closed?: boolean;
 }
 export interface OfferPricePoint {
   at: number;
@@ -33,6 +38,7 @@ export interface OfferPriceSeries extends Identity {
   points: OfferPricePoint[];
 }
 export interface OfferPriceHistory {
+  hasPeriods: boolean;
   series: OfferPriceSeries[];
   truncated: boolean;
   error: boolean;
@@ -56,7 +62,7 @@ async function fetchHistory(url: string): Promise<unknown> {
       const { done, value } = await reader.read();
       if (done) break;
       size += value.byteLength;
-      if (size > OFFER_HISTORY.maxBytes) {
+      if (size > DISCOVERY_READ_LIMITS.maxResponseBytes) {
         await reader.cancel();
         throw new SourceShapeError('offer history size');
       }
@@ -130,6 +136,7 @@ export async function getOfferPriceHistory({
   model,
   nodeId,
   days,
+  closed = true,
 }: HistoryQuery): Promise<OfferPriceHistory> {
   try {
     const field = nodeId === undefined ? 'model' : 'node';
@@ -137,19 +144,36 @@ export async function getOfferPriceHistory({
       nodeId === undefined
         ? controlIdentifier(model?.modelId)
         : controlHex(nodeId);
-    const count = days === ALL_TIME ? OFFER_HISTORY.maxDays : days;
+    const now = Date.now();
+    const count =
+      days === ALL_TIME
+        ? DISCOVERY_READ_LIMITS.maxOfferHistoryDays
+        : days + (closed || days === 1 ? 1 : 0);
     const url = `${DISCOVERY_URL}/offers/history?${field}=${encodeURIComponent(value)}&days=${count}`;
     const source = record(await fetchHistory(url), 'offer history');
-    const from = controlInteger(source.from);
-    const to = controlInteger(source.generatedAt);
+    const retainedFrom = controlInteger(source.from);
+    const snapshot = controlInteger(source.generatedAt);
     if (
       source[field] !== value ||
       source.days !== count ||
-      to - from !== count * UNITS.msPerDay
+      snapshot - retainedFrom !== count * UNITS.msPerDay
     )
       throw new SourceShapeError('offer history window');
+    const dayMs = UNITS.msPerDay;
+    const windowEnd =
+      (Math.floor(rangeEnd(days, now, closed) / dayMs) + 1) * dayMs;
+    const from =
+      days === ALL_TIME
+        ? retainedFrom
+        : Math.max(retainedFrom, windowEnd - days * dayMs);
+    const to = days === ALL_TIME ? snapshot : Math.min(windowEnd, snapshot);
+    if (to < from) throw new SourceShapeError('offer history coverage');
+    const periods = controlArray(
+      source.periods,
+      DISCOVERY_READ_LIMITS.maxOfferHistoryPeriods,
+    );
     const series = new Map<string, OfferPriceSeries>();
-    for (const raw of controlArray(source.periods, OFFER_HISTORY.maxPeriods)) {
+    for (const raw of periods) {
       const period = record(raw, 'offer period');
       const seller = controlHex(period.nodeId);
       if (nodeId !== undefined && seller !== nodeId)
@@ -172,6 +196,7 @@ export async function getOfferPriceHistory({
     for (const group of series.values())
       group.points.sort((left, right) => left.at - right.at);
     return {
+      hasPeriods: periods.length > 0,
       series: [...series.values()],
       truncated: flag(source.truncated, 'history.truncated'),
       error: false,
@@ -179,6 +204,13 @@ export async function getOfferPriceHistory({
       to,
     };
   } catch {
-    return { series: [], truncated: false, error: true, from: 0, to: 0 };
+    return {
+      hasPeriods: false,
+      series: [],
+      truncated: false,
+      error: true,
+      from: 0,
+      to: 0,
+    };
   }
 }

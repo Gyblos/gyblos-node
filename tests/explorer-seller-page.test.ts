@@ -11,7 +11,11 @@ import {
   sectionRangeHref,
   txPager,
 } from '@gyblos/explorer/paging';
-import { pagePath, sellerNodeId } from '@gyblos/explorer/seller-page';
+import {
+  missingSellerHistory,
+  pagePath,
+  sellerNodeId,
+} from '@gyblos/explorer/seller-page';
 import {
   SELLER_STATUS_LABELS,
   sellerModelRows,
@@ -344,4 +348,26 @@ void test('a valid NodeId unknown to the index and without activity is not a sel
     models: [],
   });
   assert.equal(unknownSeller(OTHER, nobody, { ...quiet, error: null }), true);
+});
+
+void test('seller absence requires a complete retained history even when the selected period is empty', async () => {
+  const empty = { hasPeriods: false, truncated: false, error: false };
+  const published = { ...empty, hasPeriods: true };
+  const truncated = { ...empty, truncated: true };
+  const unavailable = { ...empty, error: true };
+  for (const retained of [published, truncated, unavailable, empty]) {
+    let reads = 0;
+    const missing = await missingSellerHistory(empty, 7, async () => {
+      reads++;
+      return retained;
+    });
+    assert.equal(reads, 1);
+    assert.equal(missing, retained === empty);
+  }
+  const unexpected = async () =>
+    assert.fail('unnecessary retained history lookup');
+  for (const selected of [published, truncated, unavailable])
+    assert.equal(await missingSellerHistory(selected, 7, unexpected), false);
+  assert.equal(await missingSellerHistory(empty, 'all', unexpected), true);
+  assert.equal(await missingSellerHistory(published, 'all', unexpected), false);
 });

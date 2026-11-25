@@ -290,7 +290,7 @@ export default async function ModelPage({
   const [discovery, collector, history] = await Promise.all([
     getDiscovery(),
     getCollector(days, 0, query.closed),
-    getOfferPriceHistory({ model, days }),
+    getOfferPriceHistory({ model, days, closed: query.closed }),
   ]);
   const key = modelKey(model);
   const offers = discovery.sellers.flatMap((seller) =>

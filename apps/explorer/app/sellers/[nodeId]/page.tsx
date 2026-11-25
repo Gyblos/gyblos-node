@@ -16,7 +16,7 @@ import { short } from '../../../lib/format';
 import { getOfferPriceHistory } from '../../../lib/offer-price-history';
 import { directoryHref, rangeOf, readQuery } from '../../../lib/paging';
 import { sellerHref } from '../../../lib/seller-identity';
-import { sellerNodeId } from '../../../lib/seller-page';
+import { missingSellerHistory, sellerNodeId } from '../../../lib/seller-page';
 import { sellerProfile, unknownSeller } from '../../../lib/seller-profile';
 import { getSellerStats } from '../../../lib/seller-stats';
 import { SITE } from '../../../lib/site';
@@ -52,15 +52,17 @@ export default async function SellerPage({ params, searchParams }: Props) {
   const nodeId = sellerNodeId((await params).nodeId);
   if (!nodeId) notFound();
   const query = readQuery(await searchParams, sellerHref(nodeId));
+  const days = rangeOf(query, 'activity');
   const [snapshot, stats, history] = await Promise.all([
     getDiscovery(),
     getSellerStats(nodeId, ALL_TIME),
-    getOfferPriceHistory({ nodeId, days: rangeOf(query, 'activity') }),
+    getOfferPriceHistory({ nodeId, days, closed: query.closed }),
   ]);
   if (
-    !history.series.length &&
-    !history.error &&
-    unknownSeller(nodeId, snapshot, stats)
+    unknownSeller(nodeId, snapshot, stats) &&
+    (await missingSellerHistory(history, days, () =>
+      getOfferPriceHistory({ nodeId, days: ALL_TIME }),
+    ))
   )
     notFound();
   return (

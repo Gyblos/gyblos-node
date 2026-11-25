@@ -61,6 +61,10 @@ Apps are independent executables. They never import each other.
 | `apps/docs`              | `pnpm docs:dev`, `pnpm docs:build`                 | The public docs site at `docs.gyblos.com`: a Fumadocs static export in English and Spanish ([README](../apps/docs/README.md)).                                                                                                                                                                                                                                                                                                |
 | `apps/explorer`          | `pnpm explorer:dev`                                | The public metrics explorer at explorer.gyblos.com: a server-rendered Next.js app on Cloudflare Workers that reads the metrics collector's stats API (on-chain settlements included) and the discovery index through a scheduled run every 2 minutes into a KV snapshot. Pages: `/` (Network), `/sellers`, `/models`, `/transactions`, `/stats` and `/sellers/<NodeId>`; old `/` links to a moved table redirect to its page. |
 
+The Explorer’s model and seller detail pages also read advertised price history
+directly from the discovery index through `GET /v1/offers/history`. These live
+reads are separate from the scheduled discovery snapshot.
+
 Deploying a Worker or publishing a site is a maintainer action; see
 [public-decisions.md](public-decisions.md).
 
