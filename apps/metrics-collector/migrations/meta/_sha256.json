@@ -6,5 +6,5 @@
   "0005_breakdowns.sql": "b403ddebdf9908b289092b4c5123bdb19cb48cbaf76ce317876a605e9c699299",
   "0006_chain_gyblos_only.sql": "71b8fb5c053d555cc0b371c79c9046d8556077d4259f477e3b3efe240de861d4",
   "0007_model_observed.sql": "fb1c02e8843424bb339e84da8e1260c7251e8f75f3d7cc2c3086faab934b7ff4",
-  "0008_day_coverage.sql": "86389ed7c01cd996516e39c15dfb3c268decaa175b4d98ab09e4639162da61aa"
+  "0008_day_coverage.sql": "f5e09d7bd28d1beee6c9e275879847eea57bf41917303c227ff1a652adc8bec4"
 }

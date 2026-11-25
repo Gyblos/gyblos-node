@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "bd00644c-a75d-42b2-8865-9396d612c310",
+  "id": "4ebd79f3-bbbe-4ae8-b0be-f5626fd3fa6d",
   "prevId": "c7537d85-8952-40fa-80ce-3215a6cf3b29",
   "tables": {
     "collector_agg_chain_daily": {
@@ -250,13 +250,6 @@
           "name": "day",
           "type": "text",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "formula_version": {
-          "name": "formula_version",
-          "type": "integer",
-          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
@@ -2081,7 +2074,15 @@
           "autoincrement": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "collector_first_seen_by_first_day": {
+          "name": "collector_first_seen_by_first_day",
+          "columns": [
+            "first_day"
+          ],
+          "isUnique": false
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "collector_first_seen_kind_id_pk": {

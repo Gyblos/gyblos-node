@@ -44,7 +44,7 @@ import {
   type ReceiptTotals,
 } from './schema-aggregates';
 import { distinctWhere, histogramSum, total } from './sql-primitives';
-import { coverageQueries } from './stats-coverage';
+import { coverageQueries, demandRequests } from './stats-coverage-read';
 import type { StatsReader } from './stats-store';
 
 type TotalsTable = typeof aggSellerDaily | typeof aggNetworkDaily;
@@ -92,7 +92,7 @@ function network(orm: CollectorDatabase, range: DayRange, today: string) {
       connectFailed: dem.connectFailed,
       formulaVersion: dem.formulaVersion,
       aggregatedAt: dem.aggregatedAt,
-      rank: sql<number>`row_number() over (partition by ${dem.day} order by ${dem.unserved} + ${dem.refusedBeforeSelection} + ${dem.connectFailed} desc, ${dem.modelId})`.as(
+      rank: sql<number>`row_number() over (partition by ${dem.day} order by ${demandRequests} desc, ${dem.modelId})`.as(
         'rank',
       ),
     })
@@ -320,11 +320,18 @@ export function statsReader(database: D1Database): StatsReader {
         buyerTotals,
         days,
         pending,
-        start,
+        receiptStart,
+        eventStart,
         demandTotals,
       ] = await network(orm, range, today);
       return {
-        coverage: { days, pending, start, demand: demandTotals },
+        coverage: {
+          days,
+          pending,
+          receiptStart,
+          eventStart,
+          demand: demandTotals,
+        },
         network: networkRows,
         observed,
         demand,

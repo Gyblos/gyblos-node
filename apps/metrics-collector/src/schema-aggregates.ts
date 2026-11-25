@@ -3,6 +3,7 @@
 import { eq } from 'drizzle-orm';
 import {
   check,
+  index,
   integer,
   primaryKey,
   sqliteTable,
@@ -65,7 +66,6 @@ export const aggDirtyDays = sqliteTable('collector_agg_dirty_days', {
 
 export const aggDays = sqliteTable('collector_agg_days', {
   day: text('day').primaryKey(),
-  formulaVersion: integer('formula_version').notNull(),
   cutoff: integer('cutoff').notNull(),
   revision: integer('revision').notNull(),
 });
@@ -173,7 +173,10 @@ export const firstSeen = sqliteTable(
     firstDay: text('first_day').notNull(),
     firstAt: integer('first_at').notNull(),
   },
-  (table) => [primaryKey({ columns: [table.kind, table.id] })],
+  (table) => [
+    primaryKey({ columns: [table.kind, table.id] }),
+    index('collector_first_seen_by_first_day').on(table.firstDay),
+  ],
 );
 
 // The receipt total columns, in table order: the one list the aggregation, the reads and the response

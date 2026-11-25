@@ -1,21 +1,22 @@
-import { between, min, sql } from 'drizzle-orm';
+import { between, sql } from 'drizzle-orm';
 
 import { AGGREGATES } from './constants';
 import type { CollectorDatabase } from './d1-client';
 import { dayBounds, dayOfTime, daysOf, type DayBounds } from './days';
-import { aggDays, aggDirtyDays, firstSeen } from './schema';
+import { aggDays, aggDirtyDays } from './schema';
+import { captureStartDay } from './stats-coverage';
+import { captureStartQueries } from './stats-coverage-read';
 
 export async function calendarMarks(database: CollectorDatabase, now: number) {
-  const [start] = await database
-    .select({ day: min(firstSeen.firstDay) })
-    .from(firstSeen);
+  const [receipts, events] = await Promise.all(captureStartQueries(database));
+  const start = captureStartDay(receipts, events);
   const today = dayBounds(dayOfTime(now))!;
   const earliest = dayOfTime(
     today.start - (AGGREGATES.maxRangeDays - 1) * AGGREGATES.dayMs,
   );
   const to = dayOfTime(today.start - AGGREGATES.dayMs);
-  if (!start?.day) return [];
-  const from = start.day > earliest ? start.day : earliest;
+  if (!start) return [];
+  const from = start > earliest ? start : earliest;
   if (from > to) return [];
   const rows = await database
     .select({ day: aggDays.day, cutoff: aggDays.cutoff })
@@ -46,14 +47,12 @@ export const coverageUpsert = (
     .insert(aggDays)
     .values({
       day: bounds.day,
-      formulaVersion: AGGREGATES.formulaVersion,
       cutoff: now,
       revision: 1,
     })
     .onConflictDoUpdate({
       target: aggDays.day,
       set: {
-        formulaVersion: AGGREGATES.formulaVersion,
         cutoff: now,
         revision: sql`${aggDays.revision} + 1`,
       },

@@ -1,8 +1,4 @@
-import { asc, between, count, min, sql, sum } from 'drizzle-orm';
-
-import type { CollectorDatabase } from './d1-client';
-import { dayBounds, daysOf, type DayRange } from './days';
-import { aggDays, aggDemandDaily, aggDirtyDays, firstSeen } from './schema';
+import { dayBounds, dayOfTime, daysOf, type DayRange } from './days';
 
 export const COVERAGE_STATES = {
   FINAL: 'final',
@@ -21,39 +17,22 @@ export interface DayCoverage {
 export interface CoverageRows {
   days: { day: string; cutoff: number; revision: number }[];
   pending: { day: string }[];
-  start: { day: string | null }[];
+  receiptStart: { day: string | null }[];
+  eventStart: { at: number | null }[];
   demand: { day: string; models: number; total: number | null }[];
 }
 
-export function coverageQueries(orm: CollectorDatabase, range: DayRange) {
-  const dem = aggDemandDaily;
-  return [
-    orm
-      .select({
-        day: aggDays.day,
-        cutoff: aggDays.cutoff,
-        revision: aggDays.revision,
-      })
-      .from(aggDays)
-      .where(between(aggDays.day, range.from, range.to)),
-    orm
-      .select({ day: aggDirtyDays.day })
-      .from(aggDirtyDays)
-      .where(between(aggDirtyDays.day, range.from, range.to)),
-    orm.select({ day: min(firstSeen.firstDay) }).from(firstSeen),
-    orm
-      .select({
-        day: dem.day,
-        models: count(),
-        total: sum(
-          sql<number>`${dem.unserved} + ${dem.refusedBeforeSelection} + ${dem.connectFailed}`,
-        ).mapWith(Number),
-      })
-      .from(dem)
-      .where(between(dem.day, range.from, range.to))
-      .groupBy(dem.day)
-      .orderBy(asc(dem.day)),
-  ] as const;
+export function captureStartDay(
+  receipts: readonly { day: string | null }[],
+  events: readonly { at: number | null }[],
+): string | null {
+  const days = [
+    receipts[0]?.day ?? null,
+    events[0]?.at == null ? null : dayOfTime(events[0].at),
+  ].filter((day): day is string => day !== null);
+  return days.length
+    ? days.reduce((low, day) => (day < low ? day : low))
+    : null;
 }
 
 export function dayCoverage(
@@ -63,16 +42,16 @@ export function dayCoverage(
 ) {
   const computed = new Map(rows.days.map((row) => [row.day, row]));
   const pending = new Set(rows.pending.map((row) => row.day));
-  const start = rows.start[0]?.day ?? null;
+  const start = captureStartDay(rows.receiptStart, rows.eventStart);
   const demand = new Map(rows.demand.map((row) => [row.day, row]));
   const days = daysOf(range).map((day) => {
     const row = computed.get(day);
     const state =
-      start === null || day < start
+      start === null || day < start || day > today
         ? COVERAGE_STATES.UNKNOWN
         : pending.has(day)
           ? COVERAGE_STATES.PENDING
-          : day >= today
+          : day === today
             ? COVERAGE_STATES.PARTIAL
             : row && row.cutoff >= dayBounds(day)!.end
               ? COVERAGE_STATES.FINAL

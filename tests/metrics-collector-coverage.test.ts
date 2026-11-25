@@ -23,9 +23,7 @@ const TODAY = dayAt(1);
 
 const coverageRows = (database: ReturnType<typeof createCollectorD1>) =>
   database
-    .rows(
-      'SELECT day, formula_version, cutoff, revision FROM collector_agg_days ORDER BY day',
-    )
+    .rows('SELECT day, cutoff, revision FROM collector_agg_days ORDER BY day')
     .map((row) => ({ ...row }));
 
 const stats = (
@@ -39,12 +37,7 @@ void test('a computed day records its coverage in the same batch', async () => {
   insertReceipt(database);
   await runAggregation(database, NOW);
   assert.deepEqual(coverageRows(database), [
-    {
-      day: DAY,
-      formula_version: AGGREGATES.formulaVersion,
-      cutoff: NOW,
-      revision: 1,
-    },
+    { day: DAY, cutoff: NOW, revision: 1 },
   ]);
 });
 
@@ -129,4 +122,42 @@ void test('demand totals count every model before the public cut', async () => {
   assert.equal(day!.demand.length, AGGREGATES.maxPublicDemandPerDay);
   assert.equal(day!.demandModels, models);
   assert.equal(day!.demandTotal, models);
+});
+
+void test('future days are unknown and a dirty today is pending', async () => {
+  const database = createCollectorD1();
+  insertReceipt(database);
+  await runAggregation(database, NOW);
+  const later = await stats(database, DAY, dayAt(2));
+  assert.deepEqual(
+    later.days.map((day) => day.coverage.state),
+    ['final', 'partial', 'unknown'],
+  );
+  database.raw
+    .prepare('INSERT INTO collector_agg_dirty_days (day) VALUES (?)')
+    .run(TODAY);
+  assert.equal(
+    (await stats(database, TODAY, TODAY)).days[0]!.coverage.state,
+    'pending',
+  );
+});
+
+void test('a range with nothing captured is unknown with no complete day', async () => {
+  const answer = await stats(createCollectorD1(), dayAt(-2), DAY);
+  assert.ok(answer.days.every((day) => day.coverage.state === 'unknown'));
+  assert.equal(answer.completeThrough, null);
+});
+
+void test('observations before the first receipt start the capture', async () => {
+  const database = createCollectorD1();
+  const at = DAY_START - AGGREGATES.dayMs + HOUR;
+  const buyer = insertEnvelope(database, 'buyer', at);
+  insertObservation(database, buyer, { type: 'unserved', at, model: 'm' });
+  insertReceipt(database);
+  await runAggregation(database, NOW);
+  const { days } = await stats(database, dayAt(-1), DAY);
+  assert.deepEqual(
+    days.map((day) => day.coverage.state),
+    ['final', 'final'],
+  );
 });

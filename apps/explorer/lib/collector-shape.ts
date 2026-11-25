@@ -219,9 +219,7 @@ function networkSide(value: unknown, where: string): NetworkSide {
 function coverageState(value: unknown): CoverageState | null {
   if (value === undefined) return null;
   const state = text(record(value, 'coverage').state, 'coverage.state');
-  const known = COVERAGE_STATES.find((option) => option === state);
-  if (!known) throw new SourceShapeError('coverage.state');
-  return known;
+  return COVERAGE_STATES.find((option) => option === state) ?? null;
 }
 export function parseNetworkDay(value: unknown): NetworkDay {
   const source = record(value, 'day');

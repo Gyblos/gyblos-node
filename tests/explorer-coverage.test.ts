@@ -13,7 +13,7 @@ const day = (date: string, coverage?: unknown) => ({
   ...(coverage === undefined ? {} : { coverage }),
 });
 
-void test('a network day keeps its coverage state, or null from an older collector', () => {
+void test('a network day keeps its coverage state, or null when absent or unknown', () => {
   assert.equal(
     parseNetworkDay(
       day('2026-11-17', { state: 'pending', cutoff: null, revision: null }),
@@ -21,7 +21,10 @@ void test('a network day keeps its coverage state, or null from an older collect
     'pending',
   );
   assert.equal(parseNetworkDay(day('2026-11-17')).coverage, null);
-  assert.throws(() => parseNetworkDay(day('2026-11-17', { state: 'later' })));
+  assert.equal(
+    parseNetworkDay(day('2026-11-17', { state: 'later' })).coverage,
+    null,
+  );
 });
 
 void test('daily series tell pending and uncaptured days apart from zero', () => {
