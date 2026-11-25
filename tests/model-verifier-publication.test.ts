@@ -48,7 +48,7 @@ async function withVerifier(
   run: (
     parent: string,
     verify: (out: string) => Promise<number>,
-    lastError: () => unknown[] | undefined,
+    stderr: (fromLast?: number) => readonly unknown[] | undefined,
   ) => Promise<void>,
 ) {
   const home = await mkdtemp(join(tmpdir(), 'gyblos-verifier-publication-'));
@@ -86,7 +86,7 @@ async function withVerifier(
           '--out',
           out,
         ]),
-      () => stderr.mock.calls.at(-1)?.arguments,
+      (fromLast = 1) => stderr.mock.calls.at(-fromLast)?.arguments,
     );
   } finally {
     if (previousHome === undefined) delete process.env.GYBLOS_HOME;
@@ -148,6 +148,35 @@ void test('verify leaves no published directory or staging files after a partial
     }
     assert.equal(failedEvidenceWrites, 1);
     assert.deepEqual(await readdir(parent), []);
+  });
+});
+
+void test('verify records a failed staging cleanup separately from the primary error', async (t) => {
+  await withVerifier(t, async (parent, verify, stderr) => {
+    const out = join(parent, 'existing');
+    await mkdir(out, { recursive: true });
+    const cleanup = t.mock.method(fs, 'rm', () =>
+      Promise.reject(new Error('synthetic private path')),
+    );
+    syncBuiltinESMExports();
+    try {
+      assert.equal(await verify(out), 1);
+    } finally {
+      cleanup.mock.restore();
+      syncBuiltinESMExports();
+    }
+    assert.equal(cleanup.mock.callCount(), 1);
+    assert.deepEqual(stderr(), ['{"ok":false,"code":"OUTPUT_EXISTS"}']);
+    const diagnostic = stderr(2)?.[0];
+    assert.equal(typeof diagnostic, 'string');
+    assert.doesNotMatch(String(diagnostic), /synthetic private path/);
+    const record: unknown = JSON.parse(String(diagnostic));
+    assert.partialDeepStrictEqual(record, {
+      component: 'model-verifier',
+      operation: 'publish-output',
+      phase: 'cleanup',
+      code: 'OUTPUT_CLEANUP_FAILED',
+    });
   });
 });
 

@@ -23,6 +23,12 @@ export const MODEL_VERIFIER_COMMANDS = {
   CHECK: 'check',
 } as const;
 
+export const MODEL_VERIFIER_OUTPUT_DIAGNOSTICS = {
+  component: 'model-verifier',
+  operation: 'publish-output',
+  phases: { cleanup: 'cleanup' },
+} as const;
+
 export const MODEL_VERIFIER_CODES = {
   USAGE: 'USAGE',
   UNSUPPORTED_MODEL: 'UNSUPPORTED_MODEL',

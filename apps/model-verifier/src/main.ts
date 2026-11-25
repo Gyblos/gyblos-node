@@ -19,12 +19,14 @@ import {
 } from '@gyblos/protocol/model-verification';
 import { isMain } from '@gyblos/runtime';
 import { withDiagnosticCleanup } from '@gyblos/runtime/diagnostic-cleanup';
+import { createDiagnostics } from '@gyblos/runtime/diagnostics';
 
 import { CHALLENGE_SET, challengeSetDigest } from './challenge-set';
 import {
   MODEL_VERIFIER,
   MODEL_VERIFIER_CODES,
   MODEL_VERIFIER_COMMANDS,
+  MODEL_VERIFIER_OUTPUT_DIAGNOSTICS,
   ModelVerifierError,
   SECRET_BYTES,
   type ModelVerifierCode,
@@ -82,6 +84,12 @@ async function publishOutput(
   const parent = await realpath(parentPath);
   const destination = join(parent, basename(out));
   const staging = await mkdtemp(join(parent, MODEL_VERIFIER.stagingPrefix));
+  const diagnostics = createDiagnostics({
+    ...MODEL_VERIFIER_OUTPUT_DIAGNOSTICS,
+    phases: Object.values(MODEL_VERIFIER_OUTPUT_DIAGNOSTICS.phases),
+    codes: [MODEL_VERIFIER_CODES.OUTPUT_CLEANUP_FAILED],
+    sink: (record) => console.error(JSON.stringify(record)),
+  }).start();
   let published = false;
   await withDiagnosticCleanup(
     async () => {
@@ -112,9 +120,10 @@ async function publishOutput(
       if (!published) await rm(staging, { recursive: true, force: true });
     },
     () =>
-      console.error(
-        JSON.stringify({ code: MODEL_VERIFIER_CODES.OUTPUT_CLEANUP_FAILED }),
-      ),
+      diagnostics.report({
+        phase: MODEL_VERIFIER_OUTPUT_DIAGNOSTICS.phases.cleanup,
+        code: MODEL_VERIFIER_CODES.OUTPUT_CLEANUP_FAILED,
+      }),
   );
 }
 
