@@ -26,6 +26,7 @@ import {
   countText,
   dailyRequests,
   latencyText,
+  observedSum,
   rateText,
   sideFigures,
   usageMeta,
@@ -85,7 +86,7 @@ function RequestCharts({ days }: { days: SellerDay[] }) {
       amount: day[side],
     }));
   const total = (side: 'free' | 'paid') =>
-    series.reduce((sum, day) => sum + day[side], 0);
+    observedSum(series.map((day) => day[side]));
   return (
     <div className="mt-4 grid gap-3 md:grid-cols-2">
       <BarChartCard

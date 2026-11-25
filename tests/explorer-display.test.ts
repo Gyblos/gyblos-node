@@ -1,9 +1,3 @@
-// Protects the explorer's display choices: the date range accepts only its presets and maps to the
-// collector's inclusive UTC days; a model's mark comes from its id's family name, never a guess; the
-// daily series keep every day of the range, empty ones as zero; the index's network status is read
-// with its exact states and the sellers not online keep the index's order; the average uptime says over
-// how many sellers it is taken; a settlement count is singular only for exactly one; a source read gives
-// up after the fetch timeout.
 import assert from 'node:assert/strict';
 import test, { afterEach } from 'node:test';
 
@@ -143,7 +137,7 @@ void test('a model mark comes from the family in its id', () => {
   for (const [id, family] of cases) assert.equal(modelFamily(id), family, id);
 });
 
-void test('daily series keep empty days as zero', () => {
+void test('daily series distinguish an unobserved day from a covered zero', () => {
   const requests = dailyRequests([
     {
       day: '2026-11-17',
@@ -155,14 +149,16 @@ void test('daily series keep empty days as zero', () => {
       failures: [],
     },
   ] as unknown as Parameters<typeof dailyRequests>[0]);
-  assert.deepEqual(requests, [{ day: '2026-11-17', free: 0, paid: 0 }]);
+  assert.deepEqual(requests, [{ day: '2026-11-17', free: null, paid: null }]);
   const settled = dailySettled({
     aggregatedAt: null,
     backfillDone: false,
     days: [{ day: '2026-11-17', program: null, gyblos: null }],
     error: null,
   });
-  assert.deepEqual(settled, [{ day: '2026-11-17', settled: 0n, settles: 0 }]);
+  assert.deepEqual(settled, [
+    { day: '2026-11-17', settled: null, settles: null },
+  ]);
 });
 
 const NODE = (fill: string) => fill.repeat(64);

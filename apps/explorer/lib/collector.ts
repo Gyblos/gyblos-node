@@ -86,6 +86,7 @@ export async function getOverviewNetwork(
       periodsBack,
     );
     return {
+      buyerTotals: optionalNetworkBuyers(source.buyerTotals),
       from: text(source.from, 'network.from'),
       to: text(source.to, 'network.to'),
       days: list(source.days, 'network.days').map(parseNetworkDay),

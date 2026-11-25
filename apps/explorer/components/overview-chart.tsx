@@ -2,10 +2,12 @@
 
 import { ArrowUpRight, Coins, Hash, MessagesSquare } from 'lucide-react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useState, type KeyboardEvent } from 'react';
 
-import { UNITS } from '../lib/constants';
+import { STATS, UNITS } from '../lib/constants';
 import { compact, type TokenPoint } from '../lib/overview-activity';
+import { readQuery } from '../lib/paging';
 import type { RangeDays } from '../lib/range';
 import { Flow, type FlowKind, type FlowValue } from './board/animated-number';
 import { Chip } from './board/chip';
@@ -62,8 +64,7 @@ interface OverviewChartProps {
   globalDays: RangeDays;
   chartOverride?: RangeDays;
   chartDates: string;
-  receiptHref: string;
-  paymentHref: string;
+  links: Record<Metric, string>;
   receiptNote: string;
   paymentNote: string;
 }
@@ -75,12 +76,19 @@ export function OverviewChart({
   globalDays,
   chartOverride,
   chartDates,
-  receiptHref,
-  paymentHref,
+  links,
   receiptNote,
   paymentNote,
 }: OverviewChartProps) {
-  const [selected, select] = useState<Metric>('tokens');
+  const search = useSearchParams();
+  const selected =
+    readQuery(new URLSearchParams(search.toString())).metric ?? 'tokens';
+  const select = (metric: Metric) => {
+    const url = new URL(window.location.href);
+    if (metric === 'tokens') url.searchParams.delete(STATS.metricParam);
+    else url.searchParams.set(STATS.metricParam, metric);
+    window.history.replaceState(null, '', url);
+  };
   const [active, setActive] = useState<number | null>(null);
   const point = active === null ? null : points[active];
   const { label, kind } = METRICS[selected];
@@ -138,7 +146,7 @@ export function OverviewChart({
           </span>
           <Link
             className="inline-flex items-center gap-1 text-sm text-muted hover:text-ink hover:underline"
-            href={money ? paymentHref : receiptHref}
+            href={links[selected]}
           >
             Daily breakdown <ArrowUpRight size={14} aria-hidden />
           </Link>

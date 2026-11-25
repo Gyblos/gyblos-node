@@ -1,5 +1,5 @@
 import { txCursor } from './chain-txs-shape';
-import { CHAIN_TXS, IDENTITY, PAGES, PAGING, RANGE } from './constants';
+import { CHAIN_TXS, IDENTITY, PAGES, PAGING, RANGE, STATS } from './constants';
 import { count } from './format';
 import {
   hasRangeAlias,
@@ -25,7 +25,15 @@ export interface TableSort {
 export type TableSorts = Partial<Record<SortedTable, TableSort>>;
 export type Sortable = number | bigint | string | null | undefined;
 
+export type StatsMetric = keyof typeof STATS.metrics;
+export type StatsTab = (typeof STATS.tabs)[number];
+
+const isMetric = (value: unknown): value is StatsMetric =>
+  typeof value === 'string' && Object.hasOwn(STATS.metrics, value);
+
 export interface ExplorerQuery {
+  tab?: StatsTab;
+  metric?: StatsMetric;
   overviewTables?: boolean;
   path: string;
   days: RangeDays;
@@ -143,17 +151,35 @@ export function readQuery(source: SearchSource, path = '/'): ExplorerQuery {
     const sort = parseSort(table, readParam(source, PAGING.sortParams[table]));
     if (sort) sorts[table] = sort;
   }
+  const requestedMetric = readParam(source, STATS.metricParam);
+  const metric = isMetric(requestedMetric) ? requestedMetric : undefined;
+  const requestedTab = readParam(source, STATS.tabParam);
+  const legacyPayments = [
+    PAGING.params.chainDaily,
+    PAGING.sortParams.chainDaily,
+    RANGE.sections.payments.param,
+  ].some((name) => readParam(source, name) !== undefined);
+  const tab = metric
+    ? STATS.metrics[metric]
+    : (STATS.tabs.find((item) => item === requestedTab) ??
+      (legacyPayments ? 'payments' : 'usage'));
   return {
+    ...(path === PAGES.stats ? { tab } : {}),
+    ...(metric && (path === PAGES.network || path === PAGES.stats)
+      ? { metric }
+      : {}),
     ...(readParam(source, PAGING.overviewParam) === PAGING.overviewValue
       ? { overviewTables: true }
       : {}),
     path,
-    days: parseRange(readParam(source, RANGE.param)),
+    days:
+      (path === PAGES.stats ? ranges[tab] : undefined) ??
+      parseRange(readParam(source, RANGE.param)),
     ranges,
-    ...((path === PAGES.stats ||
-      path.startsWith(`${PAGES.models}/`) ||
+    ...(path === PAGES.stats ||
+    ((path.startsWith(`${PAGES.models}/`) ||
       path.startsWith(`${PAGES.sellers}/`)) &&
-    readParam(source, RANGE.closedParam) === '1'
+      readParam(source, RANGE.closedParam) === '1')
       ? { closed: true }
       : {}),
     sorts,
@@ -175,6 +201,8 @@ export function queryHref(
   const ranges = { ...query.ranges, ...change.ranges };
   const sorts = { ...query.sorts, ...change.sorts };
   const params = new URLSearchParams();
+  if (query.tab === 'payments') params.set(STATS.tabParam, query.tab);
+  if (query.metric) params.set(STATS.metricParam, query.metric);
   if (query.closed) params.set(RANGE.closedParam, '1');
   if (days !== RANGE.defaultDays) params.set(RANGE.param, rangeValue(days));
   for (const section of RANGE_SECTIONS) {
@@ -202,6 +230,25 @@ export function queryHref(
     params.set(PAGING.overviewParam, PAGING.overviewValue);
   const search = params.toString();
   return search ? `${query.path}?${search}` : query.path;
+}
+
+export function statsBreakdownHref(metric: StatsMetric, days: RangeDays) {
+  const tab = STATS.metrics[metric];
+  return (
+    queryHref({ ...readQuery({}, PAGES.stats), days, tab, metric }) +
+    '#' +
+    (tab === 'payments' ? PAGING.anchors.chainDaily : PAGING.anchors.daily)
+  );
+}
+
+export function statsTabHref(query: ExplorerQuery, tab: StatsTab) {
+  const { metric, ...rest } = query;
+  return queryHref({
+    ...rest,
+    ranges: {},
+    tab,
+    ...(metric && STATS.metrics[metric] === tab ? { metric } : {}),
+  });
 }
 
 export function canonicalPageHref(
@@ -278,6 +325,11 @@ export function sectionRangeHref(
   path = '/',
 ): string {
   const query = readQuery(new URLSearchParams(search), path);
+  if (path === PAGES.stats)
+    return queryHref(
+      { ...query, ranges: {} },
+      { days, pages: { daily: 1, demand: 1, chainDaily: 1 } },
+    );
   const pages = Object.fromEntries(
     RANGE.sections[section].tables.map((table) => [table, 1]),
   );

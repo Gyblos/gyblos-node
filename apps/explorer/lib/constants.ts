@@ -182,6 +182,13 @@ export const SELLER_STATUS = {
 
 export const ALL_TIME = 'all';
 
+export const STATS = {
+  tabParam: 'tab',
+  metricParam: 'metric',
+  tabs: ['usage', 'payments'],
+  metrics: { tokens: 'usage', requests: 'usage', paidOut: 'payments' },
+} as const;
+
 export const RANGE = {
   param: 'range',
   closedParam: 'closed',

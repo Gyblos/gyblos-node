@@ -62,7 +62,7 @@ export const rateText = (rate: number | null) =>
 export const countText = count;
 export const latencyText = latencyMs;
 
-export function summarizeUsage(snapshot: CollectorSnapshot) {
+export function summarizeUsage(snapshot: Pick<CollectorSnapshot, 'days'>) {
   const active = snapshot.days.filter(
     (day) => day.free || day.paid || day.observed || day.demand.length,
   );
@@ -93,15 +93,21 @@ export function relayText(day: NetworkDay): string {
   return routes && routed ? percent(routes.relay / routed) : '—';
 }
 
-// One point per day of the range, oldest first: each side's headline requests (0 without receipts).
 export function dailyRequests(
   days: readonly { day: string; free: Section; paid: Section }[],
 ) {
   return days.map((day) => ({
     day: day.day,
-    free: day.free?.requests.headline ?? 0,
-    paid: day.paid?.requests.headline ?? 0,
+    free: day.free?.requests.headline ?? null,
+    paid: day.paid?.requests.headline ?? null,
   }));
+}
+
+export function observedSum(values: readonly (number | null)[]) {
+  const observed = values.filter((value) => value !== null);
+  return observed.length
+    ? observed.reduce((sum, value) => sum + value, 0)
+    : null;
 }
 
 // The Usage title's note: the comparison is named only when the span before the range could be read.

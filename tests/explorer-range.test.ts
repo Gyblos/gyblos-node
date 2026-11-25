@@ -222,3 +222,27 @@ void test('published receipt changes compare observed samples from matching form
   assert.equal(observedBaseline(100, 2, 4, 3), null);
   assert.equal(observedBaseline(0, 2, 4, 4), null);
 });
+
+void test('Network drill-down carries the chart period, metric and matching Stats tab through pagination', async () => {
+  const { statsBreakdownHref, readQuery, queryHref, sectionRangeHref } =
+    await import('@gyblos/explorer/paging');
+  for (const metric of ['tokens', 'requests', 'paidOut'] as const) {
+    const url = new URL(statsBreakdownHref(metric, 7), 'http://example.test');
+    const query = readQuery(url.searchParams, url.pathname);
+    assert.equal(query.days, 7);
+    assert.equal(query.closed, true);
+    assert.equal(query.metric, metric);
+    assert.equal(query.tab, metric === 'paidOut' ? 'payments' : 'usage');
+    const next = new URL(queryHref(query, { pages: { daily: 2 } }), url);
+    assert.equal(next.searchParams.get('metric'), metric);
+    const newRange = new URL(
+      sectionRangeHref(next.search, 'usage', 30, '/stats'),
+      url,
+    );
+    assert.equal(newRange.searchParams.get('range'), '30');
+    assert.equal(newRange.searchParams.get('metric'), metric);
+    assert.equal(newRange.searchParams.has('dailyPage'), false);
+  }
+  assert.equal(readQuery({}, '/stats').closed, true);
+  assert.equal(readQuery({ chainDailyPage: '2' }, '/stats').tab, 'payments');
+});

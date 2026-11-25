@@ -32,7 +32,7 @@ const TICK = {
 
 export interface BarPoint {
   day: string;
-  value: number;
+  value: number | null;
   amount: FlowValue;
   // Shown next to the day while hovered (e.g. "3 settlements").
   detail?: string;
@@ -67,7 +67,12 @@ export function BarChartCard({
         {change && !active ? <DeltaChip delta={change} /> : null}
         <span className="font-mono text-xs text-dim">
           {active
-            ? [active.day, active.detail].filter(Boolean).join(', ')
+            ? [
+                active.day,
+                active.amount === null ? 'No observation' : active.detail,
+              ]
+                .filter(Boolean)
+                .join(', ')
             : `${points.length} days`}
         </span>
       </div>

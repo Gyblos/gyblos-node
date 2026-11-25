@@ -4,11 +4,12 @@ import { Suspense } from 'react';
 
 import { PageFrame } from '../../components/page-frame';
 import { PaymentsSection } from '../../components/payments-section';
-import { Loading } from '../../components/ui';
+import { StatsTabs } from '../../components/stats-tabs';
+import { Loading, SectionTitle } from '../../components/ui';
 import { UsageSection } from '../../components/usage-section';
 import { PAGES } from '../../lib/constants';
 import { pageMetadata } from '../../lib/page-meta';
-import { canonicalPageHref, rangeOf, readQuery } from '../../lib/paging';
+import { canonicalPageHref, readQuery, statsTabHref } from '../../lib/paging';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,18 +30,27 @@ export default async function StatsPage({
   const query = readQuery(params, PAGES.stats);
   return (
     <PageFrame title="Gyblos network stats">
-      <Suspense
-        key={`usage-${rangeOf(query, 'usage')}`}
-        fallback={<Loading cards />}
+      <SectionTitle
+        title="Network stats"
+        meta="Through the last complete UTC day"
+        range={{ section: 'usage', days: query.days }}
+      />
+      <StatsTabs
+        selected={query.tab ?? 'usage'}
+        usageHref={statsTabHref(query, 'usage')}
+        paymentsHref={statsTabHref(query, 'payments')}
       >
-        <UsageSection query={query} />
-      </Suspense>
-      <Suspense
-        key={`payments-${rangeOf(query, 'payments')}`}
-        fallback={<Loading cards />}
-      >
-        <PaymentsSection query={query} />
-      </Suspense>
+        <Suspense
+          key={JSON.stringify([query.tab, query.days, query.metric])}
+          fallback={<Loading cards />}
+        >
+          {query.tab === 'payments' ? (
+            <PaymentsSection query={query} />
+          ) : (
+            <UsageSection query={query} />
+          )}
+        </Suspense>
+      </StatsTabs>
     </PageFrame>
   );
 }

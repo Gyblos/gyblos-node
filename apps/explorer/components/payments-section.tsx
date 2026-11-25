@@ -19,16 +19,17 @@ import {
   type ChainSnapshot,
   type ChainSummary,
 } from '../lib/chain-shape';
-import { getChainStats } from '../lib/chain-stats';
-import { ALL_TIME, DISPLAY, PAGING, UNITS } from '../lib/constants';
+import { DISPLAY, PAGING, UNITS } from '../lib/constants';
 import { count, settlementCount, usdc, usdcDecimal, utc } from '../lib/format';
 import { rangeOf, tablePager, type ExplorerQuery } from '../lib/paging';
-import { displayRange, previousRange } from '../lib/range';
+import { displayRange } from '../lib/range';
+import { interval, readComparison } from './activity-report';
 import { Flow } from './board/animated-number';
 import { BarChartCard } from './board/bar-chart-card';
 import { delta, type Delta } from './board/delta';
 import { StatCard } from './board/stat-card';
 import { pagedRows, Pager } from './pager';
+import { BreakdownLinks, StatsBreakdown } from './stats-breakdown';
 import {
   amountCell,
   numberCell,
@@ -62,39 +63,46 @@ function changes(current: ChainSummary['totals'], before: ChainSnapshot) {
 
 export async function PaymentsSection({ query }: { query: ExplorerQuery }) {
   const days = rangeOf(query, 'payments');
-  const [chain, before] = await Promise.all([
-    getChainStats(days, 0, query.closed),
-    days === ALL_TIME ? null : getChainStats(days, 1, query.closed),
-  ]);
+  const report = await readComparison(days, Date.now());
+  const chain = report.period.chain;
+  const before = report.previous.chain;
   if (chain.error)
     return (
       <Unavailable title="Payments" anchors={[PAGING.anchors.chainDaily]} />
     );
   const summary = summarizeChain(chain);
   const { totals } = summary;
-  const change = before ? changes(totals, before) : null;
+  const change =
+    report.compared.paid.complete && report.previous.paid.complete
+      ? changes(summarizeChain(report.compared.chain).totals, before)
+      : null;
   return (
     <>
       <SectionTitle
         title={`Payments, ${displayRange(days)}`}
-        range={{ section: 'payments', days }}
-        meta={
-          change
-            ? `vs ${previousRange(days)}, ${meta(chain.backfillDone, chain.aggregatedAt)}`
-            : meta(chain.backfillDone, chain.aggregatedAt)
-        }
+        meta={`${interval(report.period.dates)} · ${report.metrics.paidOut.comparison} · ${meta(chain.backfillDone, chain.aggregatedAt)}`}
       />
-      <PaymentStats summary={summary} change={change} />
+      <BreakdownLinks query={query} />
+      {query.metric && (
+        <StatsBreakdown query={query} report={report} metric={query.metric} />
+      )}
+      <PaymentStats
+        summary={summary}
+        change={change}
+        paidOut={report.period.paid.total}
+      />
       <SettledChart
         chain={chain}
         total={totals.settled}
         change={change?.settled[0]}
       />
-      <DailyTable
-        query={query}
-        summary={summary}
-        complete={chain.backfillDone === true}
-      />
+      {!query.metric && (
+        <DailyTable
+          query={query}
+          summary={summary}
+          complete={chain.backfillDone === true}
+        />
+      )}
     </>
   );
 }
@@ -102,7 +110,9 @@ export async function PaymentsSection({ query }: { query: ExplorerQuery }) {
 function PaymentStats({
   summary,
   change,
+  paidOut,
 }: {
+  paidOut: bigint | null;
   summary: ChainSummary;
   change: ReturnType<typeof changes>;
 }) {
@@ -119,7 +129,7 @@ function PaymentStats({
       <StatCard
         icon={ArrowUpRight}
         label="Paid to sellers"
-        value={money(totals.paidOut)}
+        value={paidOut === null ? '—' : money(paidOut)}
         deltas={change?.paidOut}
         money
       />
@@ -177,9 +187,10 @@ function SettledChart({
 }) {
   const points = dailySettled(chain).map((day) => ({
     day: day.day,
-    value: Number(day.settled) / UNITS.atomicPerUsdc,
-    amount: usdcDecimal(day.settled),
-    detail: settlementCount(day.settles),
+    value:
+      day.settled === null ? null : Number(day.settled) / UNITS.atomicPerUsdc,
+    amount: day.settled === null ? null : usdcDecimal(day.settled),
+    detail: day.settles === null ? undefined : settlementCount(day.settles),
   }));
   if (!points.length) return null;
   return (
@@ -187,7 +198,9 @@ function SettledChart({
       <BarChartCard
         title="Settled per day"
         kind="usdc"
-        total={usdcDecimal(total)}
+        total={
+          points.some((row) => row.amount !== null) ? usdcDecimal(total) : null
+        }
         points={points}
         change={change}
         countAxis={false}

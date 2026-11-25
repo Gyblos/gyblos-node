@@ -148,8 +148,8 @@ void test('a seller stats answer is checked at the boundary, buyers withheld bel
   assert.equal(buyersText(stats.days[1]!.paid), '6');
   assert.equal(buyersText(null), '—');
   assert.deepEqual(dailyRequests(stats.days), [
-    { day: '2026-11-21', free: 3, paid: 0 },
-    { day: '2026-11-22', free: 0, paid: 6 },
+    { day: '2026-11-21', free: 3, paid: null },
+    { day: '2026-11-22', free: null, paid: 6 },
   ]);
   assert.deepEqual(
     stats.models.map((model) => model.modelId),

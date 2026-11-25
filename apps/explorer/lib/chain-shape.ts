@@ -179,11 +179,20 @@ export function summarizeChain(snapshot: ChainSnapshot): ChainSummary {
 
 // One point per day of the range, oldest first: what Gyblos channels settled that day (0 without
 // activity), for the daily chart.
+function indexedDay(chain: ChainSnapshot, date: string) {
+  return (
+    !chain.error &&
+    chain.backfillDone === true &&
+    chain.indexedAt != null &&
+    chain.indexedAt >= Date.parse(date) + UNITS.msPerDay
+  );
+}
+
 export function dailySettled(snapshot: ChainSnapshot) {
   return snapshot.days.map((day) => ({
     day: day.day,
-    settled: day.gyblos?.settled ?? 0n,
-    settles: day.gyblos?.settles ?? 0,
+    settled: day.gyblos?.settled ?? (indexedDay(snapshot, day.day) ? 0n : null),
+    settles: day.gyblos?.settles ?? (indexedDay(snapshot, day.day) ? 0 : null),
   }));
 }
 
@@ -196,10 +205,7 @@ export const chainHistoryNote = (backfillDone: boolean | null) =>
 
 export function dailyPayouts(dates: string[], chain: ChainSnapshot) {
   const rows = new Map(chain.days.map((day) => [day.day, day]));
-  const covered = (date: string) =>
-    chain.backfillDone === true &&
-    chain.indexedAt != null &&
-    chain.indexedAt >= Date.parse(date) + UNITS.msPerDay;
+  const covered = (date: string) => indexedDay(chain, date);
   const points = dates.map((date) => {
     const row = rows.get(date);
     if (!row || chain.error) return null;

@@ -7,12 +7,8 @@ import {
   Wallet,
 } from 'lucide-react';
 
-import {
-  getCollector,
-  type NetworkBuyers,
-  type NetworkDay,
-} from '../lib/collector';
-import { ALL_TIME, DISPLAY, PAGING } from '../lib/constants';
+import { type NetworkBuyers, type NetworkDay } from '../lib/collector';
+import { DISPLAY, PAGING } from '../lib/constants';
 import { count, usdcDecimal } from '../lib/format';
 import { rangeOf, tablePager, type ExplorerQuery } from '../lib/paging';
 import { displayRange, type RangeDays } from '../lib/range';
@@ -21,19 +17,21 @@ import {
   countText,
   dailyRequests,
   latencyText,
+  observedSum,
   rateText,
   relayText,
   sideFigures,
   summarizeUsage,
-  usageMeta,
   type SideFigures,
 } from '../lib/usage';
+import { interval, readComparison } from './activity-report';
 import { Flow } from './board/animated-number';
 import { BarChartCard } from './board/bar-chart-card';
 import { delta, type Delta } from './board/delta';
 import { StatCard } from './board/stat-card';
 import { BuyersCard } from './buyers-card';
 import { pagedRows, Pager } from './pager';
+import { BreakdownLinks, StatsBreakdown } from './stats-breakdown';
 import {
   ModelName,
   numberCell,
@@ -85,14 +83,18 @@ function changes(
 ) {
   if (!previous) return null;
   return {
-    requests: [
-      delta(current.free.requests, previous.free.requests),
-      delta(current.paid.requests, previous.paid.requests),
-    ],
-    outputTokens: [
-      delta(current.free.outputTokens, previous.free.outputTokens),
-      delta(current.paid.outputTokens, previous.paid.outputTokens),
-    ],
+    requests: (['free', 'paid'] as const).map((side) =>
+      current.active.some((row) => row[side]) &&
+      previous.active.some((row) => row[side])
+        ? delta(current[side].requests, previous[side].requests)
+        : null,
+    ),
+    outputTokens: (['free', 'paid'] as const).map((side) =>
+      current.active.some((row) => row[side]) &&
+      previous.active.some((row) => row[side])
+        ? delta(current[side].outputTokens, previous[side].outputTokens)
+        : null,
+    ),
     authorized: [delta(current.authorized, previous.authorized)],
     unserved: [delta(current.unserved, previous.unserved, 'down')],
   };
@@ -110,14 +112,16 @@ function UsageCards({
   days: RangeDays;
 }) {
   const { free, paid } = usage;
+  const hasFree = usage.active.some((row) => row.free);
+  const hasPaid = usage.active.some((row) => row.paid);
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       <StatCard
         icon={MessagesSquare}
         label="Requests"
         sides={{
-          free: <Flow value={free.requests} kind="count" />,
-          paid: <Flow value={paid.requests} kind="count" />,
+          free: <Flow value={hasFree ? free.requests : null} kind="count" />,
+          paid: <Flow value={hasPaid ? paid.requests : null} kind="count" />,
         }}
         deltas={change?.requests}
       />
@@ -135,8 +139,12 @@ function UsageCards({
         icon={Hash}
         label="Output tokens"
         sides={{
-          free: <Flow value={free.outputTokens} kind="count" />,
-          paid: <Flow value={paid.outputTokens} kind="count" />,
+          free: (
+            <Flow value={hasFree ? free.outputTokens : null} kind="count" />
+          ),
+          paid: (
+            <Flow value={hasPaid ? paid.outputTokens : null} kind="count" />
+          ),
         }}
         deltas={change?.outputTokens}
       />
@@ -152,7 +160,12 @@ function UsageCards({
         icon={Wallet}
         label="Authorized (paid)"
         hint="Paid usage that buyer and seller both signed for in receipts. It is not settled USDC: that is under Payments."
-        value={<Flow value={usdcDecimal(usage.authorized)} kind="usdc" />}
+        value={
+          <Flow
+            value={hasPaid ? usdcDecimal(usage.authorized) : null}
+            kind="usdc"
+          />
+        }
         deltas={change?.authorized}
         money
       />
@@ -169,11 +182,9 @@ function UsageCards({
 
 export async function UsageSection({ query }: { query: ExplorerQuery }) {
   const days = rangeOf(query, 'usage');
-  const [snapshot, before] = await Promise.all([
-    getCollector(days, 0, query.closed),
-    days === ALL_TIME ? null : getCollector(days, 1, query.closed),
-  ]);
-  if (snapshot.error)
+  const report = await readComparison(days, Date.now());
+  const snapshot = report.period.source;
+  if (!snapshot)
     return (
       <Unavailable
         title="Usage"
@@ -181,25 +192,41 @@ export async function UsageSection({ query }: { query: ExplorerQuery }) {
       />
     );
   const usage = summarizeUsage(snapshot);
+  const calendar = new Set(report.period.dates);
   const change = changes(
-    usage,
-    before && !before.error ? summarizeUsage(before) : null,
+    summarizeUsage({ days: report.compared.source?.days ?? [] }),
+    report.compared.source?.version &&
+      report.compared.source.version === report.previous.source?.version
+      ? summarizeUsage(report.previous.source)
+      : null,
   );
   return (
     <>
       <SectionTitle
         title={`Usage, ${displayRange(days)}`}
-        meta={usageMeta(days, snapshot.aggregatedAt, change !== null)}
-        range={{ section: 'usage', days }}
+        meta={
+          interval(report.period.dates) +
+          ' · ' +
+          report.metrics.requests.comparison +
+          ' · ' +
+          report.metrics.requests.sample
+        }
       />
+      <BreakdownLinks query={query} />
+      {query.metric && (
+        <StatsBreakdown query={query} report={report} metric={query.metric} />
+      )}
       <UsageCards
         usage={usage}
         change={change}
         buyers={snapshot.buyerTotals}
         days={days}
       />
-      <RequestCharts days={snapshot.days} change={change?.requests ?? null} />
-      <DailyTable query={query} days={usage.active} />
+      <RequestCharts
+        days={snapshot.days.filter((row) => calendar.has(row.day))}
+        change={change?.requests ?? null}
+      />
+      {!query.metric && <DailyTable query={query} days={usage.active} />}
       <DemandTable query={query} demand={usage.demand} />
     </>
   );
@@ -221,7 +248,7 @@ function RequestCharts({
       amount: day[side],
     }));
   const total = (side: 'free' | 'paid') =>
-    series.reduce((sum, day) => sum + day[side], 0);
+    observedSum(series.map((day) => day[side]));
   return (
     <div className="mt-4 grid gap-3 md:grid-cols-2">
       <BarChartCard
