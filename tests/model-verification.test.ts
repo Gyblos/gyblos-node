@@ -189,6 +189,8 @@ void test('the failure threshold counts deviant answers, the independent unit', 
   assert.equal(modelVerificationFailAt(1, 50_000, 100), 2);
   assert.equal(modelVerificationFailAt(0, 50_000, 100), 1);
   assert.equal(modelVerificationFailAt(64, 500_000, 100), 48);
+  assert.equal(modelVerificationFailAt(2, 120_000, 14_400), 2);
+  assert.equal(modelVerificationFailAt(1, 120_000, 120_000), 1);
 });
 
 void test('golden vectors keep the model verification domain and canonical bytes', async () => {

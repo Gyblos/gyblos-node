@@ -182,6 +182,14 @@ void test('a blank answer or one with nothing to check counts as unanswered', as
     const { evidence, verdict } = outcome.signed.result;
     assert.equal(evidence.answers, CHALLENGE_SET.prompts.length - 3);
     assert.deepEqual(
+      outcome.unscored.map(({ text, code }) => ({ text, code })),
+      [
+        { text: '', code: MODEL_VERIFIER_CODES.EMPTY_ANSWER },
+        { text: '  \n\t ', code: MODEL_VERIFIER_CODES.EMPTY_ANSWER },
+        { text: 'Nospacesatall.', code: MODEL_VERIFIER_CODES.EMPTY_ANSWER },
+      ],
+    );
+    assert.deepEqual(
       new Set(outcome.failures),
       new Set([MODEL_VERIFIER_CODES.EMPTY_ANSWER]),
     );

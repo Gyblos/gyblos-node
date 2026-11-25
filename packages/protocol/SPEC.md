@@ -1959,8 +1959,8 @@ at most the false positive bound. The verdict must equal
 `modelVerificationVerdict`: `fail` when `deviantAnswers ≥ failAt`, else
 `inconclusive` when `answers < prompts` or `checks < minimumChecks`, else
 `pass`. A result that disagrees with either is `INVALID`. `failAt` is computed
-in IEEE 754 double precision as in the reference implementation; another
-implementation must match it exactly.
+exactly with integers: the tail numerator over the shared denominator
+1,000,000^answers, compared with the bound without rounding.
 
 The parser checks only that the rule values are in range. A consumer must
 compare `minimumChecks`, `honestRatePpm` and `falsePositivePpm` with the rule of

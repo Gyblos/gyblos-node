@@ -79,7 +79,7 @@ async function verify(values: Record<string, string | undefined>) {
   try {
     const seller = await openSeller(endpoint, target, values.model);
     try {
-      const { signed, answers } = await runVerification({
+      const { signed, answers, unscored } = await runVerification({
         target,
         seller,
         reference,
@@ -106,7 +106,7 @@ async function verify(values: Record<string, string | undefined>) {
       );
       await writeFile(
         join(out, MODEL_VERIFIER.evidenceFile),
-        `${JSON.stringify({ challengeSet: CHALLENGE_SET, answers }, null, 2)}\n`,
+        `${JSON.stringify({ challengeSet: CHALLENGE_SET, answers, unscored }, null, 2)}\n`,
         { flag: 'wx', mode: MODEL_VERIFIER.privateFileMode },
       );
       return { ...summary(signed), out };

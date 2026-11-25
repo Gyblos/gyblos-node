@@ -77,14 +77,19 @@ export function modelVerificationFailAt(
   honestRatePpm: number,
   falsePositivePpm: number,
 ): number {
-  const rate = honestRatePpm / MODEL_VERIFICATION.partsPerMillion;
-  const alpha = falsePositivePpm / MODEL_VERIFICATION.partsPerMillion;
-  let mass = (1 - rate) ** answers;
-  let below = 0;
+  const scale = BigInt(MODEL_VERIFICATION.partsPerMillion);
+  const rate = BigInt(honestRatePpm);
+  const total = scale ** BigInt(answers);
+  const bound = BigInt(falsePositivePpm) * total;
+  let below = 0n;
+  let choose = 1n;
   for (let deviant = 0; deviant <= answers; deviant++) {
-    if (1 - below <= alpha) return Math.max(deviant, 1);
-    below += mass;
-    mass *= ((answers - deviant) / (deviant + 1)) * (rate / (1 - rate));
+    if ((total - below) * scale <= bound) return Math.max(deviant, 1);
+    below +=
+      choose *
+      rate ** BigInt(deviant) *
+      (scale - rate) ** BigInt(answers - deviant);
+    choose = (choose * BigInt(answers - deviant)) / BigInt(deviant + 1);
   }
   return answers + 1;
 }

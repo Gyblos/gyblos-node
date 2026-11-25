@@ -13,9 +13,9 @@ import {
 import { challengeSetDigest, type ChallengeSet } from './challenge-set';
 import {
   MODEL_VERIFIER_CODES,
-  ModelVerifierError,
   SECRET_BYTES,
   TEMPLATE_MARKER,
+  type ModelVerifierCode,
 } from './constants';
 import type { VerifierKey } from './key';
 import type { ReferenceModel } from './reference';
@@ -27,6 +27,12 @@ export interface AnswerEvidence {
   text: string;
   digest: string;
   checks: { at: number; deviation: boolean }[];
+}
+export interface UnscoredEvidence {
+  prompt: string;
+  text: string;
+  digest: string;
+  code: ModelVerifierCode;
 }
 export interface VerifiedSeller {
   selection: ModelSelection;
@@ -78,37 +84,11 @@ async function scoreAnswer(
   return { prompt, text, digest, checks };
 }
 
-export async function runVerification(input: VerificationInput): Promise<{
-  signed: SignedModelVerification;
-  answers: AnswerEvidence[];
-}> {
-  const { set } = input;
-  const setDigest = challengeSetDigest(set);
-  const nonce = randomBytes(SECRET_BYTES).toString('hex');
-  const answers: AnswerEvidence[] = [];
-  for (const [index, prompt] of set.prompts.entries()) {
-    let text: string;
-    try {
-      text = await input.seller.ask(prompt, set.rule.maxTokens);
-      if (TEMPLATE_MARKER.test(text))
-        throw new ModelVerifierError(MODEL_VERIFIER_CODES.TEMPLATE_MARKER);
-    } catch (error) {
-      input.onAnswer?.(index, failureCode(error));
-      continue;
-    }
-    const scored = await scoreAnswer(
-      input,
-      `${setDigest}:${nonce}`,
-      prompt,
-      text,
-    );
-    if (!scored.checks.length) {
-      input.onAnswer?.(index, MODEL_VERIFIER_CODES.EMPTY_ANSWER);
-      continue;
-    }
-    answers.push(scored);
-    input.onAnswer?.(index);
-  }
+function evidenceOf(
+  set: ChallengeSet,
+  answers: readonly AnswerEvidence[],
+  nonce: string,
+) {
   const checks = answers.reduce((sum, answer) => sum + answer.checks.length, 0);
   const deviations = answers.reduce(
     (sum, answer) =>
@@ -118,7 +98,7 @@ export async function runVerification(input: VerificationInput): Promise<{
   const deviantAnswers = answers.filter((answer) =>
     answer.checks.some((check) => check.deviation),
   ).length;
-  const evidence = {
+  return {
     prompts: set.prompts.length,
     answers: answers.length,
     checks,
@@ -135,6 +115,53 @@ export async function runVerification(input: VerificationInput): Promise<{
     nonce,
     answerDigests: answers.map((answer) => answer.digest),
   };
+}
+
+export async function runVerification(input: VerificationInput): Promise<{
+  signed: SignedModelVerification;
+  answers: AnswerEvidence[];
+  unscored: UnscoredEvidence[];
+}> {
+  const { set } = input;
+  const setDigest = challengeSetDigest(set);
+  const nonce = randomBytes(SECRET_BYTES).toString('hex');
+  const answers: AnswerEvidence[] = [];
+  const unscored: UnscoredEvidence[] = [];
+  const skip = (
+    index: number,
+    prompt: string,
+    text: string,
+    code: ModelVerifierCode,
+  ) => {
+    unscored.push({ prompt, text, digest: sha256(text), code });
+    input.onAnswer?.(index, code);
+  };
+  for (const [index, prompt] of set.prompts.entries()) {
+    let text: string;
+    try {
+      text = await input.seller.ask(prompt, set.rule.maxTokens);
+    } catch (error) {
+      input.onAnswer?.(index, failureCode(error));
+      continue;
+    }
+    if (TEMPLATE_MARKER.test(text)) {
+      skip(index, prompt, text, MODEL_VERIFIER_CODES.TEMPLATE_MARKER);
+      continue;
+    }
+    const scored = await scoreAnswer(
+      input,
+      `${setDigest}:${nonce}`,
+      prompt,
+      text,
+    );
+    if (!scored.checks.length) {
+      skip(index, prompt, text, MODEL_VERIFIER_CODES.EMPTY_ANSWER);
+      continue;
+    }
+    answers.push(scored);
+    input.onAnswer?.(index);
+  }
+  const evidence = evidenceOf(set, answers, nonce);
   const signed = await signModelVerification(
     {
       schemaVersion: MODEL_VERIFICATION.schemaVersion,
@@ -149,5 +176,5 @@ export async function runVerification(input: VerificationInput): Promise<{
     },
     input.key.sign,
   );
-  return { signed, answers };
+  return { signed, answers, unscored };
 }
