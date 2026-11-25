@@ -11,7 +11,7 @@ import {
 import { isMain } from '@gyblos/runtime';
 import { bindEndpoint } from '@gyblos/transport-iroh/endpoint';
 
-import { CHALLENGE_SET } from './challenge-set';
+import { CHALLENGE_SET, challengeSetDigest } from './challenge-set';
 import {
   MODEL_VERIFIER,
   MODEL_VERIFIER_CODES,
@@ -117,15 +117,33 @@ async function verify(values: Record<string, string | undefined>) {
   }
 }
 
+function publishedRule({ result }: SignedModelVerification) {
+  const { rule, prompts } = CHALLENGE_SET;
+  const { challengeSet, evidence } = result;
+  return (
+    challengeSet.id === CHALLENGE_SET.id &&
+    challengeSet.version === CHALLENGE_SET.version &&
+    challengeSet.digest === challengeSetDigest(CHALLENGE_SET) &&
+    evidence.prompts === prompts.length &&
+    evidence.minimumChecks === rule.minimumChecks &&
+    evidence.honestRatePpm === rule.honestRatePpm &&
+    evidence.falsePositivePpm === rule.falsePositivePpm
+  );
+}
+
 async function check(path: string | undefined) {
   if (!path) throw usage();
+  let signed: SignedModelVerification;
   try {
-    return summary(
-      await verifyModelVerification(await readJson(path, 'INVALID_RESULT')),
+    signed = await verifyModelVerification(
+      await readJson(path, 'INVALID_RESULT'),
     );
   } catch {
     throw new ModelVerifierError(MODEL_VERIFIER_CODES.INVALID_RESULT);
   }
+  if (!publishedRule(signed))
+    throw new ModelVerifierError(MODEL_VERIFIER_CODES.INVALID_RESULT);
+  return summary(signed);
 }
 
 export async function main(argv = process.argv.slice(2)): Promise<number> {

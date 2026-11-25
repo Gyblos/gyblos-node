@@ -153,6 +153,10 @@ void test('the parser refuses a verdict its own evidence contradicts and malform
     result(key.address, {
       evidence: { ...evidence, checks: 1_000_000 },
     }),
+    result(key.address, {
+      verdict: MODEL_VERIFICATION_VERDICTS.INCONCLUSIVE,
+      evidence: { ...evidence, checks: 29 },
+    }),
     result(key.address, { evidence: { ...evidence, nonce: 'ab' } }),
     result(key.address, { verdict: 'same' as never }),
     result(key.address, { verifier: 'ab'.repeat(32) }),

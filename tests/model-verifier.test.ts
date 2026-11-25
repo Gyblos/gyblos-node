@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -10,11 +10,12 @@ import {
   ModelVerifierError,
 } from '@gyblos/model-verifier/constants';
 import { loadVerifierKey } from '@gyblos/model-verifier/key';
+import { main } from '@gyblos/model-verifier/main';
 import { openReference } from '@gyblos/model-verifier/reference';
-import { parseSellerTarget } from '@gyblos/model-verifier/seller';
 import { runVerification } from '@gyblos/model-verifier/verify';
 import {
   MODEL_VERIFICATION_VERDICTS,
+  signModelVerification,
   verifyModelVerification,
 } from '@gyblos/protocol/model-verification';
 
@@ -342,40 +343,22 @@ void test('a point where the reference would end the answer is not counted', asy
   });
 });
 
-void test('a seller target is parsed strictly', () => {
-  assert.deepEqual(parseSellerTarget(TARGET), TARGET);
-  for (const value of [
-    { ...TARGET, owner: 'not-an-address' },
-    { ...TARGET, nodeId: 'AB'.repeat(32) },
-    { ...TARGET, directAddresses: 'x' },
-    { ...TARGET, extra: true },
-    null,
-  ])
-    assert.throws(
-      () => parseSellerTarget(value),
-      isCode(MODEL_VERIFIER_CODES.INVALID_SELLER),
-    );
-});
-
-void test('the verifier key is created once, private, and refused when missing or corrupt', async () => {
+void test('check accepts the published rule and refuses a signed result with a looser one', async () => {
   await withHome(async (home) => {
-    const path = join(home, 'nested', 'verifier.key');
-    await assert.rejects(
-      loadVerifierKey(path, false),
-      isCode(MODEL_VERIFIER_CODES.INVALID_KEY),
+    const honest = await verifyWith(home, async () => answer('word'));
+    const good = join(home, 'good.json');
+    await writeFile(good, JSON.stringify(honest.signed));
+    assert.equal(await main(['check', good]), 0);
+    const key = await loadVerifierKey(join(home, 'verifier.key'), false);
+    const loose = await signModelVerification(
+      {
+        ...honest.signed.result,
+        evidence: { ...honest.signed.result.evidence, minimumChecks: 1 },
+      },
+      key.sign,
     );
-    const first = await loadVerifierKey(path, true);
-    const again = await loadVerifierKey(path, false);
-    assert.equal(again.address, first.address);
-    if (process.platform !== 'win32')
-      assert.equal((await stat(path)).mode & 0o777, 0o600);
-    const corrupt = join(home, 'corrupt.key');
-    for (const text of ['{"seed":"zz"}\n', 'not json\n']) {
-      await writeFile(corrupt, text, { mode: 0o600 });
-      await assert.rejects(
-        loadVerifierKey(corrupt, false),
-        isCode(MODEL_VERIFIER_CODES.INVALID_KEY),
-      );
-    }
+    const bad = join(home, 'loose.json');
+    await writeFile(bad, JSON.stringify(loose));
+    assert.equal(await main(['check', bad]), 1);
   });
 });

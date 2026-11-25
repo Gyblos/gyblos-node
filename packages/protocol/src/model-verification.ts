@@ -151,6 +151,7 @@ function parseEvidence(value: unknown): ModelVerificationEvidence {
     evidence.answers !== answerDigests.length ||
     evidence.answers > evidence.prompts ||
     evidence.deviations > evidence.checks ||
+    evidence.checks < evidence.answers ||
     evidence.deviantAnswers > evidence.answers ||
     evidence.deviantAnswers > evidence.deviations ||
     (evidence.deviations > 0 && evidence.deviantAnswers === 0) ||

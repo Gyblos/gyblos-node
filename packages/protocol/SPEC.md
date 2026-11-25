@@ -1942,7 +1942,8 @@ behind the base58 address `result.verifier`, over the prefix
 | `issuedAt`      | A non-negative safe integer, milliseconds                                                 |
 
 `evidence` has exactly `prompts` (1 to 64), `answers` (at most `prompts`),
-`checks` (at most 16,384), `deviations` (at most `checks`), `deviantAnswers`
+`checks` (at most 16,384, and at least `answers`, since every scored answer has a
+check), `deviations` (at most `checks`), `deviantAnswers`
 (answers with at least one deviation: at most `answers` and `deviations`, and at
 least 1 when `deviations` is positive), `minimumChecks` (positive),
 `honestRatePpm` (1 to 500,000 parts per million), `falsePositivePpm` (1 to
@@ -1956,7 +1957,9 @@ k or more deviant answers under a binomial distribution with the honest rate is
 at most the false positive bound. The verdict must equal
 `modelVerificationVerdict`: `fail` when `deviantAnswers ≥ failAt`, else
 `inconclusive` when `answers < prompts` or `checks < minimumChecks`, else
-`pass`. A result that disagrees with either is `INVALID`.
+`pass`. A result that disagrees with either is `INVALID`. `failAt` is computed
+in IEEE 754 double precision as in the reference implementation; another
+implementation must match it exactly.
 
 The parser checks only that the rule values are in range. A consumer must
 compare `minimumChecks`, `honestRatePpm` and `falsePositivePpm` with the rule of
