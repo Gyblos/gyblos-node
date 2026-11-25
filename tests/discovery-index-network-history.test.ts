@@ -258,3 +258,19 @@ void test('uptime pruning still runs when the heartbeat table is missing', async
   await assert.rejects(storage.pruneUptime(NOW));
   assert.deepEqual(await storage.seen(nodeA, 0), []);
 });
+
+void test('each slot count has its own column name, as D1 keys rows by name', async (context) => {
+  const database = await createSqliteD1();
+  if (!database) return context.skip('node:sqlite unavailable');
+  const queries: string[] = [];
+  const storage = createD1Storage({
+    prepare: (sql) => (queries.push(sql), database.prepare(sql)),
+    batch: (statements) => database.batch(statements as never),
+  });
+  await storage.onlineSlots(0, 1);
+  const query = queries.find((sql) => sql.includes('group by'));
+  assert.deepEqual(
+    [...(query ?? '').matchAll(/as "(slot\d+)"/g)].map((match) => match[1]),
+    Array.from({ length: UPTIME.slotsPerHour }, (_, bit) => `slot${bit}`),
+  );
+});

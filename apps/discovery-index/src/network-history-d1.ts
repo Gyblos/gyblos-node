@@ -19,7 +19,7 @@ import { createD1Uptime, integer } from './uptime-d1';
 const slotColumns = Object.fromEntries(
   Array.from({ length: UPTIME.slotsPerHour }, (_, bit) => [
     `slot${bit}`,
-    slotCount(uptimeSlots.slots, bit),
+    slotCount(uptimeSlots.slots, bit).as(`slot${bit}`),
   ]),
 );
 
