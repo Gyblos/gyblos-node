@@ -22,6 +22,13 @@
       "when": 1795388794433,
       "tag": "0009_seller_profiles",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1795563702955,
+      "tag": "0010_offer_history",
+      "breakpoints": true
     }
   ]
 }

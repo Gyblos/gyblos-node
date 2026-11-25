@@ -14,6 +14,7 @@ import type {
   SellerRow,
   StoredEntry,
 } from './storage';
+import { readOfferHistory } from './storage-history';
 import {
   activeVersionsQuery,
   catalogStatusQuery,
@@ -123,6 +124,7 @@ export function createD1Storage(client: D1Database): DiscoveryStorage {
           : INDEX_ERRORS.UNKNOWN_CATALOG,
       );
     },
+    offerHistory: (query) => readOfferHistory(database, query),
     async list(query) {
       return (await listingQuery(database, query)).map(sellerRow);
     },

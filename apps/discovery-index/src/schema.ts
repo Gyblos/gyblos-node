@@ -127,6 +127,52 @@ export const withdrawals = sqliteTable(
   ],
 );
 
+export const offerItems = sqliteTable(
+  'discovery_offer_items',
+  {
+    contentHash: text('content_hash').notNull(),
+    position: integer('position').notNull(),
+    modelId: text('model_id').notNull(),
+    variant: text('variant'),
+    quantization: text('quantization'),
+    contextTokens: integer('context_tokens').notNull(),
+    reasoning: text('reasoning').notNull(),
+    inputAtomic: text('input_atomic').notNull(),
+    outputAtomic: text('output_atomic').notNull(),
+    unit: text('unit').notNull(),
+    network: text('network').notNull(),
+    asset: text('asset').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.contentHash, table.position] }),
+    index('discovery_offer_items_by_model').on(
+      table.modelId,
+      table.contentHash,
+    ),
+  ],
+);
+export const catalogPeriods = sqliteTable(
+  'discovery_catalog_periods',
+  {
+    nodeId: text('node_id').notNull(),
+    firstSequence: integer('first_sequence').notNull(),
+    contentHash: text('content_hash').notNull(),
+    owner: text('owner').notNull(),
+    startedAt: integer('started_at').notNull(),
+    lastSequence: integer('last_sequence').notNull(),
+    lastPublishedAt: integer('last_published_at').notNull(),
+    expiresAt: integer('expires_at').notNull(),
+    endedAt: integer('ended_at'),
+    endReason: text('end_reason'),
+  },
+  (table) => [
+    primaryKey({ columns: [table.nodeId, table.firstSequence] }),
+    index('discovery_catalog_periods_open').on(table.nodeId, table.endedAt),
+    index('discovery_catalog_periods_by_content').on(table.contentHash),
+    index('discovery_catalog_periods_by_end').on(table.endedAt),
+  ],
+);
+
 export const invites = sqliteTable(
   'discovery_invites',
   {
