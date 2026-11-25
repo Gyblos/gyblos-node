@@ -7,6 +7,7 @@ import test from 'node:test';
 
 import { CHALLENGE_SET } from '@gyblos/model-verifier/challenge-set';
 import {
+  MODEL_VERIFIER,
   MODEL_VERIFIER_CODES,
   ModelVerifierError,
 } from '@gyblos/model-verifier/constants';
@@ -16,6 +17,7 @@ import {
   openReference,
 } from '@gyblos/model-verifier/reference';
 import { runVerification } from '@gyblos/model-verifier/verify';
+import { MODEL_VERIFICATION_VERDICTS } from '@gyblos/protocol/model-verification';
 
 const DIGEST = 'cd'.repeat(32);
 const OTHER = 'ef'.repeat(32);
@@ -85,6 +87,68 @@ void test('a verification run refuses to sign when the reference changed', async
         error instanceof ModelVerifierError &&
         error.code === MODEL_VERIFIER_CODES.REFERENCE_CHANGED,
     );
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
+void test('empty reference candidates are retried and cannot produce a signed seller verdict', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'gyblos-verifier-ref-'));
+  try {
+    let calls = 0;
+    let recover = false;
+    const fetchImpl: typeof fetch = async (input) => {
+      if (String(input).endsWith('/api/tags'))
+        return Response.json({
+          models: [{ name: 'qwen3:1.7b', digest: DIGEST }],
+        });
+      calls++;
+      return Response.json({
+        response: ' word',
+        done: true,
+        logprobs: [
+          {
+            top_logprobs:
+              recover && calls > 1 ? [{ token: ' word', logprob: -0.1 }] : [],
+          },
+        ],
+      });
+    };
+    const reference = await openReference(
+      'http://127.0.0.1:11434',
+      'qwen3-1.7b',
+      fetchImpl,
+      0,
+    );
+    const key = await loadVerifierKey(join(home, 'verifier.key'), true);
+    const input = {
+      target: {
+        owner: key.address,
+        nodeId: 'ab'.repeat(32),
+        relayUrl: null,
+        directAddresses: [],
+      },
+      seller: {
+        selection: { modelId: 'qwen3-1.7b', variant: null, quantization: null },
+        ask: async () => Array.from({ length: 40 }, () => 'word').join(' '),
+      },
+      reference,
+      set: CHALLENGE_SET,
+      key,
+      now: () => 1_800_000_000_000,
+    };
+    await assert.rejects(
+      runVerification(input),
+      (error: unknown) =>
+        error instanceof ModelVerifierError &&
+        error.code === MODEL_VERIFIER_CODES.REFERENCE_UNAVAILABLE,
+    );
+    assert.equal(calls, MODEL_VERIFIER.referenceAttempts);
+    calls = 0;
+    recover = true;
+    const { signed } = await runVerification(input);
+    assert.equal(signed.result.verdict, MODEL_VERIFICATION_VERDICTS.PASS);
+    assert.equal(calls, signed.result.evidence.checks + 1);
   } finally {
     await rm(home, { recursive: true, force: true });
   }

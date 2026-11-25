@@ -6,7 +6,6 @@ import test from 'node:test';
 
 import { CHALLENGE_SET } from '@gyblos/model-verifier/challenge-set';
 import {
-  MODEL_VERIFIER,
   MODEL_VERIFIER_CODES,
   ModelVerifierError,
 } from '@gyblos/model-verifier/constants';
@@ -324,55 +323,6 @@ void test('the reference retries a passing failure and gives up after a bounded 
     isCode(MODEL_VERIFIER_CODES.REFERENCE_UNAVAILABLE),
   );
   assert.equal(failures, 3);
-});
-
-void test('empty reference candidates are retried and cannot produce a signed seller verdict', async () => {
-  await withHome(async (home) => {
-    let calls = 0;
-    let recover = false;
-    const fetchImpl: typeof fetch = async (input) => {
-      if (String(input).endsWith('/api/tags'))
-        return Response.json({
-          models: [{ name: 'qwen3:1.7b', digest: DIGEST }],
-        });
-      calls++;
-      return Response.json({
-        response: ' word',
-        done: true,
-        logprobs: [
-          {
-            top_logprobs:
-              recover && calls > 1 ? [{ token: ' word', logprob: -0.1 }] : [],
-          },
-        ],
-      });
-    };
-    const reference = await openReference(
-      'http://127.0.0.1:11434',
-      SELECTION.modelId,
-      fetchImpl,
-      0,
-    );
-    const key = await loadVerifierKey(join(home, 'verifier.key'), true);
-    const input = {
-      target: TARGET,
-      seller: { selection: SELECTION, ask: async () => answer('word') },
-      reference,
-      set: CHALLENGE_SET,
-      key,
-      now: () => 1_800_000_000_000,
-    };
-    await assert.rejects(
-      runVerification(input),
-      isCode(MODEL_VERIFIER_CODES.REFERENCE_UNAVAILABLE),
-    );
-    assert.equal(calls, MODEL_VERIFIER.referenceAttempts);
-    calls = 0;
-    recover = true;
-    const { signed } = await runVerification(input);
-    assert.equal(signed.result.verdict, MODEL_VERIFICATION_VERDICTS.PASS);
-    assert.equal(calls, signed.result.evidence.checks + 1);
-  });
 });
 
 void test('a point where the reference would end the answer is not counted', async () => {
