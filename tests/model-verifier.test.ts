@@ -15,6 +15,7 @@ import { main } from '@gyblos/model-verifier/main';
 import { openReference } from '@gyblos/model-verifier/reference';
 import { runVerification } from '@gyblos/model-verifier/verify';
 import { FREE_EXECUTION_CODES } from '@gyblos/protocol/constants';
+import { FreeExecutionError } from '@gyblos/protocol/free-execution';
 import {
   MODEL_VERIFICATION_VERDICTS,
   signModelVerification,
@@ -125,11 +126,7 @@ void test('a seller that answers too little is inconclusive and failures keep on
   await withHome(async (home) => {
     let calls = 0;
     const outcome = await verifyWith(home, async () => {
-      calls++;
-      if (calls > 3)
-        throw Object.assign(new Error('secret seller text'), {
-          code: FREE_EXECUTION_CODES.BUSY,
-        });
+      if (++calls > 3) throw new FreeExecutionError(FREE_EXECUTION_CODES.BUSY);
       return answer('word');
     });
     assert.equal(
@@ -147,6 +144,7 @@ void test('a seller that answers too little is inconclusive and failures keep on
       });
     });
     assert.equal(silent.signed.result.evidence.checks, 0);
+    assert.equal(silent.failures[0], MODEL_VERIFIER_CODES.UNKNOWN);
     assert.deepEqual(silent.unscored[0], {
       challenge: 1,
       phase: MODEL_VERIFIER_PHASES.EXECUTION,
@@ -170,18 +168,19 @@ void test('one unanswered prompt keeps a run from passing even with enough check
   await withHome(async (home) => {
     let calls = 0;
     const outcome = await verifyWith(home, async () => {
-      calls++;
-      if (calls === 1)
-        throw Object.assign(new Error('PRIVATE_TRANSPORT_DETAIL'), {
-          code: FREE_EXECUTION_CODES.BUSY,
-        });
+      if (++calls === 1)
+        throw new FreeExecutionError(FREE_EXECUTION_CODES.BUSY);
       return answer('word');
     });
     const { evidence, verdict } = outcome.signed.result;
     assert.ok(evidence.checks >= CHALLENGE_SET.rule.minimumChecks);
     assert.equal(verdict, MODEL_VERIFICATION_VERDICTS.INCONCLUSIVE);
     assert.deepEqual(outcome.unscored, [
-      { challenge: 1, phase: 'execution', code: FREE_EXECUTION_CODES.BUSY },
+      {
+        challenge: 1,
+        phase: MODEL_VERIFIER_PHASES.EXECUTION,
+        code: FREE_EXECUTION_CODES.BUSY,
+      },
     ]);
   });
 });

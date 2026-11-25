@@ -43,6 +43,8 @@ import {
   NATIVE_TEST_OPTIONS,
 } from './support/native-runtime';
 
+const PRIVATE_TRANSPORT_DETAIL = 'verifier transport canary';
+
 async function syntheticSeller() {
   const fixture = await controlFixture(true);
   const transport = await endpoint(undefined, [
@@ -112,21 +114,23 @@ async function syntheticSeller() {
         free: {
           async respond(value) {
             const request = parseFreeExecutionRequest(value);
+            executions++;
+            if (executions === 2) throw new Error(PRIVATE_TRANSPORT_DETAIL);
             const reply = {
               version: FREE_EXECUTION.version,
               requestId: request.requestId,
               requestDigest: await freeExecutionDigest(request),
             };
-            if (++executions === 1)
+            if (executions === 1)
               return { ...reply, error: { code: FREE_EXECUTION_CODES.BUSY } };
             return {
               ...reply,
               result: {
-                text: executions === 2 ? '' : 'Answer: word word word.',
+                text: executions === 3 ? '' : 'Answer: word word word.',
                 finishReason: ENGINE_DONE_REASONS.STOP,
                 usage: {
                   inputTokens: 10,
-                  outputTokens: executions === 2 ? 0 : 6,
+                  outputTokens: executions === 3 ? 0 : 6,
                 },
               },
             };
@@ -194,13 +198,13 @@ void test(
       0,
     );
 
-    const artifact: unknown = JSON.parse(
-      await readFile(join(out, MODEL_VERIFIER.evidenceFile), 'utf8'),
-    );
+    const raw = await readFile(join(out, MODEL_VERIFIER.evidenceFile), 'utf8');
+    assert.ok(!raw.includes(PRIVATE_TRANSPORT_DETAIL));
+    const artifact: unknown = JSON.parse(raw);
     assert.ok(artifact && typeof artifact === 'object');
     assert.ok('answers' in artifact && Array.isArray(artifact.answers));
     assert.ok('unscored' in artifact && Array.isArray(artifact.unscored));
-    assert.deepEqual(artifact.unscored.slice(0, 2), [
+    assert.deepEqual(artifact.unscored.slice(0, 3), [
       {
         challenge: 1,
         phase: MODEL_VERIFIER_PHASES.QUOTE,
@@ -211,10 +215,15 @@ void test(
         phase: MODEL_VERIFIER_PHASES.EXECUTION,
         code: FREE_EXECUTION_CODES.BUSY,
       },
+      {
+        challenge: 3,
+        phase: MODEL_VERIFIER_PHASES.EXECUTION,
+        code: FREE_EXECUTION_CODES.INTERNAL,
+      },
     ]);
-    assert.equal(artifact.unscored.length, 3);
-    assert.equal(artifact.unscored[2]?.phase, MODEL_VERIFIER_PHASES.SCORING);
-    assert.equal(artifact.unscored[2]?.code, MODEL_VERIFIER_CODES.EMPTY_ANSWER);
+    assert.equal(artifact.unscored.length, 4);
+    assert.equal(artifact.unscored[3]?.phase, MODEL_VERIFIER_PHASES.SCORING);
+    assert.equal(artifact.unscored[3]?.code, MODEL_VERIFIER_CODES.EMPTY_ANSWER);
     assert.deepEqual(
       [...artifact.unscored, ...artifact.answers].map(
         (entry) => entry.challenge,
@@ -226,6 +235,6 @@ void test(
     );
     const { result } = await verifyModelVerification(signed);
     assert.equal(result.verdict, MODEL_VERIFICATION_VERDICTS.INCONCLUSIVE);
-    assert.equal(result.evidence.answers, CHALLENGE_SET.prompts.length - 3);
+    assert.equal(result.evidence.answers, CHALLENGE_SET.prompts.length - 4);
   },
 );
