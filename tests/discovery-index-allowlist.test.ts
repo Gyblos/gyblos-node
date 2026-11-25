@@ -83,6 +83,10 @@ function countingStorage(storage: DiscoveryStorage) {
       calls.push('catalogStatus'),
       storage.catalogStatus(now, limit, maxModels)
     ),
+    offerHistory: (query) => (
+      calls.push('offerHistory'),
+      storage.offerHistory(query)
+    ),
   };
   return { storage: counted, calls };
 }

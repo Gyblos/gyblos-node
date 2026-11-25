@@ -379,3 +379,128 @@
     animation: none;
   }
 }
+
+.desktop-frame .chat-answer[data-streaming] .reply-text > :last-child::after {
+  content: '';
+  display: inline-block;
+  width: 0.38em;
+  height: 0.85em;
+  margin-inline-start: 0.18em;
+  vertical-align: -0.06em;
+  border-radius: var(--radius-control);
+  background: currentColor;
+  opacity: 0.65;
+}
+@media (prefers-reduced-motion: reduce) {
+  .desktop-frame .chat-answer[data-streaming] .reply-text > :last-child::after {
+    display: none;
+  }
+}
+
+.desktop-frame .turn-signal {
+  color: var(--muted);
+  font-size: 13px;
+  margin-block-end: var(--space-2);
+}
+.turn-signal summary,
+.turn-wait {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 28px;
+}
+.turn-signal summary {
+  cursor: pointer;
+  width: fit-content;
+  list-style: none;
+}
+.turn-signal summary .signal-mark {
+  width: 18px;
+  height: 14px;
+}
+.turn-signal summary::-webkit-details-marker {
+  display: none;
+}
+.turn-signal summary svg {
+  transition: rotate var(--motion-overlay) var(--motion-ease);
+}
+.turn-signal details[open] summary svg {
+  rotate: 90deg;
+}
+.turn-signal ol {
+  padding-inline-start: 22px;
+  margin-block: 4px 10px;
+  border-inline-start: 1px solid var(--line);
+  list-style: disc;
+}
+.turn-signal li {
+  padding: 3px 0;
+}
+.turn-signal time {
+  font-variant-numeric: tabular-nums;
+  font-family: var(--interface-font);
+  margin-inline-start: 4px;
+}
+.turn-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.turn-dots i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.desktop-frame .chat-answer .pk-code {
+  min-width: 0;
+  max-width: 100%;
+}
+.desktop-frame .chat-answer .pk-code pre {
+  overflow-x: auto;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .turn-dots i {
+    animation: turn-pulse 950ms ease-in-out infinite alternate;
+  }
+  .turn-dots i:nth-child(2) {
+    animation-delay: 150ms;
+  }
+  .turn-dots i:nth-child(3) {
+    animation-delay: 300ms;
+  }
+  .turn-wait,
+  .turn-signal details[open] ol,
+  .turn-signal ~ .reply-text {
+    animation: turn-enter 160ms ease-out both;
+  }
+  .desktop-frame .ui-composer-action > span {
+    transition:
+      opacity 150ms ease-out,
+      scale 150ms ease-out;
+  }
+  .ui-composer-action[data-busy='true'] .composer-send-glyph,
+  .ui-composer-action[data-busy='false'] .composer-stop-glyph {
+    scale: 0.72;
+  }
+}
+@keyframes turn-enter {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+}
+@keyframes turn-pulse {
+  from {
+    opacity: 0.35;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .turn-signal summary svg {
+    transition: none;
+  }
+}

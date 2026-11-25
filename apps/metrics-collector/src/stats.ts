@@ -9,6 +9,7 @@ import {
   type FailureEntry,
   type OriginEntry,
 } from './stats-breakdowns';
+import { dayCoverage, type DayCoverage } from './stats-coverage';
 import {
   bySide,
   latency,
@@ -47,6 +48,9 @@ type NetworkSide = {
 } & PublicBuyers;
 export interface NetworkDay extends Sides<NetworkSide, NetworkSide> {
   day: string;
+  coverage: DayCoverage;
+  demandModels: number;
+  demandTotal: number;
   observed: {
     buyerLatency: { firstToken: Latency; total: Latency };
     routes: { direct: number; relay: number; unknown: number };
@@ -71,6 +75,7 @@ export interface BuyerTotals {
   newInRange: PublicBuyers;
 }
 export interface NetworkStats extends StatsEnvelope {
+  completeThrough: string | null;
   days: NetworkDay[];
   buyerTotals: { free: BuyerTotals; paid: BuyerTotals };
 }
@@ -153,8 +158,16 @@ export async function networkStats(
   range: DayRange,
   today: string,
 ): Promise<NetworkStats> {
-  const { network, observed, demand, origins, failures, buyerTotals } =
-    await reader.network(range, today);
+  const {
+    coverage,
+    network,
+    observed,
+    demand,
+    origins,
+    failures,
+    buyerTotals,
+  } = await reader.network(range, today);
+  const covered = dayCoverage(coverage, range, today);
   const buyersByKind = new Map(buyerTotals.map((row) => [row.kind, row]));
   const totalsOf = (kind: FirstSeenKind): BuyerTotals => {
     const row = buyersByKind.get(kind);
@@ -168,10 +181,11 @@ export async function networkStats(
   const networkByDay = groupBy(network, (row) => row.day);
   const observedByDay = new Map(observed.map((row) => [row.day, row]));
   const demandByDay = groupBy(demand, (row) => row.day);
-  const days = daysOf(range).map((day): NetworkDay => {
+  const days = covered.days.map(({ day, ...extra }): NetworkDay => {
     const seen = observedByDay.get(day);
     return {
       day,
+      ...extra,
       ...bySide(networkByDay.get(day) ?? [], (row) => ({
         conflicts: row.conflicts,
         activeSellers: row.activeSellers,
@@ -210,6 +224,7 @@ export async function networkStats(
       ...origins.map(fromRow),
       ...failures.map(fromRow),
     ]),
+    completeThrough: covered.completeThrough,
     days,
     buyerTotals: {
       free: totalsOf(FIRST_SEEN_KINDS.BUYER_FREE),

@@ -6,8 +6,8 @@ import { AGENT_CLIENT } from '../constants';
 
 const SERVICE_MARKS: Record<string, { file: string; monochrome?: boolean }> = {
   [AGENT_CLIENT.CLAUDE_CODE]: { file: 'claudecode-color' },
-  [AGENT_CLIENT.CODEX]: { file: 'codex', monochrome: true },
-  [AGENT_CLIENT.OPENCODE]: { file: 'opencode', monochrome: true },
+  [AGENT_CLIENT.CODEX]: { file: 'codex-color' },
+  [AGENT_CLIENT.OPENCODE]: { file: 'opencode-color' },
   [AGENT_CLIENT.PI]: { file: 'pi' },
   exa: { file: 'exa', monochrome: true },
   firecrawl: { file: 'firecrawl-color' },

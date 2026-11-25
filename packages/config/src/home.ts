@@ -26,9 +26,7 @@ function defaultProductHome(environment: HomeEnvironment) {
 }
 
 export const ROLE_DIRECTORIES = { buyer: 'buyer', seller: 'seller' } as const;
-
 export type HomeRole = keyof typeof ROLE_DIRECTORIES;
-
 export const ARTIFACT_DIRECTORIES = {
   root: 'artifacts',
   tokenizer: 'tokenizer',
@@ -64,7 +62,6 @@ export const ROLE_FILES = {
   journal: 'authorization.json',
   reconciliations: 'reconciliations.json',
   calls: 'calls.json',
-  offer: 'offer.json',
   identityState: 'identity-state-8004.json',
   identityStateLock: 'identity-state-8004.lock',
   sellerRegistration: 'registration-8004-v1.json',
@@ -286,6 +283,7 @@ export function desktopActivityPaths(sandboxDirectory: string) {
 export const DESKTOP_CHAT_FILES = {
   directory: 'conversations',
   state: 'conversations-v1.json',
+  pins: 'pinned-conversations.json',
   lock: 'conversations-v1.lock',
 } as const;
 export function desktopChatPaths(profile: string) {
@@ -293,6 +291,7 @@ export function desktopChatPaths(profile: string) {
   return {
     directory,
     state: join(directory, DESKTOP_CHAT_FILES.state),
+    pins: join(directory, DESKTOP_CHAT_FILES.pins),
     lock: join(directory, DESKTOP_CHAT_FILES.lock),
   };
 }

@@ -215,6 +215,7 @@ function RequestCharts({
       day: day.day,
       value: day[side],
       amount: day[side],
+      detail: day.note,
     }));
   const total = (side: 'free' | 'paid') =>
     series.reduce((sum, day) => sum + day[side], 0);

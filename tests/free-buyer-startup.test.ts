@@ -1,4 +1,3 @@
-// Starts the free entry from temporary identity/selection files, with no wallet, v1 offer or RPC access.
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -23,7 +22,7 @@ import { endpoint } from './support/native-fixture';
 import { NATIVE_CAPABILITY } from './support/native-runtime';
 
 void test(
-  'free buyer startup requires no trusted v1 offer, wallet signer, tokenizer or program RPC',
+  'free buyer startup requires no wallet signer, tokenizer or program RPC',
   { skip: NATIVE_CAPABILITY.transportSkip },
   async () => {
     const source = await controlFixture(true);

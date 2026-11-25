@@ -2,6 +2,7 @@
 import { stdin, stdout } from 'node:process';
 import { createInterface } from 'node:readline/promises';
 
+import { BUYER_INIT_FLAGS, BUYER_INIT_INPUT } from '@gyblos/buyer/constants';
 import { DEVNET_USDC, FREE_OUTPUT_TOKENS } from '@gyblos/config';
 import { MILLISECONDS_PER_MINUTE } from '@gyblos/config/constants';
 import {
@@ -25,8 +26,6 @@ import {
 import { atomicToUsdc } from '@gyblos/node/node-config';
 import { setupRole } from '@gyblos/node/roles';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
-
-import { BUYER_INIT_FLAGS, BUYER_INIT_INPUT } from './constants';
 
 export interface BuyerInitTerminal {
   preflight(): Promise<{ path: string; exists: boolean }>;

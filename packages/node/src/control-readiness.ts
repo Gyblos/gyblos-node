@@ -1,5 +1,4 @@
 // Owns cached seller readiness, actual inference activity and bounded background renewal.
-// Control queries only read snapshots; checks never authorize payments or renew the legacy offer.
 import { SELLER_READINESS } from '@gyblos/config';
 import type { QuoteReadiness } from '@gyblos/core/control-quotes';
 import { controlInteger } from '@gyblos/protocol/control-validation';

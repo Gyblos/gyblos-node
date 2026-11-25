@@ -18,7 +18,10 @@ import {
 } from './paypal-model';
 import { prefersLightTheme, themeStyle } from './theme';
 import { Activity } from './ui/Activity';
-import { announcedModels } from './ui/announced-models';
+import {
+  announcedModels,
+  automaticOffersAvailable,
+} from './ui/announced-models';
 import { Applications } from './ui/Applications';
 import { AddBuyerFunds } from './ui/BuyerFunding';
 import { BuyerSidebar } from './ui/BuyerSidebar';
@@ -36,6 +39,7 @@ import {
   UI_VIEW,
   WORKSPACE_BREAKPOINT,
 } from './ui/constants';
+import { ConversationDetails } from './ui/ConversationDetails';
 import { authorizeDemo, DEMO_ACCOUNT, DEMO_AUTH } from './ui/demo-account';
 import { DesignSystem } from './ui/DesignSystem';
 import { FormField, FormInput } from './ui/Form';
@@ -68,7 +72,7 @@ import { Settings } from './ui/Settings';
 import { SystemStatus } from './ui/SystemStatus';
 import type { ToolId } from './ui/tools';
 import { Button, IconButton } from './ui/UI';
-import { UpdateNotice } from './ui/UpdateNotice';
+import { UpdateNotice, useDesktopUpdate } from './ui/UpdateNotice';
 import { UsdcApiKeys } from './ui/UsdcApiKeys';
 import { useActivity } from './ui/useActivity';
 import { useChatArchive } from './ui/useChatArchive';
@@ -114,6 +118,8 @@ export function DesktopApp() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => window.innerWidth < WORKSPACE_BREAKPOINT.SIDEBAR,
   );
+  const update = useDesktopUpdate();
+  const [updateOpen, setUpdateOpen] = useState(false);
   const [contextOpen, setContextOpen] = useState(false);
   const [managePaypal, setManagePaypal] = useState(false);
   const [sidebarMoving, setSidebarMoving] = useState(false);
@@ -189,6 +195,16 @@ export function DesktopApp() {
   const found = announcedModels(announcements.searchResult, now);
   const ids = new Set(networkModels.map((item) => item.id));
   networkModels.push(...found.filter((item) => !ids.has(item.id)));
+  const autoModels =
+    x402.state.policy?.autoRoutes
+      ?.map((route) => route.modelId)
+      .filter((name) =>
+        automaticOffersAvailable(
+          name,
+          networkModels,
+          !!x402.state.policy?.paidAuto && x402.state.policy.maxAtomic !== '0',
+        ),
+      ) ?? [];
   const chatModels = [MODELS[0], ...networkModels, ...MODELS.slice(1)];
   // Transport readiness and spending permission are independently enforced by each real coordinator.
   const online = true;
@@ -280,16 +296,16 @@ export function DesktopApp() {
       name === MODEL_IDS.QWEN3_0_6B &&
       policy.paidAuto &&
       policy.maxAtomic !== '0';
+    if (!automaticOffersAvailable(name, offers, !!paid)) {
+      setToast(
+        name === MODEL_IDS.QWEN3_0_6B
+          ? 'Only paid offers are listed. Enable paid Auto in Payments.'
+          : 'No free offers are listed for this model.',
+      );
+      if (name === MODEL_IDS.QWEN3_0_6B) navigate(UI_VIEW.PAYMENTS);
+      return;
+    }
     if (!offers.some((item) => item.free)) {
-      if (!paid) {
-        setToast(
-          name === MODEL_IDS.QWEN3_0_6B
-            ? 'Only paid offers are listed. Enable paid Auto in Payments.'
-            : 'No free offers are listed for this model.',
-        );
-        if (name === MODEL_IDS.QWEN3_0_6B) navigate(UI_VIEW.PAYMENTS);
-        return;
-      }
       setToast('Checking channel funds…');
       const funding = await Promise.all(
         offers.map(async (item) =>
@@ -398,7 +414,9 @@ export function DesktopApp() {
       }
     >
       <WindowTitlebar
+        notify={setToast}
         route={route}
+        onNewChat={() => chatRef.current?.newChat()}
         chat={chatController}
         collapsed={sidebarCollapsed}
         contextOpen={contextOpen}
@@ -426,16 +444,8 @@ export function DesktopApp() {
               </span>
             </Button>
           )}
-        <UpdateNotice />
       </WindowTitlebar>
       <BuyerSidebar
-        systemStatus={
-          <SystemStatus
-            state={network.state}
-            onRetry={network.retry}
-            onPayments={() => navigate(UI_VIEW.PAYMENTS)}
-          />
-        }
         view={view}
         collapsed={sidebarCollapsed}
         chat={chatController}
@@ -458,6 +468,17 @@ export function DesktopApp() {
           chat={view === UI_VIEW.CHAT}
           split={view === UI_VIEW.CONNECT}
         >
+          {view === UI_VIEW.CHAT && contextOpen && (
+            <ConversationDetails
+              chat={chatController}
+              close={() => {
+                setContextOpen(false);
+                requestAnimationFrame(() =>
+                  document.getElementById('chat-details-toggle')?.focus(),
+                );
+              }}
+            />
+          )}
           <div className="chat-root" hidden={view !== UI_VIEW.CHAT}>
             <Chat
               ref={chatRef}
@@ -480,10 +501,12 @@ export function DesktopApp() {
               online={online}
               onAuthorize={authorizeChatRequest}
               connectedTools={connectedTools}
+              onConnections={() => navigate(UI_VIEW.CONNECT)}
               onBrowseApplications={() => navigate(UI_VIEW.TOOLS)}
               models={chatModels}
               confirmedPolicy={confirmedPolicy}
               onDefaultModel={() => setModel(MODELS[0])}
+              autoModels={autoModels}
               onAutoModel={(name) => void chooseAuto(name)}
               onSelectModel={(id) => {
                 const next = chatModels.find((item) => item.id === id);
@@ -504,10 +527,7 @@ export function DesktopApp() {
               networkModels={networkModels}
               auto={
                 x402.state.policy && {
-                  buyerModels:
-                    x402.state.policy.autoRoutes?.map(
-                      (route) => route.modelId,
-                    ) ?? [],
+                  buyerModels: autoModels,
                   paid: !!x402.state.policy.paidAuto,
                   selected: !!model.automatic,
                   choose: (name) => void chooseAuto(name),
@@ -540,8 +560,31 @@ export function DesktopApp() {
               />
             )}
           {view === UI_VIEW.TOOLS && <Applications />}
-          {view === UI_VIEW.PAYMENTS && (
+          {(view === UI_VIEW.PAYMENTS || view === UI_VIEW.ACTIVITY) && (
             <Payments
+              key={view}
+              initialTab={view === UI_VIEW.ACTIVITY ? 'activity' : undefined}
+              usage={
+                <Activity
+                  x402={x402}
+                  activity={activity}
+                  chat={chatController}
+                  selectedSession={activitySession}
+                  onSelectSession={setActivitySession}
+                  onPayments={() => {
+                    reviewPaypalPayments();
+                  }}
+                  onOpenChat={(id) => {
+                    chatRef.current?.openChat(id);
+                    navigate(UI_VIEW.CHAT);
+                  }}
+                />
+              }
+              chat={chatController}
+              onOpenChat={(id) => {
+                chatRef.current?.openChat(id);
+                navigate(UI_VIEW.CHAT);
+              }}
               x402={x402}
               session={paypal}
               activity={activity}
@@ -565,24 +608,25 @@ export function DesktopApp() {
               version={manifest.version}
             />
           )}
-          {view === UI_VIEW.ACTIVITY && (
-            <Activity
-              x402={x402}
-              activity={activity}
-              chat={chatController}
-              selectedSession={activitySession}
-              onSelectSession={setActivitySession}
-              onPayments={() => {
-                reviewPaypalPayments();
-              }}
-              onOpenChat={(id) => {
-                chatController.openChat(id);
-                navigate(UI_VIEW.CHAT);
-              }}
-            />
-          )}
         </PageBody>
       </div>
+      <footer className="preview-status-bar" aria-label="App status">
+        <SystemStatus
+          update={update}
+          onUpdate={() => setUpdateOpen(true)}
+          state={network.state}
+          onRetry={network.retry}
+          onPayments={() => navigate(UI_VIEW.PAYMENTS)}
+        />
+        <span className="preview-status-end">
+          <UpdateNotice
+            update={update}
+            open={updateOpen}
+            setOpen={setUpdateOpen}
+          />
+          <span className="preview-version">Gyblos {manifest.version}</span>
+        </span>
+      </footer>
       <MotionPresence>
         {modal === UI_DIALOG.DESIGN_SYSTEM && (
           <Modal
@@ -596,7 +640,7 @@ export function DesktopApp() {
       </MotionPresence>
       <MotionPresence>
         {modal === UI_DIALOG.ADD_FUNDS && (
-          <Modal title="Add funds" close={() => setModal(null)}>
+          <Modal title="Add funds · Testnet" close={() => setModal(null)}>
             <AddBuyerFunds payer={x402.state.policy?.payer} />
           </Modal>
         )}

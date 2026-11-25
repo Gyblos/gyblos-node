@@ -6,8 +6,8 @@ import { rm, stat } from 'node:fs/promises';
 import test from 'node:test';
 import { promisify } from 'node:util';
 
-import { chatSession } from '@gyblos/buyer/chat-cli';
-import { runBuyerInit } from '@gyblos/buyer/init';
+import { chatSession } from '@gyblos/buyer-app/chat-cli';
+import { runBuyerInit } from '@gyblos/buyer-app/init';
 import {
   buildBuyerInit,
   buyerInitDefaults,

@@ -40,6 +40,7 @@ layer of each package comes from `tooling/boundaries/config.ts`.
 | `packages/telemetry-otel`    | adapter    | Bounded aggregate metrics through an injected OpenTelemetry exporter. Not composed by the node ([telemetry.md](telemetry.md#opentelemetry-adapter)).                                                           |
 | `packages/telemetry-console` | adapter    | Content-free telemetry through an injected write callback.                                                                                                                                                     |
 | `packages/node`              | node       | The local-node library for both roles. It composes adapters into the seller (offers, free and paid channels, sessions, control, receipts, registration) and the buyer runtime, and owns `config.toml` parsing. |
+| `packages/buyer`             | buyer      | Buyer orchestration over node: selection, discovery, routing, payment sessions, the buyer endpoint and buyer API keys. Imports no app.                                                                         |
 
 The local `@x402/svm` patch that `x402-upto-metered` relies on is described next
 to its entry in `pnpm-workspace.yaml`.
@@ -51,7 +52,7 @@ Apps are independent executables. They never import each other.
 | App                      | Run with                                           | Responsibility                                                                                                                                                                                                                                                                                                                                                                                                                |
 | ------------------------ | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `apps/node`              | `pnpm gyblos <command>`, `pnpm node:start`         | The seller daemon and the `gyblos` CLI (`start`, `doctor`, `logs`, `config validate`, `seller init/status/register/service`). Installs a systemd, launchd or Windows service.                                                                                                                                                                                                                                                 |
-| `apps/buyer`             | `pnpm buyer`, `pnpm buyer:chat`, `pnpm buyer:init` | The local buyer and its buyer endpoint: seller selection, offer race, free and paid calls, payment sessions, reconciliation and withdrawal ([buyer-init.md](buyer-init.md)).                                                                                                                                                                                                                                                  |
+| `apps/buyer`             | `pnpm buyer`, `pnpm buyer:chat`, `pnpm buyer:init` | The buyer executable over `packages/buyer`, which owns the buyer endpoint: seller selection, offer race, free and paid calls, payment sessions, reconciliation and withdrawal ([buyer-init.md](buyer-init.md)).                                                                                                                                                                                                               |
 | `apps/desktop`           | `pnpm desktop:start`, `pnpm desktop:package`       | The desktop app (Electron): Chat, wallet, buyer API keys, activity and payments over a separately bundled local buyer ([desktop.md](desktop.md)).                                                                                                                                                                                                                                                                             |
 | `apps/discovery-index`   | Cloudflare Worker                                  | The discovery index at `discovery.gyblos.com` (Hono, D1). Verifies records only through protocol ([discovery-index.md](discovery-index.md)).                                                                                                                                                                                                                                                                                  |
 | `apps/metrics-collector` | Cloudflare Worker                                  | The metrics collector at `collector.gyblos.com` (Hono, D1): receives signed receipts and observations, builds aggregates and serves public stats ([metrics-collector.md](metrics-collector.md)).                                                                                                                                                                                                                              |
@@ -105,7 +106,7 @@ generated code behind it.
 
 ```text
 buyer machine                                  seller machine
-apps/buyer (buyer endpoint, loopback) ── Iroh ──▶ apps/node → packages/node seller
+packages/buyer (endpoint, loopback)   ── Iroh ──▶ apps/node → packages/node seller
   or apps/desktop (bundled local buyer)  direct     ├─ control, free, paid and session channels (Iroh ALPNs)
                                          or relay   └─ the seller's own engine: Ollama, an OpenAI-compatible
                                                        server or the Anthropic API (from config.toml)
@@ -180,17 +181,18 @@ by weighted sampling:
 - A pinned seller skips sampling, never the filters. A pinned seller in cooldown
   is refused with its cooldown end.
 
-The buyer app composes it: `apps/buyer/src/selection*.ts` builds the inputs and
-persists stats, and `offer-race.ts` asks the candidates for live offers. The
-operator view is in [payment-sessions.md](payment-sessions.md#buyer-routing).
+The buyer package composes it: `packages/buyer/src/selection*.ts` builds the
+inputs and persists stats, and `offer-race.ts` asks the candidates for live
+offers. The operator view is in
+[payment-sessions.md](payment-sessions.md#buyer-routing).
 
 ## Reusable payment session composition
 
 A reusable payment session is one capped, buyer-authorized deposit that pays for
 many requests through post-usage cumulative signatures, with autonomous seller
 finalization. The seller composes it at startup when paid selling is configured
-(`packages/node/src/seller.ts`); the buyer app activates its session manager
-from explicit buyer policy (`apps/buyer/src/session-startup.ts`).
+(`packages/node/src/seller.ts`); the buyer package activates its session manager
+from explicit buyer policy (`packages/buyer/src/session-startup.ts`).
 
 | Concern                        | Owner                                                                  |
 | ------------------------------ | ---------------------------------------------------------------------- |

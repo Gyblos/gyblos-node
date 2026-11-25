@@ -189,6 +189,7 @@ export const observations = sqliteTable(
 
 // Aggregate tables (#351), recomputed from the raw tables above.
 export {
+  aggDays,
   aggDemandDaily,
   aggDirtyDays,
   aggNetworkDaily,

@@ -22,7 +22,8 @@ The app is experimental and runs on Solana devnet. Its packages are unsigned.
 | Payments     | The local buyer and Chat budget, the protected wallet and its backup, and the PayPal Sandbox summary |
 | Settings     | Appearance, the design-system preview and version information                                        |
 
-A notice appears in the title bar when a newer release exists
+The status bar shows **Update to** when a newer release exists. Open the notice,
+then choose **Open download page** to view the release on GitHub
 ([Network contact](#network-contact)).
 
 ## Run locally

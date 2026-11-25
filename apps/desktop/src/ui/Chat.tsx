@@ -31,6 +31,7 @@ import {
   type PaymentMethod,
 } from '../paypal-model';
 import {
+  buyerBalanceStatus,
   chatBudgetReady,
   paidSellerLimitNotice,
   X402_ACTION,
@@ -46,6 +47,8 @@ import { ChatAnswer } from './ChatAnswer';
 import { ChatComposer } from './ChatComposer';
 import { ToolsDropdown } from './ChatTools';
 import { ChatUserMessage } from './ChatUserMessage';
+import { ComposerFunding } from './ComposerFunding';
+import { ConnectEntry } from './ConnectEntry';
 import {
   BUTTON_VARIANT,
   CHAT_PREVIEW,
@@ -71,6 +74,7 @@ import {
   SearchField,
 } from './UI';
 import type { ActivityView } from './useActivity';
+import { useBuyerFunding } from './useBuyerFunding';
 import { chatArchiveLabel } from './useChatArchive';
 import type { PaypalSessionView } from './usePaypalSession';
 
@@ -92,11 +96,13 @@ type Props = {
   active?: boolean;
   showToolbar?: boolean;
   connectedTools: ToolId[];
+  onConnections(): void;
   onBrowseApplications: () => void;
   models: readonly ModelOption[];
   onSelectModel: (id: string) => void;
   confirmedPolicy?: string;
   onDefaultModel?: () => void;
+  autoModels?: readonly string[];
   onAutoModel?: (name: string) => void;
   onBrowseModels: () => void;
   onReviewPaypal: () => void;
@@ -152,11 +158,13 @@ export function Chat({
   online,
   active = true,
   connectedTools,
+  onConnections,
   onBrowseApplications,
   models,
   onSelectModel,
   confirmedPolicy,
   onDefaultModel,
+  autoModels,
   onAutoModel,
   onBrowseModels,
   onReviewPaypal,
@@ -182,6 +190,17 @@ export function Chat({
   const [reasoning, setReasoning] = useState<ReasoningSelection | null>(null);
   const usingPaypal = paymentMethod === PAYMENT_METHOD.PAYPAL;
   const usingX402 = !usingPaypal && !!x402;
+  const payer = x402?.state.policy?.payer;
+  const { funding, loading, refresh } = useBuyerFunding(
+    payer,
+    model.offerId,
+    active && usingX402 && !!payer,
+  );
+  const balanceStatus = buyerBalanceStatus(
+    payer ? loading : !!x402?.busy,
+    x402?.state,
+    !!payer,
+  );
   const freeOnly =
     model.source === MODEL_SOURCE.ANNOUNCED &&
     model.free &&
@@ -326,6 +345,12 @@ export function Chat({
         : '0';
     composerOrigin.current = composer.current?.getBoundingClientRect() ?? null;
   }
+  useEffect(() => {
+    setSelectedTools([]);
+    setAllowedTools([]);
+    setPendingSend(null);
+    setDetails(null);
+  }, [activeId]);
   function reset(text = '') {
     if (loadingHistory) return;
     captureComposer();
@@ -552,7 +577,8 @@ export function Chat({
     .reverse();
   return (
     <main className="chat-page enhanced-chat">
-      {storageState === CHAT_STORAGE_STATE.UNAVAILABLE && (
+      {(storageState === CHAT_STORAGE_STATE.UNAVAILABLE ||
+        storageState === CHAT_STORAGE_STATE.PINS_UNAVAILABLE) && (
         <Note>{chatArchiveLabel(storageState)}</Note>
       )}
       {usingPaypal && notice && (
@@ -606,6 +632,7 @@ export function Chat({
               />
               <h2>Start a conversation</h2>
               <p>Choose how to pay. Keep the conversation.</p>
+              <ConnectEntry open={onConnections} />
             </div>
           ) : (
             <div
@@ -656,7 +683,7 @@ export function Chat({
                   {answer && (
                     <ChatAnswer
                       message={answer}
-                      run={run}
+                      run={session.run}
                       copied={copied === answer.id}
                       canReuse={
                         answer === session.messages.at(-1) && !!lastUser
@@ -706,6 +733,13 @@ export function Chat({
               Connection paused. Your conversation and draft are kept.
             </p>
           )}
+          {active && usingX402 && x402 && (
+            <ComposerFunding
+              buyer={x402}
+              funding={funding}
+              balanceStatus={balanceStatus}
+            />
+          )}
           <ChatComposer
             disabled={loadingHistory}
             ref={composer}
@@ -739,16 +773,16 @@ export function Chat({
                 auto={
                   usingX402 && x402?.state.policy && onAutoModel
                     ? {
-                        buyerModels:
-                          x402.state.policy.autoRoutes?.map(
-                            (route) => route.modelId,
-                          ) ?? [],
+                        buyerModels: autoModels ?? [],
                         paid: !!x402.state.policy.paidAuto,
                         choose: onAutoModel,
                       }
                     : undefined
                 }
                 networkOnly={usingX402}
+                funding={funding}
+                balanceStatus={balanceStatus}
+                refreshFunding={usingX402 && payer ? refresh : undefined}
                 showBrowse={!usingPaypal}
                 contextLabel={
                   usingPaypal ? 'Local model · PayPal Sandbox' : undefined

@@ -24,8 +24,10 @@ they disagree, `AGENTS.md` and `tooling/boundaries/config.ts` win.
    core, config, runtime and its SDK; never another adapter, `node` or apps.
 4. Composes adapters into a running local node for either role (lifecycle,
    roles/keys, seller free channels, control startup)? -> `packages/node`.
+   Buyer orchestration (selection, discovery, routing, payment sessions, the
+   buyer endpoint, buyer API keys)? -> `packages/buyer`.
 5. A process the user starts or deploys (CLI flags, proxy, reconcile, Electron,
-   a Worker)? -> `apps/node`, `apps/buyer`, `apps/desktop` or
+   a Worker)? -> `apps/node`, `apps/buyer` (arguments and process lifecycle only), `apps/desktop` or
    `apps/discovery-index`. Apps never import each other; shared logic moves down
    to `packages/node` or core.
 6. Operator-changeable value (port, limit, timeout, relay, index URL) or a local
@@ -42,7 +44,7 @@ they disagree, `AGENTS.md` and `tooling/boundaries/config.ts` win.
 Splitting by concern inside a package uses a filename prefix, as in
 `packages/protocol/src/control-*.ts`, `packages/core/src/seller-selection-*.ts`,
 `packages/transport-iroh/src/control-{client,server,io}.ts` and
-`apps/buyer/src/selection-*.ts`.
+`packages/buyer/src/selection-*.ts`.
 
 ## 2. Worked examples from the tree
 
@@ -56,7 +58,7 @@ Splitting by concern inside a package uses a filename prefix, as in
 | seller control startup/readiness            | `packages/node/src/control-*.ts`                                | composes transport + core                                  |
 | seller engine plugin (refuse, create)       | `packages/node/src/engine-registry-<kind>.ts`                   | implements `engine-factory`; register in `engine-registry` |
 | seller daemon composition                   | `packages/node/src/seller.ts`                                   | free offer only; paid selling off until phase 2            |
-| buyer selection proxy, offer race           | `apps/buyer/src/selection-proxy.ts`, `offer-race.ts`            | executable wiring                                          |
+| buyer selection, offer race                 | `packages/buyer/src/selection.ts`, `offer-race.ts`              | buyer orchestration; `apps/buyer` only parses arguments    |
 | discovery index client                      | `packages/discovery-http`                                       | HTTP adapter; index defaults in `config`                   |
 | discovery index server (Worker)             | `apps/discovery-index`                                          | deployable app; verification via protocol only             |
 | `GYBLOS_HOME` / `GYBLOS_LAB_HOME` layout    | `packages/config/src/home.ts`                                   | single path owner                                          |

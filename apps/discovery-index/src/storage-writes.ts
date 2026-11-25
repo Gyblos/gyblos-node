@@ -29,6 +29,7 @@ import {
   valueField,
 } from './sqlite-expressions';
 import type { StoredEntry } from './storage';
+import { historyQueries } from './storage-history';
 import { withdrawnCatalog } from './storage-queries';
 
 function currentReference(database: DiscoveryDatabase, entry: StoredEntry) {
@@ -217,6 +218,7 @@ export function recordQueries(database: DiscoveryDatabase, entry: StoredEntry) {
         .select(source)
         .onConflictDoUpdate({ target: withdrawals.nodeId, set: fields }),
       clearPresence,
+      ...historyQueries(database, entry, won),
     ];
   return [
     database
@@ -246,5 +248,6 @@ export function recordQueries(database: DiscoveryDatabase, entry: StoredEntry) {
       ),
     ...catalogModelQueries(database, entry),
     clearPresence,
+    ...historyQueries(database, entry, won),
   ];
 }

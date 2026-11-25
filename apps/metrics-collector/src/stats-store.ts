@@ -9,6 +9,7 @@ import type {
 } from './schema-aggregates';
 import type { aggFailuresDaily, aggOriginDaily } from './schema-breakdowns';
 import type { aggChainDaily } from './schema-chain';
+import type { CoverageRows } from './stats-coverage';
 
 // Summed receipt totals of grouped rows, with the newest computation time and the formula versions
 // they were computed with.
@@ -75,6 +76,7 @@ export interface StatsReader {
     range: DayRange,
     today: string,
   ): Promise<{
+    coverage: CoverageRows;
     network: NetworkRow[];
     observed: ObservedRow[];
     demand: DemandRow[];

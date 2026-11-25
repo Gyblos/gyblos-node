@@ -13,6 +13,7 @@ import {
   type PaypalAgentResult,
 } from '../paypal-agent-model';
 import type { PaypalResult } from '../paypal-model';
+import { CodeBlock } from './CodeBlock';
 import {
   BUTTON_VARIANT,
   CONNECTION_PRESET,
@@ -34,7 +35,7 @@ type SetupProps = {
   run: (action: PaypalAgentAction, limitCents?: number) => Promise<void>;
   sessionStatus: PaypalResult['status'];
   sessionFresh: boolean;
-  copy: (target: PaypalAgentCopyTarget, label: string) => Promise<void>;
+  copy: (target: PaypalAgentCopyTarget, label: string) => Promise<boolean>;
   onlyConnected: boolean;
   sessionReady: boolean;
   onPayments: () => void;
@@ -292,27 +293,24 @@ export function ConnectionGuide({
         {preset === CONNECTION_PRESET.GENERIC ? (
           <>
             <p className="ui-help-text">
-              Set your app's base URL, API key and model using your connection
-              details. Text and supported tool calls use Chat Completions.
+              Point any OpenAI-compatible client at this base URL and key. Text
+              and supported tool calls use Chat Completions.
             </p>
             {connection && (
-              <pre className="ui-code-block">
-                {paypalAgentExample(connection)}
-              </pre>
+              <CodeBlock
+                language="shell"
+                title="Example request"
+                code={paypalAgentExample(connection)}
+                copyDisabled={disabled}
+                onCopy={() =>
+                  copy(PAYPAL_AGENT_COPY.EXAMPLE, 'Example request')
+                }
+              />
             )}
             <p className="ui-help-text">
               Set GYBLOS_API_KEY privately in your terminal before running the
-              example. Running a request can consume the shared session limit.
+              example.
             </p>
-            <Button
-              variant={BUTTON_VARIANT.PRIMARY}
-              disabled={disabled}
-              onClick={() => {
-                void copy(PAYPAL_AGENT_COPY.EXAMPLE, 'Example request');
-              }}
-            >
-              Copy example request
-            </Button>
           </>
         ) : (
           <>

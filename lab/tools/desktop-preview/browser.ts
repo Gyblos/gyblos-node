@@ -26,6 +26,8 @@ export function startPreview(examples: AgentExamples) {
   document.title = PREVIEW.title;
   const query = new URLSearchParams(location.search);
   const compact = query.get('density') !== PREVIEW_DENSITY.COMFORTABLE;
+  delete document.documentElement.dataset.font;
+  delete document.documentElement.dataset.density;
   if (compact)
     document.documentElement.dataset.density = PREVIEW_DENSITY.COMPACT;
   if (query.get('font') === 'inter' || (compact && !query.has('font')))

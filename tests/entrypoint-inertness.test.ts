@@ -88,9 +88,9 @@ void test('all executable modules are inert when imported', async (context) => {
     await import('@gyblos/node/telemetry-startup');
     await import('@gyblos/telemetry-console');
     await import('@gyblos/telemetry-otel');
-    await import('@gyblos/buyer/setup');
-    await import('@gyblos/buyer/init');
-    await import('@gyblos/buyer/entry');
+    await import('@gyblos/buyer-app/setup');
+    await import('@gyblos/buyer-app/init');
+    await import('@gyblos/buyer-app/entry');
     await import('@gyblos/node-app/cli');
     await import('@gyblos/desktop/wallet-restore');
     await import('@gyblos/discovery-index/worker');
@@ -114,8 +114,8 @@ void test('all executable modules are inert when imported', async (context) => {
       async () => {
         await import('@gyblos/node-app/daemon');
         await import('@gyblos/node-app/setup');
-        await import('@gyblos/buyer/free-main');
-        await import('@gyblos/buyer/chat-cli');
+        await import('@gyblos/buyer-app/free-main');
+        await import('@gyblos/buyer-app/chat-cli');
         await import('@gyblos/buyer/chat-cli-turn');
         await import('@gyblos/buyer/free-startup');
         await import('@gyblos/inference');

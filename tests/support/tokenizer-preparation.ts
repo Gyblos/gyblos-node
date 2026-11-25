@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { homeLayout } from '@gyblos/config';
 
 const PRODUCT_ENTRIES = {
-  buyer: '@gyblos/buyer/setup',
+  buyer: '@gyblos/buyer-app/setup',
   desktop: '@gyblos/node/artifacts',
   node: '@gyblos/node-app/tokenizer',
 } as const;
