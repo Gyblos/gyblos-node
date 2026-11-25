@@ -5,11 +5,22 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 import {
+  CHALLENGE_SET,
+  challengeSetDigest,
+} from '@gyblos/model-verifier/challenge-set';
+import {
   MODEL_VERIFIER_CODES,
   ModelVerifierError,
 } from '@gyblos/model-verifier/constants';
 import { loadVerifierKey } from '@gyblos/model-verifier/key';
+import { main } from '@gyblos/model-verifier/main';
 import { parseSellerTarget } from '@gyblos/model-verifier/seller';
+import {
+  MODEL_VERIFICATION,
+  modelVerificationFailAt,
+  modelVerificationVerdict,
+  signModelVerification,
+} from '@gyblos/protocol/model-verification';
 
 const TARGET = {
   owner: '2nc4a8RxZMdWMMyBxAeKcT22HpAs5c3zgSTXnvYZ2L9S',
@@ -69,3 +80,88 @@ void test('the verifier key is created once, private, and refused when missing o
     }
   });
 });
+
+const { prompts, rule } = CHALLENGE_SET;
+const evidenceCases = [
+  [
+    'accepts counts at both published limits',
+    prompts.length,
+    0,
+    rule.checksPerAnswer,
+    0,
+  ],
+  ['rejects one check above the full maximum', prompts.length, 1, 0, 1],
+  [
+    'rejects one check above the maximum for the answered prompts',
+    prompts.length - 1,
+    1,
+    0,
+    1,
+  ],
+  [
+    'rejects one deviation above the maximum for one deviant answer',
+    prompts.length,
+    0,
+    rule.checksPerAnswer + 1,
+    1,
+  ],
+] as const;
+
+for (const [
+  name,
+  answers,
+  extraChecks,
+  deviations,
+  exitCode,
+] of evidenceCases) {
+  void test(`check ${name}`, async () => {
+    await withHome(async (home) => {
+      const key = await loadVerifierKey(join(home, 'verifier.key'), true);
+      const digest = 'cd'.repeat(32);
+      const { minimumChecks, honestRatePpm, falsePositivePpm } = rule;
+      const evidence = {
+        prompts: prompts.length,
+        answers,
+        checks: answers * rule.checksPerAnswer + extraChecks,
+        deviations,
+        deviantAnswers: deviations > 0 ? 1 : 0,
+        minimumChecks,
+        honestRatePpm,
+        falsePositivePpm,
+        failAt: modelVerificationFailAt(
+          answers,
+          honestRatePpm,
+          falsePositivePpm,
+        ),
+        nonce: 'ab'.repeat(MODEL_VERIFICATION.nonceBytes),
+        answerDigests: Array.from({ length: answers }, () => digest),
+      };
+      const { id, version } = CHALLENGE_SET;
+      const signed = await signModelVerification(
+        {
+          schemaVersion: MODEL_VERIFICATION.schemaVersion,
+          verifier: key.address,
+          seller: { owner: TARGET.owner, nodeId: TARGET.nodeId },
+          selection: {
+            modelId: 'qwen3-1.7b',
+            variant: null,
+            quantization: null,
+          },
+          challengeSet: {
+            id,
+            version,
+            digest: challengeSetDigest(CHALLENGE_SET),
+          },
+          reference: { model: 'qwen3:1.7b', digest },
+          evidence,
+          verdict: modelVerificationVerdict(evidence),
+          issuedAt: 1_800_000_000_000,
+        },
+        key.sign,
+      );
+      const resultFile = join(home, 'result.json');
+      await writeFile(resultFile, JSON.stringify(signed));
+      assert.equal(await main(['check', resultFile]), exitCode);
+    });
+  });
+}
