@@ -65,7 +65,7 @@ function CatalogRows({
                 <InputPriceRange offers={rows} selected={selectedId} />
               </span>
               <span className="preview-model-mode">
-                {selected ? (automatic ? 'Auto' : 'Selected') : '—'}
+                {selected ? (automatic ? 'Auto' : 'Selected') : ''}
               </span>
               <span className="ui-price">
                 <strong>{groupPrice(rows)}</strong>
@@ -112,7 +112,9 @@ export function CatalogOffers(
           options={options.sorts}
           onChange={options.setSort}
         />
-        <small className="ui-help-text">{groups.size} models</small>
+        <small className="ui-help-text">
+          {groups.size === 1 ? '1 model' : groups.size + ' models'}
+        </small>
       </div>
       <List label="Model catalog">
         {!groups.size && (

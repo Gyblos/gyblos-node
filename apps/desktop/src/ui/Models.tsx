@@ -1,6 +1,8 @@
 // Uses the approved compact catalog layout with the existing selection and network policies.
+import { Globe } from '@phosphor-icons/react';
 import { useState } from 'react';
 
+import { ActionButton } from './ActionButton';
 import { matchesCatalog, type ModelFilter } from './catalog-state';
 import { CatalogOffers } from './CatalogOffers';
 import { MODEL_FILTER, MODELS } from './constants';
@@ -10,15 +12,7 @@ import { priceRange } from './model-price';
 import type { CatalogModel } from './model-types';
 import { ModelImage } from './ModelImage';
 import { NetworkCatalogPanel, useNetworkCatalog } from './NetworkCatalog';
-import {
-  Badge,
-  Button,
-  List,
-  ListRow,
-  PagePanel,
-  RowCopy,
-  SearchField,
-} from './UI';
+import { Badge, List, ListRow, PagePanel, RowCopy, SearchField } from './UI';
 
 type ModelsProps = {
   networkModels: readonly CatalogModel[];
@@ -61,7 +55,11 @@ export function Models({
           onValueChange={setQuery}
         />
         <CatalogFilter filter={filter} change={setFilter} />
-        <Button onClick={() => setNetwork(true)}>Find network models</Button>
+        <ActionButton
+          icon={<Globe size={16} />}
+          label="Find network models"
+          onClick={() => setNetwork(true)}
+        />
         {!canSelect && <Badge>Preview</Badge>}
       </div>
       {canSelect ? (

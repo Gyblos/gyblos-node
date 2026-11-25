@@ -1685,6 +1685,14 @@ html .app.desktop-frame .content .preview-model-summary {
   gap: 4px;
   min-width: 0;
 }
+.desktop-frame .preview-model-mode:not(:empty) {
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
 .desktop-frame .preview-model-stats small {
   color: var(--muted);
   font-size: 11px;
@@ -2751,6 +2759,17 @@ html[data-density='compact']
   padding-block: 3px;
   font-size: var(--ui-font);
 }
+@container (max-width: 620px) {
+  html[data-density='compact']
+    .app.desktop-frame
+    .content
+    .ui-table-region
+    .ui-data-table
+    :is(th, td) {
+    height: auto;
+    padding-block: 0;
+  }
+}
 html[data-density='compact']
   .app.desktop-frame
   .content
@@ -2953,6 +2972,33 @@ html[data-density='compact']
   min-height: var(--control-size);
   padding-inline: 10px;
   font-size: var(--ui-detail);
+}
+html .app.desktop-frame .ui-button.ui-action-button + .ui-tooltip {
+  display: none;
+}
+@container (max-width: 600px) {
+  html
+    .app.desktop-frame
+    .content
+    .ui-button.ui-action-button:not(dialog .ui-button),
+  html .app.desktop-frame dialog .ui-button.ui-action-button {
+    --control-size: inherit;
+    width: var(--control-size);
+    min-width: var(--control-size);
+    padding: 0;
+    justify-content: center;
+  }
+  html .app.desktop-frame .ui-action-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  html .app.desktop-frame .ui-button.ui-action-button + .ui-tooltip {
+    display: block;
+  }
 }
 html[data-density='compact']
   .app.desktop-frame
