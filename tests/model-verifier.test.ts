@@ -13,6 +13,7 @@ import { loadVerifierKey } from '@gyblos/model-verifier/key';
 import { main } from '@gyblos/model-verifier/main';
 import { openReference } from '@gyblos/model-verifier/reference';
 import { runVerification } from '@gyblos/model-verifier/verify';
+import { FREE_EXECUTION_CODES } from '@gyblos/protocol/constants';
 import {
   MODEL_VERIFICATION_VERDICTS,
   signModelVerification,
@@ -125,7 +126,9 @@ void test('a seller that answers too little is inconclusive and failures keep on
     const outcome = await verifyWith(home, async () => {
       calls++;
       if (calls > 3)
-        throw Object.assign(new Error('secret seller text'), { code: 'BUSY' });
+        throw Object.assign(new Error('secret seller text'), {
+          code: FREE_EXECUTION_CODES.BUSY,
+        });
       return answer('word');
     });
     assert.equal(
@@ -133,7 +136,10 @@ void test('a seller that answers too little is inconclusive and failures keep on
       MODEL_VERIFICATION_VERDICTS.INCONCLUSIVE,
     );
     assert.equal(outcome.signed.result.evidence.answers, 3);
-    assert.deepEqual(new Set(outcome.failures), new Set(['BUSY']));
+    assert.deepEqual(
+      new Set(outcome.failures),
+      new Set([FREE_EXECUTION_CODES.BUSY]),
+    );
     const silent = await verifyWith(home, async () => {
       throw new Error('no code');
     });
@@ -161,12 +167,18 @@ void test('one unanswered prompt keeps a run from passing even with enough check
     let calls = 0;
     const outcome = await verifyWith(home, async () => {
       calls++;
-      if (calls === 1) throw Object.assign(new Error('x'), { code: 'BUSY' });
+      if (calls === 1)
+        throw Object.assign(new Error('PRIVATE_TRANSPORT_DETAIL'), {
+          code: FREE_EXECUTION_CODES.BUSY,
+        });
       return answer('word');
     });
     const { evidence, verdict } = outcome.signed.result;
     assert.ok(evidence.checks >= CHALLENGE_SET.rule.minimumChecks);
     assert.equal(verdict, MODEL_VERIFICATION_VERDICTS.INCONCLUSIVE);
+    assert.deepEqual(outcome.unscored, [
+      { challenge: 1, phase: 'execution', code: FREE_EXECUTION_CODES.BUSY },
+    ]);
   });
 });
 
