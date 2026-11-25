@@ -27,16 +27,12 @@ export function pagedRows<T>(
   return page;
 }
 
-export function Pager({
-  label,
-  view,
-}: {
-  label: string;
-  view: PagerView | null;
-}) {
-  if (!view) return null;
+export function Pager({ label, view }: { label: string; view: PagerView }) {
   return (
-    <div className="flex items-center justify-between gap-3 border-t border-separator-border px-4 py-1.5">
+    <div
+      data-query-control=""
+      className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-separator-border px-4 py-1.5"
+    >
       <span className="font-mono text-xs text-dim">{view.rows}</span>
       <Pagination
         aria-label={`${label} pages`}

@@ -1,6 +1,3 @@
-// Owns the D1 adapter of the stats read port: typed, set-based selects over aggregate tables only,
-// never raw rows. Each answer is one batch with a fixed number of statements for any day range;
-// histograms are summed in SQL and list sizes are capped in SQL with window functions.
 import {
   and,
   asc,
@@ -45,6 +42,8 @@ import {
 } from './schema-aggregates';
 import { distinctWhere, histogramSum, total } from './sql-primitives';
 import { coverageQueries, demandRequests } from './stats-coverage-read';
+import { firstPublicDay } from './stats-history';
+import { intradayRows } from './stats-intraday';
 import type { StatsReader } from './stats-store';
 
 type TotalsTable = typeof aggSellerDaily | typeof aggNetworkDaily;
@@ -310,6 +309,9 @@ function chain(orm: CollectorDatabase, range: DayRange) {
 export function statsReader(database: D1Database): StatsReader {
   const orm = createD1Orm(database);
   return {
+    intraday: (bounds) => intradayRows(orm, bounds),
+    firstDay: (resource, to, nodeId) =>
+      firstPublicDay(orm, resource, to, nodeId),
     async network(range, today) {
       const [
         networkRows,

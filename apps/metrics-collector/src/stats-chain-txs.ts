@@ -47,7 +47,17 @@ export interface PayoutSplit {
   channels: number;
   unclassified: string;
 }
+export interface NumberedChainTxPage {
+  page: number;
+  total: number;
+  rows: ChainTxRow[];
+}
+
 export interface ChainTxReader {
+  numberedTransactions(
+    query: ChainTxQuery,
+    page: number,
+  ): Promise<NumberedChainTxPage>;
   transactions(page: {
     before: ChainTxCursor | null;
     rows: number;
@@ -69,8 +79,11 @@ export interface ChainTxPage {
   treasury: string;
   transactions: ChainTx[];
   next: string | null;
+  total?: number;
+  page?: number;
 }
 export interface ChainTxQuery {
+  page?: number;
   before: ChainTxCursor | null;
   limit: number;
   recipient: string | null;
@@ -85,6 +98,7 @@ const PARAM_ORDER: readonly string[] = [
   PARAMS.BEFORE,
   PARAMS.LIMIT,
   PARAMS.RECIPIENT,
+  PARAMS.PAGE,
 ];
 
 export const cursorOf = (row: ChainTxCursor) =>
@@ -134,7 +148,10 @@ export function parseChainTxQuery(
   const recipient = parseRecipient(params.get(PARAMS.RECIPIENT));
   if (limit === undefined || before === undefined || recipient === undefined)
     return undefined;
-  return { before, limit, recipient };
+  const page = params.get(PARAMS.PAGE);
+  if (page === null) return { before, limit, recipient };
+  if (before || !/^[1-9]\d{0,5}$/.test(page)) return undefined;
+  return { before, limit, recipient, page: Number(page) };
 }
 
 function recipientOwners(json: string | null): string[] {
@@ -194,11 +211,17 @@ export async function chainTransactions(
   reader: ChainTxReader,
   query: ChainTxQuery,
 ): Promise<ChainTxPage> {
-  const rows = await reader.transactions({
-    before: query.before,
-    rows: query.limit + 1,
-    recipient: query.recipient,
-  });
+  const numbered =
+    query.page === undefined
+      ? undefined
+      : await reader.numberedTransactions(query, query.page);
+  const rows =
+    numbered?.rows ??
+    (await reader.transactions({
+      before: query.before,
+      rows: query.limit + 1,
+      recipient: query.recipient,
+    }));
   const page = rows.slice(0, query.limit);
   const last = page.at(-1);
   return {
@@ -206,6 +229,7 @@ export async function chainTransactions(
     programId: CHANNEL_PROGRAM,
     mint: DEVNET_USDC,
     treasury: DEVNET_GYBLOS_TREASURY,
+    ...(numbered && { total: numbered.total, page: numbered.page }),
     transactions: page.map(chainTx),
     next: rows.length > query.limit && last ? cursorOf(last) : null,
   };

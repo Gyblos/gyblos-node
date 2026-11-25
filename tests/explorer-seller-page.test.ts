@@ -5,12 +5,17 @@ import { parseSellerStats } from '@gyblos/explorer/collector-shape';
 import { DISPLAY, RANGE, SELLER_STATUS } from '@gyblos/explorer/constants';
 import type { DiscoverySnapshot, Seller } from '@gyblos/explorer/discovery';
 import {
+  pageOf,
   queryHref,
   readQuery,
   sectionRangeHref,
   txPager,
 } from '@gyblos/explorer/paging';
-import { pagePath, sellerNodeId } from '@gyblos/explorer/seller-page';
+import {
+  missingSellerHistory,
+  pagePath,
+  sellerNodeId,
+} from '@gyblos/explorer/seller-page';
 import {
   SELLER_STATUS_LABELS,
   sellerModelRows,
@@ -62,16 +67,16 @@ void test('seller page links stay on the seller page and keep every other parame
     sectionRangeHref(
       'modelsPage=2&dailyPage=2&verified=1',
       'activity',
-      90,
+      30,
       PATH,
     ),
-    `${PATH}?activityRange=90&verified=1`,
+    `${PATH}?activityRange=30&verified=1`,
   );
   assert.equal(
     sectionRangeHref('verified=1', 'overview', 7),
     '/?overviewRange=7&verified=1',
   );
-  const pager = txPager(query, 25, CURSOR);
+  const pager = txPager(query, pageOf([1, 2, 3, 4, 5, 6], 2));
   assert.ok(
     Object.values(pager?.hrefs ?? {}).every((href) =>
       href.startsWith(`${PATH}?`),
@@ -148,8 +153,8 @@ void test('a seller stats answer is checked at the boundary, buyers withheld bel
   assert.equal(buyersText(stats.days[1]!.paid), '6');
   assert.equal(buyersText(null), '—');
   assert.deepEqual(dailyRequests(stats.days), [
-    { day: '2026-11-21', free: 3, paid: 0 },
-    { day: '2026-11-22', free: 0, paid: 6 },
+    { day: '2026-11-21', free: 3, paid: null },
+    { day: '2026-11-22', free: null, paid: 6 },
   ]);
   assert.deepEqual(
     stats.models.map((model) => model.modelId),
@@ -343,4 +348,26 @@ void test('a valid NodeId unknown to the index and without activity is not a sel
     models: [],
   });
   assert.equal(unknownSeller(OTHER, nobody, { ...quiet, error: null }), true);
+});
+
+void test('seller absence requires a complete retained history even when the selected period is empty', async () => {
+  const empty = { hasPeriods: false, truncated: false, error: false };
+  const published = { ...empty, hasPeriods: true };
+  const truncated = { ...empty, truncated: true };
+  const unavailable = { ...empty, error: true };
+  for (const retained of [published, truncated, unavailable, empty]) {
+    let reads = 0;
+    const missing = await missingSellerHistory(empty, 7, async () => {
+      reads++;
+      return retained;
+    });
+    assert.equal(reads, 1);
+    assert.equal(missing, retained === empty);
+  }
+  const unexpected = async () =>
+    assert.fail('unnecessary retained history lookup');
+  for (const selected of [published, truncated, unavailable])
+    assert.equal(await missingSellerHistory(selected, 7, unexpected), false);
+  assert.equal(await missingSellerHistory(empty, 'all', unexpected), true);
+  assert.equal(await missingSellerHistory(published, 'all', unexpected), false);
 });

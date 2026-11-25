@@ -12,6 +12,7 @@ import { DISPLAY, PAGING } from '../lib/constants';
 import { getDiscovery } from '../lib/discovery-render';
 import { count, pricePerMtok, usdcDecimal } from '../lib/format';
 import { rangeOf, tablePager, type ExplorerQuery } from '../lib/paging';
+import { displayRange } from '../lib/range';
 import {
   modelsNote,
   modelsServedText,
@@ -25,6 +26,7 @@ import {
   countText,
   dailyRequests,
   latencyText,
+  observedSum,
   rateText,
   sideFigures,
   usageMeta,
@@ -34,9 +36,11 @@ import { BarChartCard } from './board/bar-chart-card';
 import { StatCard } from './board/stat-card';
 import { pagedRows, Pager } from './pager';
 import {
+  EmptyRow,
   ModelName,
   moneyCell,
   numberCell,
+  prefixedColumn,
   SectionTitle,
   SideCells,
   sideColumns,
@@ -47,7 +51,6 @@ import {
 
 type Section = Parameters<typeof sideFigures>[0][number];
 type Figure = 'requests' | 'successRate' | 'outputTokens' | 'firstToken';
-const muted = `${td} text-muted`;
 const FIGURE_TEXT: Record<Figure, (value: never) => string> = {
   requests: countText,
   successRate: rateText,
@@ -84,7 +87,7 @@ function RequestCharts({ days }: { days: SellerDay[] }) {
       amount: day[side],
     }));
   const total = (side: 'free' | 'paid') =>
-    series.reduce((sum, day) => sum + day[side], 0);
+    observedSum(series.map((day) => day[side]));
   return (
     <div className="mt-4 grid gap-3 md:grid-cols-2">
       <BarChartCard
@@ -103,6 +106,16 @@ function RequestCharts({ days }: { days: SellerDay[] }) {
   );
 }
 
+const MODELS_HEAD = [
+  prefixedColumn('Model', 'model'),
+  { label: 'Context', right: true },
+  { label: 'Input / 1M', right: true },
+  { label: 'Output / 1M', right: true },
+  ...sideColumns('Requests'),
+  ...sideColumns('Success'),
+  ...sideColumns('Seller first token p50'),
+];
+
 function ModelsTable({
   query,
   rows,
@@ -114,15 +127,6 @@ function ModelsTable({
   served: boolean;
   offersKnown: boolean;
 }) {
-  const head = [
-    { label: 'Model' },
-    { label: 'Context', right: true },
-    { label: 'Input / 1M', right: true },
-    { label: 'Output / 1M', right: true },
-    ...sideColumns('Requests'),
-    ...sideColumns('Success'),
-    ...sideColumns('Seller first token p50'),
-  ];
   const shown = pagedRows(query, 'models', rows);
   const figure = (row: (typeof rows)[number], name: Figure) => (
     <FigureCells
@@ -140,22 +144,22 @@ function ModelsTable({
       </p>
       <Table
         minWidth={DISPLAY.modelsTable}
-        head={head}
+        head={MODELS_HEAD}
         footer={
           <Pager label="Models" view={tablePager(query, 'models', shown)} />
         }
       >
         {rows.length ? null : (
-          <tr>
-            <td className={muted} colSpan={head.length}>
-              No models offered now or served in this range.
-            </td>
-          </tr>
+          <EmptyRow columns={MODELS_HEAD.length}>
+            No models offered now or served in this range.
+          </EmptyRow>
         )}
         {shown.rows.map((row) => (
           <tr key={row.key} className="border-t border-line">
             <td className={td}>
               <ModelName
+                days={rangeOf(query, 'activity')}
+                closed={query.closed}
                 modelId={row.modelId}
                 variant={row.variant}
                 quantization={row.quantization}
@@ -211,11 +215,9 @@ function DailyTable({
         }
       >
         {active.length ? null : (
-          <tr>
-            <td className={muted} colSpan={head.length}>
-              No daily activity in this range.
-            </td>
-          </tr>
+          <EmptyRow columns={head.length}>
+            No daily activity in this range.
+          </EmptyRow>
         )}
         {shown.rows.map((day) => (
           <tr key={day.day} className="border-t border-line">
@@ -249,7 +251,7 @@ function Figures({
 }) {
   const { free, paid } = totals;
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-3 min-[390px]:grid-cols-2 lg:grid-cols-3">
       <StatCard
         icon={MessagesSquare}
         label="Requests"
@@ -309,7 +311,7 @@ export async function SellerActivity({
 }) {
   const days = rangeOf(query, 'activity');
   const [stats, snapshot] = await Promise.all([
-    getSellerStats(nodeId, days),
+    getSellerStats(nodeId, days, query.closed),
     getDiscovery(),
   ]);
   const offers = snapshot.error ? [] : sellerProfile(nodeId, snapshot).offers;
@@ -318,14 +320,14 @@ export async function SellerActivity({
     <>
       {stats.error ? (
         <Unavailable
-          title={`Activity, last ${days} days`}
+          title={`Activity, ${displayRange(days)}`}
           anchors={[PAGING.anchors.daily]}
         />
       ) : (
         <>
           <SectionTitle
-            title={`Activity, last ${days} days`}
-            meta={usageMeta(days, stats.aggregatedAt, false)}
+            title="Activity"
+            meta={`${query.closed ? 'Completed UTC days · ' : ''}${usageMeta(days, stats.aggregatedAt, false)}`}
             range={{ section: 'activity', days }}
           />
           <Figures totals={totals} served={stats.models.length} />

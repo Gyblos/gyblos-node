@@ -1,7 +1,7 @@
 // Owns the stats read port: what the public stats use case needs from aggregate storage. Row types
 // come from the aggregate schema; the D1 adapter is stats-read.ts.
-import type { FirstSeenKind } from './constants';
-import type { DayRange } from './days';
+import type { COLLECTOR_ROUTES, FirstSeenKind } from './constants';
+import type { DayBounds, DayRange } from './days';
 import type {
   aggDemandDaily,
   aggObservedDaily,
@@ -68,7 +68,23 @@ export interface ChainIndexState {
   updatedAt: number;
 }
 
+export type StatsResource = (typeof COLLECTOR_ROUTES)[
+  'STATS_NETWORK' | 'STATS_MODELS' | 'STATS_SELLER' | 'STATS_CHAIN'];
+
+export type IntradayBounds = Pick<DayBounds, 'start' | 'end'>;
+export interface IntradayRow {
+  at: number;
+  requests: number;
+  tokens: number;
+  paidOut: string;
+}
 export interface StatsReader {
+  intraday?(bounds: IntradayBounds): Promise<IntradayRow[]>;
+  firstDay(
+    resource: StatsResource,
+    to: string,
+    nodeId: string,
+  ): Promise<string | null>;
   // Network rows per day and paid flag; observed rows per day; demand rows, at most
   // AGGREGATES.maxPublicDemandPerDay per day, largest first.
   // Origin rows per day, paid flag and client; failure rows per day, side, client, event and reason.

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { DISPLAY, NODE_STATE } from '@gyblos/explorer/constants';
-import { hashTarget } from '@gyblos/explorer/hash-target';
+import { hashTarget, pageScrollTarget } from '@gyblos/explorer/hash-target';
 import { NODE_STATES } from '@gyblos/explorer/network-status';
 import { readQuery } from '@gyblos/explorer/paging';
 import { sellerHref } from '@gyblos/explorer/seller-identity';
@@ -54,4 +54,15 @@ void test('the models note never calls a model not offered when offers are unkno
   assert.doesNotMatch(modelsNote(true, false), /not offered now/);
   assert.match(modelsNote(true, false), /current offers unavailable/);
   assert.match(modelsNote(false, true), /requests unavailable/);
+});
+
+void test('Payments table navigation preserves position while direct links reach the target', () => {
+  const url = new URL(
+    'https://example.com/stats?tab=payments&txPage=2#channel-transactions',
+  );
+  assert.equal(pageScrollTarget(url, url.href), null);
+  assert.equal(pageScrollTarget(url, null), 'channel-transactions');
+  url.hash = '';
+  assert.equal(pageScrollTarget(url, url.href), null);
+  assert.equal(pageScrollTarget(url, null), 'payments');
 });

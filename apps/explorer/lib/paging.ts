@@ -1,13 +1,25 @@
 import { txCursor } from './chain-txs-shape';
-import { CHAIN_TXS, IDENTITY, PAGES, PAGING, RANGE } from './constants';
-import { count } from './format';
+import { CHAIN_TXS, IDENTITY, PAGES, PAGING, RANGE, STATS } from './constants';
+import { numberedPager } from './pager-view';
+import { pageOf, type Page, type TableSort } from './paging-rows';
 import {
+  hasRangeAlias,
   parseRange,
   presetRange,
   RANGE_SECTIONS,
+  rangeValue,
   type RangeDays,
   type RangeSection,
 } from './range';
+
+export {
+  pageOf,
+  sortedRows,
+  type Sortable,
+  type Page,
+  type TableSort,
+} from './paging-rows';
+export { numberedPager } from './pager-view';
 
 export type PagedTable = keyof typeof PAGING.params;
 export type TablePages = Partial<Record<PagedTable, number>>;
@@ -16,17 +28,22 @@ export type SearchSource =
 
 export type SectionRanges = Partial<Record<RangeSection, RangeDays>>;
 export type SortedTable = keyof typeof PAGING.sortParams;
-export interface TableSort {
-  key: string;
-  desc: boolean;
-}
 export type TableSorts = Partial<Record<SortedTable, TableSort>>;
-export type Sortable = number | bigint | string | null | undefined;
+
+export type StatsMetric = keyof typeof STATS.metrics;
+export type StatsTab = (typeof STATS.tabs)[number];
+
+const isMetric = (value: unknown): value is StatsMetric =>
+  typeof value === 'string' && Object.hasOwn(STATS.metrics, value);
 
 export interface ExplorerQuery {
+  tab?: StatsTab;
+  metric?: StatsMetric;
+  overviewTables?: boolean;
   path: string;
   days: RangeDays;
   ranges: SectionRanges;
+  closed?: boolean;
   sorts: TableSorts;
   verified: boolean;
   before: string | null;
@@ -40,16 +57,6 @@ export interface QueryChange {
   verified?: boolean;
   before?: string | null;
   pages?: TablePages;
-}
-
-export interface Page<T> {
-  rows: T[];
-  requested: number;
-  page: number;
-  pages: number;
-  total: number;
-  first: number;
-  last: number;
 }
 
 export interface PagerView {
@@ -105,6 +112,7 @@ export function movedHomeHref(source: SearchSource): string | null {
     source instanceof URLSearchParams ? [...source] : Object.entries(source);
   for (const [name, value] of entries)
     for (const item of [value ?? []].flat()) search.append(name, item);
+  if (search.get(PAGING.overviewParam) === PAGING.overviewValue) return null;
   const moved = MOVED_PARAMS.find(([name]) => search.has(name));
   return moved ? `${moved[1]}?${search.toString()}` : null;
 }
@@ -125,8 +133,7 @@ export function readQuery(source: SearchSource, path = '/'): ExplorerQuery {
   const pages: TablePages = {};
   for (const table of PAGED_TABLES) {
     const page = parsePage(readParam(source, PAGING.params[table]));
-    if (page > 1 && (table !== PAGING.cursorTable || before))
-      pages[table] = page;
+    if (page > 1) pages[table] = page;
   }
   const ranges: SectionRanges = {};
   for (const section of RANGE_SECTIONS) {
@@ -138,10 +145,39 @@ export function readQuery(source: SearchSource, path = '/'): ExplorerQuery {
     const sort = parseSort(table, readParam(source, PAGING.sortParams[table]));
     if (sort) sorts[table] = sort;
   }
+  const requestedMetric = readParam(source, STATS.metricParam);
+  const metric = isMetric(requestedMetric) ? requestedMetric : undefined;
+  const requestedTab = readParam(source, STATS.tabParam);
+  const legacyPayments = [
+    PAGING.params.chainDaily,
+    PAGING.sortParams.chainDaily,
+    RANGE.sections.payments.param,
+  ].some((name) => readParam(source, name) !== undefined);
+  const tab = metric
+    ? STATS.metrics[metric]
+    : (STATS.tabs.find((item) => item === requestedTab) ??
+      (legacyPayments ? 'payments' : 'usage'));
   return {
+    ...(path === PAGES.stats ? { tab } : {}),
+    ...(metric && (path === PAGES.network || path === PAGES.stats)
+      ? { metric }
+      : {}),
+    ...(readParam(source, PAGING.overviewParam) === PAGING.overviewValue
+      ? { overviewTables: true }
+      : {}),
     path,
-    days: parseRange(readParam(source, RANGE.param)),
+    days:
+      (path === PAGES.stats ? ranges[tab] : undefined) ??
+      parseRange(readParam(source, RANGE.param)),
     ranges,
+    ...(path === PAGES.stats ||
+    ((path === PAGES.models ||
+      path === PAGES.sellers ||
+      path.startsWith(`${PAGES.models}/`) ||
+      path.startsWith(`${PAGES.sellers}/`)) &&
+      readParam(source, RANGE.closedParam) === '1')
+      ? { closed: true }
+      : {}),
     sorts,
     verified:
       readParam(source, IDENTITY.verifiedParam) === IDENTITY.verifiedValue,
@@ -158,29 +194,48 @@ export function queryHref(
   const verified = change.verified ?? query.verified;
   const before = change.before === undefined ? query.before : change.before;
   const pages = { ...query.pages, ...change.pages };
+  if (change.before === null && !change.pages?.transactions)
+    delete pages.transactions;
   const ranges = { ...query.ranges, ...change.ranges };
   const sorts = { ...query.sorts, ...change.sorts };
   const params = new URLSearchParams();
-  if (days !== RANGE.defaultDays) params.set(RANGE.param, String(days));
+  if (query.tab === 'payments') params.set(STATS.tabParam, query.tab);
+  if (query.metric) params.set(STATS.metricParam, query.metric);
+  if (query.closed) params.set(RANGE.closedParam, '1');
+  if (days !== RANGE.defaultDays) params.set(RANGE.param, rangeValue(days));
   for (const section of RANGE_SECTIONS) {
     const shown = ranges[section];
-    if (shown && shown !== days)
-      params.set(RANGE.sections[section].param, String(shown));
+    if (shown && (shown !== days || section === 'chart'))
+      params.set(RANGE.sections[section].param, rangeValue(shown));
   }
   if (verified) params.set(IDENTITY.verifiedParam, IDENTITY.verifiedValue);
   if (before) params.set(CHAIN_TXS.param, before);
   for (const table of PAGED_TABLES) {
     const page = pages[table] ?? 1;
-    if (page > 1 && (table !== PAGING.cursorTable || before))
-      params.set(PAGING.params[table], String(page));
+    if (page > 1) params.set(PAGING.params[table], String(page));
   }
   for (const table of SORTED_TABLES) {
     const sort = sorts[table];
     if (sort) params.set(PAGING.sortParams[table], sortText(sort));
     else delete sorts[table];
   }
+  if (
+    query.path === PAGES.network &&
+    query.overviewTables &&
+    (before || (pages.transactions ?? 1) > 1 || pages.sellers || sorts.sellers)
+  )
+    params.set(PAGING.overviewParam, PAGING.overviewValue);
   const search = params.toString();
   return search ? `${query.path}?${search}` : query.path;
+}
+
+export function statsBreakdownHref(metric: StatsMetric, days: RangeDays) {
+  const tab = STATS.metrics[metric];
+  return (
+    queryHref({ ...readQuery({}, PAGES.stats), days, tab, metric }) +
+    '#' +
+    (tab === 'payments' ? PAGING.anchors.chainDaily : PAGING.anchors.daily)
+  );
 }
 
 export function canonicalPageHref(
@@ -189,6 +244,7 @@ export function canonicalPageHref(
 ): string | null {
   const query = readQuery(source, path);
   const dropped =
+    hasRangeAlias((param) => readParam(source, param)) ||
     PAGED_TABLES.some(
       (table) =>
         readParam(source, PAGING.params[table]) !== undefined &&
@@ -223,31 +279,19 @@ export function sortHref(
   return `${queryHref(query, { sorts: { [table]: next }, pages: { [table]: 1 } })}#${PAGING.anchors[table]}`;
 }
 
-const compare = (left: Sortable, right: Sortable) => {
-  if (left === right) return 0;
-  if (left === null || left === undefined) return 1;
-  if (right === null || right === undefined) return -1;
-  return left < right ? -1 : 1;
-};
-
-export function sortedRows<T>(
-  rows: readonly T[],
-  sort: TableSort | undefined,
-  by: Record<string, (row: T) => Sortable>,
-): readonly T[] {
-  const read = sort ? by[sort.key] : undefined;
-  if (!sort || !read) return rows;
-  const sign = sort.desc ? -1 : 1;
-  return [...rows].sort((left, right) => {
-    const first = read(left);
-    const second = read(right);
-    if (first == null || second == null) return compare(first, second);
-    return sign * compare(first, second);
-  });
-}
-
 export const rangeOf = (query: ExplorerQuery, section: RangeSection) =>
   query.ranges[section] ?? query.days;
+
+export function directoryHref(
+  path: typeof PAGES.models | typeof PAGES.sellers,
+  query: ExplorerQuery,
+  section: RangeSection,
+) {
+  return queryHref(
+    { ...readQuery({}, path), closed: query.closed },
+    { days: rangeOf(query, section) },
+  );
+}
 
 export function sectionRangeHref(
   search: string,
@@ -256,26 +300,15 @@ export function sectionRangeHref(
   path = '/',
 ): string {
   const query = readQuery(new URLSearchParams(search), path);
+  if (path === PAGES.stats)
+    return queryHref(
+      { ...query, ranges: {} },
+      { days, pages: { daily: 1, demand: 1, chainDaily: 1 } },
+    );
   const pages = Object.fromEntries(
     RANGE.sections[section].tables.map((table) => [table, 1]),
   );
   return queryHref(query, { ranges: { [section]: days }, pages });
-}
-
-export function pageOf<T>(rows: readonly T[], requested: number): Page<T> {
-  const pages = Math.max(1, Math.ceil(rows.length / PAGING.rowsPerPage));
-  const page = requested >= 1 && requested <= pages ? requested : 1;
-  const start = (page - 1) * PAGING.rowsPerPage;
-  const shown = rows.slice(start, start + PAGING.rowsPerPage);
-  return {
-    rows: shown,
-    requested,
-    page,
-    pages,
-    total: rows.length,
-    first: shown.length ? start + 1 : 0,
-    last: start + shown.length,
-  };
 }
 
 export function tablePage<T>(
@@ -300,71 +333,25 @@ export function pageRedirect(
 const anchored = (href: string, table: PagedTable) =>
   `${href}#${PAGING.anchors[table]}`;
 
-const rowSpan = (first: number, last: number) =>
-  `Rows ${count(first)}–${count(last)}`;
-
-const PAGER_WINDOW = 2;
-const PAGER_EDGE = 5;
-
 export function tablePager(
   query: ExplorerQuery,
   table: PagedTable,
   page: Page<unknown>,
-): PagerView | null {
-  if (page.pages <= 1) return null;
-  const targets = new Set<number>();
-  for (let offset = 0; offset < PAGER_EDGE; offset++) {
-    targets.add(1 + offset);
-    targets.add(page.pages - offset);
-  }
-  for (let offset = -PAGER_WINDOW; offset <= PAGER_WINDOW; offset++)
-    targets.add(page.page + offset);
-  const hrefs: Record<number, string> = {};
-  for (const target of targets)
-    if (target >= 1 && target <= page.pages)
-      hrefs[target] = anchored(
-        queryHref(query, { pages: { [table]: target } }),
-        table,
-      );
-  return {
-    rows: `${rowSpan(page.first, page.last)} of ${count(page.total)}`,
-    page: page.page,
-    pages: page.pages,
-    hrefs,
-    showPages: true,
-    previousLabel: 'Previous',
-    nextLabel: 'Next',
-  };
+): PagerView {
+  return numberedPager(page, (target) =>
+    anchored(queryHref(query, { pages: { [table]: target } }), table),
+  );
 }
 
-export function txPager(
-  query: ExplorerQuery,
-  shown: number,
-  older: string | null,
-): PagerView | null {
-  if (!query.before && !older) return null;
-  const page = query.before ? (query.pages.transactions ?? null) : 1;
+export function txPager(query: ExplorerQuery, page: Page<unknown>): PagerView {
   const table = PAGING.cursorTable;
-  const current = page ?? 2;
-  const hrefs: Record<number, string> = {};
-  if (query.before)
-    hrefs[current - 1] = anchored(queryHref(query, { before: null }), table);
-  if (older)
-    hrefs[current + 1] = anchored(
+  return numberedPager(page, (target) =>
+    anchored(
       queryHref(query, {
-        before: older,
-        pages: { [table]: page === null ? 1 : page + 1 },
+        before: null,
+        pages: { [table]: target },
       }),
       table,
-    );
-  const first = page === null ? 0 : (page - 1) * CHAIN_TXS.pageRows + 1;
-  return {
-    rows: page === null || !shown ? null : rowSpan(first, first + shown - 1),
-    page: current,
-    pages: older ? current + 1 : current,
-    hrefs,
-    showPages: false,
-    previousLabel: 'Newest',
-    nextLabel: 'Older',
-  };
+    ),
+  );
 }

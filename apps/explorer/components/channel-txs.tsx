@@ -1,26 +1,45 @@
-import { ArrowUpRight } from 'lucide-react';
+import {
+  ArrowDownToLine,
+  ArrowUpRight,
+  CirclePlus,
+  FileCheck2,
+  Hourglass,
+  LockKeyhole,
+  Receipt,
+  Undo2,
+  Wallet,
+  type LucideIcon,
+} from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 import { Chip, type ChipColor } from '../boardui/components/base/badges/chip';
-import { getChainTxs } from '../lib/chain-txs';
-import { sellerOwners, txRow, type ChainTxKind } from '../lib/chain-txs-shape';
+import { getTransactionTable } from '../lib/chain-txs';
 import {
-  explorerAddressUrl,
+  CHAIN_TX_LABELS,
+  sellerOwners,
+  txRow,
+  type ChainTxKind,
+} from '../lib/chain-txs-shape';
+import {
+  addressHref,
   HELP_TEXT,
   PAYMENT_PROGRAM_SOURCE_URL,
 } from '../lib/config';
 import { DISPLAY, PAGES, PAGING } from '../lib/constants';
 import { getDiscovery } from '../lib/discovery-render';
-import { short } from '../lib/format';
-import { txPager, type ExplorerQuery } from '../lib/paging';
-import { sellerHref } from '../lib/seller-identity';
+import type { GithubAccount } from '../lib/network-status';
+import { type ExplorerQuery } from '../lib/paging';
+import { githubByNode, namesByNode, sellerHref } from '../lib/seller-identity';
 import { Pager } from './pager';
+import { SellerCell } from './seller-cell';
 import {
   Addr,
+  EmptyRow,
   moneyCell,
   MoreLink,
   numberCell,
+  prefixedColumn,
   SectionTitle,
   Table,
   td,
@@ -31,7 +50,6 @@ import {
 const TITLE = 'Channel transactions';
 const link =
   'inline-flex items-center gap-1 hover:text-ink hover:underline underline-offset-2';
-const muted = `${td} text-muted`;
 export const TX_AMOUNT_HEAD = [
   { label: 'Amount', right: true, group: 'USDC' },
   { label: 'Gyblos fee', right: true, group: 'USDC' },
@@ -41,10 +59,10 @@ export const TX_AMOUNT_HEAD = [
 
 const HEAD = [
   { label: 'Time (UTC)' },
-  { label: 'Type' },
+  prefixedColumn('Type', 'operation'),
   ...TX_AMOUNT_HEAD,
   { label: 'Transaction' },
-  { label: 'Seller' },
+  prefixedColumn('Seller', 'seller'),
   { label: 'Channel' },
 ];
 type Row = ReturnType<typeof txRow>;
@@ -53,10 +71,9 @@ function Meta({ programId }: { programId: string }) {
   return (
     <span className="flex flex-wrap gap-4">
       <span>Newest first, all time, not filtered by range</span>
-      <a className={link} href={explorerAddressUrl(programId)}>
+      <Link className={link} href={addressHref(programId)}>
         Payments program
-        <ArrowUpRight aria-hidden className="size-3" />
-      </a>
+      </Link>
       <a className={link} href={PAYMENT_PROGRAM_SOURCE_URL}>
         Upstream source
         <ArrowUpRight aria-hidden className="size-3" />
@@ -68,47 +85,67 @@ function Meta({ programId }: { programId: string }) {
 function Seller({
   row,
   lookup,
+  accounts,
+  names,
   query,
 }: {
   row: Row;
   lookup: boolean;
+  accounts: ReadonlyMap<string, GithubAccount>;
+  names: ReadonlyMap<string, string>;
   query: ExplorerQuery;
 }) {
   if (!lookup)
-    return <span className="text-muted">Seller lookup unavailable</span>;
-  if (row.shared) return <span className="text-muted">Several channels</span>;
+    return (
+      <span className="block ps-9 text-muted">Seller lookup unavailable</span>
+    );
+  if (row.shared)
+    return <span className="block ps-9 text-muted">Several channels</span>;
   if (row.seller)
     return (
-      <span className="font-mono">
-        <Link
-          className="text-ink underline-offset-2 hover:underline"
-          href={sellerHref(row.seller.nodeId, query)}
-          title={`Node ${row.seller.nodeId}`}
-        >
-          {short(row.seller.nodeId)}
-        </Link>
-        <span className="block text-xs text-dim">
-          <Addr value={row.seller.owner} />
-        </span>
-      </span>
+      <SellerCell
+        nodeId={row.seller.nodeId}
+        github={accounts.get(row.seller.nodeId) ?? null}
+        name={names.get(row.seller.nodeId)}
+        href={sellerHref(row.seller.nodeId, query)}
+      >
+        <Addr value={row.seller.owner} />
+      </SellerCell>
     );
   return (
-    <span className="text-muted" title={row.payTo ?? undefined}>
-      Unlisted seller
+    <span className="block ps-9 text-muted" title={row.payTo ?? undefined}>
+      {row.payTo ? (
+        <>
+          Recipient <Addr value={row.payTo} />
+        </>
+      ) : (
+        '—'
+      )}
     </span>
   );
 }
 
-const KIND_COLORS: Record<ChainTxKind, ChipColor> = {
-  open: 'blue',
-  top_up: 'blue',
-  settle: 'soft',
-  settle_and_seal: 'soft',
-  request_close: 'soft',
-  seal: 'soft',
-  distribute: 'lime',
-  reclaim: 'neutral',
-};
+const OPERATIONS: Record<ChainTxKind, { color: ChipColor; icon: LucideIcon }> =
+  {
+    open: { color: 'blue', icon: ArrowDownToLine },
+    top_up: { color: 'blue', icon: CirclePlus },
+    settle: { color: 'soft', icon: Receipt },
+    settle_and_seal: { color: 'soft', icon: FileCheck2 },
+    request_close: { color: 'soft', icon: Hourglass },
+    seal: { color: 'soft', icon: LockKeyhole },
+    distribute: { color: 'lime', icon: Wallet },
+    reclaim: { color: 'neutral', icon: Undo2 },
+  };
+
+export function OperationChip({ kind }: { kind: ChainTxKind }) {
+  const { color, icon: Icon } = OPERATIONS[kind];
+  return (
+    <Chip variant="caption" color={color}>
+      <Icon aria-hidden className="size-3.5 shrink-0" />
+      {CHAIN_TX_LABELS[kind]}
+    </Chip>
+  );
+}
 
 export function TxAmount({ row }: { row: Row }) {
   const part = (value: string | null) => (
@@ -139,16 +176,13 @@ export function TxLine({ row, seller }: { row: Row; seller?: ReactNode }) {
     <tr className="border-t border-line">
       <td className={timeCell}>{row.time}</td>
       <td className={td} title={row.kind}>
-        <Chip variant="caption" color={KIND_COLORS[row.kind]}>
-          {row.label}
-        </Chip>
+        <OperationChip kind={row.kind} />
       </td>
       <TxAmount row={row} />
       <td className={`${td} font-mono`}>
-        <a className={link} href={row.href}>
+        <Link className={link} href={row.href}>
           {row.signature}
-          <ArrowUpRight aria-hidden className="size-3" />
-        </a>
+        </Link>
       </td>
       {seller === undefined ? null : <td className={td}>{seller}</td>}
       <td className={`${td} font-mono`}>
@@ -167,7 +201,7 @@ export async function ChannelTxs({
 }) {
   const { before } = query;
   const [page, discovery] = await Promise.all([
-    getChainTxs(before),
+    getTransactionTable(query),
     getDiscovery(),
   ]);
   if (page.error)
@@ -175,6 +209,8 @@ export async function ChannelTxs({
       <Unavailable title={TITLE} anchors={[PAGING.anchors.transactions]} />
     );
   const owners = sellerOwners(discovery.sellers);
+  const accounts = githubByNode(discovery.network);
+  const names = namesByNode(discovery.network);
   const lookup = discovery.error === null;
   return (
     <>
@@ -187,23 +223,14 @@ export async function ChannelTxs({
       <Table
         minWidth={DISPLAY.txTable}
         head={HEAD}
-        footer={
-          preview ? undefined : (
-            <Pager
-              label={TITLE}
-              view={txPager(query, page.transactions.length, page.next)}
-            />
-          )
-        }
+        footer={<Pager label={TITLE} view={page.pager} />}
       >
         {page.transactions.length ? null : (
-          <tr>
-            <td className={muted} colSpan={HEAD.length}>
-              {before
-                ? 'No older transactions.'
-                : 'No Gyblos channel transactions.'}
-            </td>
-          </tr>
+          <EmptyRow columns={HEAD.length}>
+            {before
+              ? 'No older transactions.'
+              : 'No Gyblos channel transactions.'}
+          </EmptyRow>
         )}
         {page.transactions.map((tx) => {
           const row = txRow(tx, owners, page.treasury);
@@ -211,7 +238,15 @@ export async function ChannelTxs({
             <TxLine
               key={row.key}
               row={row}
-              seller={<Seller row={row} lookup={lookup} query={query} />}
+              seller={
+                <Seller
+                  accounts={accounts}
+                  names={names}
+                  row={row}
+                  lookup={lookup}
+                  query={query}
+                />
+              }
             />
           );
         })}

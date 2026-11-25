@@ -1,9 +1,3 @@
-// Protects the explorer's display choices: the date range accepts only its presets and maps to the
-// collector's inclusive UTC days; a model's mark comes from its id's family name, never a guess; the
-// daily series keep every day of the range, empty ones as zero; the index's network status is read
-// with its exact states and the sellers not online keep the index's order; the average uptime says over
-// how many sellers it is taken; a settlement count is singular only for exactly one; a source read gives
-// up after the fetch timeout.
 import assert from 'node:assert/strict';
 import test, { afterEach } from 'node:test';
 
@@ -15,13 +9,14 @@ import { FETCH, HELP_TRIGGER } from '@gyblos/explorer/constants';
 import { fetchJson } from '@gyblos/explorer/fetch-json';
 import {
   percent,
+  refreshAge,
   settlementCount,
   tokensPerSecond,
   usdcDecimal,
 } from '@gyblos/explorer/format';
 import { modelFamily } from '@gyblos/explorer/model-family';
 import { notOnline, parseNetworkStatus } from '@gyblos/explorer/network-status';
-import { parseRange, rangeQuery } from '@gyblos/explorer/range';
+import { displayRange, parseRange, rangeQuery } from '@gyblos/explorer/range';
 import { dailyRequests, usageMeta } from '@gyblos/explorer/usage';
 
 const realFetch = globalThis.fetch;
@@ -29,6 +24,15 @@ const realTimeout = AbortSignal.timeout.bind(AbortSignal);
 afterEach(() => {
   globalThis.fetch = realFetch;
   AbortSignal.timeout = realTimeout;
+});
+
+void test('last update displays elapsed time from the last server render', () => {
+  assert.equal(refreshAge(-100), 'just now');
+  assert.equal(refreshAge(0), 'just now');
+  assert.equal(refreshAge(5_100), '5s ago');
+  assert.equal(refreshAge(62_000), '1m ago');
+  assert.equal(refreshAge(7_200_000), '2h ago');
+  assert.equal(refreshAge(86_400_000), '1d ago');
 });
 
 void test('settlement counts use singular only for one settlement', () => {
@@ -61,9 +65,13 @@ void test('request bars keep visible integer ticks by default and explicitly', (
   assert.deepEqual(barAxis(true), counts);
 });
 
-void test('the range is a preset or the 30-day default', () => {
+void test('the range defaults to all public history and accepts the finite presets', () => {
   assert.equal(parseRange('7'), 7);
-  assert.equal(parseRange('90'), 90);
+  assert.equal(parseRange('30'), 30);
+  assert.equal(parseRange('90'), 'all');
+  assert.equal(parseRange('all'), 'all');
+  assert.equal(displayRange('all'), 'all time');
+  assert.equal(displayRange(7), 'last 7 days');
   for (const value of [
     undefined,
     '',
@@ -76,7 +84,7 @@ void test('the range is a preset or the 30-day default', () => {
     ' 7',
     '7e0',
   ])
-    assert.equal(parseRange(value), 30);
+    assert.equal(parseRange(value), 'all');
 });
 
 void test('a range maps to the collector days ending today, inclusive', () => {
@@ -139,7 +147,7 @@ void test('a model mark comes from the family in its id', () => {
   for (const [id, family] of cases) assert.equal(modelFamily(id), family, id);
 });
 
-void test('daily series keep empty days as zero', () => {
+void test('daily series distinguish an unobserved day from a covered zero', () => {
   const requests = dailyRequests([
     {
       day: '2026-11-17',
@@ -151,14 +159,16 @@ void test('daily series keep empty days as zero', () => {
       failures: [],
     },
   ] as unknown as Parameters<typeof dailyRequests>[0]);
-  assert.deepEqual(requests, [{ day: '2026-11-17', free: 0, paid: 0 }]);
+  assert.deepEqual(requests, [{ day: '2026-11-17', free: null, paid: null }]);
   const settled = dailySettled({
     aggregatedAt: null,
     backfillDone: false,
     days: [{ day: '2026-11-17', program: null, gyblos: null }],
     error: null,
   });
-  assert.deepEqual(settled, [{ day: '2026-11-17', settled: 0n, settles: 0 }]);
+  assert.deepEqual(settled, [
+    { day: '2026-11-17', settled: null, settles: null },
+  ]);
 });
 
 const NODE = (fill: string) => fill.repeat(64);
@@ -302,4 +312,25 @@ void test('chain figures say when the chain history is still being read', () => 
 
 void test('a help tap toggles its tooltip: the press itself never closes it', () => {
   assert.equal(HELP_TRIGGER.shouldCloseOnPress, false);
+});
+
+void test('both Stats series preserve UTC dates omitted by the source', () => {
+  const dates = ['2026-11-20', '2026-11-21'];
+  assert.deepEqual(
+    dailyRequests([], dates),
+    dates.map((day) => ({ day, free: null, paid: null })),
+  );
+  assert.deepEqual(
+    dailySettled(
+      {
+        days: [],
+        aggregatedAt: null,
+        backfillDone: true,
+        indexedAt: Date.parse('2026-11-22'),
+        error: null,
+      },
+      dates,
+    ),
+    dates.map((day) => ({ day, settled: null, settles: null })),
+  );
 });

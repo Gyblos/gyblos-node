@@ -8,6 +8,7 @@ import {
   DEVNET_USDC,
 } from '@gyblos/config/network';
 import { runAggregation } from '@gyblos/metrics-collector/aggregate';
+import { base58Encode } from '@gyblos/metrics-collector/chain/base58';
 import { runChainIndex } from '@gyblos/metrics-collector/chain/indexer';
 import type { ChainStats } from '@gyblos/metrics-collector/stats-chain';
 import type { ChainTxPage } from '@gyblos/metrics-collector/stats-chain-txs';
@@ -30,7 +31,7 @@ import {
 } from './support/metrics-collector-chain-txs';
 import { createCollectorD1 } from './support/metrics-collector-d1';
 
-const SELLER_OWNER = 'SeLLerOwner1111111111111111111111111111111';
+const SELLER_OWNER = base58Encode(new Uint8Array(32).fill(7));
 const FEE_PAYER = 'FeePayer11111111111111111111111111111111111';
 
 function seeded() {
@@ -156,6 +157,39 @@ void test('pages follow the (slot, signature, instruction) cursor without gaps o
   assert.equal(thirds.body.next, null);
 });
 
+void test('numbered operation pages report a scoped count and fall back to page one outside history', async () => {
+  const { app } = collector(seeded());
+  const all = await get(app, '?limit=4&page=2');
+  assert.equal(all.status, 200);
+  assert.equal(all.body.total, 9);
+  assert.equal(all.body.page, 2);
+  assert.deepEqual(
+    summary(all.body.transactions),
+    expected(EXPECTED.slice(4, 8)),
+  );
+  assert.equal(all.body.next, `110-${sig('B')}-0`);
+  const scope = `?limit=4&recipient=${SELLER_OWNER}`;
+  const filtered = await get(app, `${scope}&page=2`);
+  assert.equal(filtered.body.total, 8);
+  assert.deepEqual(
+    summary(filtered.body.transactions),
+    expected(EXPECTED.slice(5)),
+  );
+  assert.equal(filtered.body.next, null);
+  const outside = await get(app, `${scope}&page=3`);
+  const first = await get(app, `${scope}&page=1`);
+  assert.equal(first.body.page, 1);
+  assert.deepEqual(outside.body, first.body);
+  const empty = await get(app, `?recipient=${DEVNET_GYBLOS_TREASURY}&page=2`);
+  assert.deepEqual(
+    [empty.body.total, empty.body.page, empty.body.transactions],
+    [0, 1, []],
+  );
+  const cursor = await get(app, '?limit=4');
+  assert.equal(Object.hasOwn(cursor.body, 'total'), false);
+  assert.equal(Object.hasOwn(cursor.body, 'page'), false);
+});
+
 void test('the default page is 25 rows and a page holds at most 50', async () => {
   const database = createCollectorD1();
   channel(database, 'G', { mint: DEVNET_USDC });
@@ -176,6 +210,11 @@ void test('the default page is 25 rows and a page holds at most 50', async () =>
 void test('a malformed, unknown or repeated query parameter answers 400 INVALID_QUERY uncached', async () => {
   const { app } = collector(seeded());
   for (const query of [
+    '?page=0',
+    '?page=01',
+    '?page=1000000',
+    '?page=2&limit=4',
+    `?before=130-${sig('D')}-0&page=2`,
     '?limit=0',
     '?limit=51',
     '?limit=01',

@@ -1,13 +1,28 @@
 import { PAGE_LINKS, PAGES } from './constants';
 
+const detailSections = new Set<string>([
+  PAGES.sellers,
+  PAGES.models,
+  PAGES.transactions,
+]);
 export const isCurrentPage = (pathname: string, href: string) =>
-  href === PAGES.network
-    ? pathname === href
-    : pathname === href ||
-      (href === PAGES.sellers && pathname.startsWith(`${PAGES.sellers}/`));
+  pathname === href ||
+  (detailSections.has(href) && pathname.startsWith(`${href}/`));
 
 export const currentPage = (pathname: string) =>
   PAGE_LINKS.find((link) => isCurrentPage(pathname, link.href));
+
+interface MetricColumn {
+  label: string;
+  group?: string;
+  compactGroup?: string;
+}
+
+export function compactColumnGroups(columns: readonly MetricColumn[]) {
+  return columns.map((column, index) =>
+    index === 0 ? null : (column.compactGroup ?? column.group ?? column.label),
+  );
+}
 
 const FIVE_SPANS = [
   'col-span-2 lg:col-span-2 xl:col-span-1',

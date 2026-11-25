@@ -167,7 +167,10 @@ export function payoutParts() {
 // bundled with the payout) counts none, so payouts never exceed money the program released. Payouts
 // are per transaction, so in the gyblos scope a transaction counts only when every paying instruction
 // in it is for a Gyblos channel.
-function payoutTotals(bounds: DayBounds, scope: ChainAggregateScope) {
+export function payoutTransactions(
+  bounds: Pick<DayBounds, 'start' | 'end'>,
+  scope: ChainAggregateScope,
+) {
   const {
     signature,
     amount,
@@ -180,7 +183,7 @@ function payoutTotals(bounds: DayBounds, scope: ChainAggregateScope) {
     otherChannelPaid,
     balanced,
   } = payoutParts();
-  const perTx = sql`(select
+  const perTx = sql`(select ${col('t', chainTxs.blockTime)} as at,
       ${part(toGyblos)} as g, ${part(toProgram)} as pt, ${part(toPayer)} as r, ${part(toOthers)} as o,
       ${vault} as vault
     from ${from(chainTokenDeltas, 'd')} join ${from(chainTxs, 't')} on ${col('t', chainTxs.signature)} = ${signature}
@@ -203,6 +206,11 @@ function payoutTotals(bounds: DayBounds, scope: ChainAggregateScope) {
     atomicTotal(
       sql`case when ${balanced({ g: sql.raw('g'), pt: sql.raw('pt'), r: sql.raw('r'), o: sql.raw('o'), outflow: sql.raw('vault') })} then ${sql.identifier(name)} end`,
     );
+  return { perTx, shown };
+}
+
+function payoutTotals(bounds: DayBounds, scope: ChainAggregateScope) {
+  const { perTx, shown } = payoutTransactions(bounds, scope);
   return sql`(select
       ${shown('g')} as gyblos_fees,
       ${shown('pt')} as program_treasury,

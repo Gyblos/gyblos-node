@@ -66,7 +66,29 @@ function OwnerField({ profile }: { profile: SellerProfile }) {
   );
 }
 
-export async function SellerProfileSection({ nodeId }: { nodeId: string }) {
+function ProfileFields({ profile }: { profile: SellerProfile }) {
+  return (
+    <div className="rounded-xl border border-line bg-panel p-4 text-sm sm:p-5">
+      <Identity profile={profile} />
+      <dl className="mt-4 grid gap-3 sm:grid-cols-2">
+        <Field label="NodeId">
+          <span className="font-mono text-xs break-all">{profile.nodeId}</span>
+        </Field>
+        <Field label="Owner address (self-declared)">
+          <OwnerField profile={profile} />
+        </Field>
+      </dl>
+    </div>
+  );
+}
+
+export async function SellerProfileSection({
+  nodeId,
+  directory,
+}: {
+  nodeId: string;
+  directory: ReactNode;
+}) {
   const snapshot = await getDiscovery();
   if (snapshot.error) return <Unavailable title="Seller" />;
   const dated = [
@@ -82,22 +104,17 @@ export async function SellerProfileSection({ nodeId }: { nodeId: string }) {
     <>
       <SectionTitle
         title="Seller"
-        meta={`index read ${utc(snapshot.generatedAt)}`}
+        meta={
+          <span className="flex flex-wrap gap-3">
+            <span>Index read {utc(snapshot.generatedAt)}</span>
+            {directory}
+          </span>
+        }
       />
       {dated.length ? (
         <p className="-mt-2 mb-3 text-xs text-dim">{dated.join(' ')}</p>
       ) : null}
-      <div className="rounded-xl border border-line bg-panel p-4 text-sm sm:p-5">
-        <Identity profile={profile} />
-        <dl className="mt-4 grid gap-3 sm:grid-cols-2">
-          <Field label="NodeId">
-            <span className="font-mono text-xs break-all">{nodeId}</span>
-          </Field>
-          <Field label="Owner address (self-declared)">
-            <OwnerField profile={profile} />
-          </Field>
-        </dl>
-      </div>
+      <ProfileFields profile={profile} />
       <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
           icon={Server}

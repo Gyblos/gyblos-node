@@ -3,16 +3,13 @@
 // change per side, in the same order) and an optional line of context.
 import type { ComponentType, ReactNode } from 'react';
 
-import {
-  DeltaPill,
-  StatHint,
-} from '../../boardui/components/application/dashboard/stat-cards';
+import { StatHint } from '../../boardui/components/application/dashboard/stat-cards';
+import { Chip } from './chip';
 import { cx } from './cx';
 import type { Delta } from './delta';
+import { DeltaChip } from './delta-chip';
 
 const SIDES = ['free', 'paid'] as const;
-const PILL_COLORS = { good: 'lime', bad: 'rose', neutral: 'neutral' } as const;
-const COMPARED = 'vs previous period';
 const LABEL = 'text-body-medium text-balance break-words text-text-secondary';
 const VALUE = {
   footer:
@@ -24,16 +21,6 @@ const VALUE = {
 type Variant = keyof typeof VALUE;
 type Sides = Record<(typeof SIDES)[number], ReactNode>;
 
-function Pill({ delta, side }: { delta: Delta; side?: string }) {
-  return (
-    <DeltaPill
-      delta={side ? `${side} ${delta.label}` : delta.label}
-      deltaColor={PILL_COLORS[delta.tone]}
-      direction={delta.direction}
-    />
-  );
-}
-
 function Pills({
   deltas,
   sides,
@@ -41,17 +28,32 @@ function Pills({
   deltas: (Delta | null)[];
   sides: boolean;
 }) {
+  const available = deltas.some(Boolean);
   return (
-    <span className="flex flex-wrap items-center gap-1">
-      {deltas.map((delta, index) =>
-        delta ? (
-          <Pill
-            key={index}
-            delta={delta}
-            side={sides ? SIDES[index] : undefined}
-          />
-        ) : null,
+    <span
+      data-loading-field=""
+      className={cx(
+        'flex items-start gap-1',
+        sides
+          ? 'min-h-[3.25rem] flex-col @min-[18rem]:min-h-6 @min-[18rem]:flex-row'
+          : 'min-h-6',
       )}
+    >
+      {!available && <Chip>No baseline</Chip>}
+      {available &&
+        deltas.map((delta, index) =>
+          delta ? (
+            <DeltaChip
+              key={index}
+              delta={delta}
+              side={sides ? SIDES[index] : undefined}
+            />
+          ) : (
+            <Chip key={index}>
+              {sides ? SIDES[index] + ' · ' : ''}No baseline
+            </Chip>
+          ),
+        )}
     </span>
   );
 }
@@ -70,6 +72,7 @@ function Value({
   if (!sides)
     return (
       <span
+        data-loading-field=""
         className={cx(
           VALUE[variant],
           money ? 'text-money' : 'text-text-primary',
@@ -79,9 +82,12 @@ function Value({
       </span>
     );
   return (
-    <span className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+    <span
+      data-loading-field=""
+      className="grid w-full min-w-0 auto-rows-[2rem] items-center gap-x-4 @min-[18rem]:flex @min-[18rem]:h-8"
+    >
       {SIDES.map((side) => (
-        <span key={side} className="inline-flex items-baseline gap-1">
+        <span key={side} className="inline-flex h-8 items-center gap-1">
           <span className={cx(VALUE[variant], 'text-text-primary')}>
             {sides[side]}
           </span>
@@ -89,6 +95,88 @@ function Value({
         </span>
       ))}
     </span>
+  );
+}
+
+type CardProps = {
+  icon: ComponentType<{ className?: string; 'aria-hidden'?: boolean }>;
+  label: string;
+  value?: ReactNode;
+  sides?: Sides;
+  deltas?: (Delta | null)[];
+  caption?: ReactNode;
+  hint?: string;
+  money?: boolean;
+  variant?: Variant;
+  comparison?: ReactNode;
+  selection?: { pressed: boolean; controls: string; onPress: () => void };
+};
+
+function PlainCard({
+  icon: Icon,
+  label,
+  selection,
+  hint,
+  value,
+  sides,
+  money,
+  comparison,
+  caption,
+  changed,
+}: CardProps & { changed: (Delta | null)[] | null }) {
+  const frame =
+    'row-span-3 grid min-w-0 grid-rows-subgrid gap-y-0 rounded-xl bg-background-secondary-default p-3';
+  const content = (
+    <>
+      <span className="flex items-center gap-2">
+        <span className="flex items-center rounded-md bg-stat-card-icon-background p-1.5">
+          <Icon
+            aria-hidden
+            className="size-4 shrink-0 text-foreground-icon-primary"
+          />
+        </span>
+        <span className={cx('min-w-0 flex-1', LABEL)}>{label}</span>
+        {hint && !selection ? <StatHint label={label} hint={hint} /> : null}
+      </span>
+      <span
+        className={cx(
+          '@container mt-1 min-w-0',
+          selection
+            ? 'grid grid-rows-[2.25rem_1.75rem] items-center justify-items-start'
+            : 'flex min-h-8 flex-wrap items-center gap-x-2 gap-y-1',
+        )}
+      >
+        <Value variant="plain" value={value} sides={sides} money={money} />
+        {comparison}
+      </span>
+      {changed || caption ? (
+        <span className="@container mt-1 flex min-w-0 flex-col gap-1 self-start">
+          {changed ? <Pills deltas={changed} sides={!!sides} /> : null}
+          {caption ? (
+            <span className="text-caption-1-medium text-text-tertiary">
+              {caption}
+            </span>
+          ) : null}
+        </span>
+      ) : null}
+    </>
+  );
+  return selection ? (
+    <button
+      type="button"
+      aria-controls={selection.controls}
+      aria-pressed={selection.pressed}
+      onClick={selection.onPress}
+      className={cx(
+        frame,
+        'cursor-pointer text-left hover:bg-raised focus-visible:outline-2 focus-visible:outline-signal',
+        selection.pressed && 'ring-1 ring-inset ring-signal',
+      )}
+    >
+      {content}
+    </button>
+  ) : (
+    <section className={frame}>{content}</section>
   );
 }
 
@@ -102,47 +190,28 @@ export function StatCard({
   hint,
   money,
   variant = 'plain',
-}: {
-  icon: ComponentType<{ className?: string; 'aria-hidden'?: boolean }>;
-  label: string;
-  value?: ReactNode;
-  sides?: Sides;
-  deltas?: (Delta | null)[];
-  caption?: ReactNode;
-  hint?: string;
-  money?: boolean;
-  variant?: Variant;
-}) {
-  const changed = deltas?.some(Boolean) ? deltas : null;
+  selection,
+  comparison,
+}: CardProps) {
+  const changed = deltas ?? null;
   if (variant === 'plain')
     return (
-      <section className="row-span-4 grid min-w-0 grid-rows-subgrid gap-y-0 rounded-xl bg-background-secondary-default p-4">
-        <div className="flex items-start justify-between gap-2">
-          <span className="flex items-center rounded-md bg-stat-card-icon-background p-1.5">
-            <Icon
-              aria-hidden
-              className="size-4 shrink-0 text-foreground-icon-primary"
-            />
-          </span>
-          {hint ? <StatHint label={label} hint={hint} /> : null}
-        </div>
-        <p className={cx('mt-3', LABEL)}>{label}</p>
-        <div className="@container mt-1 flex min-w-0 items-baseline self-baseline">
-          <Value variant={variant} value={value} sides={sides} money={money} />
-        </div>
-        {changed || caption ? (
-          <div className="mt-1 flex min-w-0 flex-col gap-1 self-start">
-            {changed ? <Pills deltas={changed} sides={!!sides} /> : null}
-            {caption ? (
-              <p className="text-caption-1-medium text-text-tertiary">
-                {caption}
-              </p>
-            ) : null}
-          </div>
-        ) : null}
-      </section>
+      <PlainCard
+        icon={Icon}
+        {...{
+          label,
+          selection,
+          hint,
+          value,
+          sides,
+          money,
+          comparison,
+          caption,
+          changed,
+        }}
+      />
     );
-  const band = caption ?? (changed ? COMPARED : null);
+  const band = caption;
   return (
     <section className="row-span-4 grid min-w-0 grid-rows-subgrid gap-y-0 rounded-xl bg-background-secondary-default p-2">
       <div className="flex w-full items-start justify-between gap-2.5 p-2">
@@ -158,11 +227,13 @@ export function StatCard({
       <div className="@container mx-2 mt-0.5 mb-3.5 flex min-w-0 items-baseline self-baseline">
         <Value variant={variant} value={value} sides={sides} money={money} />
       </div>
-      {band ? (
+      {band || changed ? (
         <div className="flex w-full flex-wrap items-center justify-between gap-2 self-end rounded-2lg bg-background-inner-default py-1.5 ps-2.5 pe-1.5 shadow-card">
-          <p className="min-w-0 text-body-regular text-text-secondary">
-            {band}
-          </p>
+          {band && (
+            <p className="min-w-0 text-body-regular text-text-secondary">
+              {band}
+            </p>
+          )}
           {changed ? <Pills deltas={changed} sides={!!sides} /> : null}
         </div>
       ) : null}

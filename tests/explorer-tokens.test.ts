@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import type { NetworkSide } from '@gyblos/explorer/collector-shape';
+import { overviewActivity } from '@gyblos/explorer/overview-activity';
 import { summarizeUsage } from '@gyblos/explorer/usage';
 
 const NO_LATENCY = {
@@ -42,10 +43,6 @@ const day = (
 
 void test('tokens processed add input and output, each side apart', () => {
   const usage = summarizeUsage({
-    aggregatedAt: 1,
-    models: [],
-    buyerTotals: null,
-    error: null,
     days: [
       day('2026-11-16', side(20_000, 50_000, false), side(300, 400, true)),
       day('2026-11-17', side(1, 2, false), null),
@@ -53,4 +50,24 @@ void test('tokens processed add input and output, each side apart', () => {
   });
   assert.equal(usage.free.tokens, 70_003);
   assert.equal(usage.paid.tokens, 700);
+});
+
+void test('the token breakdown reconciles input and output for observed dates and keeps gaps', () => {
+  const days = [
+    day('2026-11-16', side(10, 50, false), side(100, 5, true)),
+    day('2026-11-17', side(0, 0, false), null),
+  ];
+  const report = overviewActivity(
+    [...days.map((row) => row.day), '2026-11-18'],
+    { days, version: 4, updated: 1 },
+  );
+  assert.deepEqual(
+    report.points.map(({ input, output, tokens }) => [input, output, tokens]),
+    [
+      [110, 55, 165],
+      [0, 0, 0],
+      [null, null, null],
+    ],
+  );
+  assert.equal(report.tokens, 165);
 });

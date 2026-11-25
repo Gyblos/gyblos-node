@@ -1,12 +1,9 @@
 'use client';
 
-// A single-select segmented control, after BoardUI's SegmentedControl (MIT, see ./LICENSE): a raised
-// track and a panel-colored thumb behind the selected segment. Built on React Aria's ToggleButtonGroup,
-// so arrow keys move focus and Space/Enter select; the selection can't be emptied.
-import { ToggleButton, ToggleButtonGroup } from 'react-aria-components';
-
-import { cx } from './cx';
-import { SURFACE } from './styles';
+import {
+  SegmentedControl as BoardControl,
+  SegmentedControlItem,
+} from '../../boardui/components/base/segmented-control/segmented-control';
 
 export function SegmentedControl<Value extends string | number>({
   label,
@@ -20,29 +17,24 @@ export function SegmentedControl<Value extends string | number>({
   onChange: (value: Value) => void;
 }) {
   return (
-    <ToggleButtonGroup
+    <BoardControl
       aria-label={label}
-      selectionMode="single"
-      disallowEmptySelection
       selectedKeys={[selected]}
       onSelectionChange={(keys) => {
         const next = options.find((option) => keys.has(option.value));
         if (next && next.value !== selected) onChange(next.value);
       }}
-      className={cx('inline-flex items-stretch gap-0.5 p-0.5', SURFACE.control)}
+      className="border border-line"
     >
       {options.map((option) => (
-        <ToggleButton
+        <SegmentedControlItem
           key={option.value}
           id={option.value}
-          className={cx(
-            'flex cursor-pointer items-center rounded-md px-3 font-mono text-xs text-muted transition-colors hover:text-ink data-[selected]:bg-raised data-[selected]:text-ink',
-            SURFACE.focus,
-          )}
+          className="min-h-11 min-w-11 font-mono text-xs sm:pointer-fine:min-h-0 sm:pointer-fine:min-w-0"
         >
           {option.label}
-        </ToggleButton>
+        </SegmentedControlItem>
       ))}
-    </ToggleButtonGroup>
+    </BoardControl>
   );
 }

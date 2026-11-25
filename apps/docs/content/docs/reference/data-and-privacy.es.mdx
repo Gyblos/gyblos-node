@@ -83,6 +83,8 @@ descartan. La subida nunca retrasa ni bloquea una respuesta.
 de la red, por modelo y por vendedor, identificados por NodeId. Usa tu dirección IP para limitar la tasa
 de solicitudes y no la guarda.
 
+Para días UTC completos, el endpoint de actividad de la red agrupa las solicitudes, los tokens y los pagos indexados a vendedores en intervalos de media hora. Publica totales de toda la red y admite hasta siete días por consulta. Si un intervalo contiene una sola solicitud, se puede deducir cuántos tokens procesó. La respuesta omite identificadores y desgloses por modelo o vendedor.
+
 Los totales de la red también cuentan compradores distintos: los gratuitos por NodeId y los de pago por
 billetera (o por NodeId cuando un recibo de pago no nombra billetera), sin sumarlos nunca. Cada conteo
 se publica para todo el historial y para los compradores cuyo primer recibo informado por el vendedor y no disputado por el comprador cae en los días elegidos. Un comprador sigue contado aunque ese recibo se dispute después. Los compradores nuevos de hoy se cuentan solo cuando termina el

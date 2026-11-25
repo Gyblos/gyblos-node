@@ -123,3 +123,44 @@ void test('a malformed buyerTotals empties only the Buyers card, not the collect
   assert.equal(snapshot.days.length, 1);
   assert.equal(snapshot.buyerTotals, null);
 });
+
+void test('All rejects collector responses that silently default to a bounded window', async (context) => {
+  context.mock.method(globalThis, 'fetch', async () =>
+    Response.json({
+      from: DAY,
+      to: DAY,
+      aggregatedAt: 1,
+      days: [],
+      models: [],
+    }),
+  );
+  const result = await getCollector('all');
+  assert.ok(result.error);
+});
+
+void test('All requests the entire published history without a fixed start date', async (context) => {
+  const urls: URL[] = [];
+  context.mock.method(globalThis, 'fetch', async (input: string | URL) => {
+    const url = new URL(input);
+    urls.push(url);
+    return Response.json({
+      range: 'all',
+      from: DAY,
+      to: url.searchParams.get('to'),
+      historyAvailable: true,
+      aggregatedAt: 1,
+      days: [],
+      models: [],
+    });
+  });
+  const result = await getCollector('all');
+  assert.equal(result.error, null);
+  assert.equal(urls.length, 2);
+  assert.ok(
+    urls.every(
+      (url) =>
+        url.searchParams.get('range') === 'all' &&
+        !url.searchParams.has('from'),
+    ),
+  );
+});

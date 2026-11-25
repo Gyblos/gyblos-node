@@ -2,23 +2,32 @@
 // unavailable states, and linked addresses. No data access.
 import { ChevronDown, ChevronsUpDown, ChevronUp } from 'lucide-react';
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 
 import { Skeleton } from '../boardui/components/base/skeleton/skeleton';
-import { explorerAddressUrl } from '../lib/config';
+import { addressHref } from '../lib/config';
 import { DISPLAY, PAGING } from '../lib/constants';
 import { short } from '../lib/format';
-import { FULL_OVERVIEW, overviewLayout } from '../lib/layout';
+import {
+  compactColumnGroups,
+  FULL_OVERVIEW,
+  overviewLayout,
+} from '../lib/layout';
+import { modelLab } from '../lib/model-family';
+import { modelHref } from '../lib/offers';
 import { sortHref, type ExplorerQuery, type SortedTable } from '../lib/paging';
 import type { RangeDays, RangeSection } from '../lib/range';
 import { ModelLogo } from './model-logo';
 import { RangeControl } from './range-control';
 import { SectionHelp } from './section-help';
+import { HeaderText, type Column } from './table-cells';
 import { TableScroll } from './table-scroll';
 import { isToken, TokenLogo } from './token-logo';
 
-export const th = 'px-4 py-3 text-xs font-medium text-muted';
-export const td = 'px-4 py-3';
+export { EmptyRow, prefixedColumn, type Column } from './table-cells';
+
+export const th = 'px-3 py-2 text-xs font-medium text-muted';
+export const td = 'px-3 py-2';
 export const numberCell = `${td} text-right font-mono`;
 export const moneyCell = `${numberCell} text-money`;
 export const amountCell = (atomic: bigint) =>
@@ -100,7 +109,7 @@ export function SectionTitle({
   return (
     <div
       id={id}
-      className="mt-10 mb-4 flex scroll-mt-4 flex-wrap items-baseline justify-between gap-2"
+      className="mt-6 mb-3 flex scroll-mt-4 flex-wrap items-baseline justify-between gap-2"
     >
       <div className="flex items-center gap-2">
         <h2 className="text-xl font-medium">{title}</h2>
@@ -139,21 +148,13 @@ export function Unavailable({
   );
 }
 
-export interface Column {
-  label: string;
-  right?: boolean;
-  group?: string;
-  sort?: string;
-  ascendingFirst?: boolean;
-}
-
 interface Sorting {
   query: ExplorerQuery;
   table: SortedTable;
 }
 
 function HeadLabel({ column, sorting }: { column: Column; sorting?: Sorting }) {
-  if (!column.sort || !sorting) return <>{column.label}</>;
+  if (!column.sort || !sorting) return <HeaderText column={column} />;
   const current = sorting.query.sorts[sorting.table];
   const active = current?.key === column.sort;
   const Icon = !active
@@ -163,6 +164,7 @@ function HeadLabel({ column, sorting }: { column: Column; sorting?: Sorting }) {
       : ChevronUp;
   return (
     <Link
+      data-query-control=""
       href={sortHref(
         sorting.query,
         sorting.table,
@@ -172,7 +174,7 @@ function HeadLabel({ column, sorting }: { column: Column; sorting?: Sorting }) {
       scroll={false}
       className={`inline-flex items-center gap-1 hover:text-ink ${column.right ? 'flex-row-reverse' : ''} ${active ? 'text-ink' : ''}`}
     >
-      {column.label}
+      <HeaderText column={column} />
       <Icon aria-hidden className="size-3.5 shrink-0 opacity-70" />
     </Link>
   );
@@ -218,6 +220,8 @@ function TableHead({ head, sorting }: { head: Column[]; sorting?: Sorting }) {
             <th
               key={index}
               colSpan={run.columns.length}
+              scope="colgroup"
+              data-metric={run.group}
               data-group=""
               data-edge={edge(index, true, true)}
               className={`${th} text-center`}
@@ -232,6 +236,12 @@ function TableHead({ head, sorting }: { head: Column[]; sorting?: Sorting }) {
           ) : (
             <th
               key={index}
+              scope="col"
+              data-metric={
+                index
+                  ? (run.columns[0]!.compactGroup ?? run.columns[0]!.label)
+                  : undefined
+              }
               rowSpan={grouped ? 2 : undefined}
               aria-sort={ariaSort(run.columns[0]!, sorting)}
               className={`${th} ${align(run.columns[0]!)} align-middle`}
@@ -249,6 +259,8 @@ function TableHead({ head, sorting }: { head: Column[]; sorting?: Sorting }) {
                   <th
                     key={`${index}-${position}`}
                     colSpan={1}
+                    scope="col"
+                    data-metric={run.group}
                     data-edge={edge(
                       index,
                       position === 0,
@@ -273,19 +285,31 @@ export function Table({
   children,
   footer,
   sorting,
+  compactLabel,
+  heading,
   minWidth = DISPLAY.defaultTable,
 }: {
   head: Column[];
   children: ReactNode;
-  footer?: ReactNode;
+  footer: ReactElement;
   sorting?: Sorting;
+  compactLabel?: string;
+  heading?: ReactNode;
   minWidth?: number;
 }) {
   return (
-    <TableScroll footer={footer}>
+    <TableScroll
+      heading={heading}
+      footer={footer}
+      compact={
+        compactLabel
+          ? { label: compactLabel, columns: compactColumnGroups(head) }
+          : undefined
+      }
+    >
       <table
-        className="bui-table explorer-table w-full text-left whitespace-nowrap"
-        style={{ minWidth }}
+        className="bui-table bui-table-sm explorer-table w-full text-left whitespace-nowrap"
+        style={{ minWidth: `var(--table-min-width, ${minWidth}px)` }}
       >
         <TableHead head={head} sorting={sorting} />
         <tbody>{children}</tbody>
@@ -327,38 +351,47 @@ export function MoreLink({ href, label }: { href: string; label: string }) {
 export function Addr({ value }: { value: string | null }) {
   if (!value) return <>—</>;
   return (
-    <a
-      className="hover:text-ink hover:underline underline-offset-2"
-      href={explorerAddressUrl(value)}
+    <Link
+      className="underline decoration-line underline-offset-2 hover:text-ink hover:decoration-current"
+      href={addressHref(value)}
+      title={value}
     >
       {short(value)}
-    </a>
+    </Link>
   );
 }
 
 // A model as published: its maker's mark, the id, then variant and quantization when present.
 export function ModelName({
+  closed,
+  days,
   modelId,
   variant,
   quantization,
 }: {
+  days?: RangeDays;
+  closed?: boolean;
   modelId: string;
   variant: string | null;
   quantization: string | null;
 }) {
   const detail = [variant, quantization].filter(Boolean).join(' ');
   return (
-    <span
-      className="inline-flex max-w-full items-center gap-2"
+    <Link
+      href={modelHref({ modelId, variant, quantization }, days, closed)}
+      className="hover:underline underline-offset-2 inline-flex max-w-full items-center gap-2"
       title={[modelId, detail].filter(Boolean).join(' ')}
     >
       <ModelLogo modelId={modelId} />
       <span className="truncate">
+        <span className="block text-xs font-sans text-muted">
+          {modelLab(modelId) ?? 'Lab unknown'}
+        </span>
         {modelId}
         {detail ? (
           <span className="ml-2 font-mono text-xs text-dim">{detail}</span>
         ) : null}
       </span>
-    </span>
+    </Link>
   );
 }

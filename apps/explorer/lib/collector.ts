@@ -10,10 +10,9 @@ import {
   parseNetworkDay,
   type CollectorSnapshot,
 } from './collector-shape';
-import { COLLECTOR_URL } from './config';
-import { fetchJson } from './fetch-json';
-import { rangeQuery, type RangeDays } from './range';
-import { list, record } from './validate';
+import { rangeEnd, type RangeDays } from './range';
+import { readStats } from './stats-window';
+import { list, text } from './validate';
 
 export type {
   CollectorSnapshot,
@@ -26,13 +25,21 @@ export type {
 // The last `days` UTC days of network totals and models, as aggregated by the collector, or the
 // span just before them with `periodsBack` 1. Read once per render and span: the Models and Usage
 // sections share the answer.
-export const getCollector = (days: RangeDays, periodsBack = 0) =>
-  readCollector(days, periodsBack);
+export const getCollector = (days: RangeDays, periodsBack = 0, closed = true) =>
+  readCollector(days, periodsBack, closed);
 // Memoized on both arguments always passed, so a default and an explicit 0 share one read.
 const readCollector = cache(
-  async (days: RangeDays, periodsBack: number): Promise<CollectorSnapshot> => {
+  async (
+    days: RangeDays,
+    periodsBack: number,
+    closed: boolean,
+  ): Promise<CollectorSnapshot> => {
     try {
-      return await loadCollector(rangeQuery(days, Date.now(), periodsBack));
+      return await loadCollector(
+        days,
+        rangeEnd(days, Date.now(), closed),
+        periodsBack,
+      );
     } catch (error) {
       return {
         aggregatedAt: null,
@@ -45,18 +52,48 @@ const readCollector = cache(
   },
 );
 
-async function loadCollector(query: string): Promise<CollectorSnapshot> {
-  const [networkBody, modelsBody] = await Promise.all([
-    fetchJson(`${COLLECTOR_URL}/stats/network${query}`, 'collector network'),
-    fetchJson(`${COLLECTOR_URL}/stats/models${query}`, 'collector models'),
+async function loadCollector(
+  days: RangeDays,
+  end: number,
+  periodsBack: number,
+): Promise<CollectorSnapshot> {
+  const [network, models] = await Promise.all([
+    readStats('network', days, end, periodsBack),
+    readStats('models', days, end, periodsBack),
   ]);
-  const network = record(networkBody, 'network');
-  const models = record(modelsBody, 'models');
   return {
+    error: null,
     aggregatedAt: Math.max(aggregatedAt(network), aggregatedAt(models)) || null,
     days: list(network.days, 'network.days').map(parseNetworkDay),
     models: list(models.models, 'models.models').map(parseModel),
     buyerTotals: optionalNetworkBuyers(network.buyerTotals),
-    error: null,
   };
+}
+
+export async function getOverviewNetwork(
+  days: RangeDays,
+  now: number,
+  periodsBack = 0,
+) {
+  try {
+    const source = await readStats(
+      'network',
+      days,
+      rangeEnd(days, now, true),
+      periodsBack,
+    );
+    return {
+      buyerTotals: optionalNetworkBuyers(source.buyerTotals),
+      from: text(source.from, 'network.from'),
+      to: text(source.to, 'network.to'),
+      days: list(source.days, 'network.days').map(parseNetworkDay),
+      version:
+        typeof source.formulaVersion === 'number'
+          ? source.formulaVersion
+          : null,
+      updated: aggregatedAt(source),
+    };
+  } catch {
+    return null;
+  }
 }

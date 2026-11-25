@@ -4,6 +4,7 @@ import {
   DISPLAY,
   FIRST_SPEED_BOUND,
   LATENCY_BUCKETS_MS,
+  LIVE,
   UNITS,
 } from './constants';
 import type { LatencyBound } from './latency';
@@ -12,6 +13,19 @@ const LAST_BOUND_MS = LATENCY_BUCKETS_MS.at(-1) ?? 0;
 
 const LOCALE = 'en-US';
 const DECIMAL_BASE = 10n;
+const SECONDS_PER_MINUTE = 60;
+const MINUTES_PER_HOUR = 60;
+
+export function refreshAge(elapsed: number) {
+  const seconds = Math.max(0, Math.floor(elapsed / UNITS.msPerSecond));
+  if (elapsed < LIVE.labelMs) return 'just now';
+  if (seconds < SECONDS_PER_MINUTE) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / SECONDS_PER_MINUTE);
+  if (minutes < MINUTES_PER_HOUR) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / MINUTES_PER_HOUR);
+  const days = Math.floor(elapsed / UNITS.msPerDay);
+  return days ? `${days}d ago` : `${hours}h ago`;
+}
 
 // A USDC amount's sign, whole dollars and fraction (at most `digits` digits, trailing zeros dropped).
 function usdcParts(atomic: bigint, digits: number = UNITS.usdcDecimals) {
@@ -56,6 +70,7 @@ export function usdcDecimal(atomic: bigint): `${number}` {
 
 // Price per million tokens, from atomic units per million tokens.
 export function pricePerMtok(atomic: string): string {
+  if (!/^\d+$/.test(atomic)) return '—';
   const value = BigInt(atomic);
   return value === 0n ? 'Free' : usdc(value);
 }

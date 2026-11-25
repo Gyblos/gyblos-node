@@ -6,12 +6,6 @@ export const FETCH = {
   timeoutMs: 8_000,
 } as const;
 
-// The discovery index is read in one place, by the Worker's scheduled run (scheduled.ts, on the cron
-// in wrangler.jsonc), into KV that every render reads (discovery-snapshot.ts): the index's load does
-// not grow with viewers. A run sends at most maxRequestsPerRun requests: under the Workers Free plan's
-// 50 subrequests per invocation (its KV read and write count too) and the index's 120 a minute per
-// address. A whole read of a large index spans several runs. On the Free plan a run also has 10 ms of
-// CPU, which parsing a few hundred sellers can exceed: an index that large needs the Workers Paid plan.
 export const DISCOVERY = {
   // Bump the version whenever StoredDiscovery changes: renders show nothing until the next whole read.
   storedKey: 'discovery/v1',
@@ -63,6 +57,7 @@ export const LATENCY_BUCKETS_MS = [
 
 export const DISPLAY = {
   statCards: 4,
+  demandModelsPerDay: 20,
   // Digits of a short address on each side of the ellipsis.
   addressHead: 4,
   addressTail: 4,
@@ -94,9 +89,12 @@ export const CHAIN_TXS = {
   limitParam: 'limit',
   recipientParam: 'recipient',
   pageRows: 5,
+  pageParam: 'page',
 } as const;
 
 export const PAGING = {
+  overviewParam: 'view',
+  overviewValue: 'network',
   rowsPerPage: 5,
   maxPageDigits: 6,
   params: {
@@ -177,19 +175,30 @@ export const SELLER_STATUS = {
   unknown: 'unknown',
 } as const;
 
-// The date range control: preset spans of UTC days ending today. The collector answers at most 92 days
-// (AGGREGATES.maxRangeDays) and 30 by default.
+export const ALL_TIME = 'all';
+
+export const STATS = {
+  tabParam: 'tab',
+  metricParam: 'metric',
+  tabs: ['usage', 'payments'],
+  metrics: { tokens: 'usage', requests: 'usage', paidOut: 'payments' },
+} as const;
+
 export const RANGE = {
   param: 'range',
+  closedParam: 'closed',
   sections: {
     overview: { param: 'overviewRange', tables: [] },
+    chart: { param: 'chartRange', tables: [] },
     models: { param: 'modelsRange', tables: ['models'] },
     usage: { param: 'usageRange', tables: ['daily', 'demand'] },
     payments: { param: 'paymentsRange', tables: ['chainDaily'] },
     activity: { param: 'activityRange', tables: ['models', 'daily'] },
   },
-  presets: [7, 30, 90],
-  defaultDays: 30,
+  dayParam: '24h',
+  presets: [1, 7, 30, ALL_TIME],
+  defaultDays: ALL_TIME,
+  legacyRange: '90',
   // "YYYY-MM-DD" from an ISO timestamp.
   dayPrecision: 10,
 } as const;
@@ -207,7 +216,6 @@ export const IDENTITY = {
   verifiedParam: 'verified',
   verifiedValue: '1',
   bandsPerUnit: 100,
-  gridSize: 5,
   cellPx: 4,
   hashOffset: 2_166_136_261,
   hashPrime: 16_777_619,
@@ -217,6 +225,8 @@ export const SELLER_NAME = {
   hint: 'self-chosen name, not verified',
   unsafe: /[@✓✔✅☑\p{Cc}\p{Cf}]/u,
 } as const;
+
+export const SEARCH_TERM_LIMIT = 160;
 
 export const COVERAGE_STATES = {
   FINAL: 'final',

@@ -1,0 +1,3 @@
+@import '../../boardui/styles/globals.css';
+@source '../../boardui/components';
+@source '../app';

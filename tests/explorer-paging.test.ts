@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { getTransactionTable } from '@gyblos/explorer/chain-txs';
+import { operationBefore } from '@gyblos/explorer/chain-txs-shape';
 import { CHAIN_TXS, PAGING, RANGE } from '@gyblos/explorer/constants';
 import {
   canonicalPageHref,
@@ -80,12 +82,14 @@ void test('the query reads every table page and drops invalid values', () => {
     before: CURSOR,
     pages: { sellers: 2, transactions: 3 },
   });
-  assert.deepEqual(readQuery(new URLSearchParams('txPage=4')).pages, {});
+  assert.deepEqual(readQuery(new URLSearchParams('txPage=4')).pages, {
+    transactions: 4,
+  });
 });
 
 void test('every link keeps the range, the filter, the cursor and the other tables pages', () => {
   const query = readQuery({
-    range: '90',
+    range: '30',
     verified: '1',
     before: CURSOR,
     sellersPage: '2',
@@ -94,15 +98,15 @@ void test('every link keeps the range, the filter, the cursor and the other tabl
   });
   assert.equal(
     queryHref(query, { pages: { models: 4 } }),
-    `/?range=90&verified=1&before=${CURSOR}&sellersPage=2&offlinePage=3&modelsPage=4&txPage=2`,
+    `/?range=30&verified=1&before=${CURSOR}&sellersPage=2&offlinePage=3&modelsPage=4&txPage=2`,
   );
   assert.equal(
     queryHref(query, { pages: { sellers: 1 } }),
-    `/?range=90&verified=1&before=${CURSOR}&offlinePage=3&txPage=2`,
+    `/?range=30&verified=1&before=${CURSOR}&offlinePage=3&txPage=2`,
   );
   assert.equal(
     queryHref(query, { before: null }),
-    '/?range=90&verified=1&sellersPage=2&offlinePage=3',
+    '/?range=30&verified=1&sellersPage=2&offlinePage=3',
   );
   assert.equal(queryHref(readQuery({})), '/');
   for (const param of Object.values(PAGING.params))
@@ -121,6 +125,7 @@ void test("a section's range resets only that section's tables, and an old range
     ),
     {
       overview: [],
+      chart: [],
       models: ['models'],
       usage: ['daily', 'demand'],
       payments: ['chainDaily'],
@@ -145,7 +150,10 @@ void test("a section's range resets only that section's tables, and an old range
 
 void test('a table pager links every page it can show to its table, keeping the other parameters', () => {
   const query = readQuery({ range: '7', offlinePage: '2' });
-  assert.equal(tablePager(query, 'models', pageOf(rows(5), 1)), null);
+  const single = tablePager(query, 'models', pageOf(rows(5), 1));
+  assert.equal(single?.rows, 'Rows 1–5 of 5');
+  assert.equal(single?.pages, 1);
+  assert.equal(tablePager(query, 'models', pageOf([], 1))?.rows, '0 rows');
   const models = `#${PAGING.anchors.models}`;
   const first = tablePager(query, 'models', pageOf(rows(1200), 1));
   assert.deepEqual(
@@ -208,51 +216,25 @@ void test('an invalid page parameter is dropped from the URL', () => {
     canonicalPageHref({ dailyPage: '1', sellersPage: '2' }),
     '/?sellersPage=2',
   );
-  assert.equal(canonicalPageHref({ txPage: '2' }), '/');
+  assert.equal(canonicalPageHref({ txPage: '2' }), null);
   assert.equal(canonicalPageHref({ sellersPage: '2', other: 'x' }), null);
   assert.equal(canonicalPageHref({ before: CURSOR, txPage: '2' }), null);
   assert.equal(canonicalPageHref({}), null);
 });
 
-void test('the transaction pager counts rows without a total and keeps its cursor paging', () => {
-  const anchor = `#${PAGING.anchors.transactions}`;
-  assert.equal(PAGING.cursorTable, 'transactions');
+void test('operations show the real last page and link back to the immediately preceding page', () => {
   assert.equal(CHAIN_TXS.pageRows, PAGING.rowsPerPage);
   assert.ok(CHAIN_TXS.pageRows <= CHAIN_TX_PAGE.maxLimit);
-  assert.equal(txPager(readQuery({}), 3, null), null);
-  assert.deepEqual(txPager(readQuery({ sellersPage: '2' }), 5, OLDER), {
-    rows: 'Rows 1–5',
-    page: 1,
-    pages: 2,
-    hrefs: { 2: `/?before=${OLDER}&sellersPage=2&txPage=2${anchor}` },
-    showPages: false,
-    previousLabel: 'Newest',
-    nextLabel: 'Older',
-  });
-  assert.deepEqual(
-    txPager(readQuery({ before: CURSOR, txPage: '2', range: '7' }), 5, OLDER),
-    {
-      rows: 'Rows 6–10',
-      page: 2,
-      pages: 3,
-      hrefs: {
-        1: `/?range=7${anchor}`,
-        3: `/?range=7&before=${OLDER}&txPage=3${anchor}`,
-      },
-      showPages: false,
-      previousLabel: 'Newest',
-      nextLabel: 'Older',
-    },
+  const pager = txPager(
+    readQuery({ before: OLDER, txPage: '3' }),
+    pageOf(rows(13), 3),
   );
-  assert.deepEqual(txPager(readQuery({ before: CURSOR }), 4, null), {
-    rows: null,
-    page: 2,
-    pages: 2,
-    hrefs: { 1: `/${anchor}` },
-    showPages: false,
-    previousLabel: 'Newest',
-    nextLabel: 'Older',
-  });
+  assert.equal(pager.rows, 'Rows 11–13 of 13');
+  assert.equal(pager.pages, 3);
+  assert.equal(pager.showPages, true);
+  assert.match(pager.hrefs[2] ?? '', /txPage=2/);
+  assert.ok(!pager.hrefs[2]?.includes('before='));
+  assert.equal(txPager(readQuery({}), pageOf([], 1)).pages, 1);
 });
 
 void test('the Sellers caption counts offers and sellers apart from rows', () => {
@@ -279,8 +261,8 @@ void test('switching a section range keeps a valid transaction page', () => {
     `/?before=${CURSOR}`,
   );
   assert.equal(
-    sectionRangeHref('usageRange=7', 'usage', 90),
-    '/?usageRange=90',
+    sectionRangeHref('usageRange=7', 'usage', 30),
+    '/?usageRange=30',
   );
   assert.equal(
     sectionRangeHref('usageRange=7&before=bad', 'usage', RANGE.defaultDays),
@@ -347,4 +329,88 @@ void test('a home link to a table that moved to its own page redirects there wit
   assert.equal(movedHomeHref({ overviewRange: '7', verified: '1' }), null);
   assert.equal(movedHomeHref({}), null);
   assert.deepEqual(PAGING.sortKeys.models, ['input', 'output', 'context']);
+});
+
+void test('overview table links keep the range and paginate inside Network', () => {
+  const query = { ...readQuery({ overviewRange: '7' }), overviewTables: true };
+  const view = tablePager(query, 'sellers', pageOf(rows(8), 1));
+  const url = new URL(view!.hrefs[2]!, 'https://example.org');
+  assert.equal(movedHomeHref(url.searchParams), null);
+  assert.equal(readQuery(url.searchParams).pages.sellers, 2);
+  assert.equal(readQuery(url.searchParams).ranges.overview, 7);
+});
+
+void test('an operation opens the indexed instruction through the exclusive collector cursor', () => {
+  assert.equal(operationBefore(CURSOR), `140-${SIGNATURE}-2`);
+  assert.equal(operationBefore('invalid'), null);
+});
+
+void test('legacy 90-day bookmarks become All while retaining the surrounding page state', () => {
+  assert.equal(
+    canonicalPageHref({ range: '90', verified: '1' }),
+    '/?verified=1',
+  );
+  assert.equal(
+    canonicalPageHref(
+      { range: '7', modelsRange: '90', modelsPage: '2' },
+      '/models',
+    ),
+    '/models?range=7&modelsRange=all&modelsPage=2',
+  );
+  assert.equal(readQuery({}).days, 'all');
+});
+
+void test('a cold deep link reads one operation page and its recipient-scoped total', async (t) => {
+  const urls: URL[] = [];
+  t.mock.method(globalThis, 'fetch', async (input: string) => {
+    urls.push(new URL(input));
+    return Response.json({
+      programId: 'program',
+      treasury: 'treasury',
+      total: 100001,
+      page: 20001,
+      next: null,
+      transactions: [
+        {
+          signature: SIGNATURE,
+          instructionIndex: 0,
+          slot: 100,
+          blockTime: null,
+          kind: 'open',
+          channel: 'channel',
+          recipients: [],
+          amountAtomic: '1',
+        },
+      ],
+    });
+  });
+  const table = await getTransactionTable(
+    readQuery({ txPage: '20001' }),
+    'recipient',
+  );
+  assert.equal(urls.length, 1);
+  assert.equal(urls[0]?.searchParams.get('page'), '20001');
+  assert.equal(urls[0]?.searchParams.get('recipient'), 'recipient');
+  assert.equal(table.pager.page, 20001);
+  assert.equal(table.pager.pages, 20001);
+  assert.equal(table.transactions[0]?.signature, SIGNATURE);
+});
+
+void test('saved operation links retain their cursor when newer rows shift numbered pages', async (t) => {
+  const urls: URL[] = [];
+  t.mock.method(globalThis, 'fetch', async (input: string) => {
+    urls.push(new URL(input));
+    return Response.json({
+      programId: 'program',
+      treasury: 'treasury',
+      total: 0,
+      page: 1,
+      transactions: [],
+      next: null,
+    });
+  });
+  await getTransactionTable(readQuery({ before: CURSOR, txPage: '2' }));
+  assert.equal(urls.length, 1);
+  assert.equal(urls[0]?.searchParams.get('before'), CURSOR);
+  assert.equal(urls[0]?.searchParams.has('page'), false);
 });

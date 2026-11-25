@@ -32,7 +32,10 @@ export const asInteger = (value: SQL) => sql`cast(${value} as integer)`;
 export const atomicTotal = (value: SQL) =>
   sql`cast(cast(total(${value}) as integer) as text)`;
 // The block time of transaction alias `alias` falls in the day.
-export const inDay = (alias: string, bounds: DayBounds) =>
+export const inDay = (
+  alias: string,
+  bounds: Pick<DayBounds, 'start' | 'end'>,
+) =>
   sql`${col(alias, chainTxs.blockTime)} >= ${number(bounds.start)} and ${col(alias, chainTxs.blockTime)} < ${number(bounds.end)}`;
 // Channel alias `alias` is in scope (left-joined: an unknown channel is never a Gyblos one).
 export const inScope = (alias: string, scope: ChainAggregateScope) =>

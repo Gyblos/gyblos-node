@@ -1,7 +1,10 @@
 // Owns the discovery index's canonical values: wire error codes, statuses, routes, limits and binding names.
 // It must not hold record formats or signing domains (protocol owns those) or operator URLs (config).
 import { LOOPBACK_HOST_NAMES } from '@gyblos/config/hosts';
-import { PUBLIC_RECORD_LIMITS } from '@gyblos/protocol/constants';
+import {
+  DISCOVERY_READ_LIMITS,
+  PUBLIC_RECORD_LIMITS,
+} from '@gyblos/protocol/constants';
 
 // Static `error` values on the wire (docs/discovery.md, "Running an index").
 export const INDEX_ERRORS = {
@@ -111,7 +114,7 @@ export const DISCOVERY_INDEX_LIMITS = {
   maxSellers: 200,
   // Models listed by GET /v1/models, most sellers first.
   maxModels: 500,
-  maxResponseBytes: 1024 * 1024,
+  maxResponseBytes: DISCOVERY_READ_LIMITS.maxResponseBytes,
   // Bytes reserved for the page framing around the seller entries.
   responseFramingBytes: 128,
   // Atomic cap on tracked NodeIds, checked while a new NodeId is admitted. NodeIds are free
@@ -288,8 +291,8 @@ export const HEARTBEAT_FAILED = 'DISCOVERY_HEARTBEAT_FAILED';
 export const NETWORK_ROLLUP_FAILED = 'DISCOVERY_NETWORK_ROLLUP_FAILED';
 export const OFFER_HISTORY = {
   defaultDays: 30,
-  maxDays: 92,
-  maxPeriods: 50,
+  maxDays: DISCOVERY_READ_LIMITS.maxOfferHistoryDays,
+  maxPeriods: DISCOVERY_READ_LIMITS.maxOfferHistoryPeriods,
   dayMs: 86_400_000,
   retentionDays: UPTIME.retentionDays,
   framingBytes: 256,

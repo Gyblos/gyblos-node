@@ -1,20 +1,26 @@
-import { getChainTxs } from '../lib/chain-txs';
+import { getTransactionTable } from '../lib/chain-txs';
 import { txRow } from '../lib/chain-txs-shape';
 import { HELP_TEXT } from '../lib/config';
 import { DISPLAY, PAGING } from '../lib/constants';
 import { getDiscovery } from '../lib/discovery-render';
-import { txPager, type ExplorerQuery } from '../lib/paging';
+import { type ExplorerQuery } from '../lib/paging';
 import { sellerProfile } from '../lib/seller-profile';
 import { TX_AMOUNT_HEAD, TxLine } from './channel-txs';
 import { Pager } from './pager';
-import { SectionTitle, Table, td, Unavailable } from './ui';
+import {
+  EmptyRow,
+  prefixedColumn,
+  SectionTitle,
+  Table,
+  Unavailable,
+} from './ui';
 
 const TITLE = 'Channel transactions';
 const ANCHORS = [PAGING.anchors.transactions];
 const NO_OWNERS = new Map<string, never>();
 const HEAD = [
   { label: 'Time (UTC)' },
-  { label: 'Type' },
+  prefixedColumn('Type', 'operation'),
   ...TX_AMOUNT_HEAD,
   { label: 'Transaction' },
   { label: 'Channel' },
@@ -48,7 +54,7 @@ export async function SellerTxs({
         the discovery index publishes only while the seller is online.
       </Note>
     );
-  const page = await getChainTxs(query.before, profile.owner);
+  const page = await getTransactionTable(query, profile.owner);
   if (page.error) return <Unavailable title={TITLE} anchors={ANCHORS} />;
   return (
     <>
@@ -67,21 +73,14 @@ export async function SellerTxs({
       <Table
         minWidth={DISPLAY.txTable}
         head={HEAD}
-        footer={
-          <Pager
-            label={TITLE}
-            view={txPager(query, page.transactions.length, page.next)}
-          />
-        }
+        footer={<Pager label={TITLE} view={page.pager} />}
       >
         {page.transactions.length ? null : (
-          <tr>
-            <td className={`${td} text-muted`} colSpan={HEAD.length}>
-              {query.before
-                ? 'No older transactions.'
-                : 'No Gyblos channel transactions pay this owner address.'}
-            </td>
-          </tr>
+          <EmptyRow columns={HEAD.length}>
+            {query.before
+              ? 'No older transactions.'
+              : 'No Gyblos channel transactions pay this owner address.'}
+          </EmptyRow>
         )}
         {page.transactions.map((tx) => {
           const row = txRow(tx, NO_OWNERS, page.treasury);

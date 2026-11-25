@@ -76,47 +76,13 @@ body {
   background: var(--raised);
 }
 
-.seller-avatar-glyph {
-  color: var(--ink);
-  shape-rendering: crispEdges;
-  animation: seller-avatar-arrive 1.8s ease-out;
-  transition: transform 160ms ease-out;
-}
-
-.seller-cell:is(:hover, :focus-within) .seller-avatar-glyph {
-  transform: translateY(-1px);
-}
-
-@keyframes seller-avatar-arrive {
-  0% {
-    opacity: 0.35;
-  }
-  40%,
-  100% {
-    opacity: 1;
-  }
-  70% {
-    opacity: 0.7;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .seller-avatar-glyph {
-    animation: none;
-    transition: none;
-  }
-
-  .seller-cell:is(:hover, :focus-within) .seller-avatar-glyph {
-    transform: none;
-  }
-}
-
 /* Sticky first column and scroll divider; the opaque header mix prevents content showing through. */
 .explorer-table {
   background: var(--panel);
 }
 
 .explorer-table-scroll {
+  container-type: inline-size;
   scroll-timeline: --table-scroll inline;
 }
 
@@ -175,6 +141,21 @@ body {
   transition: box-shadow 80ms ease-out;
 }
 
+.explorer-table td.explorer-table-empty {
+  padding: 0;
+  text-align: center;
+  color: var(--dim);
+  white-space: normal;
+}
+
+.explorer-table-empty > span {
+  position: sticky;
+  inset-inline-start: 0;
+  display: block;
+  inline-size: min(100%, 100cqi);
+  padding: 1.5rem 1rem;
+}
+
 .explorer-table [data-cross] {
   box-shadow: inset 0 0 0 100vmax color-mix(in srgb, var(--ink) 6%, transparent);
 }
@@ -221,8 +202,50 @@ body {
   }
 }
 
+@media (width < theme(--breakpoint-xl)) {
+  .explorer-table[data-compact] {
+    --table-min-width: 100%;
+  }
+
+  .explorer-table[data-compact] [data-compact-hidden] {
+    display: none;
+  }
+}
+
 @media (width < theme(--breakpoint-md)) {
   [data-overflow] > .explorer-table tr > :first-child:not([colspan]) > span {
     max-width: calc(55vw - 2rem);
   }
+}
+
+[data-loading-active] {
+  position: relative;
+  visibility: hidden;
+}
+
+[data-loading-active] > .contents > .query-skeleton {
+  position: absolute;
+  visibility: visible;
+  inset-inline: 0;
+  top: 50%;
+  height: 1em;
+  max-width: 12em;
+  transform: translateY(-50%);
+}
+
+td[data-loading-active] > .contents > .query-skeleton {
+  inset-inline: 1rem;
+}
+
+td.text-right[data-loading-active] > .contents > .query-skeleton {
+  margin-inline-start: auto;
+}
+
+[data-loading-active=''][data-loading-field='plot']
+  > .contents
+  > .query-skeleton {
+  inset: 0;
+  max-width: none;
+  height: auto;
+  transform: none;
 }

@@ -1,0 +1,38 @@
+{
+  "name": "@gyblos/boardui-catalog",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sync": "boardui add --all --yes",
+    "typecheck": "tsc --noEmit",
+    "preview": "next dev preview --hostname 127.0.0.1 --port 4194"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.108",
+    "@ai-sdk/google": "^4.0.126",
+    "@ai-sdk/openai": "^4.0.123",
+    "@ai-sdk/react": "^4.0.186",
+    "@internationalized/date": "^3.12.4",
+    "@remixicon/react": "4.9.0",
+    "@tanstack/react-table": "^8.21.3",
+    "ai": "^7.0.181",
+    "motion": "^12.43.0",
+    "next": "16.4.6",
+    "react": "19.3.1",
+    "react-aria-components": "1.17.0",
+    "react-dom": "19.3.1",
+    "recharts": "3.10.1",
+    "tailwind-merge": "3.7.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "4.3.5",
+    "@types/node": "26.6.6",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "boardui": "0.5.9",
+    "postcss": "8.5.33",
+    "tailwindcss": "4.3.5",
+    "typescript": "5.9.3"
+  }
+}

@@ -86,66 +86,6 @@
           "path": "components/board/LICENSE",
           "type": "registry:file",
           "target": "components/board/LICENSE"
-        }
-      ],
-      "registryDependencies": ["gyblos-theme"]
-    },
-    {
-      "name": "animated-number",
-      "type": "registry:component",
-      "title": "Animated number",
-      "description": "A count, percent or exact USDC amount that rolls to its new value (NumberFlow), and a free · paid pair.",
-      "dependencies": ["@number-flow/react@0.6.2"],
-      "registryDependencies": ["board-base"],
-      "files": [
-        {
-          "path": "components/board/animated-number.tsx",
-          "type": "registry:component",
-          "target": "components/board/animated-number.tsx"
-        }
-      ]
-    },
-    {
-      "name": "delta-chip",
-      "type": "registry:component",
-      "title": "Delta chip",
-      "description": "A figure's change against the previous period, with a direction glyph and good, bad or neutral tone.",
-      "dependencies": ["lucide-react@1.68.0"],
-      "registryDependencies": ["board-base"],
-      "files": [
-        {
-          "path": "components/board/delta-chip.tsx",
-          "type": "registry:component",
-          "target": "components/board/delta-chip.tsx"
-        }
-      ]
-    },
-    {
-      "name": "stat-card",
-      "type": "registry:component",
-      "title": "Stat card",
-      "description": "A headline figure with an icon tile, label, value and one change per side. Spans four rows in a parent grid so neighboring stat cards share their icon, label, figure and context tracks; account for that span when mixing with other cards.",
-      "dependencies": [
-        "@remixicon/react@4.9.0",
-        "react-aria-components@1.22.1",
-        "tailwind-merge@3.7.0"
-      ],
-      "registryDependencies": ["board-base"],
-      "files": [
-        {
-          "path": "components/board/stat-card.tsx",
-          "type": "registry:component",
-          "target": "components/board/stat-card.tsx"
-        },
-        {
-          "path": "boardui/components/application/dashboard/stat-cards.tsx",
-          "type": "registry:component",
-          "target": "boardui/components/application/dashboard/stat-cards.tsx"
-        },
-        {
-          "path": "boardui/components/base/tooltip/tooltip.tsx",
-          "type": "registry:component",
-          "target": "boardui/components/base/tooltip/tooltip.tsx"
         },
         {
           "path": "boardui/components/foundations/direction/direction.tsx",
@@ -167,6 +107,67 @@
           "type": "registry:file",
           "target": "boardui/LICENSE"
         }
+      ],
+      "registryDependencies": ["gyblos-theme"],
+      "dependencies": ["tailwind-merge@3.7.0", "react-aria-components@1.22.1"]
+    },
+    {
+      "name": "animated-number",
+      "type": "registry:component",
+      "title": "Animated number",
+      "description": "A count, percent or exact USDC amount that rolls to its new value (NumberFlow), and a free \u00b7 paid pair.",
+      "dependencies": ["@number-flow/react@0.6.2"],
+      "registryDependencies": ["board-base"],
+      "files": [
+        {
+          "path": "components/board/animated-number.tsx",
+          "type": "registry:component",
+          "target": "components/board/animated-number.tsx"
+        }
+      ]
+    },
+    {
+      "name": "delta-chip",
+      "type": "registry:component",
+      "title": "Delta chip",
+      "description": "A figure's change against the previous period, with a direction glyph and good, bad or neutral tone.",
+      "dependencies": ["@remixicon/react@4.9.0"],
+      "registryDependencies": ["board-base"],
+      "files": [
+        {
+          "path": "components/board/delta-chip.tsx",
+          "type": "registry:component",
+          "target": "components/board/delta-chip.tsx"
+        },
+        {
+          "path": "boardui/components/application/dashboard/stat-cards.tsx",
+          "type": "registry:component",
+          "target": "boardui/components/application/dashboard/stat-cards.tsx"
+        },
+        {
+          "path": "boardui/components/base/tooltip/tooltip.tsx",
+          "type": "registry:component",
+          "target": "boardui/components/base/tooltip/tooltip.tsx"
+        }
+      ]
+    },
+    {
+      "name": "stat-card",
+      "type": "registry:component",
+      "title": "Stat card",
+      "description": "A headline figure with an icon tile, label, value and one change per side. Spans four rows in a parent grid so neighboring stat cards share their icon, label, figure and context tracks; account for that span when mixing with other cards.",
+      "dependencies": [
+        "@remixicon/react@4.9.0",
+        "react-aria-components@1.22.1",
+        "tailwind-merge@3.7.0"
+      ],
+      "registryDependencies": ["delta-chip", "chip"],
+      "files": [
+        {
+          "path": "components/board/stat-card.tsx",
+          "type": "registry:component",
+          "target": "components/board/stat-card.tsx"
+        }
       ]
     },
     {
@@ -174,13 +175,22 @@
       "type": "registry:component",
       "title": "Bar chart card",
       "description": "A daily bar chart with an animated total, its change and a hover readout of each day.",
-      "dependencies": ["recharts@3.10.1"],
-      "registryDependencies": ["board-base", "animated-number", "delta-chip"],
+      "registryDependencies": [
+        "board-base",
+        "animated-number",
+        "delta-chip",
+        "chip"
+      ],
       "files": [
         {
           "path": "components/board/bar-chart-card.tsx",
           "type": "registry:component",
           "target": "components/board/bar-chart-card.tsx"
+        },
+        {
+          "path": "components/board/chart-readout.tsx",
+          "type": "registry:component",
+          "target": "components/board/chart-readout.tsx"
         },
         {
           "path": "components/board/bar-axis.ts",
@@ -191,6 +201,11 @@
           "path": "components/board/hovered.ts",
           "type": "registry:lib",
           "target": "components/board/hovered.ts"
+        },
+        {
+          "path": "components/board/day-bars.tsx",
+          "type": "registry:component",
+          "target": "components/board/day-bars.tsx"
         }
       ]
     },
@@ -205,6 +220,11 @@
           "path": "components/board/segmented-control.tsx",
           "type": "registry:component",
           "target": "components/board/segmented-control.tsx"
+        },
+        {
+          "path": "boardui/components/base/segmented-control/segmented-control.tsx",
+          "target": "boardui/components/base/segmented-control/segmented-control.tsx",
+          "type": "registry:file"
         }
       ],
       "registryDependencies": ["board-base"]
@@ -214,13 +234,47 @@
       "type": "registry:component",
       "title": "Select",
       "description": "A single-value select with a button trigger and a floating list; disabled options keep a hint.",
-      "dependencies": ["react-aria-components@1.22.1", "lucide-react@1.68.0"],
+      "dependencies": [
+        "react-aria-components@1.22.1",
+        "lucide-react@1.68.0",
+        "@remixicon/react@4.9.0"
+      ],
       "registryDependencies": ["board-base"],
       "files": [
         {
           "path": "components/board/select.tsx",
           "type": "registry:component",
           "target": "components/board/select.tsx"
+        },
+        {
+          "path": "boardui/components/base/dropdown/menu-styles.ts",
+          "type": "registry:component",
+          "target": "boardui/components/base/dropdown/menu-styles.ts"
+        },
+        {
+          "path": "boardui/components/base/input/label.tsx",
+          "type": "registry:component",
+          "target": "boardui/components/base/input/label.tsx"
+        },
+        {
+          "path": "boardui/components/foundations/scroll-fade/scroll-fade.tsx",
+          "type": "registry:component",
+          "target": "boardui/components/foundations/scroll-fade/scroll-fade.tsx"
+        },
+        {
+          "path": "boardui/components/foundations/icons/chevrons.tsx",
+          "type": "registry:component",
+          "target": "boardui/components/foundations/icons/chevrons.tsx"
+        },
+        {
+          "path": "boardui/utils/use-dismiss-on-outside-press.ts",
+          "type": "registry:component",
+          "target": "boardui/utils/use-dismiss-on-outside-press.ts"
+        },
+        {
+          "path": "boardui/components/base/select/select.tsx",
+          "type": "registry:component",
+          "target": "boardui/components/base/select/select.tsx"
         }
       ]
     },
@@ -235,6 +289,11 @@
           "path": "components/board/chip.tsx",
           "type": "registry:component",
           "target": "components/board/chip.tsx"
+        },
+        {
+          "path": "boardui/components/base/badges/chip.tsx",
+          "target": "boardui/components/base/badges/chip.tsx",
+          "type": "registry:file"
         }
       ]
     },
@@ -242,7 +301,7 @@
       "name": "status-dot",
       "type": "registry:component",
       "title": "Status dot",
-      "description": "A 12 px status indicator in the signal blue.",
+      "description": "A 12 px status indicator in the online status green.",
       "files": [
         {
           "path": "components/board/status-dot.tsx",

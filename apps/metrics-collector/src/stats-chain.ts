@@ -4,7 +4,7 @@
 // make), the full detail. Settled USDC and fees come only from here, never from receipts.
 import { CHANNEL_PROGRAM, DEVNET, DEVNET_USDC } from '@gyblos/config/network';
 
-import { CHAIN_AGGREGATE_SCOPES } from './constants';
+import { CHAIN_AGGREGATE_SCOPES, CHAIN_INDEX } from './constants';
 import { daysOf, type DayRange } from './days';
 import { envelope, fromRow, groupBy, type StatsEnvelope } from './stats';
 import type { ChainDayRow, ChainIndexState, StatsReader } from './stats-store';
@@ -49,7 +49,7 @@ export interface ChainStats extends StatsEnvelope {
   network: string;
   programId: string;
   mint: string;
-  index: ChainIndexState | null;
+  index: (ChainIndexState & { historyFloorMs: number }) | null;
   days: ChainDay[];
 }
 
@@ -91,7 +91,7 @@ export async function chainStats(
     network: DEVNET,
     programId: CHANNEL_PROGRAM,
     mint: DEVNET_USDC,
-    index,
+    index: index && { ...index, historyFloorMs: CHAIN_INDEX.historyFloorMs },
     days: daysOf(range).map((day): ChainDay => {
       const rows = byDay.get(day) ?? [];
       const program = rows.find(

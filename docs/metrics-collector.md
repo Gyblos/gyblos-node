@@ -28,6 +28,7 @@ rules. The local receipt receiver for private testing is a different app
 | `POST /v1/observations`         | Upload one signed envelope of 1 to 200 content-free telemetry events.    |
 | `GET /v1/health`                | `{ "ok": true }` once storage and every limiter exist.                   |
 | `GET /v1/stats/network`         | Network totals per UTC day ([public stats](#public-stats-api)).          |
+| `GET /v1/stats/intraday`        | Network requests, tokens and seller payouts per closed UTC half hour.    |
 | `GET /v1/stats/models`          | Totals per model over a day range.                                       |
 | `GET /v1/stats/sellers/:nodeId` | One seller's totals per day and per model.                               |
 | `GET /v1/stats/chain`           | Payment-channels program activity per UTC day ([chain](#chain-stats)).   |
@@ -401,18 +402,24 @@ observation. The one list of single rows is
 [chain transactions](#chain-transactions), which is public chain data. Query
 parameters `from` and `to` are UTC days (`YYYY-MM-DD`); the range is inclusive
 and at most 92 days long (for example 2026-08-17 to 2026-11-16). The default is
-the 30 days up to today. A malformed, impossible, reversed or too long range, or
-a NodeId that is not 64 lowercase hex characters, answers `400 INVALID_QUERY`.
-Without a database the stats routes answer `503 COLLECTOR_UNAVAILABLE`. Reads
-spend their own per-address budget (`COLLECTOR_READ_LIMITER`, 120 per minute). A
-successful answer is `Cache-Control: public, max-age=300` and the Worker keeps
-it in the edge cache, keyed by URL, so repeated reads cost no database query;
-errors are never cached.
+the 30 days up to today. For the complete published history, use `range=all`
+with an optional inclusive `to`. The collector discovers the earliest available
+day per resource, including the requested node on seller reads. All-time
+responses include `range: "all"` and `historyAvailable`. When the resource has
+no history through the cutoff, `historyAvailable` is false and `from` equals
+`to`. Combining `range=all` with `from` or a future `to` is invalid. A
+malformed, impossible, reversed or too long bounded range, or a NodeId that is
+not 64 lowercase hex characters, answers `400 INVALID_QUERY`. Without a database
+the stats routes answer `503 COLLECTOR_UNAVAILABLE`. Reads spend their own
+per-address budget (`COLLECTOR_READ_LIMITER`, 120 per minute). A successful
+answer is `Cache-Control: public, max-age=300` and the Worker keeps it in the
+edge cache, keyed by URL, so repeated reads cost no database query; errors are
+never cached.
 
-Every answer has `from`, `to`, `formulaVersion` (the version every row in the
-answer was computed with, or `null` when there is no data or a recompute after a
-formula change is under way) and `aggregatedAt` (when the newest row in the
-answer was computed, or `null` without data).
+Every daily aggregate answer has `from`, `to`, `formulaVersion` (the version
+every row in the answer was computed with, or `null` when there is no data or a
+recompute after a formula change is under way) and `aggregatedAt` (when the
+newest row in the answer was computed, or `null` without data).
 
 The network answer also says how complete each day is, so a reader can tell a
 real zero from a day not counted yet. Each day has `coverage`:
@@ -482,21 +489,46 @@ answer whose days have no data can still carry `buyerTotals`.
 | `GET /v1/stats/models`          | `models`: up to 100 models (model, variant and quantization) with the most completed requests, free and paid together, each with `free` and `paid` (plus `sellers`, and `observed`: `buyerFirstToken` as a latency, and `engineSpeed` with `samples`, `p50MinTokensPerSecond` (the lower bound of the median's bucket; `null` only without samples), `bucketsTokensPerSecond` and `counts`; `observed` is `null` without any observation joined to a receipt of that side, and either metric is empty, with `samples` 0, when only the other has data).                                                                                                                                                                                                   |
 | `GET /v1/stats/sellers/:nodeId` | `days`: every day of the range with `free` and `paid` plus `buyers` and `withheld`; `models`: up to 100 of the seller's models over the range, ordered as above.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 
-Each stats request is one batch of reads over aggregate tables: eleven
+Each daily stats request is one batch of reads over aggregate tables: eleven
 statements for the network answer, three for the seller answer, two in one batch
 for models, two for chain, whatever the range; the chain transaction list is one
 statement per page. Histograms are summed and lists are capped in SQL. The one
 read whose cost grows with history is the network answer's buyer totals: one
 grouped count over every first-seen buyer row, whatever the range.
 
+### Intraday network activity
+
+`GET /v1/stats/intraday?from=2026-11-10&to=2026-11-16` requires those two
+parameters in that order. Both bounds are inclusive UTC dates and the range can
+cover one to seven completed days. An open day, extra query field or
+noncanonical query returns `400 INVALID_QUERY`.
+
+The response is
+`{"rows":[{"at":1794268800000,"tokens":17,"requests":2,"paidOut":"80"}]}`. `at`
+is the inclusive half-hour start in epoch milliseconds. Rows are sorted oldest
+first. Each headline receipt counts once at the seller's signed `receivedAt`;
+tokens sum input and output across paid and free receipts. `paidOut` is decimal
+integer text in atomic devnet USDC, using the same balanced, Gyblos-attributed
+payout calculation as the daily chain totals. Block time assigns the payout to a
+half hour. Bins without a headline receipt or an attributed seller payout are
+omitted. A missing bin does not establish source coverage. Late uploads, index
+backfill and daily aggregation lag can cause temporary differences from the
+published daily totals.
+
+A read groups the indexed receipts and chain rows in one database batch. Only
+network-level counts and amounts leave the database. There are no seller, buyer,
+model, signature or receipt identifiers and no per-entity filters. In a quiet
+interval a count of one can reveal the token total of a single request.
+
 ### Chain stats
 
 `GET /v1/stats/chain` takes the same range and envelope, plus `network` (the
-CAIP-2 devnet id), `programId`, `mint` (devnet USDC) and `index`: whether the
-program's history is fully read (`backfillDone`) and when the index last moved
-(`updatedAt`), or `null` before its first run. Until `backfillDone`, older days
-may still be missing. `days` lists every day of the range with `program` and
-`gyblosClaimed`, each `null` without activity that day:
+CAIP-2 devnet id), `programId`, `mint` (devnet USDC) and `index`. The index
+reports its configured history start (`historyFloorMs`, epoch milliseconds),
+whether it finished reading back to that start (`backfillDone`), and when the
+index last moved (`updatedAt`). The index is `null` before its first run. Until
+`backfillDone`, older days may still be missing. `days` lists every day of the
+range with `program` and `gyblosClaimed`, each `null` without activity that day:
 
 - `program` (anyone's traffic, from the signature list only): `transactions`
   (successful and failed) and `failed`;
@@ -531,10 +563,16 @@ at most once and in this order:
   channels whose first split recipient as opened (`recipients[0]`, the seller's
   payout address for Gyblos sessions) is that owner. Channels whose open was not
   read never match. The filter goes into the page's row selection, so the page
-  stays one bounded read-only statement. It has no index of its own: it reads
-  Gyblos instructions newest first until the page is full, so a rare recipient
-  costs a scan of the history, which grows with it as the unfiltered page's
-  does.
+  uses one read-only statement in cursor mode. It has no index of its own: it
+  reads Gyblos instructions newest first until the page is full, so a rare
+  recipient costs a scan of the history, which grows with it as the unfiltered
+  page's does.
+- `page`: a one-based page number from 1 to 999999, mutually exclusive with
+  `before`. The answer adds `total` (matching instructions) and `page` (the page
+  returned). An empty feed or a page beyond the end returns page 1. The count
+  and the page come from one database snapshot. SQL applies the offset before
+  calculating amounts, so only the selected page and its one lookahead row
+  require amount calculations.
 
 Numbers are canonical (`0` or no leading zero). Any other parameter (an unnamed
 one included), a repeated one, another order, `limit=25` (the default is sent by

@@ -17,7 +17,6 @@ import { sectionRangeHref } from '@gyblos/explorer/paging';
 import {
   emptySellersMessage,
   githubByNode,
-  identicon,
   notOnlineMeta,
   orderSellers,
   verifiedOnly,
@@ -154,21 +153,6 @@ void test('the verified filter keeps only sellers with a verified account', () =
   );
 });
 
-void test('the identicon is symmetric, stable per NodeId and differs between nodes', () => {
-  const first = identicon(NODE_A);
-  assert.deepEqual(identicon(NODE_A), first);
-  assert.equal(first.length, 5);
-  for (const row of first) {
-    assert.equal(row.length, 5);
-    assert.equal(row[0], row[4]);
-    assert.equal(row[1], row[3]);
-  }
-  const other = identicon(
-    '0d1463f81260071aeda372efb2958da7719ffa2671a7e7fd30d6c181c33a4d40',
-  );
-  assert.notDeepEqual(other, first);
-});
-
 void test('the empty sellers message says what is known', () => {
   const offering = seller(NODE_A, 1, '1');
   const bare = { ...seller(NODE_B, 1, '1'), models: [] };
@@ -197,10 +181,10 @@ void test('a section range switch keeps the other query parameters', () => {
     '/?modelsRange=7&verified=1',
   );
   assert.equal(
-    sectionRangeHref('verified=1&modelsRange=7', 'models', 30),
+    sectionRangeHref('verified=1&modelsRange=7', 'models', 'all'),
     '/?verified=1',
   );
-  assert.equal(sectionRangeHref('', 'models', 30), '/');
+  assert.equal(sectionRangeHref('', 'models', 30), '/?modelsRange=30');
 });
 
 void test('llms.txt states the verified filter and the ordering window', () => {
