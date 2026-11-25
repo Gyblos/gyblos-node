@@ -1943,7 +1943,7 @@
   "tests/support/control-fixture.ts": 1,
   "tests/support/control-loopback.ts": 2,
   "tests/support/conversation.ts": 1,
-  "tests/support/d1-sqlite.ts": 3,
+  "tests/support/d1-sqlite.ts": 2,
   "tests/support/desktop-agent.ts": 2,
   "tests/support/desktop-packaging.ts": 2,
   "tests/support/desktop-paid-chat.ts": 1,
