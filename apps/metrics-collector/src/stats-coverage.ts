@@ -1,13 +1,5 @@
+import { COVERAGE_STATES, type CoverageState } from './constants';
 import { dayBounds, dayOfTime, daysOf, type DayRange } from './days';
-
-export const COVERAGE_STATES = {
-  FINAL: 'final',
-  PARTIAL: 'partial',
-  PENDING: 'pending',
-  UNKNOWN: 'unknown',
-} as const;
-export type CoverageState =
-  (typeof COVERAGE_STATES)[keyof typeof COVERAGE_STATES];
 
 export interface DayCoverage {
   state: CoverageState;

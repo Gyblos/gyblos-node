@@ -33,11 +33,13 @@ void test('daily series tell pending and uncaptured days apart from zero', () =>
       day('2026-11-15', { state: 'unknown' }),
       day('2026-11-16', { state: 'pending' }),
       day('2026-11-17', { state: 'final' }),
+      day('2026-11-18', { state: 'partial' }),
     ].map(parseNetworkDay),
   );
   assert.deepEqual(series, [
     { day: '2026-11-15', free: 0, paid: 0, note: 'not captured' },
     { day: '2026-11-16', free: 0, paid: 0, note: 'pending' },
     { day: '2026-11-17', free: 0, paid: 0 },
+    { day: '2026-11-18', free: 0, paid: 0, note: 'so far' },
   ]);
 });

@@ -1,12 +1,11 @@
 import type {
   BuyerCount,
   CollectorSnapshot,
-  CoverageState,
   NetworkBuyers,
   NetworkDay,
   Totals,
 } from './collector-shape';
-import { DISPLAY } from './constants';
+import { COVERAGE_NOTES, DISPLAY, type CoverageState } from './constants';
 import { count, latencyMs, percent, utc } from './format';
 import { mergedLatency } from './latency';
 
@@ -92,11 +91,6 @@ export function relayText(day: NetworkDay): string {
   const routed = routes ? routes.direct + routes.relay + routes.unknown : 0;
   return routes && routed ? percent(routes.relay / routed) : '—';
 }
-
-const COVERAGE_NOTES: Partial<Record<CoverageState, string>> = {
-  pending: 'pending',
-  unknown: 'not captured',
-};
 
 // One point per day of the range, oldest first: each side's headline requests (0 without receipts).
 export function dailyRequests(

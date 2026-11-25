@@ -1,5 +1,6 @@
 // Owns the shape of the metrics collector's public stats answers (gyblos-node docs/metrics-collector.md,
 // Public stats API) and their checks at the boundary. Pure, no I/O.
+import { COVERAGE_STATES, type CoverageState } from './constants';
 import type { Latency } from './latency';
 import {
   flag,
@@ -45,13 +46,6 @@ export interface SellerDay {
   free: SellerSide | null;
   paid: SellerSide | null;
 }
-export const COVERAGE_STATES = [
-  'final',
-  'partial',
-  'pending',
-  'unknown',
-] as const;
-export type CoverageState = (typeof COVERAGE_STATES)[number];
 export interface NetworkDay {
   day: string;
   coverage: CoverageState | null;
@@ -219,7 +213,9 @@ function networkSide(value: unknown, where: string): NetworkSide {
 function coverageState(value: unknown): CoverageState | null {
   if (value === undefined) return null;
   const state = text(record(value, 'coverage').state, 'coverage.state');
-  return COVERAGE_STATES.find((option) => option === state) ?? null;
+  return (
+    Object.values(COVERAGE_STATES).find((option) => option === state) ?? null
+  );
 }
 export function parseNetworkDay(value: unknown): NetworkDay {
   const source = record(value, 'day');

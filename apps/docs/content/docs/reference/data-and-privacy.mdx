@@ -104,6 +104,11 @@ Each event names the buyer's NodeId and, once one is chosen, the seller's NodeId
 model, the timing and, when known, token counts, sizes and any amount charged. Observations therefore
 show which sellers a buyer tried and when, including attempts that produced no receipt.
 
+The collector publishes only daily totals of these events. For unserved demand it lists up to 20 models a
+day and also the number of models and requests behind that list, so a request for a rarely asked model
+still counts in the day's total without its name. Each day also says whether its totals are final,
+partial, pending or not captured, and when they were last computed.
+
 Release builds send observations with the receipts. They wait in memory, at most 5,000 events, so a
 restart loses the ones not yet sent.
 
