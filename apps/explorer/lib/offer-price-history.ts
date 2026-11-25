@@ -132,6 +132,25 @@ function addOffer(
   series.set(key, group);
 }
 
+function historyWindow(
+  days: RangeDays,
+  now: number,
+  closed: boolean,
+  retainedFrom: number,
+  snapshot: number,
+) {
+  const dayMs = UNITS.msPerDay;
+  const windowEnd =
+    (Math.floor(rangeEnd(days, now, closed) / dayMs) + 1) * dayMs;
+  const from =
+    days === ALL_TIME
+      ? retainedFrom
+      : Math.max(retainedFrom, windowEnd - days * dayMs);
+  const to = days === ALL_TIME ? snapshot : Math.min(windowEnd, snapshot);
+  if (to < from) throw new SourceShapeError('offer history coverage');
+  return { from, to };
+}
+
 export async function getOfferPriceHistory({
   model,
   nodeId,
@@ -159,15 +178,13 @@ export async function getOfferPriceHistory({
       snapshot - retainedFrom !== count * UNITS.msPerDay
     )
       throw new SourceShapeError('offer history window');
-    const dayMs = UNITS.msPerDay;
-    const windowEnd =
-      (Math.floor(rangeEnd(days, now, closed) / dayMs) + 1) * dayMs;
-    const from =
-      days === ALL_TIME
-        ? retainedFrom
-        : Math.max(retainedFrom, windowEnd - days * dayMs);
-    const to = days === ALL_TIME ? snapshot : Math.min(windowEnd, snapshot);
-    if (to < from) throw new SourceShapeError('offer history coverage');
+    const { from, to } = historyWindow(
+      days,
+      now,
+      closed,
+      retainedFrom,
+      snapshot,
+    );
     const periods = controlArray(
       source.periods,
       DISCOVERY_READ_LIMITS.maxOfferHistoryPeriods,
