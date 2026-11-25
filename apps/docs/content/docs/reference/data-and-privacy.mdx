@@ -105,8 +105,9 @@ model, the timing and, when known, token counts, sizes and any amount charged. O
 show which sellers a buyer tried and when, including attempts that produced no receipt.
 
 The collector publishes only daily totals of these events. For unserved demand it lists up to 20 models a
-day and also the number of models and requests behind that list, so a request for a rarely asked model
-still counts in the day's total without its name. Each day also says whether its totals are final,
+day, the most requested first, and also the number of models and requests behind that list. A day with
+20 models or fewer lists every one of them, even a model asked for once; beyond 20, the rest count only
+in the day's totals, without their names. Each day also says whether its totals are final,
 partial, pending or not captured, and when they were last computed. The first day with any receipt or observation, even one that adds to no published total, is public as the start of collection: earlier days read "not captured".
 
 Release builds send observations with the receipts. They wait in memory, at most 5,000 events, so a
