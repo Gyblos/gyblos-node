@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import fs, {
   mkdir,
   mkdtemp,
@@ -14,13 +15,18 @@ import { basename, join, sep } from 'node:path';
 import test, { type TestContext } from 'node:test';
 
 import { CHALLENGE_SET } from '@gyblos/model-verifier/challenge-set';
-import { MODEL_VERIFIER } from '@gyblos/model-verifier/constants';
+import {
+  MODEL_VERIFIER,
+  MODEL_VERIFIER_CODES,
+} from '@gyblos/model-verifier/constants';
 import { verifyModelVerification } from '@gyblos/protocol/model-verification';
 
+const scoredAnswer = 'first scored';
 const seller = `export function parseSellerTarget(value) { return value; }
 export async function openSeller() {
+  let answers = 0;
   return { selection: { modelId: 'qwen3-1.7b', variant: null, quantization: null },
-    async ask() { return ''; }, async close() {} };
+    async ask() { return answers++ === 0 ? ${JSON.stringify(scoredAnswer)} : ''; }, async close() {} };
 }`;
 const endpoint =
   'export async function bindEndpoint() { return { async close() {} }; }';
@@ -54,11 +60,15 @@ async function withVerifier(
   const home = await mkdtemp(join(tmpdir(), 'gyblos-verifier-publication-'));
   const previousHome = process.env.GYBLOS_HOME;
   process.env.GYBLOS_HOME = home;
-  t.mock.method(globalThis, 'fetch', () =>
+  t.mock.method(globalThis, 'fetch', (input: Parameters<typeof fetch>[0]) =>
     Promise.resolve(
-      Response.json({
-        models: [{ name: 'qwen3:1.7b', digest: 'cd'.repeat(32) }],
-      }),
+      String(input).endsWith('/api/generate')
+        ? Response.json({
+            logprobs: [{ top_logprobs: [{ token: ' scored', logprob: -0.1 }] }],
+          })
+        : Response.json({
+            models: [{ name: 'qwen3:1.7b', digest: 'cd'.repeat(32) }],
+          }),
     ),
   );
   t.mock.method(console, 'log', () => {});
@@ -197,9 +207,27 @@ void test('verify publishes both artifacts from the same run', async (t) => {
       await readFile(join(out, MODEL_VERIFIER.evidenceFile), 'utf8'),
     );
     assert.equal(result.evidence.prompts, CHALLENGE_SET.prompts.length);
+    assert.equal(result.evidence.answers, 1);
+    assert.equal(result.evidence.checks, 1);
+    const digest = createHash('sha256').update(scoredAnswer).digest('hex');
+    assert.deepEqual(result.evidence.answerDigests, [digest]);
+    const unscoredDigest = createHash('sha256').update('').digest('hex');
     assert.partialDeepStrictEqual(evidence, {
       challengeSet: CHALLENGE_SET,
-      answers: [],
+      answers: [
+        {
+          prompt: CHALLENGE_SET.prompts[0],
+          text: scoredAnswer,
+          digest,
+          checks: [{ at: scoredAnswer.indexOf(' '), deviation: false }],
+        },
+      ],
+      unscored: CHALLENGE_SET.prompts.slice(1).map((prompt) => ({
+        prompt,
+        text: '',
+        digest: unscoredDigest,
+        code: MODEL_VERIFIER_CODES.EMPTY_ANSWER,
+      })),
     });
   });
 });
