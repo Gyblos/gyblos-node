@@ -201,7 +201,10 @@ A run takes a few minutes on this machine, mostly the seller's generation.
 - An NVIDIA GPU, Windows or Linux seller, vLLM, SGLang or llama.cpp servers, and
   other Ollama versions. A higher measured honest rate on another stack would
   raise the assumed rate in a new challenge set version.
-- A cloud provider serving the same weights in another precision.
+- A cloud provider serving the same weights in another precision. Alibaba Cloud
+  Model Studio, the official Qwen API, no longer serves the small open Qwen3
+  models (0.6B to 8B); its smallest open model is Qwen3.5-27B, so there was no
+  cloud copy of the declared weights to measure against.
 - Sizes above 1.7B as the declared model.
 
 ## Run it
