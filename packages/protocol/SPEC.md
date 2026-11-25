@@ -1945,7 +1945,8 @@ behind the base58 address `result.verifier`, over the prefix
 `checks` (at most 16,384, and at least `answers`, since every scored answer has a
 check), `deviations` (at most `checks`), `deviantAnswers`
 (answers with at least one deviation: at most `answers` and `deviations`, and at
-least 1 when `deviations` is positive), `minimumChecks` (positive),
+least 1 when `deviations` is positive; every answer that is not deviant needs a
+clean check, so `checks - deviations ≥ answers - deviantAnswers`), `minimumChecks` (positive),
 `honestRatePpm` (1 to 500,000 parts per million), `falsePositivePpm` (1 to
 999,999), `failAt`, `nonce` (64 hex) and `answerDigests` (one SHA-256 hex digest
 per answer, so its length is `answers`).

@@ -18,6 +18,7 @@ import {
   MODEL_VERIFIER_COMMANDS,
   ModelVerifierError,
   SECRET_BYTES,
+  type ModelVerifierCode,
 } from './constants';
 import { loadVerifierKey } from './key';
 import { openReference } from './reference';
@@ -33,15 +34,15 @@ const OPTIONS = {
 
 const usage = () => new ModelVerifierError(MODEL_VERIFIER_CODES.USAGE);
 
-async function readJson(path: string, code: keyof typeof MODEL_VERIFIER_CODES) {
+async function readJson(path: string, code: ModelVerifierCode) {
   try {
     const text = await readFile(path, 'utf8');
     if (Buffer.byteLength(text) > MODEL_VERIFIER.maxSellerFileBytes)
-      throw new ModelVerifierError(MODEL_VERIFIER_CODES[code]);
+      throw new ModelVerifierError(code);
     const value: unknown = JSON.parse(text);
     return value;
   } catch {
-    throw new ModelVerifierError(MODEL_VERIFIER_CODES[code]);
+    throw new ModelVerifierError(code);
   }
 }
 
@@ -64,7 +65,7 @@ function summary(signed: SignedModelVerification) {
 async function verify(values: Record<string, string | undefined>) {
   if (!values.seller || !values.model) throw usage();
   const target = parseSellerTarget(
-    await readJson(values.seller, 'INVALID_SELLER'),
+    await readJson(values.seller, MODEL_VERIFIER_CODES.INVALID_SELLER),
   );
   const paths = modelVerifierLayout(process.env);
   const key = await loadVerifierKey(paths.key, true);
@@ -136,7 +137,7 @@ async function check(path: string | undefined) {
   let signed: SignedModelVerification;
   try {
     signed = await verifyModelVerification(
-      await readJson(path, 'INVALID_RESULT'),
+      await readJson(path, MODEL_VERIFIER_CODES.INVALID_RESULT),
     );
   } catch {
     throw new ModelVerifierError(MODEL_VERIFIER_CODES.INVALID_RESULT);

@@ -35,8 +35,9 @@ Only free offers of Qwen3 catalog models with a public Ollama tag are verified f
 checked.
 
 The prompts are public, so a `pass` is not proof against a seller that recognizes them and answers them
-differently from real traffic. A seller that substitutes another model on only a few answers (11 or fewer of 30)
-is not caught either.
+differently from real traffic. A seller that substitutes another model on only a few answers is not caught either: when all 30 answers are
+scored and its other answers show no deviation, 11 or fewer substituted answers stay under the threshold of 12.
+With fewer scored answers the threshold is lower, and deviations in genuine answers count toward it too.
 
 ## Reproduce a result [#reproduce]
 
