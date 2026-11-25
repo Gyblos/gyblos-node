@@ -22,6 +22,7 @@ const JOURNEY = [
   'sellers/get-paid',
   'sellers/operate',
   'sellers/identity',
+  'sellers/model-verification',
   'buyers/desktop-app',
   'buyers/use-from-code',
   'reference/cli',

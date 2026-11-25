@@ -1,0 +1,69 @@
+---
+title: Verificación de modelo
+description: Cómo Gyblos comprueba que un vendedor sirve el modelo que declara, qué significan pass, fail e inconclusive, y cómo reproducir un resultado.
+---
+
+Un vendedor declara el modelo que sirve, por ejemplo `qwen3-1.7b`. El verificador de modelo comprueba esa
+declaración desde afuera, como un comprador normal de tu oferta gratis. No lee tu máquina, tus llaves ni tu
+configuración.
+
+## Qué hace el verificador [#qué-hace]
+
+1. Le hace a tu oferta gratis un conjunto fijo y público de 30 preguntas cortas, sin razonamiento y con un
+   máximo de 200 tokens de respuesta cada una.
+2. Relee cada respuesta con el modelo declarado, que corre en la máquina del verificador. En hasta 24 puntos de
+   cada respuesta comprueba que tus siguientes palabras estén entre las 20 que el modelo declarado considera más
+   probables, con una probabilidad de al menos 0,1 %.
+3. Cuenta las respuestas con al menos un punto que no pasa esa comprobación y firma un resultado con su propia
+   llave. Los puntos se eligen con un secreto nuevo en cada corrida, después de recibir la respuesta, y cada
+   corrida pregunta desde una dirección de comprador nueva. Una respuesta vacía, o sin ningún punto que
+   comprobar, cuenta como no respondida.
+
+Un vendedor honesto debería pasar: en las mediciones de Gyblos la comprobación toleró la temperatura de
+muestreo y las diferencias entre GPU y CPU, mientras que un modelo más chico vendido como uno más grande falló.
+
+## Resultados [#resultados]
+
+| Resultado      | Significado                                                                                                                                                                                                    |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fail`         | Hubo suficientes respuestas con un punto fallido como para que un vendedor honesto obtuviera esto menos de una vez cada 10.000 corridas (12 de 30). Vale aunque algunas preguntas hayan quedado sin respuesta. |
+| `pass`         | No es fail, se respondieron todas las preguntas y se comprobaron al menos 480 puntos.                                                                                                                          |
+| `inconclusive` | No es fail, pero quedó una pregunta sin respuesta o se comprobaron menos de 480 puntos, así que la corrida no prueba nada.                                                                                     |
+
+Un resultado cubre un vendedor, un modelo y una versión del conjunto de preguntas. Es evidencia de un
+verificador, no una sanción: hoy no cambia nada en el descubrimiento, la selección de vendedores ni los pagos.
+
+Por ahora solo se verifican ofertas gratis de modelos Qwen3 del catálogo que tienen una etiqueta pública en
+Ollama. La cuantización no se comprueba.
+
+Las preguntas son públicas, así que un `pass` no es prueba frente a un vendedor que las reconoce y las responde
+distinto que al tráfico real. Tampoco se detecta a un vendedor que sustituye otro modelo solo en unas pocas
+respuestas: si se puntúan las 30 y sus otras respuestas no tienen desviaciones, 11 o menos respuestas sustituidas
+quedan bajo el umbral de 12. El umbral se mantiene en 12 entre 26 y 30 respuestas puntuadas y baja por debajo de eso (11 entre 22 y
+25), y las desviaciones en respuestas genuinas también cuentan.
+
+## Reproducir un resultado [#reproducir]
+
+Desde una copia del repositorio, con [Ollama](https://ollama.com) corriendo y el modelo declarado descargado
+(`ollama pull qwen3:1.7b`), escribe los datos públicos del vendedor en un archivo:
+
+```json title="seller.json"
+{
+  "owner": "SELLER_OWNER_ADDRESS",
+  "nodeId": "SELLER_NODE_ID",
+  "relayUrl": "https://na1.relay.gyblos.com/",
+  "directAddresses": []
+}
+```
+
+Luego ejecuta:
+
+```sh
+pnpm model-verifier verify --seller seller.json --model qwen3-1.7b
+pnpm model-verifier check RESULT_DIRECTORY/result.json
+```
+
+`verify` muestra el veredicto y escribe `result.json` (el resultado firmado) y `evidence.json` (las preguntas,
+las respuestas y cada comprobación, más cada respuesta que no se pudo puntuar y por qué) en un directorio nuevo. `check` verifica la firma de un resultado y muestra
+su veredicto. `pnpm model-verifier address` muestra la dirección pública del verificador. La llave del
+verificador se crea la primera vez en `model-verifier/verifier.key`, dentro del directorio de datos de Gyblos.
