@@ -5,7 +5,7 @@ import type {
   NetworkDay,
   Totals,
 } from './collector-shape';
-import { ALL_TIME, DISPLAY } from './constants';
+import { ALL_TIME, COVERAGE_NOTES, DISPLAY, type CoverageState } from './constants';
 import { count, latencyMs, percent, utc } from './format';
 import { mergedLatency } from './latency';
 import { previousRange, type RangeDays } from './range';
@@ -94,13 +94,15 @@ export function relayText(day: NetworkDay): string {
 }
 
 export function dailyRequests(
-  days: readonly { day: string; free: Section; paid: Section }[],
+  days: readonly { day: string; free: Section; paid: Section; coverage?: CoverageState | null }[],
   dates = days.map((row) => row.day),
 ) {
   const rows = new Map(days.map((row) => [row.day, row]));
   return dates.map((day) => {
     const row = rows.get(day);
+    const note = row?.coverage ? COVERAGE_NOTES[row.coverage] : undefined;
     return {
+      ...(note ? { note } : {}),
       day,
       free: row?.free?.requests.headline ?? null,
       paid: row?.paid?.requests.headline ?? null,

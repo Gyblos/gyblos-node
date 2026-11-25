@@ -63,6 +63,7 @@ void test('preview status tones map desktop payment statuses as DESIGN.md docume
     'Capture unconfirmed': 'warning',
     'Response unconfirmed': 'warning',
     'Needs review': 'warning',
+    'Paid limit reached': 'warning',
     Failed: 'danger',
     'Authorization voided': 'neutral',
     'Checkout cancelled': 'neutral',

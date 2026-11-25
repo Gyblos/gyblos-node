@@ -22,6 +22,8 @@ export type CatalogModel = ModelOption & {
   family: string;
   category: (typeof import('./constants').MODEL_CATEGORY)[keyof typeof import('./constants').MODEL_CATEGORY];
   context: string;
+  contextTokens?: number;
+  variant?: string;
   providers: number;
 };
 export type View =

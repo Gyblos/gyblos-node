@@ -21,7 +21,9 @@ export { CHAT_PHASE, MESSAGE_STATE } from './constants';
 
 export type ChatPhase = (typeof CHAT_PHASE)[keyof typeof CHAT_PHASE];
 export type MessageState = (typeof MESSAGE_STATE)[keyof typeof MESSAGE_STATE];
+export type TurnTiming = { started: number; first?: number; ended?: number };
 export type ChatMessage = {
+  activity?: TurnTiming;
   id: string;
   role: (typeof CHAT_ROLE)[keyof typeof CHAT_ROLE];
   text: string;
@@ -48,6 +50,7 @@ export type ChatRun = {
   offset: number;
 };
 export type ChatSession = {
+  pinned?: true;
   id: string;
   title: string;
   draft: string;

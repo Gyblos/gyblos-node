@@ -21,6 +21,7 @@ import type { DiscoveryDatabase } from './d1-client';
 import { catalogs, models, nodes, presence, withdrawals } from './schema';
 import { columnField, coveringIndex } from './sqlite-expressions';
 import type { SellerQuery } from './storage';
+import { historyPruneQueries } from './storage-history';
 
 // Built-in aggregates default to Number coercion. Keep external values unchanged so the storage
 // boundary still rejects malformed numeric text, nulls and non-integers instead of accepting them.
@@ -256,6 +257,7 @@ export function onlineModelsQuery(
 }
 export function pruneQueries(database: DiscoveryDatabase, now: number) {
   return [
+    ...historyPruneQueries(database, now),
     database.delete(presence).where(lte(presence.expiresAt, now)),
     database
       .delete(models)

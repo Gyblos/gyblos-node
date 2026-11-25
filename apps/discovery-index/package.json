@@ -27,6 +27,7 @@
     "./registrations": "./src/registrations.ts",
     "./schema": "./src/schema.ts",
     "./storage": "./src/storage.ts",
+    "./network-history": "./src/network-history.ts",
     "./uptime": "./src/uptime.ts",
     "./storage-d1": "./src/storage-d1.ts",
     "./worker": "./src/worker.ts"

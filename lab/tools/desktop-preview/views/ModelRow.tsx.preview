@@ -296,7 +296,7 @@ function PreviewCatalog({ query, filter, selected, canSelect, onSelect }: {
         <ChoiceMenu label="Model family" value={family} options={families} onChange={(v) => reset(() => setFamily(v))} />
         <ChoiceMenu label="Model context" value={context} options={CONTEXT_FILTERS} onChange={(v) => reset(() => setContext(v))} />
         <ChoiceMenu label="Sort models" value={sort} options={CATALOG_SORTS} onChange={(v) => reset(() => setSort(v))} />
-        <span className="ui-help-text" aria-live="polite">{rows.length} models</span>
+        <span className="ui-help-text" aria-live="polite">{rows.length === 1 ? '1 model' : rows.length + ' models'}</span>
         {filtered && <Button onClick={() => reset(() => { setLab(ALL_LABS); setFamily(ALL_FAMILIES); setContext(CONTEXT_FILTERS[0]); })}>Clear filters</Button>}
       </div>
       <List label="Model catalog">

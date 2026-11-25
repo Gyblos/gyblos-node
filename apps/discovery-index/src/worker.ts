@@ -17,10 +17,13 @@ import {
   DISCOVERY_PUBLISH_ALLOWLIST_BINDING,
   DISCOVERY_SOLANA_RPC_BINDING,
   GITHUB_RECHECK_FAILED,
+  HEARTBEAT_FAILED,
+  NETWORK_ROLLUP_FAILED,
 } from './constants';
 import { createD1GithubClaimStore } from './github-claim-store-d1';
 import { recheckGithubClaims } from './github-claims';
 import type { DiscoveryLimiters, RateLimiter } from './limits';
+import { rollupNetworkDays } from './network-history';
 import { createD1SellerProfileStore } from './profile-store-d1';
 import { parsePublishAllowlist } from './publishers';
 import { createD1RegistrationStore } from './registration-store-d1';
@@ -171,6 +174,16 @@ export async function scheduledRecheck(
   }
 }
 
+export async function scheduledNetwork(bindings: unknown, now: number) {
+  const database = binding(bindings, DISCOVERY_DB_BINDING);
+  if (!isDatabase(database)) return;
+  const storage = createD1Storage(database);
+  await storage.markAlive(now).catch(() => console.warn(HEARTBEAT_FAILED));
+  await rollupNetworkDays(storage, now).catch(() =>
+    console.warn(NETWORK_ROLLUP_FAILED),
+  );
+}
+
 // The default worker creates its app cache on the first request, not on import.
 let worker: ReturnType<typeof createWorker> | undefined;
 export default {
@@ -184,5 +197,6 @@ export default {
     context: ExecutionContext,
   ) {
     context.waitUntil(scheduledRecheck(bindings, controller.scheduledTime));
+    context.waitUntil(scheduledNetwork(bindings, controller.scheduledTime));
   },
 };

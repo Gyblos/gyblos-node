@@ -1,13 +1,12 @@
 // Buyer-owned executable entry for a desktop utility process, built separately from the renderer.
+import { startBuyer } from '@gyblos/buyer/buyer-startup';
+import { runBuyerSidecar } from '@gyblos/buyer/desktop-service';
+import { startDesktopBuyer } from '@gyblos/buyer/desktop-startup';
+import { endpointToken } from '@gyblos/buyer/session-requirements';
 import { DEVNET_USDC } from '@gyblos/config';
 import { setupRole } from '@gyblos/node/roles';
 import { parseAutoPrices } from '@gyblos/protocol/buyer-api';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
-
-import { startBuyer } from './buyer-startup';
-import { runBuyerSidecar } from './desktop-service';
-import { startDesktopBuyer } from './desktop-startup';
-import { endpointToken } from './session-requirements';
 
 export async function startBuyerWorker() {
   const port = process.parentPort;

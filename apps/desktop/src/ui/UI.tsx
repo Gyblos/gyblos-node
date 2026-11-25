@@ -1,6 +1,11 @@
 // Shared compact desktop primitives; visual sizes and variants live in ui.css.
 // Components render local UI only and do not own model, payment or agent workflows.
-import { MagnifyingGlass, ShieldCheck, X } from '@phosphor-icons/react';
+import {
+  MagnifyingGlass,
+  ShieldCheck,
+  X,
+  type Icon,
+} from '@phosphor-icons/react';
 import {
   useRef,
   type ComponentPropsWithoutRef,
@@ -11,7 +16,7 @@ import {
 import { BUTTON_VARIANT } from './constants';
 import { useTooltip } from './Tooltip';
 
-type ButtonProps = ComponentPropsWithRef<'button'> & {
+export type ButtonProps = ComponentPropsWithRef<'button'> & {
   variant?: (typeof BUTTON_VARIANT)[keyof typeof BUTTON_VARIANT];
 };
 export function Button({
@@ -369,23 +374,7 @@ export function Note({ children }: { children: ReactNode }) {
     </p>
   );
 }
-export function StatCard({
-  label,
-  value,
-  detail,
-}: {
-  label: string;
-  value: string;
-  detail: string;
-}) {
-  return (
-    <div className="ui-stat">
-      <span>{label}</span>
-      <strong>{value}</strong>
-      <small>{detail}</small>
-    </div>
-  );
-}
+export { StatGrid, StatCard } from './StatCard';
 export function EmptyState({
   icon,
   title,

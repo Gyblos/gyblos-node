@@ -79,6 +79,8 @@
     "./identity-claim": "./src/identity-claim.ts",
     "./vectors/identity-claim-v1.json": "./vectors/identity-claim-v1.json",
     "./profile-claim": "./src/profile-claim.ts",
-    "./vectors/profile-claim-v1.json": "./vectors/profile-claim-v1.json"
+    "./vectors/profile-claim-v1.json": "./vectors/profile-claim-v1.json",
+    "./model-verification": "./src/model-verification.ts",
+    "./vectors/model-verification-v1.json": "./vectors/model-verification-v1.json"
   }
 }

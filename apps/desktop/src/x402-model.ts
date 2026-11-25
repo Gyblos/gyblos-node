@@ -51,6 +51,16 @@ export function emptyX402(): X402Summary {
     records: [],
   };
 }
+export function buyerBalanceStatus(
+  checking: boolean,
+  state: Pick<X402Result, 'summary' | 'error'> | undefined,
+  hasPayer: boolean,
+) {
+  if (checking) return 'Checking…';
+  if (hasPayer) return 'No reading';
+  return state?.summary.available && !state.error ? 'No payer' : 'No status';
+}
+
 export function chatBudgetReady(
   active: boolean,
   selectedOffer: boolean,
@@ -241,6 +251,21 @@ export function x402Amount(
     '.' +
     String(BigInt(atomic) % scale).padStart(DESKTOP_X402.ATOMIC_DECIMALS, '0')
   );
+}
+export function x402StatAmount(
+  atomic: string,
+  policy: Pick<BuyerApiPolicy, 'mint'>,
+) {
+  if (policy.mint !== DEVNET_USDC) return atomic + ' ' + x402Asset(policy);
+  return x402ShortAmount(atomic, policy) + ' USDC';
+}
+export function x402ShortAmount(
+  atomic: string,
+  policy: Pick<BuyerApiPolicy, 'mint'>,
+) {
+  const [whole, fraction] = x402Amount(atomic, policy).split('.');
+  const decimals = fraction?.replace(/0+$/, '');
+  return decimals ? whole + '.' + decimals : whole;
 }
 export function x402BudgetInput(
   value: string,

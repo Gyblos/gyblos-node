@@ -4,7 +4,7 @@ import { spawn } from 'node:child_process';
 import { PassThrough, Readable, Writable } from 'node:stream';
 import test from 'node:test';
 
-import { main, runTerminal } from '@gyblos/buyer/chat-cli';
+import { main, runTerminal } from '@gyblos/buyer-app/chat-cli';
 
 void test('terminal starts and closes its owned buyer using injected input and output', async () => {
   let started = 0;
@@ -144,7 +144,7 @@ void test(
   },
   async () => {
     const source = `
-    import { main } from '@gyblos/buyer/chat-cli';
+    import { main } from '@gyblos/buyer-app/chat-cli';
     let calls = 0, closed = 0, aborted = 0;
     await main({ input: process.stdin, output: process.stdout, start: async () => ({
       chat: { model: 'synthetic', maxTokens: 8, maxAtomic: '0', request: async (_url, init) => {

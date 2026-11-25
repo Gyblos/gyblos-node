@@ -1,7 +1,10 @@
 // Uses the approved compact catalog layout with the existing selection and network policies.
+import { Globe } from '@phosphor-icons/react';
 import { useState } from 'react';
 
+import { ActionButton } from './ActionButton';
 import { matchesCatalog, type ModelFilter } from './catalog-state';
+import { CatalogOffers } from './CatalogOffers';
 import { MODEL_FILTER, MODELS } from './constants';
 import { ChoiceMenu } from './Management';
 import { Modal } from './Modal';
@@ -9,16 +12,7 @@ import { priceRange } from './model-price';
 import type { CatalogModel } from './model-types';
 import { ModelImage } from './ModelImage';
 import { NetworkCatalogPanel, useNetworkCatalog } from './NetworkCatalog';
-import { NetworkSellerMenu } from './NetworkSellerMenu';
-import {
-  Badge,
-  Button,
-  List,
-  ListRow,
-  PagePanel,
-  RowCopy,
-  SearchField,
-} from './UI';
+import { Badge, List, ListRow, PagePanel, RowCopy, SearchField } from './UI';
 
 type ModelsProps = {
   networkModels: readonly CatalogModel[];
@@ -61,36 +55,36 @@ export function Models({
           onValueChange={setQuery}
         />
         <CatalogFilter filter={filter} change={setFilter} />
-        <Button onClick={() => setNetwork(true)}>Find network models</Button>
+        <ActionButton
+          icon={<Globe size={16} />}
+          label="Find network models"
+          onClick={() => setNetwork(true)}
+        />
         {!canSelect && <Badge>Preview</Badge>}
       </div>
-      <List label="Model catalog">
-        {canSelect && (
-          <NetworkSellerMenu
-            models={offers}
-            selected={selected}
-            automatic={!!auto?.selected}
-            buyerModels={auto?.buyerModels ?? []}
-            paid={!!auto?.paid}
-            onAuto={(name) => auto?.choose(name)}
-            onSelect={(id) => {
-              const offer = offers.find((row) => row.id === id);
-              if (offer) chooseOffer(offer);
-            }}
-          />
-        )}
-        {canSelect && !offers.length && (
-          <p className="ui-list-empty">No network offers match your search.</p>
-        )}
-        {!canSelect && (
+      {canSelect ? (
+        <CatalogOffers
+          models={offers}
+          selected={selected}
+          automatic={!!auto?.selected}
+          buyerModels={auto?.buyerModels ?? []}
+          paid={!!auto?.paid}
+          onAuto={(name) => auto?.choose(name)}
+          onSelect={(id) => {
+            const offer = offers.find((row) => row.id === id);
+            if (offer) chooseOffer(offer);
+          }}
+        />
+      ) : (
+        <List label="Model catalog">
           <PreviewRows
             query={query}
             filter={filter}
             selected={selected}
             onSelect={onSelect}
           />
-        )}
-      </List>
+        </List>
+      )}
       {!canSelect && (
         <p className="ui-help-text">
           PayPal uses its configured local model. This catalog is a USDC

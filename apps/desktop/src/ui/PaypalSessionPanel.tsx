@@ -1,4 +1,6 @@
 // Manages the existing shared PayPal session from Payments; all operations retain controller guards.
+import { Gauge, Receipt, Wallet } from '@phosphor-icons/react';
+
 import {
   PAYPAL_SESSION_PHASE,
   PAYPAL_SESSION_STATUS,
@@ -9,7 +11,6 @@ import {
   paypalPaymentSummary,
 } from '../paypal-model';
 import { BUTTON_VARIANT } from './constants';
-import { Facts, Pair } from './Management';
 import {
   CheckStatus,
   NewSessionTerms,
@@ -17,6 +18,7 @@ import {
   StartPaypalSession,
   VoidCheckAction,
 } from './PaypalCheckoutActions';
+import { StatCard, StatGrid } from './StatCard';
 import { Badge, Button } from './UI';
 import type { PaypalSessionView } from './usePaypalSession';
 
@@ -178,9 +180,14 @@ function SessionAmounts({
   summary: ReturnType<typeof paypalPaymentSummary>;
 }) {
   return summary.limitCents === null ? null : (
-    <Facts>
-      <Pair label="Session limit" value={dollars(summary.limitCents)} />
-      <Pair
+    <StatGrid>
+      <StatCard
+        icon={Gauge}
+        label="Session limit"
+        value={dollars(summary.limitCents)}
+      />
+      <StatCard
+        icon={Receipt}
         label={summary.capturedCents !== null ? 'Paid' : 'Recorded usage'}
         value={
           summary.capturedCents !== null
@@ -191,9 +198,13 @@ function SessionAmounts({
         }
       />
       {summary.remainingCents !== null && (
-        <Pair label="Remaining" value={dollars(summary.remainingCents)} />
+        <StatCard
+          icon={Wallet}
+          label="Remaining"
+          value={dollars(summary.remainingCents)}
+        />
       )}
-    </Facts>
+    </StatGrid>
   );
 }
 

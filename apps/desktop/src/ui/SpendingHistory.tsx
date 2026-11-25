@@ -1,14 +1,14 @@
-// Filters actual provider observations; USDC has no transaction source in this desktop version.
-import { useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
+
+import { DEVNET_USDC } from '@gyblos/config/network';
 
 import type { ActivityEntry } from '../activity-model';
 import type { PaypalPaymentReference } from '../payment-reference-model';
-import { sessionOutcome } from './activity-presentation';
-import { DataCell } from './DataTable';
+import { type X402Record } from '../x402-model';
+import type { ChatController } from './chat-controller';
+import { FilterChips } from './FilterChips';
 import {
-  FINANCIAL_TONE,
   HISTORY,
-  HISTORY_KIND,
   HISTORY_METHOD,
   HISTORY_PERIOD,
   HISTORY_SOURCE,
@@ -16,310 +16,290 @@ import {
   type HistoryPeriod,
   type HistorySource,
 } from './history-constants';
-import {
-  filterHistory,
-  historyDate,
-  paymentAmount,
-  referenceHeading,
-} from './history-presentation';
+import { filterHistory, referenceHeading } from './history-presentation';
 import { HistorySummary } from './HistorySummary';
-import { ChoiceMenu, FinancialValue, Section, StatePanel } from './Management';
+import { ChoiceMenu, Section } from './Management';
 import { Pagination } from './Pagination';
-import { PaymentReference } from './PaymentReference';
 import { ScrollTable } from './ScrollTable';
-import { Button } from './UI';
+import { PaymentRow, UsdcPaymentRow } from './SpendingPaymentRows';
 import type { ActivityView } from './useActivity';
+import type { X402View } from './useX402';
 
-type Props = { activity: ActivityView; onActivity(id?: string): void };
-export function SpendingHistory({ activity, onActivity }: Props) {
-  const [method, setMethod] = useState<HistoryMethod>(HISTORY_METHOD.USDC);
-  const [period, setPeriod] = useState<HistoryPeriod>(HISTORY_PERIOD.MONTH);
-  const [source, setSource] = useState<HistorySource>(HISTORY_SOURCE.ALL);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState<number>(HISTORY.PAGE_SIZES[0]);
+type Props = {
+  activity: ActivityView;
+  buyer?: X402View;
+  chat: ChatController;
+  onActivity(id?: string): void;
+  onChat(id: string): void;
+};
+type Entry =
+  | { at: number; id: string; entry: ActivityEntry }
+  | { at: number; id: string; record: X402Record };
+function sourceFilter(entry: Entry, source: HistorySource) {
+  if (source === HISTORY_SOURCE.ALL) return true;
+  if ('record' in entry) return source === HISTORY_SOURCE.CHAT;
+  return source === HISTORY_SOURCE.CHAT
+    ? entry.entry.chatCount > 0 || entry.entry.chatCents > 0
+    : entry.entry.agentCount > 0 || entry.entry.agentCents > 0;
+}
+function historyRows(
+  { activity, buyer }: Props,
+  method: HistoryMethod,
+  period: HistoryPeriod,
+) {
+  const now = Date.now();
+  const sessions = filterHistory(
+    activity.state?.available ? activity.state.sessions : [],
+    { now, method, period, source: HISTORY_SOURCE.ALL, query: '' },
+  );
+  const rows: Entry[] = sessions.map((entry) => ({
+    id: 'paypal-' + entry.id,
+    at: entry.updatedAt,
+    entry,
+  }));
+  const after =
+    period === HISTORY_PERIOD.ALL
+      ? 0
+      : now -
+        HISTORY.DAY_MS *
+          (period === HISTORY_PERIOD.WEEK
+            ? HISTORY.WEEK_DAYS
+            : HISTORY.MONTH_DAYS);
+  if (method !== HISTORY_METHOD.PAYPAL && buyer?.state.summary.available) {
+    for (const record of buyer.state.summary.records)
+      if (
+        record.at >= after &&
+        (method !== HISTORY_METHOD.USDC || record.policy.mint === DEVNET_USDC)
+      )
+        rows.push({ id: 'usdc-' + record.id, at: record.at, record });
+  }
+  return rows.sort((left, right) => right.at - left.at);
+}
+export function SpendingHistory(props: Props) {
+  const { activity, buyer, onActivity } = props;
+  const { sessions } = useSyncExternalStore(
+    props.chat.subscribe,
+    props.chat.getSnapshot,
+  );
+  const conversations = new Map(
+    sessions.flatMap((session) =>
+      session.messages.map((message) => [message.id, session] as const),
+    ),
+  );
+  const filters = useHistoryFilters(props);
+  const { method, period, source, current, size, filtered, setPage, setSize } =
+    filters;
   const references = activity.references.available
     ? activity.references.references
     : [];
-  const rows = filterHistory(
-    activity.state?.available ? activity.state.sessions : [],
-    { method, period, source, query: '', now: Date.now() },
-    references,
-  );
-  const currentPage = Math.min(
-    page,
-    Math.max(1, Math.ceil(rows.length / pageSize)),
-  );
   return (
-    <>
-      <Section title="Spending">
-        <SpendingFilters
-          period={period}
-          setPeriod={setPeriod}
-          method={method}
-          setMethod={setMethod}
-          source={source}
-          setSource={setSource}
-          setPage={setPage}
+    <Section title="Payment history">
+      <HistoryFilters {...filters} />
+      {method !== HISTORY_METHOD.USDC && !activity.state?.available && (
+        <p role="status">
+          {activity.state
+            ? 'PayPal history unavailable.'
+            : 'Loading PayPal history…'}
+        </p>
+      )}
+      {method !== HISTORY_METHOD.PAYPAL && !buyer?.state.summary.available && (
+        <p role="status">USDC history unavailable.</p>
+      )}
+      {source !== HISTORY_SOURCE.ALL && method !== HISTORY_METHOD.USDC && (
+        <p className="ui-help-text">
+          Amounts for shared PayPal sessions include all sources.
+        </p>
+      )}
+      <HistoryTable
+        rows={filtered.slice((current - 1) * size, current * size)}
+        method={method}
+        buyer={buyer}
+        references={references}
+        onActivity={onActivity}
+        onChat={(id) => {
+          const conversation = conversations.get(id + '-assistant');
+          return conversation ? () => props.onChat(conversation.id) : undefined;
+        }}
+        resetKey={[source, method, period, current, size].join('|')}
+      />
+      {filtered.length >= HISTORY.PAGE_SIZES[0] && (
+        <Pagination
+          label="Payment pagination"
+          total={filtered.length}
+          page={current}
+          pageSize={size}
+          onPage={setPage}
+          onPageSize={(n) => {
+            setSize(n);
+            setPage(1);
+          }}
         />
-        {activity.state?.available && (
+      )}
+      {method !== HISTORY_METHOD.USDC && activity.state?.available && (
+        <Section title="PayPal spending summary">
           <HistorySummary
-            entries={rows}
-            method={method}
+            method={HISTORY_METHOD.PAYPAL}
             source={source}
             spending
+            entries={filtered.flatMap((row) =>
+              'entry' in row ? [row.entry] : [],
+            )}
           />
-        )}
-      </Section>
-      <Section
-        title="Payment history"
-        action={<Button onClick={() => onActivity()}>View activity</Button>}
-      >
-        {source !== HISTORY_SOURCE.ALL && (
-          <p className="ui-help-text">
-            Totals show {source} usage. Each history row shows the entire shared
-            session payment.
-          </p>
-        )}
-        <PaymentHistoryResults
-          activity={activity}
-          rows={rows}
-          references={references}
-          method={method}
-          period={period}
-          source={source}
-          currentPage={currentPage}
-          pageSize={pageSize}
-          onActivity={onActivity}
-          setPage={setPage}
-          setPageSize={setPageSize}
-        />
-      </Section>
-    </>
-  );
-}
-function PaymentRow({
-  entry,
-  reference,
-  method,
-  onView,
-}: {
-  entry: ActivityEntry;
-  reference: Parameters<typeof PaymentReference>[0]['reference'];
-  method: HistoryMethod;
-  onView(): void;
-}) {
-  const kind =
-    entry.capturedCents !== null
-      ? HISTORY_KIND.PAYMENT
-      : entry.recordedCents > 0
-        ? HISTORY_KIND.USAGE
-        : HISTORY_KIND.AUTHORIZATION;
-  return (
-    <tr>
-      <th scope="row">
-        <strong>{historyDate(entry.updatedAt)}</strong>
-        <span className="activity-row-meta">
-          {new Date(entry.updatedAt).getFullYear()}
-        </span>
-      </th>
-      <DataCell label="Method">PayPal</DataCell>
-      <DataCell label="Type">
-        {kind}
-        <span className="activity-row-meta">
-          {entry.chatCount && entry.agentCount
-            ? 'Chat + Agents'
-            : entry.chatCount
-              ? 'Chat'
-              : entry.agentCount
-                ? 'Agents'
-                : '—'}
-        </span>
-      </DataCell>
-      <DataCell label="Amount">
-        <FinancialValue
-          tone={
-            entry.needsReview ? FINANCIAL_TONE.PENDING : FINANCIAL_TONE.NEUTRAL
-          }
-        >
-          {entry.capturedCents !== null
-            ? '− ' + paymentAmount(entry.capturedCents)
-            : paymentAmount(entry.recordedCents || entry.limitCents)}
-        </FinancialValue>
-        {kind === HISTORY_KIND.AUTHORIZATION && (
-          <span className="activity-row-meta">Session limit</span>
-        )}
-      </DataCell>
-      <DataCell label="Status">
-        <FinancialValue
-          tone={
-            entry.needsReview ? FINANCIAL_TONE.PENDING : FINANCIAL_TONE.NEUTRAL
-          }
-        >
-          {sessionOutcome(entry)}
-        </FinancialValue>
-      </DataCell>
-      <DataCell label={referenceHeading(method)}>
-        <PaymentReference reference={reference} />
-      </DataCell>
-      <DataCell label="Details">
-        <Button onClick={onView}>View</Button>
-      </DataCell>
-    </tr>
+        </Section>
+      )}
+    </Section>
   );
 }
 
-function SpendingFilters({
-  period,
-  setPeriod,
-  method,
-  setMethod,
+function HistoryFilters({
+  rows,
   source,
+  method,
+  period,
   setSource,
-  setPage,
+  setMethod,
+  setPeriod,
 }: {
-  period: HistoryPeriod;
-  setPeriod(value: HistoryPeriod): void;
-  method: HistoryMethod;
-  setMethod(value: HistoryMethod): void;
+  rows: Entry[];
   source: HistorySource;
-  setSource(value: HistorySource): void;
-  setPage(page: number): void;
+  method: HistoryMethod;
+  period: HistoryPeriod;
+  setSource(v: HistorySource): void;
+  setMethod(v: HistoryMethod): void;
+  setPeriod(v: HistoryPeriod): void;
 }) {
   return (
-    <div className="ui-toolbar ui-spending-filters">
-      <div className="ui-field">
-        <span>Period</span>
-        <ChoiceMenu
-          label="Spending period"
-          value={period}
-          options={Object.values(HISTORY_PERIOD)}
-          onChange={(value) => {
-            setPeriod(value);
-            setPage(1);
-          }}
-        />
-      </div>
-      <div className="ui-field">
-        <span>Payment method</span>
-        <ChoiceMenu
-          label="Spending payment method"
-          value={method}
-          options={Object.values(HISTORY_METHOD)}
-          onChange={(value) => {
-            setMethod(value);
-            setPage(1);
-          }}
-        />
-      </div>
-      <div className="ui-field">
-        <span>Usage source</span>
-        <ChoiceMenu
-          label="Spending usage source"
-          value={source}
-          options={Object.values(HISTORY_SOURCE)}
-          onChange={(value) => {
-            setSource(value);
-            setPage(1);
-          }}
-        />
-      </div>
+    <div className="ui-toolbar preview-history-filters">
+      <FilterChips
+        label="Usage source"
+        value={source}
+        options={Object.values(HISTORY_SOURCE).map((value) => ({
+          value,
+          label:
+            value === HISTORY_SOURCE.ALL
+              ? 'All'
+              : value === HISTORY_SOURCE.AGENTS
+                ? 'API'
+                : 'Chat',
+          count: rows.filter((row) => sourceFilter(row, value)).length,
+        }))}
+        onChange={setSource}
+      />
+      <ChoiceMenu
+        label="Payment method"
+        value={method}
+        options={Object.values(HISTORY_METHOD)}
+        onChange={setMethod}
+      />
+      <ChoiceMenu
+        label="Period"
+        value={period}
+        options={Object.values(HISTORY_PERIOD)}
+        onChange={setPeriod}
+      />
     </div>
   );
 }
 
-function PaymentHistoryResults({
-  activity,
+function HistoryTable({
   rows,
-  references,
   method,
-  period,
-  source,
-  currentPage,
-  pageSize,
+  buyer,
+  references,
   onActivity,
-  setPage,
-  setPageSize,
+  onChat,
+  resetKey,
 }: {
-  activity: ActivityView;
-  rows: ActivityEntry[];
-  references: PaypalPaymentReference[];
+  rows: Entry[];
   method: HistoryMethod;
-  period: HistoryPeriod;
-  source: HistorySource;
-  currentPage: number;
-  pageSize: number;
-  onActivity(id?: string): void;
-  setPage(page: number): void;
-  setPageSize(size: number): void;
+  buyer?: X402View;
+  references: readonly PaypalPaymentReference[];
+  onActivity(id: string): void;
+  onChat(id: string): (() => void) | undefined;
+  resetKey: string;
 }) {
-  if (!activity.state?.available)
-    return <PaymentHistoryState activity={activity} />;
-  return rows.length ? (
-    <>
-      <div className="ui-payment-history">
-        <ScrollTable
-          regionLabel="Payment history table"
-          caption="Latest locally observed payment and authorization outcome per session"
-          headings={[
-            'Date',
-            'Method',
-            'Type',
-            'Amount',
-            'Status',
-            referenceHeading(method),
-            'Details',
-          ]}
-          resetKey={[currentPage, pageSize, period, method, source].join('|')}
-        >
-          {rows
-            .slice((currentPage - 1) * pageSize, currentPage * pageSize)
-            .map((row) => (
-              <PaymentRow
-                key={row.id}
-                entry={row}
-                reference={references.find((item) => item.sessionId === row.id)}
-                method={method}
-                onView={() => onActivity(row.id)}
-              />
-            ))}
-        </ScrollTable>
-      </div>
-      <Pagination
-        label="Payment pagination"
-        page={currentPage}
-        pageSize={pageSize}
-        total={rows.length}
-        onPage={setPage}
-        onPageSize={(size) => {
-          setPageSize(size);
-          setPage(1);
-        }}
-      />
-    </>
-  ) : (
-    <StatePanel
-      title="No payments to show"
-      description={
-        method === HISTORY_METHOD.USDC
-          ? 'USDC transaction history is not available in this version.'
-          : 'No sessions match these filters.'
-      }
-    />
+  return (
+    <ScrollTable
+      regionLabel="Payment history table"
+      caption="Locally recorded payments and authorizations"
+      headings={[
+        'Date',
+        'Source',
+        'Method',
+        'Amount',
+        'Status',
+        referenceHeading(method),
+        'Details',
+      ]}
+      resetKey={resetKey}
+    >
+      {rows.map((row) => {
+        if ('entry' in row)
+          return (
+            <PaymentRow
+              key={row.id}
+              entry={row.entry}
+              reference={references.find(
+                (ref) => ref.sessionId === row.entry.id,
+              )}
+              method={method}
+              onView={() => onActivity(row.entry.id)}
+            />
+          );
+
+        return (
+          buyer && (
+            <UsdcPaymentRow
+              key={row.id}
+              record={row.record}
+              buyer={buyer}
+              onOpen={onChat(row.record.id)}
+            />
+          )
+        );
+      })}
+      {!rows.length && (
+        <tr>
+          <td colSpan={7}>No matching records.</td>
+        </tr>
+      )}
+    </ScrollTable>
   );
 }
 
-function PaymentHistoryState({ activity }: { activity: ActivityView }) {
-  return activity.state === null ? (
-    <StatePanel
-      title="Loading payments…"
-      description="Reading local payment records."
-      loading
-    />
-  ) : (
-    <StatePanel
-      title="Payment history unavailable"
-      description="Check local history before relying on totals."
-      tone={FINANCIAL_TONE.FAILED}
-    />
+function useHistoryFilters(props: Props) {
+  const [method, updateMethod] = useState<HistoryMethod>(HISTORY_METHOD.ALL);
+  const [period, updatePeriod] = useState<HistoryPeriod>(HISTORY_PERIOD.MONTH);
+  const [source, updateSource] = useState<HistorySource>(HISTORY_SOURCE.ALL);
+  const [page, setPage] = useState(1);
+  const [size, setSize] = useState<number>(HISTORY.PAGE_SIZES[0]);
+  const rows = historyRows(props, method, period);
+  const filtered = rows.filter((row) => sourceFilter(row, source));
+  const current = Math.min(
+    page,
+    Math.max(1, Math.ceil(filtered.length / size)),
   );
+  return {
+    method,
+    period,
+    source,
+    current,
+    size,
+    filtered,
+    rows,
+    setPage,
+    setSize,
+    setSource(value: HistorySource) {
+      updateSource(value);
+      setPage(1);
+    },
+    setMethod(value: HistoryMethod) {
+      updateMethod(value);
+      setPage(1);
+    },
+    setPeriod(value: HistoryPeriod) {
+      updatePeriod(value);
+      setPage(1);
+    },
+  };
 }

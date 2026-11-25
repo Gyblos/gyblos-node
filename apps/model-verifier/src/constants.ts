@@ -1,0 +1,48 @@
+export const SECRET_BYTES = 32;
+export const MAX_DIRECT_ADDRESSES = 16;
+export const FREE_ATOMIC = '0';
+export const TEMPLATE_MARKER = /<\|[A-Za-z0-9_]+\|>/;
+
+export const MODEL_VERIFIER = {
+  defaultOllamaUrl: 'http://127.0.0.1:11434',
+  referenceTimeoutMs: 120_000,
+  referenceAttempts: 3,
+  referenceRetryMs: 3_000,
+  answerTimeoutMs: 180_000,
+  directoryMode: 0o700,
+  resultFile: 'result.json',
+  evidenceFile: 'evidence.json',
+  maxSellerFileBytes: 16_384,
+  privateFileMode: 0o600,
+} as const;
+
+export const MODEL_VERIFIER_COMMANDS = {
+  VERIFY: 'verify',
+  ADDRESS: 'address',
+  CHECK: 'check',
+} as const;
+
+export const MODEL_VERIFIER_CODES = {
+  USAGE: 'USAGE',
+  UNSUPPORTED_MODEL: 'UNSUPPORTED_MODEL',
+  REFERENCE_UNAVAILABLE: 'REFERENCE_UNAVAILABLE',
+  REFERENCE_CHANGED: 'REFERENCE_CHANGED',
+  NO_FREE_OFFER: 'NO_FREE_OFFER',
+  INVALID_SELLER: 'INVALID_SELLER',
+  INVALID_KEY: 'INVALID_KEY',
+  INVALID_RESULT: 'INVALID_RESULT',
+  TEMPLATE_MARKER: 'TEMPLATE_MARKER',
+  EMPTY_ANSWER: 'EMPTY_ANSWER',
+  UNKNOWN: 'UNKNOWN',
+  INTERNAL: 'INTERNAL',
+} as const;
+
+export type ModelVerifierCode =
+  (typeof MODEL_VERIFIER_CODES)[keyof typeof MODEL_VERIFIER_CODES];
+
+export class ModelVerifierError extends Error {
+  constructor(readonly code: ModelVerifierCode) {
+    super(code);
+    this.name = 'ModelVerifierError';
+  }
+}

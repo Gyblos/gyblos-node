@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
+import { previewStyles } from '../support/desktop-preview-styles';
+
 const preview = new URL('../../lab/tools/desktop-preview/', import.meta.url);
 const views = new URL('views/', preview);
 const view = (name: string) => readFile(new URL(name, views), 'utf8');
@@ -24,7 +26,7 @@ void test('Add funds offers the faucet on Testnet only, from chat and Usage & pa
 void test('the seller table uses the shared pagination and a pinned-seller summary', async () => {
   const row = await view('ModelRow.tsx.preview');
   const kit = await view('PreviewKit.tsx.preview');
-  const css = await readFile(new URL('preview.css', preview), 'utf8');
+  const css = await previewStyles();
   const design = await readFile(new URL('DESIGN.md', preview), 'utf8');
   assert.match(row, /<Pagination\b/);
   assert.doesNotMatch(row, /preview-pager/);

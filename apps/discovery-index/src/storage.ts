@@ -8,6 +8,11 @@ import {
 
 import { INDEX_ERRORS, NODE_PUBLISH_QUOTA } from './constants';
 import { indexFail } from './errors';
+import {
+  memoryOfferHistory,
+  type OfferContent,
+  type OfferHistoryStorage,
+} from './offer-history';
 import { memoryUptime, type UptimeStorage } from './uptime';
 
 // The NodeId's current catalog; `json` is its signed envelope exactly as published.
@@ -41,6 +46,7 @@ export interface StoredEntry {
   version?: string | null;
   retainUntil: number;
   json: string;
+  offers?: OfferContent;
 }
 
 // The last NodeId of the previous page.
@@ -77,7 +83,7 @@ export interface CatalogStatusRow {
   models: string[];
 }
 
-export interface DiscoveryStorage extends UptimeStorage {
+export interface DiscoveryStorage extends UptimeStorage, OfferHistoryStorage {
   activeVersions(
     now: number,
     limit: number,
@@ -299,6 +305,16 @@ function dropWithdrawals(
       withdrawals.delete(nodeId);
 }
 
+const memoryRecord = (entry: StoredEntry): MemoryRecord => ({
+  sequence: entry.sequence,
+  issuedAt: entry.issuedAt,
+  expiresAt: entry.expiresAt,
+  digest: entry.digest,
+  models: entry.models,
+  json: entry.json,
+  version: entry.version,
+});
+
 // Same semantics as the D1 adapter, in process memory.
 export function createMemoryStorage(): DiscoveryStorage {
   const nodes = new Map<string, MemoryNode>();
@@ -308,17 +324,10 @@ export function createMemoryStorage(): DiscoveryStorage {
   const withdrawn = (nodeId: string, digest: string) =>
     withdrawals.get(nodeId)?.digest === digest;
   const uptime = memoryUptime();
+  const history = memoryOfferHistory();
   const tables = { catalogs, presence, withdrawn };
   function apply(entry: StoredEntry) {
-    const row: MemoryRecord = {
-      sequence: entry.sequence,
-      issuedAt: entry.issuedAt,
-      expiresAt: entry.expiresAt,
-      digest: entry.digest,
-      models: entry.models,
-      json: entry.json,
-      version: entry.version,
-    };
+    const row = memoryRecord(entry);
     if (entry.kind === PUBLIC_RECORD_KINDS.PRESENCE)
       return presence.set(entry.nodeId, row);
     presence.delete(entry.nodeId);
@@ -338,6 +347,7 @@ export function createMemoryStorage(): DiscoveryStorage {
       );
     },
     async prune(now) {
+      history.prune(now);
       dropExpired(presence, now);
       dropExpired(catalogs, now);
       dropWithdrawals(withdrawals, catalogs, now);
@@ -360,9 +370,11 @@ export function createMemoryStorage(): DiscoveryStorage {
       if (!node && nodes.size >= entry.admission.maxNodes)
         indexFail(INDEX_ERRORS.RATE_LIMITED);
       nodes.set(entry.nodeId, nextMemoryNode(node, entry));
+      history.record(entry);
       apply(entry);
       return true;
     },
+    offerHistory: history.offerHistory,
     list: async (query) => listMemory(tables, query),
     activeVersions: async (now, limit, nodeId) =>
       versionsMemory(tables, now, limit, nodeId),

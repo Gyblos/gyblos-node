@@ -8,12 +8,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
+import { sellerFailureLine } from '@gyblos/buyer-app/free-main';
 import {
   BUYER_SELECTION,
   ERROR_DIAGNOSTICS,
   SELLER_FAILURE_PHASES,
 } from '@gyblos/buyer/constants';
-import { sellerFailureLine } from '@gyblos/buyer/free-main';
 import {
   backoffFor,
   createSellerBackoff,

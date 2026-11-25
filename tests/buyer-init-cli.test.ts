@@ -5,7 +5,7 @@ import { rm, stat } from 'node:fs/promises';
 import test from 'node:test';
 import { promisify } from 'node:util';
 
-import { runBuyerInit } from '@gyblos/buyer/init';
+import { runBuyerInit } from '@gyblos/buyer-app/init';
 import { buildBuyerInit, type BuyerInitAnswers } from '@gyblos/node/buyer-init';
 import { BUYER_INIT_MODES } from '@gyblos/node/buyer-init-constants';
 

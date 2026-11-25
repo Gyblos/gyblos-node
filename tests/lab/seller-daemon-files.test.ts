@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
 
-import { chatSession } from '@gyblos/buyer/chat-cli';
+import { chatSession } from '@gyblos/buyer-app/chat-cli';
 import { ROLE_FILES, rolePathIn } from '@gyblos/config';
 import { SELLER_DAEMON_STATES } from '@gyblos/node/constants';
 import { OFFER_PRICING_KINDS, P2P_ROLES } from '@gyblos/protocol/constants';

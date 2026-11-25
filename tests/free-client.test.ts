@@ -13,7 +13,10 @@ import { freeExecutionDigest } from '@gyblos/protocol/free-execution';
 import { encodeFreeExecutionResponse } from '@gyblos/protocol/free-execution-framing';
 import { signOfferV2 } from '@gyblos/protocol/offer-v2';
 
+import { batchDeferred } from './support/batch-deferred';
 import { freeSellerFixture } from './support/free-seller';
+
+const UNHURRIED_MS = 10_000;
 
 async function fixture(
   options: {
@@ -27,6 +30,7 @@ async function fixture(
   const request = await source.request();
   let writes = 0;
   let closes = 0;
+  let finishes = 0;
   let bodyReads = 0;
   let remoteId = source.options.nodeId;
   let relay: string | null = null;
@@ -55,7 +59,9 @@ async function fixture(
           writes++;
           await write();
         },
-        finish: async () => {},
+        finish: async () => {
+          finishes++;
+        },
       },
       recv: {
         readExact: async (length: number) => {
@@ -83,7 +89,7 @@ async function fixture(
       owner: source.options.owner,
       nodeId: source.options.nodeId,
     },
-    { now: source.options.now, requestMs: 100, ...options },
+    { now: source.options.now, requestMs: UNHURRIED_MS, ...options },
   );
   return {
     source,
@@ -91,6 +97,7 @@ async function fixture(
     client,
     writes: () => writes,
     closes: () => closes,
+    finishes: () => finishes,
     bodyReads: () => bodyReads,
     setRemoteAddr: (value: string) => {
       remoteAddr = value;
@@ -162,23 +169,22 @@ void test('free client cuts oversized prefixes before reading the body', async (
 });
 void test('free client cancels a slow dial and closes a late connection without sending', async () => {
   const item = await fixture();
-  let resolve = (_connection: Connection) => {};
-  item.setConnect(
-    () =>
-      new Promise<Connection>((done) => {
-        resolve = done;
-      }),
-  );
+  const dialed = batchDeferred<void>();
+  const late = batchDeferred<Connection>();
+  item.setConnect(() => {
+    dialed.resolve();
+    return late.promise;
+  });
   const controller = new AbortController();
   const operation = item.client.execute(item.request, controller.signal);
-  await new Promise((done) => setTimeout(done, 10));
+  await Promise.race([dialed.promise, operation]);
   controller.abort();
   await assert.rejects(operation, {
     code: FREE_EXECUTION_CODES.CANCELLED,
     sent: false,
   });
-  resolve(item.connection);
-  await new Promise((done) => setTimeout(done, 10));
+  late.resolve(item.connection);
+  await item.client.settled();
   assert.equal(item.writes(), 0);
   assert.equal(item.closes(), 1);
 });
@@ -240,7 +246,7 @@ void test('free client refuses a paid quote and a mismatched selection before se
   );
   assert.equal(changed.writes(), 0);
 });
-void test('free client correlates remote errors and rejects mismatched responses', async (context) => {
+void test('free client correlates remote errors and rejects mismatched responses', async () => {
   const remote = await fixture();
   remote.setFrame(
     encodeFreeExecutionResponse({
@@ -250,8 +256,6 @@ void test('free client correlates remote errors and rejects mismatched responses
       error: { code: FREE_EXECUTION_CODES.BUSY },
     }),
   );
-  // This case checks correlation; crypto scheduling must not consume its simulated budget.
-  context.mock.timers.enable({ apis: ['setTimeout'] });
   await assert.rejects(remote.client.execute(remote.request), {
     code: FREE_EXECUTION_CODES.BUSY,
     remote: true,
@@ -274,29 +278,24 @@ void test('free client correlates remote errors and rejects mismatched responses
 });
 void test('free client exposes settlement until a cancelled native write actually finishes', async () => {
   const item = await fixture();
-  let writing = () => {};
-  const began = new Promise<void>((resolve) => {
-    writing = resolve;
-  });
-  let release = () => {};
+  const began = batchDeferred<void>();
+  const released = batchDeferred<void>();
   item.setWrite(async () => {
-    writing();
-    await new Promise<void>((resolve) => {
-      release = resolve;
-    });
+    began.resolve();
+    await released.promise;
   });
   const controller = new AbortController();
   const operation = item.client.execute(item.request, controller.signal);
-  await began;
+  await Promise.race([began.promise, operation]);
   controller.abort();
   await assert.rejects(operation, { sent: true });
   let settled = false;
   const finished = item.client.settled().then(() => {
     settled = true;
   });
-  await new Promise((resolve) => setTimeout(resolve, 5));
+  await new Promise((resolve) => setImmediate(resolve));
   assert.equal(settled, false);
-  release();
+  released.resolve();
   await finished;
   assert.equal(settled, true);
 });
@@ -332,23 +331,26 @@ void test('relay-only free client sends over a same-machine loopback path only',
   assert.equal((await local.client.execute(local.request)).text, 'answer');
   assert.equal(local.writes(), 1);
 });
-void test('free client cuts slow frames at the absolute deadline and suppresses late writes', async () => {
+void test('free client cuts slow frames at the absolute deadline and suppresses late writes', async (context) => {
   const item = await fixture({ requestMs: 30 });
-  let release = () => {};
-  item.setWrite(
-    () =>
-      new Promise<void>((resolve) => {
-        release = resolve;
-      }),
-  );
-  await assert.rejects(item.client.execute(item.request), {
+  const began = batchDeferred<void>();
+  const released = batchDeferred<void>();
+  item.setWrite(async () => {
+    began.resolve();
+    await released.promise;
+  });
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+  const operation = item.client.execute(item.request);
+  context.mock.timers.tick(20);
+  await Promise.race([began.promise, operation]);
+  context.mock.timers.tick(10);
+  await assert.rejects(operation, {
     code: FREE_EXECUTION_CODES.TIMEOUT,
     sent: true,
   });
-  release();
+  released.resolve();
   await item.client.settled();
-  assert.equal(item.writes(), 1);
-  assert.equal(item.closes(), 1);
+  assert.deepEqual([item.writes(), item.closes(), item.finishes()], [1, 1, 0]);
 });
 
 void test('free client checks the shared uncertainty barrier immediately before the first prompt write', async () => {

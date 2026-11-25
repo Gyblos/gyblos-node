@@ -19,6 +19,7 @@ export class ChatArchiveClient {
   private generation = 0;
   private sequence = 0;
   private saved = 0;
+  private pinsUnavailable = false;
   private last = '';
   private blocked = false;
   private remove = () => {};
@@ -54,10 +55,9 @@ export class ChatArchiveClient {
     if (result.archive) this.chat.restoreArchive(result.archive);
     this.chat.setRestoring(false);
     this.generation = result.available ? result.generation : 0;
+    this.pinsUnavailable = !!result.pinsUnavailable;
     this.onState(
-      result.available
-        ? CHAT_STORAGE_STATE.SAVED
-        : CHAT_STORAGE_STATE.UNAVAILABLE,
+      result.available ? this.savedState() : CHAT_STORAGE_STATE.UNAVAILABLE,
     );
     this.remove = this.chat.subscribe(this.save);
     this.pollTimer = setInterval(() => {
@@ -72,13 +72,20 @@ export class ChatArchiveClient {
       this.onState(CHAT_STORAGE_STATE.UNAVAILABLE);
       return;
     }
-    this.saved = Math.max(this.saved, result.savedSequence);
+    if (result.savedSequence < this.saved) return;
+    this.pinsUnavailable = !!result.pinsUnavailable;
+    this.saved = result.savedSequence;
     if (!this.blocked) this.markSaved();
   };
+  private savedState() {
+    return this.pinsUnavailable
+      ? CHAT_STORAGE_STATE.PINS_UNAVAILABLE
+      : CHAT_STORAGE_STATE.SAVED;
+  }
   private markSaved() {
     this.onState(
       this.saved >= this.sequence
-        ? CHAT_STORAGE_STATE.SAVED
+        ? this.savedState()
         : CHAT_STORAGE_STATE.SAVING,
     );
   }

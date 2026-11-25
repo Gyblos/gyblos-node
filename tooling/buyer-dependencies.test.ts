@@ -17,7 +17,7 @@ import test from 'node:test';
 
 import ts from 'typescript';
 
-const BUYER = resolve('apps/buyer');
+const BUYER = resolve('packages/buyer');
 const ADAPTER_ENTRY = '@gyblos/payments-upto/batch-session';
 
 function isRecord(value: unknown): value is Record<string, unknown> {

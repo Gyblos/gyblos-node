@@ -264,6 +264,7 @@ function RequestCharts({
       day: day.day,
       value: day[side],
       amount: day[side],
+      detail: day.note,
     }));
   const total = (side: 'free' | 'paid') =>
     observedSum(series.map((day) => day[side]));

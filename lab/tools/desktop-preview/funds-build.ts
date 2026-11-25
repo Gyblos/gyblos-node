@@ -27,34 +27,3 @@ export const CHAT_FUNDS_REWRITES: readonly [string, string][] = [
     "            {(previewFunds.blocked ? 'Add funds or choose a free model to send.' : previewFunds.fallback && !previewHardNotice ? undefined : limitNotice) ||",
   ],
 ];
-
-export const MENU_REWRITES: readonly [string, string][] = [
-  [
-    "window.addEventListener('scroll', position, true);",
-    "const outside = (event: Event) => {\n      if (!(event.target instanceof Node && menu.contains(event.target))) position();\n    };\n    window.addEventListener('scroll', outside, true);",
-  ],
-  [
-    "window.removeEventListener('scroll', position, true);",
-    "window.removeEventListener('scroll', outside, true);\n      menu.removeEventListener('preview:reposition', position);",
-  ],
-  [
-    "window.addEventListener('resize', position);",
-    "window.addEventListener('resize', position);\n    menu.addEventListener('preview:reposition', position);",
-  ],
-  [
-    'menu.style.width = `min(var(--seller-menu-width, ${MENU_GEOMETRY.WIDTH}px), ${window.innerWidth - gutter * 2}px)`;',
-    "const split = menu.dataset.split === 'true';\n      menu.style.width = split\n        ? `${Math.min(MENU_GEOMETRY.WIDTH, (window.innerWidth - gutter * 2 - 6) / 2)}px`\n        : `min(var(--seller-menu-width, ${MENU_GEOMETRY.WIDTH}px), ${window.innerWidth - gutter * 2}px)`;",
-  ],
-  [
-    'const up =\n        below < Math.min(menu.scrollHeight, MENU_GEOMETRY.WIDTH) &&\n        above > below;',
-    "const fits = (space: number) => space >= Math.min(menu.scrollHeight, MENU_GEOMETRY.WIDTH);\n      const up = anchor.closest('.composer')\n        ? fits(above) || above > below\n        : !fits(below) && above > below;",
-  ],
-  [
-    'window.innerWidth - width - gutter',
-    'window.innerWidth - width - (split ? width + 6 : 0) - gutter',
-  ],
-  [
-    'menu.style.top = `${up ? bounds.top - gap - Math.min(menu.scrollHeight, available) : bounds.bottom + gap}px`;',
-    "menu.style.top = up ? 'auto' : `${bounds.bottom + gap}px`;\n      menu.style.bottom = up ? `${window.innerHeight - bounds.top + gap}px` : 'auto';",
-  ],
-];

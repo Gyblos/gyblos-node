@@ -54,6 +54,14 @@
       "upstream": "https://github.com/Instrument/instrument-sans",
       "verifiedSource": "https://raw.githubusercontent.com/google/fonts/main/ofl/instrumentsans/InstrumentSans-Italic%5Bwdth%2Cwght%5D.ttf",
       "exactDownloadRevision": "Google Fonts main; SHA256 identifies downloaded bytes"
+    },
+    {
+      "file": "InterVariable.woff2",
+      "sha256": "693b77d4f32ee9b8bfc995589b5fad5e99adf2832738661f5402f9978429a8e3",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "Inter-LICENSE.txt",
+      "upstream": "https://github.com/rsms/inter",
+      "exactDownloadRevision": "Inter 4.1; SHA256 identifies the bundled bytes"
     }
   ],
   "sourceVerification": "The verified source URLs served bytes matching the recorded SHA256 values. This establishes a reproducible source match, not the original download date or revision. Google Fonts distribution URLs are versioned endpoints, not cryptographic Git revisions."

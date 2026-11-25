@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
+import { previewStyles } from '../support/desktop-preview-styles';
+
 const preview = new URL('../../lab/tools/desktop-preview/', import.meta.url);
 const read = (name: string) => readFile(new URL(name, preview), 'utf8');
 const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -65,11 +67,17 @@ void test('the title bar adds a conversation menu and a details panel for the ch
   const build = await read('brand-build.ts');
   const layout = await read('layout-build.ts');
   assert.match(layout, /<PreviewConversationMenu chat=\{props\.chat\}/);
-  assert.match(layout, /<PreviewChatDetails chat=\{chatController\}/);
-  assert.match(layout, /'Hide conversation details'/);
+  assert.match(
+    await readFile('apps/desktop/src/desktop-app.tsx', 'utf8'),
+    /<ConversationDetails\s+chat=\{chatController\}/,
+  );
+  assert.match(
+    await readFile('apps/desktop/src/ui/WindowTitlebar.tsx', 'utf8'),
+    /'Hide conversation details'/,
+  );
   assert.match(layout, /usePreviewConversationTitle\(conversation\)/);
   assert.match(build, /layout\.TITLEBAR_REWRITES/);
-  const css = await read('preview.css');
+  const css = await previewStyles();
   assert.match(css, /\.preview-rail \{/);
   assert.match(
     css,
@@ -132,7 +140,7 @@ void test('compact density is the default and ?density=comfortable restores the 
   const [browser, constants, css, kit, settings] = await Promise.all([
     read('browser.ts'),
     read('constants.ts'),
-    read('preview.css'),
+    previewStyles(),
     read('views/PreviewKit.tsx.preview'),
     read('views/Settings.tsx.preview'),
   ]);
@@ -248,7 +256,7 @@ void test('compact loading and shortcut hints stay accessible', async () => {
 
 void test('compact pills, buttons, icons, digits and code line numbers', async () => {
   const [css, kit] = await Promise.all([
-    read('preview.css'),
+    previewStyles(),
     read('views/PreviewKit.tsx.preview'),
   ]);
   const compact = (selector: string, declaration: string) =>
@@ -292,7 +300,7 @@ void test('compact pills, buttons, icons, digits and code line numbers', async (
 });
 
 void test('compact cards and connection steps use the compact scale', async () => {
-  const css = (await read('preview.css')).replace(/\s+/g, ' ');
+  const css = (await previewStyles()).replace(/\s+/g, ' ');
   const compact = (selector: string, declaration: string) =>
     assertCompact(css, selector, declaration);
   compact('.preview-metric-card', 'padding: 12px 14px;');
@@ -313,7 +321,7 @@ void test('compact cards and connection steps use the compact scale', async () =
 });
 
 void test('the conversation panel slides under the rail like a stacked sheet', async () => {
-  const css = (await read('preview.css')).replace(/\s+/g, ' ');
+  const css = (await previewStyles()).replace(/\s+/g, ' ');
   assert.doesNotMatch(
     css,
     /\.sidebar-collapsed \.preview-chat-panel \{ display: none;/,
@@ -334,7 +342,7 @@ void test('the conversation panel slides under the rail like a stacked sheet', a
 });
 
 void test('connection tool cards stretch with the sheet instead of snapping to empty tracks', async () => {
-  const css = (await read('preview.css')).replace(/\s+/g, ' ');
+  const css = (await previewStyles()).replace(/\s+/g, ' ');
   assert.match(
     css,
     /\.desktop-frame \.preview-tool-grid \{[^}]*grid-template-columns: repeat\(auto-fit, minmax\(min\(100%, 150px\), 1fr\)\);/,
@@ -366,4 +374,14 @@ void test('conversation details total spend in each charge unit', async () => {
   const details = kit.slice(kit.indexOf('export function PreviewChatDetails'));
   assert.doesNotMatch(details, /' USDC'/);
   assert.match(details, /totals\[cost\.unit\]/);
+});
+
+void test('the model list names a single result in the singular', async () => {
+  const row = await read('views/ModelRow.tsx.preview');
+  assert.doesNotMatch(row, /\{rows\.length\} models/);
+});
+
+void test('the mockup reuses the renderer model mode pill', async () => {
+  const css = (await read('preview.css')).replace(/\s+/g, ' ');
+  assert.doesNotMatch(css, /\.preview-model-mode \{[^}]*border-radius/);
 });

@@ -3,6 +3,8 @@ import type { BrowserWindowConstructorOptions } from 'electron';
 
 import { WINDOW_CHROME, WINDOW_PLATFORM } from './constants';
 
+export { DESKTOP } from './constants';
+
 export type WindowPlatform =
   (typeof WINDOW_PLATFORM)[keyof typeof WINDOW_PLATFORM];
 export function windowPlatform(input: unknown): WindowPlatform {

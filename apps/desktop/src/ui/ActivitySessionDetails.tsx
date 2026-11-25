@@ -1,10 +1,5 @@
 // Keeps source usage, payment outcome and linked conversations distinct in a flat dialog.
-import {
-  ArrowRight,
-  ChatCircle,
-  CreditCard,
-  Robot,
-} from '@phosphor-icons/react';
+import { ArrowRight, ChatCircle } from '@phosphor-icons/react';
 
 import type { ActivityEntry } from '../activity-model';
 import { DESKTOP_ACTIVITY } from '../constants';
@@ -14,18 +9,11 @@ import { activityDate, sessionOutcome } from './activity-presentation';
 import { conversationSummary } from './chat-history';
 import type { ChatSession } from './chat-state';
 import { BUTTON_VARIANT } from './constants';
+import { DetailSummary } from './DetailSummary';
 import { Modal } from './Modal';
 import { PaymentReferenceDetails } from './PaymentReference';
-import {
-  Badge,
-  Button,
-  List,
-  ListRow,
-  Note,
-  RowCopy,
-  SectionTitle,
-  StatCard,
-} from './UI';
+import { statusTone } from './status-tone';
+import { Badge, Button, Note } from './UI';
 
 type Props = {
   entry: ActivityEntry;
@@ -37,6 +25,8 @@ type Props = {
   onPayments(): void;
   canReview: boolean;
 };
+const plural = (count: number, one: string, many: string) =>
+  count + ' ' + (count === 1 ? one : many);
 export function ActivitySessionDetails({
   entry,
   reference,
@@ -47,47 +37,43 @@ export function ActivitySessionDetails({
   onPayments,
   canReview,
 }: Props) {
+  const linked = conversations.filter((item) =>
+    conversationSummary(item).paymentSessionIds.includes(entry.id),
+  );
   return (
     <Modal
       title={`Session ${entry.id.slice(0, DESKTOP_ACTIVITY.DISPLAY_ID_CHARACTERS)}`}
       close={close}
     >
-      <div className="activity-heading">
-        <Badge>PayPal Sandbox · test funds</Badge>
-        <Badge>{sessionOutcome(entry)}</Badge>
-      </div>
-      <div className="ui-stats activity-breakdown">
-        <StatCard
-          label="Chat"
-          value={paypalDollars(entry.chatCents)}
-          detail={`${entry.chatCount} acknowledged replies`}
-        />
-        <StatCard
-          label="Agents"
-          value={paypalDollars(entry.agentCents)}
-          detail={`${entry.agentCount} completed inferences`}
-        />
-      </div>
-      <SessionPayment entry={entry} />
-      <PaymentReferenceDetails reference={reference} copy={onCopyReference} />
+      <SessionFinancialSummary entry={entry} />
+      {reference && (
+        <PaymentReferenceDetails reference={reference} copy={onCopyReference} />
+      )}
       {entry.needsReview && (
         <Note>
           An unfinished operation needs review. An uncertain inference may be
           outside the recorded total. Activity never retries a payment.
         </Note>
       )}
-      <LinkedConversations
-        conversations={conversations}
-        sessionId={entry.id}
-        onOpen={(id) => {
-          close();
-          onOpenChat(id);
-        }}
-      />
-      <p className="activity-footnote">
-        Shared session totals can include several conversations and agents. Last
-        recorded on this device: {activityDate(entry.updatedAt)}.
-      </p>
+      {linked.length > 0 && (
+        <nav className="preview-detail-links" aria-label="Linked conversations">
+          <h3>Linked conversations</h3>
+          {linked.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => {
+                close();
+                onOpenChat(item.id);
+              }}
+            >
+              <ChatCircle size={16} aria-hidden="true" />
+              <span>{item.title}</span>
+              <ArrowRight size={14} aria-hidden="true" />
+            </button>
+          ))}
+        </nav>
+      )}
       {canReview && (
         <Button
           variant={BUTTON_VARIANT.SECONDARY}
@@ -96,80 +82,55 @@ export function ActivitySessionDetails({
             onPayments();
           }}
         >
-          Review in Payments
+          Review in Usage &amp; payments
         </Button>
       )}
     </Modal>
   );
 }
-function SessionPayment({ entry }: { entry: ActivityEntry }) {
-  return (
-    <List label="Session payment summary">
-      <ListRow
-        leading={<CreditCard size={18} />}
-        trailing={paypalDollars(entry.limitCents)}
-      >
-        <RowCopy title="Session limit" detail="Maximum requested" />
-      </ListRow>
-      <ListRow
-        leading={<Robot size={18} />}
-        trailing={paypalDollars(entry.recordedCents)}
-      >
-        <RowCopy
-          title="Recorded consumption"
-          detail={
-            entry.unconfirmedCents
-              ? `${paypalDollars(entry.unconfirmedCents)} awaiting confirmation`
-              : 'Chat and Agents combined'
-          }
-        />
-      </ListRow>
-      <ListRow
-        leading={<CreditCard size={18} />}
-        trailing={
-          entry.capturedCents === null
-            ? 'Not confirmed'
-            : paypalDollars(entry.capturedCents)
-        }
-      >
-        <RowCopy title="Captured payment" detail={sessionOutcome(entry)} />
-      </ListRow>
-    </List>
-  );
-}
-function LinkedConversations({
-  conversations,
-  sessionId,
-  onOpen,
-}: {
-  conversations: ChatSession[];
-  sessionId: string;
-  onOpen(id: string): void;
-}) {
-  const linked = conversations.filter((item) =>
-    conversationSummary(item).paymentSessionIds.includes(sessionId),
-  );
+
+function SessionFinancialSummary({ entry }: Pick<Props, 'entry'>) {
   return (
     <>
-      <SectionTitle>Linked conversations</SectionTitle>
-      <List label="Linked conversations">
-        {linked.map((item) => (
-          <ListRow
-            key={item.id}
-            leading={<ChatCircle size={18} />}
-            onActivate={() => onOpen(item.id)}
-            trailing={<ArrowRight size={16} />}
-          >
-            <RowCopy title={item.title} detail="Open conversation" />
-          </ListRow>
-        ))}
-        {!linked.length && (
-          <p className="ui-list-empty">
-            No linked conversations saved on this device. Agent usage and
-            earlier replies remain in the session totals.
-          </p>
-        )}
-      </List>
+      <DetailSummary
+        status={{
+          label: sessionOutcome(entry),
+          tone: statusTone(sessionOutcome(entry)),
+        }}
+        meta="PayPal Sandbox · test funds"
+        totals={[
+          { label: 'Recorded', value: paypalDollars(entry.recordedCents) },
+          {
+            label: 'Captured',
+            value:
+              entry.capturedCents === null
+                ? 'Not confirmed'
+                : paypalDollars(entry.capturedCents),
+          },
+          { label: 'Limit', value: paypalDollars(entry.limitCents) },
+        ]}
+        rows={[
+          {
+            label: 'Chat',
+            value: paypalDollars(entry.chatCents),
+            note: plural(entry.chatCount, 'reply', 'replies'),
+          },
+          {
+            label: 'API',
+            value: paypalDollars(entry.agentCents),
+            note: plural(entry.agentCount, 'request', 'requests'),
+          },
+          ...(entry.unconfirmedCents > 0
+            ? [
+                {
+                  label: 'Awaiting confirmation',
+                  value: paypalDollars(entry.unconfirmedCents),
+                },
+              ]
+            : []),
+          { label: 'Last activity', value: activityDate(entry.updatedAt) },
+        ]}
+      />
     </>
   );
 }

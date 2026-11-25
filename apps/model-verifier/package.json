@@ -1,0 +1,30 @@
+{
+  "name": "@gyblos/model-verifier",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./challenge-set": "./src/challenge-set.ts",
+    "./constants": "./src/constants.ts",
+    "./scoring": "./src/scoring.ts",
+    "./quotes": "./src/quotes.ts",
+    "./reference": "./src/reference.ts",
+    "./seller": "./src/seller.ts",
+    "./verify": "./src/verify.ts",
+    "./key": "./src/key.ts",
+    "./main": "./src/main.ts"
+  },
+  "scripts": {
+    "start": "node --import tsx src/main.ts"
+  },
+  "dependencies": {
+    "@gyblos/config": "workspace:*",
+    "@gyblos/core": "workspace:*",
+    "@gyblos/engine-ollama": "workspace:*",
+    "@gyblos/protocol": "workspace:*",
+    "@gyblos/runtime": "workspace:*",
+    "@gyblos/transport-iroh": "workspace:*",
+    "@number0/iroh": "1.2.0",
+    "@solana/kit": "5.1.0"
+  }
+}

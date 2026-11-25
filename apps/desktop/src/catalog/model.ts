@@ -128,8 +128,15 @@ function parseModel(value: unknown): AnnouncedModel | null {
     outputAtomicPerMtok: value.outputAtomicPerMtok,
   };
 }
-export function parseNetworkCatalog(value: unknown): NetworkCatalog {
-  const failed = () => emptyCatalog(CATALOG_STATE.ERROR);
+export function parseNetworkCatalog(
+  value: unknown,
+  requested?: string,
+): NetworkCatalog {
+  const failed = () =>
+    emptyCatalog(
+      CATALOG_STATE.ERROR,
+      validCatalogQuery(requested) ? requested : '',
+    );
   if (!object(value, ['state', 'query', 'checkedAt', 'models', 'truncated']))
     return failed();
   const state = Object.values(CATALOG_STATE).find(
@@ -137,6 +144,7 @@ export function parseNetworkCatalog(value: unknown): NetworkCatalog {
   );
   if (
     !state ||
+    (requested !== undefined && value.query !== requested) ||
     (value.query !== '' && !validCatalogQuery(value.query)) ||
     (value.checkedAt !== null && !integer(value.checkedAt)) ||
     typeof value.truncated !== 'boolean' ||

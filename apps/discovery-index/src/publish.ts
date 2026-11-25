@@ -2,12 +2,15 @@
 // then an atomic put.
 // It stores only signed public data and never sees or keeps the client address.
 import { PUBLIC_RECORD_KINDS } from '@gyblos/protocol/constants';
-import type { PublicRecordV2 } from '@gyblos/protocol/control-types';
+import type {
+  PublicModelV2,
+  PublicRecordV2,
+} from '@gyblos/protocol/control-types';
 import { catalogDigestV2 } from '@gyblos/protocol/public-v2';
 import { verifiedSellerVersion } from '@gyblos/protocol/seller-version';
 
 import { readPublishBody } from './body';
-import { DISCOVERY_INDEX_LIMITS, INDEX_ERRORS } from './constants';
+import { DISCOVERY_INDEX_LIMITS, HEX, INDEX_ERRORS } from './constants';
 import { indexFail } from './errors';
 import {
   claimedNodeId,
@@ -30,6 +33,25 @@ export interface PublishContext {
   prune: (now: number) => Promise<void>;
   // Records an accepted presence for public uptime.
   markSeen: (nodeId: string, now: number) => Promise<void>;
+}
+
+const offerKey = (model: PublicModelV2) =>
+  JSON.stringify([model.modelId, model.variant, model.quantization]);
+
+async function offerContent(models: readonly PublicModelV2[]) {
+  const json = JSON.stringify(
+    [...models].sort((left, right) =>
+      offerKey(left) < offerKey(right) ? -1 : 1,
+    ),
+  );
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(json),
+  );
+  const hash = Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(HEX.radix).padStart(HEX.byteWidth, '0'),
+  ).join('');
+  return { hash, json };
 }
 
 async function storedEntry(
@@ -56,6 +78,7 @@ async function storedEntry(
     retainUntil: record.expiresAt + DISCOVERY_INDEX_LIMITS.retentionMs,
     // Stored verbatim exactly as published (compact, checked by readPublishBody).
     json,
+    ...(catalog ? { offers: await offerContent(record.models) } : {}),
   };
 }
 
