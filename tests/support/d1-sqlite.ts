@@ -34,18 +34,6 @@ export interface SqliteStatement extends D1PreparedStatement {
   params: D1Value[];
 }
 
-// D1 accepts ordered ?NNN parameters; node:sqlite binds them reliably by name.
-export function namedSql(sql: string) {
-  let next = 0;
-  return sql.replace(/\?(\d*)/g, (_match, digits: string) => {
-    const index = digits ? Number(digits) : next + 1;
-    next = Math.max(next, index);
-    return `:p${index}`;
-  });
-}
-export const namedParams = (params: D1Value[]) =>
-  Object.fromEntries(params.map((value, index) => [`p${index + 1}`, value]));
-
 export interface SqliteQueryPlanRow {
   id: number;
   parent: number;
@@ -57,8 +45,8 @@ export function explainD1Statement(
   statement: Pick<SqliteStatement, 'sql' | 'params'>,
 ): SqliteQueryPlanRow[] {
   return database.raw
-    .prepare('EXPLAIN QUERY PLAN ' + namedSql(statement.sql))
-    .all(namedParams(statement.params))
+    .prepare('EXPLAIN QUERY PLAN ' + statement.sql)
+    .all(...statement.params)
     .map((row) => ({
       id: Number(row.id),
       parent: Number(row.parent),
@@ -83,7 +71,10 @@ export async function createSqliteD1(): Promise<SqliteD1 | null> {
     .sort())
     db.exec(readFileSync(new URL(file, MIGRATIONS), 'utf8'));
   const run = (sql: string, params: D1Value[]) => {
-    const results = db.prepare(namedSql(sql)).all(namedParams(params)).map(row);
+    const results = db
+      .prepare(sql)
+      .all(...params)
+      .map(row);
     const changes = Number(db.prepare('SELECT changes() AS n').get()?.n ?? 0);
     return { meta: { changes }, results };
   };
@@ -92,7 +83,10 @@ export async function createSqliteD1(): Promise<SqliteD1 | null> {
     params,
     bind: (...values) => statement(sql, values),
     all: async () => ({
-      results: db.prepare(namedSql(sql)).all(namedParams(params)).map(row),
+      results: db
+        .prepare(sql)
+        .all(...params)
+        .map(row),
     }),
     run: async () => run(sql, params),
   });

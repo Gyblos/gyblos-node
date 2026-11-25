@@ -21,8 +21,7 @@ import { ipKey } from '@gyblos/runtime/ip-key';
 
 import {
   createSqliteD1,
-  namedParams,
-  namedSql,
+  explainD1Statement,
   type SqliteStatement,
 } from './support/d1-sqlite';
 import {
@@ -333,10 +332,7 @@ void test('D1 prune uses indexes only and drops expired rows by key', async (con
   await storage.prune(T0 + 100);
   assert.ok(recorded.length > 0);
   for (const statement of recorded) {
-    const plan = db.raw
-      .prepare('EXPLAIN QUERY PLAN ' + namedSql(statement.sql))
-      .all(namedParams(statement.params));
-    for (const step of plan)
+    for (const step of explainD1Statement(db, statement))
       assert.doesNotMatch(String(step.detail), /^SCAN /, statement.sql);
     assert.doesNotMatch(statement.sql, /NOT IN/);
   }
