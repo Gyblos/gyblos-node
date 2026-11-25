@@ -107,6 +107,12 @@ identificador de solicitud, el modelo, los tiempos y, cuando se conocen, el núm
 y el monto cobrado. Por eso las observaciones muestran a qué vendedores intentó llegar un comprador y
 cuándo, incluidos los intentos que no generaron recibo.
 
+El recolector publica solo totales diarios de estos eventos. Para la demanda no atendida lista hasta 20
+modelos por día, primero los más pedidos, y además el número de modelos y de solicitudes detrás de esa lista.
+Un día con 20 modelos o menos los lista todos, incluso uno pedido una sola vez; pasados los 20, el resto
+cuenta solo en los totales del día, sin su nombre. Cada día indica también si sus totales
+son finales, parciales, pendientes o no capturados, y cuándo se calcularon por última vez. El primer día con algún recibo u observación, aunque no sume a ningún total publicado, es público como el inicio de la captura: los días anteriores aparecen como "not captured".
+
 Las versiones publicadas envían las observaciones junto con los recibos. Esperan en memoria, como máximo
 5.000 eventos, así que un reinicio pierde las que aún no se enviaron.
 

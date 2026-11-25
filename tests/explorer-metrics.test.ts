@@ -69,6 +69,7 @@ void test('free and paid figures are never added up', () => {
     days: [
       {
         day: '2026-11-16',
+        coverage: 'final',
         free: { ...side(10_000, 9_900, 100, 50_000), authorizedAtomic: null },
         paid: { ...side(50, 30, 20, 400), authorizedAtomic: '1000' },
         observed: null,

@@ -325,3 +325,12 @@ export const COLLECTOR_ADMIN_TOKEN_BINDING = 'COLLECTOR_ADMIN_TOKEN';
 export const COLLECTOR_CHAIN_INDEX_FAILED = 'COLLECTOR_CHAIN_INDEX_FAILED';
 // Log code of every scheduled chain read: calls per endpoint, rate limits, work done and backlog.
 export const COLLECTOR_CHAIN_INDEX_RUN = 'COLLECTOR_CHAIN_INDEX_RUN';
+
+export const COVERAGE_STATES = {
+  FINAL: 'final',
+  PARTIAL: 'partial',
+  PENDING: 'pending',
+  UNKNOWN: 'unknown',
+} as const;
+export type CoverageState =
+  (typeof COVERAGE_STATES)[keyof typeof COVERAGE_STATES];

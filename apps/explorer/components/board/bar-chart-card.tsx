@@ -60,7 +60,7 @@ export function BarChartCard({
   return (
     <div className={cx('p-4 sm:p-5', SURFACE.card)}>
       <div className="text-sm text-muted">{title}</div>
-      <div className="mt-1 flex items-center gap-2">
+      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className="font-mono text-2xl">
           <Flow value={active ? active.amount : total} kind={kind} />
         </span>

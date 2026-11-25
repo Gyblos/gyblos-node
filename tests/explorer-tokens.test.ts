@@ -33,6 +33,7 @@ const day = (
   paid: NetworkSide | null,
 ) => ({
   day: date,
+  coverage: null,
   free,
   paid,
   observed: null,

@@ -217,3 +217,17 @@ export const SELLER_NAME = {
   hint: 'self-chosen name, not verified',
   unsafe: /[@✓✔✅☑\p{Cc}\p{Cf}]/u,
 } as const;
+
+export const COVERAGE_STATES = {
+  FINAL: 'final',
+  PARTIAL: 'partial',
+  PENDING: 'pending',
+  UNKNOWN: 'unknown',
+} as const;
+export type CoverageState =
+  (typeof COVERAGE_STATES)[keyof typeof COVERAGE_STATES];
+export const COVERAGE_NOTES: Partial<Record<CoverageState, string>> = {
+  [COVERAGE_STATES.PARTIAL]: 'so far',
+  [COVERAGE_STATES.PENDING]: 'pending',
+  [COVERAGE_STATES.UNKNOWN]: 'not captured',
+};
