@@ -30,7 +30,10 @@ import { signPublicV2 } from '@gyblos/protocol/public-v2';
 
 import { controlFixture } from './support/control-fixture';
 import { endpoint } from './support/native-fixture';
-import { NATIVE_TEST_OPTIONS } from './support/native-runtime';
+import {
+  NATIVE_CAPABILITY,
+  NATIVE_TEST_OPTIONS,
+} from './support/native-runtime';
 
 async function syntheticSeller() {
   const fixture = await controlFixture(true);
@@ -135,6 +138,13 @@ void test(
   'verify writes a numbered outcome for every challenge to evidence.json',
   NATIVE_TEST_OPTIONS,
   async (t) => {
+    assert.ok(NATIVE_CAPABILITY.sdk);
+    const { EndpointBuilder } = NATIVE_CAPABILITY.sdk;
+    t.mock.method(
+      EndpointBuilder.prototype,
+      'applyN0',
+      EndpointBuilder.prototype.applyMinimal,
+    );
     const home = await mkdtemp(join(tmpdir(), 'gyblos-verifier-evidence-'));
     t.after(() => rm(home, { recursive: true, force: true }));
     const { target, server, modelId } = await syntheticSeller();
