@@ -12,7 +12,7 @@ void test('the D1 harness names columns from the SQL as written, so repeated nam
     .all();
   assert.deepEqual(results, [{ '? + 0': 2, third: 3 }]);
   const batched = await database.batch([
-    database.prepare('select ?2 - ?1 as gap').bind(1, 5),
+    database.prepare('select ?2 - ?1').bind(1, 5),
   ]);
-  assert.deepEqual(batched[0]?.results, [{ gap: 4 }]);
+  assert.deepEqual(batched[0]?.results, [{ '?2 - ?1': 4 }]);
 });
