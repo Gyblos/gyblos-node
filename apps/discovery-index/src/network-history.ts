@@ -56,7 +56,7 @@ export async function summarizeDay(
 }
 
 const lastSettledDay = (now: number) =>
-  dayOfTime(now - NETWORK_HISTORY.heartbeatSlots * UPTIME.slotMs) - 1;
+  dayOfTime(now - NETWORK_HISTORY.settleSlots * UPTIME.slotMs) - 1;
 
 export async function rollupNetworkDays(
   storage: NetworkHistoryStorage,

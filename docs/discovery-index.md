@@ -451,9 +451,10 @@ were online on average and at peak:
   `coveredSlots: 0`.
 - **Daily summary.** After its heartbeat, each cron run summarizes up to four
   missing past days of the last 90, newest first, into `discovery_network_days`
-  (one row per day). A day is summarized once the run that vouches for its last
-  slot has passed, so a summary is final. After a deploy, the 90 days fill in
-  within about four hours.
+  (one row per day). A day is summarized from 15 minutes after it ends, one slot
+  after the run that vouches for its last slot is due, so a late run still lands
+  before the summary, which is final. After a deploy, the 90 days fill in within
+  about four hours.
 - Failures log only the static codes `DISCOVERY_HEARTBEAT_FAILED` or
   `DISCOVERY_NETWORK_ROLLUP_FAILED`. Heartbeat and summary rows are pruned with
   the uptime rows, after them, so a missing table never stops uptime pruning.

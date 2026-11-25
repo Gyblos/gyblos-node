@@ -276,6 +276,7 @@ export const NETWORK_HISTORY = {
   slotsPerDay: UPTIME.dayMs / UPTIME.slotMs,
   hoursPerDay: UPTIME.dayMs / UPTIME.hourMs,
   heartbeatSlots: 2,
+  settleSlots: 3,
   rollupDaysPerRun: 4,
 } as const;
 export const NETWORK_DAY_STATES = {

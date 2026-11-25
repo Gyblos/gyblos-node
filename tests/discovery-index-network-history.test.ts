@@ -148,15 +148,15 @@ eachStorage(
 );
 
 eachStorage(
-  'a day is rolled up only after the run that vouches for its last slot',
+  'a day is rolled up only one slot after the run that vouches for its last slot',
   async ({ storage }) => {
-    await rollAll(storage, TODAY + slotMs);
+    await rollAll(storage, TODAY + 2 * slotMs);
     const days = async () =>
       (await storage.networkDays(dayNumber(YESTERDAY) - 1)).map(
         (row) => row.day,
       );
     assert.deepEqual(await days(), [dayNumber(YESTERDAY) - 1]);
-    await rollAll(storage, TODAY + 2 * slotMs);
+    await rollAll(storage, TODAY + 3 * slotMs);
     assert.deepEqual(await days(), [
       dayNumber(YESTERDAY) - 1,
       dayNumber(YESTERDAY),
