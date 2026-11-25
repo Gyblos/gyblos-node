@@ -29,6 +29,13 @@
       "when": 1795563702955,
       "tag": "0010_offer_history",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1795609718071,
+      "tag": "0011_network_history",
+      "breakpoints": true
     }
   ]
 }

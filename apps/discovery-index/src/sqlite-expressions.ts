@@ -60,6 +60,11 @@ export const minimum = (
 export const capacityAdmission = (existing: SQL, capacity: SQL) =>
   sql<boolean>`case when ${existing} then 1 else ${capacity} end`;
 
+export const slotCount = (
+  column: AnySQLiteColumn<{ data: number }>,
+  bit: number,
+) => sql<number>`sum((${column} >> ${bit}) & 1)`;
+
 // Drizzle has no SQLite bitwise-OR builder. Slots from concurrent sightings must merge in the write.
 export const mergedBits = (
   column: AnySQLiteColumn<{ data: number }>,

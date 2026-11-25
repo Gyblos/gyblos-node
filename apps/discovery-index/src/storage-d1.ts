@@ -8,6 +8,7 @@ import {
 import { INDEX_ERRORS, NODE_PUBLISH_QUOTA } from './constants';
 import { createD1Orm, type D1Database, type D1Row } from './d1-client';
 import { indexFail } from './errors';
+import { createD1UptimeHistory } from './network-history-d1';
 import type {
   DiscoveryStorage,
   NodeState,
@@ -26,7 +27,7 @@ import {
   recordCountsQuery,
 } from './storage-queries';
 import { admitNodeQuery, recordQueries } from './storage-writes';
-import { createD1Uptime, integer, text } from './uptime-d1';
+import { integer, text } from './uptime-d1';
 
 export type {
   D1Database,
@@ -92,7 +93,7 @@ async function readActiveVersions(
 export function createD1Storage(client: D1Database): DiscoveryStorage {
   const database = createD1Orm(client);
   return {
-    ...createD1Uptime(database),
+    ...createD1UptimeHistory(database),
     async state(nodeId) {
       const [row] = await nodeStateQuery(database, nodeId);
       return row ? nodeState(row) : null;

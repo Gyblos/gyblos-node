@@ -3,7 +3,12 @@
 // week and month. A window starts no earlier than the NodeId was first seen, so a new seller is not
 // counted down for time before it existed. Its sightings also feed GET /v1/network (network.ts). Built
 // only from records the index already verified.
-import { DISCOVERY_INDEX_LIMITS, INDEX_ERRORS, UPTIME } from './constants';
+import {
+  DISCOVERY_INDEX_LIMITS,
+  INDEX_ERRORS,
+  NETWORK_HISTORY,
+  UPTIME,
+} from './constants';
 import { indexFail } from './errors';
 
 export { UPTIME } from './constants';
@@ -26,7 +31,7 @@ export interface Sighting {
   lastAt: number | null;
 }
 
-export interface UptimeStorage {
+export interface UptimeStorage extends NetworkHistoryStorage {
   // Marks the slot holding `now` for the NodeId.
   markSeen(nodeId: string, now: number, maxNodes?: number): Promise<void>;
   // The NodeId's rows from `sinceHour` on, oldest first.
@@ -39,10 +44,44 @@ export interface UptimeStorage {
   pruneUptime(now: number): Promise<void>;
 }
 
+export interface NetworkHistoryStorage {
+  markAlive(now: number): Promise<void>;
+  aliveSlots(sinceHour: number, untilHour: number): Promise<AliveRow[]>;
+  onlineSlots(sinceHour: number, untilHour: number): Promise<OnlineRow[]>;
+  networkDays(firstDay: number): Promise<NetworkDayRow[]>;
+  saveNetworkDay(row: NetworkDayRow): Promise<void>;
+}
+
+export interface NetworkDayRow {
+  day: number;
+  nodeSlots: number;
+  peak: number;
+  coveredSlots: number;
+}
+
+export interface AliveRow {
+  hour: number;
+  slots: number;
+}
+
+export interface OnlineRow {
+  hour: number;
+  counts: number[];
+}
+
 export const slotOf = (now: number) => Math.floor(now / UPTIME.slotMs);
 export const hourOf = (now: number) => Math.floor(now / UPTIME.hourMs);
 export const slotBit = (now: number) =>
   1 << (slotOf(now) % UPTIME.slotsPerHour);
+export const dayOfHour = (hour: number) =>
+  Math.floor(hour / NETWORK_HISTORY.hoursPerDay);
+export const slotBits = (slots: number) =>
+  Array.from({ length: UPTIME.slotsPerHour }, (_, bit) => (slots >> bit) & 1);
+export const vouchedSlots = (now: number) =>
+  Array.from(
+    { length: NETWORK_HISTORY.heartbeatSlots },
+    (_, back) => now - back * UPTIME.slotMs,
+  );
 // The first hour kept: rows before it are pruned.
 export const retainedHour = (now: number) =>
   hourOf(now - UPTIME.retentionDays * UPTIME.dayMs);
@@ -154,11 +193,71 @@ export async function uptimePage(
   });
 }
 
+const inHours = (hour: number, sinceHour: number, untilHour: number) =>
+  hour >= sinceHour && hour < untilHour;
+
+function countOnline(
+  nodes: Iterable<Map<number, UptimeRow>>,
+  sinceHour: number,
+  untilHour: number,
+): OnlineRow[] {
+  const counts = new Map<number, number[]>();
+  for (const hours of nodes)
+    for (const row of hours.values()) {
+      if (!inHours(row.hour, sinceHour, untilHour)) continue;
+      const prior = counts.get(row.hour);
+      const bits = slotBits(row.slots);
+      counts.set(
+        row.hour,
+        prior ? prior.map((count, bit) => count + bits[bit]!) : bits,
+      );
+    }
+  return [...counts]
+    .sort(([left], [right]) => left - right)
+    .map(([hour, slots]) => ({ hour, counts: slots }));
+}
+
+function memoryHeartbeat() {
+  const alive = new Map<number, number>();
+  const days = new Map<number, NetworkDayRow>();
+  return {
+    async networkDays(firstDay: number) {
+      return [...days.values()]
+        .filter((row) => row.day >= firstDay)
+        .sort((left, right) => left.day - right.day);
+    },
+    async saveNetworkDay(row: NetworkDayRow) {
+      days.set(row.day, { ...row });
+    },
+    async markAlive(now: number) {
+      for (const at of vouchedSlots(now))
+        alive.set(hourOf(at), (alive.get(hourOf(at)) ?? 0) | slotBit(at));
+    },
+    async aliveSlots(sinceHour: number, untilHour: number) {
+      return [...alive]
+        .filter(([hour]) => inHours(hour, sinceHour, untilHour))
+        .sort(([left], [right]) => left - right)
+        .map(([hour, slots]) => ({ hour, slots }));
+    },
+    pruneAlive(now: number) {
+      for (const hour of alive.keys())
+        if (hour < retainedHour(now)) alive.delete(hour);
+      for (const day of days.keys())
+        if (day < dayOfHour(retainedHour(now))) days.delete(day);
+    },
+  };
+}
+
 // The in-memory adapter's uptime rows (storage.ts), with their pruning.
 export function memoryUptime() {
   const nodes = new Map<string, Map<number, UptimeRow>>();
   const first = new Map<string, number>();
+  const { pruneAlive, ...heartbeat } = memoryHeartbeat();
   return {
+    ...heartbeat,
+    async onlineSlots(sinceHour: number, untilHour: number) {
+      return countOnline(nodes.values(), sinceHour, untilHour);
+    },
     async firstSeen(nodeId: string) {
       return first.get(nodeId) ?? null;
     },
@@ -168,6 +267,7 @@ export function memoryUptime() {
           if (hour < retainedHour(now)) hours.delete(hour);
         if (!hours.size) nodes.delete(id);
       }
+      pruneAlive(now);
     },
     async markSeen(
       nodeId: string,

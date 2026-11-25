@@ -181,6 +181,9 @@ renewed and ended (replaced, withdrawn or expired). Anyone can read it by NodeId
 to the last 92 days per request. It is kept after you unpublish, for about ten years after each catalog
 ended, so past prices stay traceable.
 
+The index also publishes how many sellers were online each day (`/v1/network/history`): the average and
+peak counts per UTC day, without NodeIds, computed from the same uptime the index already keeps.
+
 Buyers and the desktop app read the index to find sellers. `gyblos seller status --online` also asks it
 for the seller's own uptime by NodeId, which the seller already publishes there. The index uses IP
 addresses for rate limiting and stores none.
