@@ -15,6 +15,12 @@
   font-family: GeistMono;
   src: url('/assets/JetBrainsMono-Regular.woff2');
 }
+@font-face {
+  font-family: 'Gyblos Digits';
+  src: url('/assets/JetBrainsMono-Regular.woff2') format('woff2');
+  unicode-range: U+0030-0039;
+  font-display: swap;
+}
 * {
   box-sizing: border-box;
 }

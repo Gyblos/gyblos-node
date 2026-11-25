@@ -2,11 +2,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { DEVNET, DEVNET_USDC } from '@gyblos/config/network';
 import { createUsdcApiHandlers } from '@gyblos/desktop/usdc-api-handlers';
 import {
   emptyUsdcApi,
   parseUsdcApiState,
   USDC_API_ACTION,
+  usdcApiAmount,
   usdcApiKeyListDetail,
 } from '@gyblos/desktop/usdc-api-model';
 import { createBuyerApiKeys } from '@gyblos/node/buyer-api-keys';
@@ -159,4 +161,15 @@ void test('the owner copies a newly created delegated secret without exposing it
     host.close();
     await keys.close();
   }
+});
+
+void test('API key table amounts use compact exact decimals without trimming atomic units', () => {
+  const scope = { network: DEVNET, mint: DEVNET_USDC, payer: 'synthetic' };
+  assert.equal(usdcApiAmount('2000', scope), '0.002 USDC');
+  assert.equal(usdcApiAmount('10000000', scope), '10 USDC');
+  assert.equal(usdcApiAmount('1', scope), '0.000001 USDC');
+  assert.equal(
+    usdcApiAmount('1000', { ...scope, mint: 'other' }),
+    '1000 atomic units',
+  );
 });

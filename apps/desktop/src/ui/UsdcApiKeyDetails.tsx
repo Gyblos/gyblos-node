@@ -6,17 +6,19 @@ import type {
   BuyerKeyScope,
 } from '@gyblos/protocol/buyer-api-keys';
 
+import { RESPONSE_METRICS } from '../constants';
 import {
   usdcApiAmount as amount,
   USDC_API_ACTION,
   usdcApiKeyBadge,
 } from '../usdc-api-model';
+import { x402Asset } from '../x402-model';
 import { BuyerAgentSetup } from './BuyerAgentSetup';
-import { BUTTON_VARIANT } from './constants';
+import { DetailSummary } from './DetailSummary';
 import { CopyField, FormActions } from './Form';
-import { Facts, Pair } from './Management';
 import { Modal } from './Modal';
-import { Badge, Button } from './UI';
+import { statusTone } from './status-tone';
+import { Button } from './UI';
 import { UsdcApiKeyField } from './UsdcApiKeyField';
 import type { useUsdcApiKeys } from './useUsdcApiKeys';
 
@@ -30,43 +32,38 @@ function KeyUsage({
   scope: BuyerKeyScope;
   known: boolean;
 }) {
+  if (!known) return <p role="status">Recorded amounts need review.</p>;
+  const spent = BigInt(key.spentAtomic);
+  const reserved = BigInt(key.reservedAtomic);
+  const limit = BigInt(key.limitAtomic);
   return (
-    <>
-      <Facts compact>
-        <Pair label="Spend limit" value={amount(key.limitAtomic, scope)} />
-        <Pair
-          label="Consumed budget"
-          value={known ? amount(key.spentAtomic, scope) : 'Needs review'}
-        />
-        <Pair
-          label="Remaining"
+    <div className="preview-key-budget">
+      <div>
+        <span>
+          <strong>{amount(key.spentAtomic, scope)}</strong> used of{' '}
+          {amount(key.limitAtomic, scope)}
+        </span>
+        <span>{amount(String(limit - spent - reserved), scope)} available</span>
+      </div>
+      {limit > 0n && (
+        <progress
+          aria-label="Budget consumed"
+          max={RESPONSE_METRICS.PERCENT_SCALE}
           value={
-            known
-              ? amount(
-                  String(
-                    BigInt(key.limitAtomic) -
-                      BigInt(key.spentAtomic) -
-                      BigInt(key.reservedAtomic),
-                  ),
-                  scope,
-                )
-              : 'Unavailable'
+            (Number(spent) / Number(limit)) * RESPONSE_METRICS.PERCENT_SCALE
           }
         />
-      </Facts>
-      <p className="ui-help-text">
-        {!known ? (
-          'Recorded amounts need review.'
-        ) : (
-          <>
-            {amount(key.settledAtomic, scope)} settled ·{' '}
-            {amount(key.approvedAtomic, scope)} approved ·{' '}
-            {amount(key.reservedAtomic, scope)} reserved. Approved usage is not
-            a settled payment.
-          </>
-        )}
-      </p>
-    </>
+      )}
+      {(reserved > 0n ||
+        BigInt(key.approvedAtomic) > 0n ||
+        BigInt(key.settledAtomic) > 0n) && (
+        <small>
+          {amount(key.settledAtomic, scope)} settled ·{' '}
+          {amount(key.approvedAtomic, scope)} approved ·{' '}
+          {amount(key.reservedAtomic, scope)} reserved.
+        </small>
+      )}
+    </div>
   );
 }
 function RevokeConfirmation({
@@ -79,7 +76,7 @@ function RevokeConfirmation({
   run: Controller['run'];
 }) {
   return (
-    <Modal title="Revoke API key?" close={close}>
+    <Modal title="Revoke API key?" size="sm" close={close}>
       <p>
         Stops new requests from every tool using this key. An inference already
         sent can still count. Its consumption and pending reservations stay
@@ -88,7 +85,7 @@ function RevokeConfirmation({
       <FormActions>
         <Button onClick={close}>Keep key</Button>
         <Button
-          variant={BUTTON_VARIANT.PRIMARY}
+          className="preview-destructive"
           onClick={() => {
             close();
             void run({ action: USDC_API_ACTION.REVOKE, id });
@@ -148,10 +145,12 @@ export function UsdcApiKeyDetails({
   const available = known && !key.revoked && state.copyable.includes(key.id);
   return (
     <section className="ui-section" aria-label="USDC API connection">
-      <div className="ui-section-title">
-        <h2>{key.name}</h2>
-        <Badge>{usdcApiKeyBadge(state, key)}</Badge>
-      </div>
+      <KeySummary
+        keyStatus={key}
+        scope={scope}
+        known={known}
+        status={usdcApiKeyBadge(state, key)}
+      />
       <UsdcApiKeyField
         key={id + state.policyId}
         api={api}
@@ -191,5 +190,47 @@ export function UsdcApiKeyDetails({
         <RevokeConfirmation id={id} close={() => setConfirm(false)} run={run} />
       )}
     </section>
+  );
+}
+
+function KeySummary({
+  keyStatus: key,
+  scope,
+  known,
+  status,
+}: {
+  keyStatus: BuyerApiKeySummary;
+  scope: BuyerKeyScope;
+  known: boolean;
+  status: string;
+}) {
+  return (
+    <DetailSummary
+      status={{
+        label: status,
+        tone: statusTone(status),
+      }}
+      meta={'API key · ' + x402Asset(scope)}
+      totals={[
+        {
+          label: 'Used',
+          value: known ? amount(key.spentAtomic, scope) : 'Needs review',
+        },
+        { label: 'Limit', value: amount(key.limitAtomic, scope) },
+        {
+          label: 'Available',
+          value: known
+            ? amount(
+                String(
+                  BigInt(key.limitAtomic) -
+                    BigInt(key.spentAtomic) -
+                    BigInt(key.reservedAtomic),
+                ),
+                scope,
+              )
+            : 'Unavailable',
+        },
+      ]}
+    />
   );
 }

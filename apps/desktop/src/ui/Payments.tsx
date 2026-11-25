@@ -1,38 +1,32 @@
 // Composes wallet metadata and the guarded shared PayPal session. Navigation never starts a payment.
-import { PaypalLogo } from '@phosphor-icons/react';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
-import { BUYER_SESSION_DEFAULT_POLICY } from '@gyblos/config/batch-session';
-import { DEVNET } from '@gyblos/config/network';
-import {
-  PAYPAL_SESSION_PHASE,
-  PAYPAL_SESSION_STATUS,
-} from '@gyblos/node/constants';
-
-import { depositShortfall } from '../funding/model';
 import {
   managePaypal,
   PAYMENT_METHOD,
-  paypalPaymentSummary,
-  paypalSessionCanConnectAgent,
   type PaymentMethod,
 } from '../paypal-model';
-import { BuyerFundingAddress, fundingAmount } from './BuyerFunding';
-import { BUTTON_VARIANT } from './constants';
+import type { ChatController } from './chat-controller';
 import { FormActions } from './Form';
-import { displayDollars } from './history-presentation';
 import { Modal } from './Modal';
+import { PaypalSummary, WalletOverview } from './PaymentMethods';
+import { TabBar, type Tab } from './PaymentTabs';
 import { PaypalSessionPanel } from './PaypalSessionPanel';
 import { SpendingHistory } from './SpendingHistory';
-import { Badge, Button, PagePanel } from './UI';
+import { SpendingLimits } from './SpendingLimits';
+import { SpendingOverview } from './SpendingOverview';
+import { Button, PagePanel } from './UI';
 import type { ActivityView } from './useActivity';
 import { useBuyerFunding } from './useBuyerFunding';
 import type { PaypalSessionView } from './usePaypalSession';
 import type { X402View } from './useX402';
 import { WalletDetails } from './WalletDetails';
-import { X402Payments } from './X402Payments';
 
 type Props = {
+  initialTab?: Tab;
+  usage: ReactNode;
+  chat: ChatController;
+  onOpenChat(id: string): void;
   x402?: X402View;
   session: PaypalSessionView;
   activity: ActivityView;
@@ -46,34 +40,91 @@ type Props = {
   onPaymentMethod(method: PaymentMethod): boolean;
 };
 export function Payments(props: Props) {
+  const [tab, setTab] = useState<Tab>(props.initialTab ?? 'overview');
   const [walletOpen, setWalletOpen] = useState(false);
+  const observation = useBuyerFunding(
+    props.x402?.state.policy?.payer,
+    undefined,
+    tab === 'overview' || walletOpen,
+  );
+  function openUsdc(destination: () => void) {
+    if (props.onPaymentMethod(PAYMENT_METHOD.USDC)) destination();
+  }
   return (
     <PagePanel>
-      {props.x402 && (
-        <X402Payments
-          buyer={props.x402}
-          onChat={() => {
-            if (props.onPaymentMethod(PAYMENT_METHOD.USDC)) props.onChat();
-          }}
+      <TabBar tab={tab} onTab={setTab} />
+      <div
+        className="preview-tab-panel"
+        role="tabpanel"
+        id="preview-tab-panel"
+        aria-labelledby={'preview-tab-' + tab}
+      >
+        {tab === 'activity' && props.usage}
+        {tab === 'limits' && props.x402 && (
+          <SpendingLimits
+            manage={() => openUsdc(props.onConnections)}
+            buyer={props.x402}
+            onChat={() => openUsdc(props.onChat)}
+          />
+        )}
+        {tab === 'overview' && (
+          <>
+            <SpendingOverview
+              buyer={props.x402}
+              onLimits={() => setTab('limits')}
+            />
+            <section className="ui-section" aria-label="Payment methods">
+              <div className="ui-section-title">
+                <h2>Payment methods</h2>
+              </div>
+              <ul className="preview-method-list">
+                <WalletOverview
+                  observation={observation}
+                  onAddFunds={props.onAddFunds}
+                  onDetails={() => setWalletOpen(true)}
+                />
+                <PaypalSummary
+                  session={props.session}
+                  onManage={() => {
+                    managePaypal(props.onPaymentMethod, () =>
+                      props.onManagePaypal(true),
+                    );
+                  }}
+                />
+              </ul>
+            </section>
+          </>
+        )}
+        {tab === 'history' && (
+          <SpendingHistory
+            buyer={props.x402}
+            chat={props.chat}
+            onChat={props.onOpenChat}
+            activity={props.activity}
+            onActivity={(id) => {
+              setTab('activity');
+              props.onActivity(id);
+            }}
+          />
+        )}
+      </div>
+      <PaypalManagement {...props} />
+      {walletOpen && (
+        <PaymentWallet
+          observation={observation}
+          props={props}
+          close={() => setWalletOpen(false)}
         />
       )}
-      <WalletOverview
-        buyer={props.x402}
-        onAddFunds={props.onAddFunds}
-        onDetails={() => setWalletOpen(true)}
-      />
-      <PaypalSummary
-        session={props.session}
-        onManage={() => {
-          managePaypal(props.onPaymentMethod, () => props.onManagePaypal(true));
-        }}
-      />
-      <SpendingHistory
-        activity={props.activity}
-        onActivity={props.onActivity}
-      />
+    </PagePanel>
+  );
+}
+
+function PaypalManagement(props: Props) {
+  return (
+    <>
       {props.managePaypal && (
-        <Modal title="PayPal Sandbox" close={() => props.onManagePaypal(false)}>
+        <Modal title="PayPal session" close={() => props.onManagePaypal(false)}>
           <PaypalSessionPanel
             session={props.session}
             onChat={() => {
@@ -93,156 +144,33 @@ export function Payments(props: Props) {
           </FormActions>
         </Modal>
       )}
-      {walletOpen && (
-        <Modal title="Wallet details" close={() => setWalletOpen(false)}>
-          <WalletDetails
-            onBackup={() => {
-              setWalletOpen(false);
-              props.onBackup();
-            }}
-            onAddFunds={() => {
-              setWalletOpen(false);
-              props.onAddFunds();
-            }}
-          />
-        </Modal>
-      )}
-    </PagePanel>
-  );
-}
-function WalletOverview({
-  buyer,
-  onAddFunds,
-  onDetails,
-}: {
-  buyer?: X402View;
-  onAddFunds(): void;
-  onDetails(): void;
-}) {
-  const { funding, loading, refresh } = useBuyerFunding(
-    buyer?.state.policy?.payer,
-  );
-  const balance = funding?.balanceAtomic;
-  const needed =
-    balance != null
-      ? depositShortfall(
-          balance,
-          buyer?.state.policy?.depositAtomic ??
-            BUYER_SESSION_DEFAULT_POLICY.depositAtomic,
-        )
-      : null;
-  return (
-    <section className="ui-section ui-wallet-overview" aria-label="USDC wallet">
-      <div className="ui-section-title">
-        <h2>USDC buyer wallet</h2>
-      </div>
-      <div className="ui-wallet-summary">
-        <div>
-          <span className="ui-help-text">
-            {funding?.network === DEVNET
-              ? 'Devnet balance'
-              : 'Available balance'}
-          </span>
-          <strong className="ui-wallet-amount">
-            {loading
-              ? 'Checking…'
-              : balance != null
-                ? fundingAmount(balance)
-                : 'Unavailable'}
-          </strong>
-          {needed && needed !== '0' && (
-            <p>Add {fundingAmount(needed)} to open a new channel.</p>
-          )}
-        </div>
-        <FormActions align="start">
-          <Button
-            variant={BUTTON_VARIANT.PRIMARY}
-            disabled={!funding}
-            onClick={onAddFunds}
-          >
-            Add funds
-          </Button>
-          <Button disabled={loading} onClick={refresh}>
-            Refresh balance
-          </Button>
-          <Button onClick={onDetails}>Desktop wallet details</Button>
-        </FormActions>
-      </div>
-      {funding && <BuyerFundingAddress funding={funding} />}
-    </section>
-  );
-}
-function PaypalSummary({
-  session,
-  onManage,
-}: {
-  session: PaypalSessionView;
-  onManage(): void;
-}) {
-  const summary = paypalPaymentSummary(
-    session.state.status,
-    session.state.statusFresh,
-    session.state.busy,
-  );
-  return (
-    <section className="ui-paypal-summary" aria-label="PayPal payment method">
-      <span className="ui-icon-tile" aria-hidden="true">
-        <PaypalLogo size={22} />
-      </span>
-      <div className="ui-paypal-summary-copy">
-        <div className="ui-inline-actions">
-          <h2>PayPal</h2>
-          <Badge>Sandbox</Badge>
-        </div>
-        <strong
-          className="ui-status-line"
-          data-ready={paypalSessionCanConnectAgent(
-            session.state.status,
-            session.state.statusFresh,
-            session.state.busy,
-          )}
-        >
-          {summary.label}
-        </strong>
-        <p className="ui-help-text">
-          {summary.limitCents === null
-            ? 'One approval for multiple replies and tool requests.'
-            : (summary.usedCents === null
-                ? 'Unconfirmed usage'
-                : displayDollars(summary.usedCents)) +
-              ' recorded · ' +
-              displayDollars(summary.limitCents) +
-              ' limit'}
-        </p>
-      </div>
-      <Button
-        variant={BUTTON_VARIANT.SECONDARY}
-        disabled={session.state.busy}
-        onClick={onManage}
-      >
-        {paypalManageLabel(session)}
-      </Button>
-    </section>
+    </>
   );
 }
 
-function paypalManageLabel(session: PaypalSessionView) {
-  const phase = session.state.statusFresh
-    ? session.state.status?.phase
-    : undefined;
-  if (
-    phase === PAYPAL_SESSION_STATUS.READY ||
-    phase === PAYPAL_SESSION_PHASE.COMPLETED ||
-    phase === PAYPAL_SESSION_PHASE.VOIDED ||
-    phase === PAYPAL_SESSION_PHASE.CANCELLED
-  )
-    return 'Authorize';
-  if (phase === PAYPAL_SESSION_PHASE.CREATED) return 'Finish approval';
-  return paypalSessionCanConnectAgent(
-    session.state.status,
-    session.state.statusFresh,
-    session.state.busy,
-  )
-    ? 'Manage session'
-    : 'Review session';
+function PaymentWallet({
+  props,
+  close,
+  observation,
+}: {
+  props: Props;
+  close(): void;
+  observation: ReturnType<typeof useBuyerFunding>;
+}) {
+  return (
+    <Modal title="Wallet details" size="lg" close={close}>
+      <WalletDetails
+        observation={observation}
+        depositAtomic={props.x402?.state.policy?.depositAtomic}
+        onBackup={() => {
+          close();
+          props.onBackup();
+        }}
+        onAddFunds={() => {
+          close();
+          props.onAddFunds();
+        }}
+      />
+    </Modal>
+  );
 }

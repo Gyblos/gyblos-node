@@ -34,6 +34,8 @@ export function chatArchiveLabel(state: ChatArchiveState) {
       return 'Saving on this device…';
     case CHAT_STORAGE_STATE.SAVED:
       return 'Conversations and drafts are saved on this device.';
+    case CHAT_STORAGE_STATE.PINS_UNAVAILABLE:
+      return 'Conversations are saved on this device. Pin preferences are unavailable.';
     case CHAT_STORAGE_STATE.UNAVAILABLE:
       return 'Conversation saving is unavailable. New messages and drafts may be lost when Gyblos closes.';
   }

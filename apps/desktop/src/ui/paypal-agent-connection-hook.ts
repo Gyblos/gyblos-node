@@ -161,7 +161,7 @@ export function usePaypalAgentConnection() {
     }
   }
   async function copy(target: PaypalAgentCopyTarget, label: string) {
-    if (!connection) return;
+    if (!connection) return false;
     const copied = await window.desktopPaypalAgent
       ?.copy?.({ target })
       .catch(() => false);
@@ -171,6 +171,7 @@ export function usePaypalAgentConnection() {
           ? `${label} copied.`
           : 'Could not copy. Check the connection and try again.',
       );
+    return copied === true;
   }
   return { connection, busy, notice, statusUnavailable, run, copy };
 }

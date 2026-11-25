@@ -18,8 +18,9 @@ its local buyer running while a client uses a key.
    own buyer; use **Retry local buyer** or **Connect a running buyer** if it is
    not.
 2. Open **Connections**.
-3. Under **Create an API key**, enter a **Name** and a **Spend limit** in the
-   displayed asset. A limit of `0` allows free models only.
+3. Choose **Create your first API key** or **New API key**, then enter a
+   **Name** and a **Limit for this key** in the displayed asset. A limit of `0`
+   allows free models only.
 4. Choose **Create API key**.
 5. Copy the **API key** and the **Base URL** shown for the key.
 
@@ -55,9 +56,9 @@ its limit.
 
 ## Connect a coding agent
 
-1. In **Connections**, select an active key.
-2. Choose **Connect agent**.
-3. Pick the **Agent**: OpenCode, pi, Codex CLI or Claude Code.
+1. In **Connections**, open **Details** for an active key.
+2. Choose **Connect a tool**.
+3. Pick the **Tool**: OpenCode, pi, Codex CLI or Claude Code.
 4. Review the generated configuration, then choose **Write configuration**, or
    copy it.
 5. Choose **Copy API key** and set `GYBLOS_API_KEY` in the shell that starts the

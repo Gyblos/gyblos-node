@@ -6,10 +6,8 @@ import {
   Check,
   CurrencyCircleDollar,
   Lightning,
-  Plus,
   ShieldCheck,
   Sparkle,
-  Wallet,
   type Icon,
 } from '@phosphor-icons/react';
 import {
@@ -25,10 +23,12 @@ import { Dropdown } from './Dropdown';
 import { Modal } from './Modal';
 import { MotionPresence } from './Motion';
 import type { ModelOption } from './model-types';
+import { ModelMenuBadges } from './ModelMenuBadges';
+import { ModelMenuBalance } from './ModelMenuBalance';
 import { ModelImage } from './ModelImage';
 import { priceRange, usdPerMtok } from './model-price';
-import { feeLabel, openPreviewFunds, PREVIEW_COPY, previewUsdc, READY_SELLER_MODES, Tag, TONE, usePreviewBalance, usePreviewSetting, type SellerMode } from './PreviewKit';
-import { Badge, Button, MenuItem } from './UI';
+import { feeLabel, openPreviewFunds, PREVIEW_COPY, previewUsdc, READY_SELLER_MODES, Tag, usePreviewBalance, usePreviewSetting, type SellerMode } from './PreviewKit';
+import { Badge, MenuItem } from './UI';
 
 export type { ModelOption } from './model-types';
 
@@ -88,25 +88,6 @@ function recommended(offers: readonly ModelOption[]) {
 function sellerCount(offers: readonly ModelOption[]) {
   return offers.length + (offers.length === 1 ? ' seller' : ' sellers');
 }
-function fromPrice(offers: readonly ModelOption[]) {
-  const cheapest = offers.filter((item) => !item.free).sort((a, b) => a.input - b.input)[0];
-  return cheapest ? (offers.length > 1 ? 'from ' : '') + usdPerMtok(cheapest.input) + '/M' : null;
-}
-/** Free or Paid pill, then the input price and the number of sellers on the line below. */
-function ModelBadges({ offers, locked }: { offers: readonly ModelOption[]; locked: boolean }) {
-  const free = offers.some((item) => item.free);
-  const price = fromPrice(offers);
-  return (
-    <>
-      <Tag pill tone={free ? TONE.SUCCESS : TONE.NEUTRAL}>{free ? 'Free' : 'Paid'}</Tag>
-      <span className="pk-badge-line">
-        {!free && price && <Tag>{price}</Tag>}
-        <Tag>{sellerCount(offers)}</Tag>
-        {locked && <span className="sr-only">Needs funds</span>}
-      </span>
-    </>
-  );
-}
 function group(models: readonly ModelOption[]) {
   const groups = new Map<string, ModelOption[]>();
   for (const item of models) {
@@ -117,7 +98,7 @@ function group(models: readonly ModelOption[]) {
   return [...groups.entries()];
 }
 
-const FLYOUT = { GAP: 6, REPOSITION: 'preview:reposition' } as const;
+const FLYOUT = { GAP: 6, REPOSITION: MENU_GEOMETRY.REPOSITION } as const;
 
 function moveFocus(event: KeyboardEvent<HTMLElement>, selector: string) {
   if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return false;
@@ -375,21 +356,13 @@ export function ModelDropdown({
         return (
           <>
             {!contextLabel && (
-              <p className="pk-balance-line">
-                <Wallet size={14} aria-hidden="true" />
-                <span>Balance</span>
-                <strong>{previewUsdc(balance)}</strong>
-                <Button
-                  className="pk-balance-add"
-                  onClick={() => {
-                    close();
-                    openPreviewFunds();
-                  }}
-                >
-                  <Plus size={12} weight="bold" aria-hidden="true" />
-                  Add funds
-                </Button>
-              </p>
+              <ModelMenuBalance
+                amount={previewUsdc(balance)}
+                onAdd={() => {
+                  close();
+                  openPreviewFunds();
+                }}
+              />
             )}
             <div
               className="preview-model-list"
@@ -423,7 +396,7 @@ export function ModelDropdown({
                     title={locked ? PREVIEW_COPY.needsFunds : undefined}
                     label={name}
                     detail={contextLabel}
-                    badge={contextLabel ? undefined : <ModelBadges offers={list} locked={locked} />}
+                    badge={contextLabel ? undefined : <ModelMenuBadges offers={list} countLabel={sellerCount(list)} locked={locked} />}
                     leading={<ModelImage artwork={first.image} name={name} />}
                     trailing={
                       <span className="preview-menu-trail">

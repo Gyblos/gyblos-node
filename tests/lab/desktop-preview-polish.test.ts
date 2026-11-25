@@ -2,22 +2,22 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 
+import { previewStyles } from '../support/desktop-preview-styles';
+
 void test('preview dialogs share small, medium and large sizes that shrink with the window', async () => {
   const { transformBrand } =
     await import('../../lab/tools/desktop-preview/brand-build');
   const file = 'apps/desktop/src/ui/Modal.tsx';
-  const modal = transformBrand(
-    await readFile(file, 'utf8'),
-    file,
-    'apps/desktop',
-  );
+  const modal =
+    transformBrand(await readFile(file, 'utf8'), file, 'apps/desktop') ??
+    (await readFile(file, 'utf8'));
   assert.match(modal ?? '', /size\?: 'sm' \| 'md' \| 'lg'/);
   assert.match(
     modal ?? '',
     /data-size=\{compact \? undefined : \(size \?\? 'md'\)\}/,
     'every dialog except compact pickers gets a size, medium by default',
   );
-  const css = await readFile('lab/tools/desktop-preview/preview.css', 'utf8');
+  const css = await previewStyles();
   for (const [size, width] of [
     ['sm', '440px'],
     ['md', '560px'],
@@ -66,7 +66,7 @@ void test('metric cards explain their numbers with a help button and primary act
     for (const tag of cards)
       assert.match(tag, /\bhelp=/, view + ' explains every metric: ' + tag);
   }
-  const css = await readFile('lab/tools/desktop-preview/preview.css', 'utf8');
+  const css = await previewStyles();
   assert.match(
     css,
     /\.ui-button--primary:not\(\.ui-icon-button\) \{\s*background: var\(--ink\);\s*color: var\(--panel\);/,

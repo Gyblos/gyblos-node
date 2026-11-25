@@ -75,6 +75,7 @@ async function fixture(search = '?state=ready&connection-state=ready') {
       },
     },
     structuredClone,
+    performance,
     URL,
     URLSearchParams,
     TextEncoder,
