@@ -14,12 +14,12 @@ seller that serves a different model than it declares. Quantization, inflated
 usage, a false context length, paid offers and any use of the result in
 discovery or routing are out of scope; see [Limits](#limits).
 
-**Status.** This is a design note, not an operations reference. The command
-`pnpm model-verifier`, the challenge set `gyblos-text` version 1 and the signed
-record parser (`@gyblos/protocol/model-verification`) exist only once the app
-change that follows this note is merged; until then they are the design. Nothing
-in discovery, routing, payments or the public metrics reads a verification
-result.
+**Status.** The command `pnpm model-verifier`, the challenge set `gyblos-text`
+version 1 and the signed record (`@gyblos/protocol/model-verification`) ship
+with the `apps/model-verifier` app; in a checkout without that app they are
+design only. Still design, not built: private or rotating challenge sets, paid
+verification, and any use of a result in discovery, routing, payments or the
+public metrics, none of which reads a verification result today.
 
 ## Why not the other candidate signals
 
@@ -61,11 +61,11 @@ reference. A point where the declared model's most likely next token ends the
 answer is not counted: Ollama returns no probabilities there, so the point says
 nothing either way.
 
-This is the approach recorded in the internal model verification research: it
-needs no log probabilities from the seller and no protocol change, it tolerates
-sampling, and it works for any engine that serves an open-weight catalog model.
-An honest seller sampling from the declared model almost never picks a token
-that the same model gives less than 0.1 %; a smaller model often does.
+This approach needs no log probabilities from the seller and no protocol change,
+it tolerates sampling, and it works for any engine that serves an open-weight
+catalog model. An honest seller sampling from the declared model almost never
+picks a token that the same model gives less than 0.1 %; a smaller model often
+does.
 
 ### Decision rule
 
@@ -105,14 +105,29 @@ asks for quotes from a new, unrelated buyer address.
 
 The assumed rate, 12 %, is at least the 95 % upper bound of the worst honest
 case measured below (17 deviant answers in 240 at temperature 1 without top-k:
-upper bound 10.4 %). At that bound an honest run fails with probability 0.0025
-%. A full-time `qwen3-0.6b` substitute had 27 or 28 deviant answers out of 30 in
-every run; a seller that substitutes on about a third of its answers would be
-caught only about 43 % of the time.
+one-sided upper bound 10.4 %). At that bound an honest run fails with
+probability about 0.002 %.
 
-The bound assumes each prompt's chance of a deviant honest answer is at most the
-assumed rate, independently across prompts. Per-prompt rates differ; the
-binomial with the largest rate still bounds the count.
+Assumptions behind the bound:
+
+- Each prompt's chance of a deviant honest answer is at most the assumed rate,
+  independently across prompts. The 12 % comes from answers pooled across
+  prompts; per-prompt rates (for example the short haiku and limerick prompts)
+  are not measured separately. A prompt above the rate would risk failing an
+  honest seller; it would not help a substitute.
+- The rate holds among scored answers. Answers are excluded only when they are
+  blank, carry a chat template marker, fail in transport or leave no point to
+  check, none of which depends on whether their checked points deviate.
+
+What the rule catches, and what it does not:
+
+- A full-time `qwen3-0.6b` substitute had 27 or 28 deviant answers out of 30 in
+  every run, far above 12.
+- Partial substitution has a hard floor. A substituted answer was deviant about
+  92 % of the time; clean answers with engine defaults never were. A seller that
+  substitutes on 11 or fewer of the 30 answers therefore cannot reach 12 and
+  passes. With 12 substituted answers it fails about 37 % of the time, with 13
+  about 72 %, with 14 about 90 % and with 15 about 97 %.
 
 ## How references are produced
 
@@ -185,14 +200,16 @@ A run takes a few minutes on this machine, mostly the seller's generation.
 
 ## Run it
 
+With the `apps/model-verifier` app in the checkout,
 `pnpm model-verifier verify --seller seller.json --model qwen3-1.7b` runs the
-challenge set against one seller and writes `result.json` and `evidence.json`;
-`pnpm model-verifier check result.json` verifies a result. The seller file and
-the full steps are on the docs site:
+challenge set against one seller and writes `result.json` and `evidence.json` to
+a new result directory; `pnpm model-verifier check RESULT_DIRECTORY/result.json`
+verifies a result's signature and that its rule matches the published challenge
+set. The seller file and the full steps are on the docs site:
 [Model verification](https://docs.gyblos.com/en/sellers/model-verification). The
-app is `apps/model-verifier`. It uses public package entries only (protocol,
-core, the Iroh transport and the Ollama engine's chat template) and never
-imports the buyer, node or desktop code.
+app uses public package entries only (protocol, core, the Iroh transport and the
+Ollama engine's chat template) and never imports the buyer, node or desktop
+code.
 
 ## Signed result
 
@@ -211,14 +228,16 @@ every check.
 ## Limits
 
 - **Quantization.** A weaker quantization of the declared model is not the
-  target. Earlier internal measurements put it near 5 % deviations at
-  temperature 0 under a stricter rule; it needs its own rule.
+  target. It changes the distribution much less than a different model size and
+  needs its own rule.
 - **A seller that recognizes the verifier.** The challenge prompts are public in
-  this repository. A seller could route them to the real model, or give answers
-  with nothing to check, which only yields `inconclusive`. A seller that
-  substitutes on a fraction of its answers is caught less often (about 43 % at a
-  third). Rotating private challenge sets and prompts shaped like real traffic
-  are follow-ups.
+  this repository. A seller can recognize them and route them to the real model,
+  or answer them with text prepared in advance, so a `pass` is not proof against
+  a seller that targets the verifier. Answers with nothing to check only yield
+  `inconclusive`. Rotating private challenge sets and prompts shaped like real
+  traffic are follow-ups.
+- **Partial substitution.** Substituting on 11 or fewer of 30 answers is not
+  caught; see the decision rule.
 - **Free offers only.** Paid verification needs a budget decision.
 - **Reference hardware.** The verifier must run the declared model, so verifying
   a large model needs a machine that can load it.

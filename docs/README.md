@@ -86,7 +86,7 @@ is [apps/docs](../apps/docs/README.md).
 ## Design notes
 
 - [Model verifier](model-verifier.md): design and measurements for checking that
-  a seller serves the model it declares, and what is implemented today.
+  a seller serves the model it declares.
 
 ## Lab
 
