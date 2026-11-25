@@ -51,6 +51,7 @@ function reference() {
     tag: 'qwen3:1.7b',
     digest: DIGEST,
     prompts: [] as string[],
+    async confirm() {},
     async candidates(prompt: string) {
       this.prompts.push(prompt);
       return [

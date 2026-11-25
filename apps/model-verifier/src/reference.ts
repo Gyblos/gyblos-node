@@ -15,6 +15,7 @@ export interface ReferenceModel {
   tag: string;
   digest: string;
   candidates(prompt: string, topLogprobs: number): Promise<Candidate[] | null>;
+  confirm(): Promise<void>;
 }
 
 const unavailable = () =>
@@ -24,15 +25,23 @@ const record = (value: unknown): Record<string, unknown> =>
     ? Object.fromEntries(Object.entries(value))
     : {};
 
-export function referenceTag(modelId: string): string {
+function catalogModel(modelId: string) {
   const resolved = resolveModel(modelId);
-  const tag =
-    resolved.kind === MODEL_CLASSIFICATIONS.CATALOG
-      ? resolved.model.aliases[0]
-      : undefined;
-  if (!tag || !usesPinnedTokenizer(modelId))
+  if (
+    resolved.kind !== MODEL_CLASSIFICATIONS.CATALOG ||
+    !resolved.model.aliases[0] ||
+    !usesPinnedTokenizer(modelId)
+  )
     throw new ModelVerifierError(MODEL_VERIFIER_CODES.UNSUPPORTED_MODEL);
-  return tag;
+  return { id: resolved.model.id, tag: resolved.model.aliases[0] };
+}
+
+export function catalogModelId(modelId: string): string {
+  return catalogModel(modelId).id;
+}
+
+export function referenceTag(modelId: string): string {
+  return catalogModel(modelId).tag;
 }
 
 async function call(
@@ -93,20 +102,29 @@ export async function openReference(
   retryMs: number = MODEL_VERIFIER.referenceRetryMs,
 ): Promise<ReferenceModel> {
   const tag = referenceTag(modelId);
-  const tags = await call(fetchImpl, new URL(ROUTES.ollamaTags, base));
-  const listed = Array.isArray(tags.models)
-    ? tags.models.map(record).find((model) => model.name === tag)
-    : undefined;
-  if (
-    !listed ||
-    typeof listed.digest !== 'string' ||
-    !/^[0-9a-f]{64}$/.test(listed.digest)
-  )
-    throw unavailable();
+  const tagsUrl = new URL(ROUTES.ollamaTags, base);
+  const digestOf = async () => {
+    const tags = await call(fetchImpl, tagsUrl);
+    const listed = Array.isArray(tags.models)
+      ? tags.models.map(record).find((model) => model.name === tag)
+      : undefined;
+    if (
+      !listed ||
+      typeof listed.digest !== 'string' ||
+      !/^[0-9a-f]{64}$/.test(listed.digest)
+    )
+      throw unavailable();
+    return listed.digest;
+  };
+  const digest = await digestOf();
   const generate = new URL(ROUTES.ollamaGenerate, base);
   return {
     tag,
-    digest: listed.digest,
+    digest,
+    async confirm() {
+      if ((await digestOf()) !== digest)
+        throw new ModelVerifierError(MODEL_VERIFIER_CODES.REFERENCE_CHANGED);
+    },
     async candidates(prompt, topLogprobs) {
       const body = {
         model: tag,

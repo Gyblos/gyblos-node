@@ -4,7 +4,7 @@ import { dirname } from 'node:path';
 import { getAddressDecoder } from '@solana/kit';
 
 import {
-  ensurePrivateDirectory,
+  ensurePrivatePaymentPaths,
   readPrivateFile,
   writePrivateFileOnce,
 } from '@gyblos/runtime/private-file';
@@ -55,10 +55,18 @@ export async function loadVerifierKey(
   path: string,
   create: boolean,
 ): Promise<VerifierKey> {
+  try {
+    await ensurePrivatePaymentPaths({
+      directory: dirname(path),
+      state: path,
+      lock: path,
+    });
+  } catch {
+    throw new ModelVerifierError(MODEL_VERIFIER_CODES.INVALID_KEY);
+  }
   const existing = await readPrivateFile(path, KEY_FILE_BYTES);
   if (existing !== undefined) return fromSeed(parseSeed(existing));
   if (!create) throw new ModelVerifierError(MODEL_VERIFIER_CODES.INVALID_KEY);
-  await ensurePrivateDirectory(dirname(path));
   const seed = randomBytes(SEED_BYTES);
   await writePrivateFileOnce(
     path,

@@ -71,7 +71,9 @@ does.
 
 The rule is fixed by challenge set `gyblos-text` version 1: 30 prompts in
 English and Spanish (explanations, code, JSON, SQL, short creative text), at
-most 200 output tokens each, reasoning off.
+most 200 output tokens each, reasoning off. A free offer whose per-request
+output cap is below 200 tokens refuses every quote, so its run is
+`inconclusive`.
 
 The unit of the test is the **answer**, not the check. The 24 checks of one
 answer read the same generated text, so they are not independent, and a binomial

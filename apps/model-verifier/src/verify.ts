@@ -161,6 +161,7 @@ export async function runVerification(input: VerificationInput): Promise<{
     answers.push(scored);
     input.onAnswer?.(index);
   }
+  await input.reference.confirm();
   const evidence = evidenceOf(set, answers, nonce);
   const signed = await signModelVerification(
     {

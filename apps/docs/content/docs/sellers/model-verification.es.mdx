@@ -10,7 +10,8 @@ configuración.
 ## Qué hace el verificador [#qué-hace]
 
 1. Le hace a tu oferta gratis un conjunto fijo y público de 30 preguntas cortas, sin razonamiento y con un
-   máximo de 200 tokens de respuesta cada una.
+   máximo de 200 tokens de respuesta cada una. Tu oferta gratis debe permitir al menos 200 tokens de respuesta
+   por pedido; si no, rechaza todas las preguntas y la corrida queda inconclusive.
 2. Relee cada respuesta con el modelo declarado, que corre en la máquina del verificador. En hasta 24 puntos de
    cada respuesta comprueba que tus siguientes palabras estén entre las 20 que el modelo declarado considera más
    probables, con una probabilidad de al menos 0,1 %.
@@ -24,11 +25,11 @@ muestreo y las diferencias entre GPU y CPU, mientras que un modelo más chico ve
 
 ## Resultados [#resultados]
 
-| Resultado      | Significado                                                                                                                                                                                                    |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `fail`         | Hubo suficientes respuestas con un punto fallido como para que un vendedor honesto obtuviera esto menos de una vez cada 10.000 corridas (12 de 30). Vale aunque algunas preguntas hayan quedado sin respuesta. |
-| `pass`         | No es fail, se respondieron todas las preguntas y se comprobaron al menos 480 puntos.                                                                                                                          |
-| `inconclusive` | No es fail, pero quedó una pregunta sin respuesta o se comprobaron menos de 480 puntos, así que la corrida no prueba nada.                                                                                     |
+| Resultado      | Significado                                                                                                                                                                                                                                                                                    |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fail`         | Hubo suficientes respuestas con un punto fallido (12 de 30) como para que, con los supuestos medidos para esta regla, un vendedor honesto obtuviera esto menos de una vez cada 10.000 corridas. Es una estimación, no una garantía. Vale aunque algunas preguntas hayan quedado sin respuesta. |
+| `pass`         | No es fail, se respondieron todas las preguntas y se comprobaron al menos 480 puntos.                                                                                                                                                                                                          |
+| `inconclusive` | No es fail, pero quedó una pregunta sin respuesta o se comprobaron menos de 480 puntos, así que la corrida no prueba nada.                                                                                                                                                                     |
 
 Un resultado cubre un vendedor, un modelo y una versión del conjunto de preguntas. Es evidencia de un
 verificador, no una sanción: hoy no cambia nada en el descubrimiento, la selección de vendedores ni los pagos.

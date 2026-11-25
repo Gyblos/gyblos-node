@@ -9,7 +9,8 @@ outside, as an ordinary buyer of your free offer. It does not read your machine,
 ## What the verifier does [#what-it-does]
 
 1. It asks your free offer a fixed, public set of 30 short prompts, with reasoning off and at most 200 output
-   tokens each.
+   tokens each. Your free offer must allow at least 200 output tokens per request; otherwise it refuses every
+   prompt and the run is inconclusive.
 2. It rereads each answer with the declared model, run on the verifier's own machine. At up to 24 points per
    answer it checks that your next words are among the 20 the declared model finds most likely, with a
    probability of at least 0.1 %.
@@ -22,11 +23,11 @@ differences between a GPU and a CPU, while a smaller model sold as a larger one 
 
 ## Results [#results]
 
-| Result         | Meaning                                                                                                                                                                   |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `fail`         | Enough answers had a failing point that an honest seller would get this result less than once in 10,000 runs (12 of 30). It applies even if some prompts went unanswered. |
-| `pass`         | Not a fail, every prompt was answered and at least 480 points were checked.                                                                                               |
-| `inconclusive` | Not a fail, but a prompt went unanswered or fewer than 480 points could be checked, so the run proves nothing either way.                                                 |
+| Result         | Meaning                                                                                                                                                                                                                                                      |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `fail`         | Enough answers had a failing point (12 of 30) that, under the assumptions measured for this rule, an honest seller would get this result less than once in 10,000 runs. It is an estimate, not a guarantee. It applies even if some prompts went unanswered. |
+| `pass`         | Not a fail, every prompt was answered and at least 480 points were checked.                                                                                                                                                                                  |
+| `inconclusive` | Not a fail, but a prompt went unanswered or fewer than 480 points could be checked, so the run proves nothing either way.                                                                                                                                    |
 
 A result covers one seller, one model and one version of the prompt set. It is evidence from one verifier, not
 a penalty: today it changes nothing in discovery, routing or payments.

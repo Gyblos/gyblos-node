@@ -9,7 +9,6 @@ import {
   type SignedModelVerification,
 } from '@gyblos/protocol/model-verification';
 import { isMain } from '@gyblos/runtime';
-import { bindEndpoint } from '@gyblos/transport-iroh/endpoint';
 
 import { CHALLENGE_SET, challengeSetDigest } from './challenge-set';
 import {
@@ -21,8 +20,7 @@ import {
   type ModelVerifierCode,
 } from './constants';
 import { loadVerifierKey } from './key';
-import { openReference } from './reference';
-import { openSeller, parseSellerTarget } from './seller';
+import { catalogModelId, openReference } from './reference';
 import { runVerification } from './verify';
 
 const OPTIONS = {
@@ -64,6 +62,9 @@ function summary(signed: SignedModelVerification) {
 
 async function verify(values: Record<string, string | undefined>) {
   if (!values.seller || !values.model) throw usage();
+  const { openSeller, parseSellerTarget } = await import('./seller');
+  const { bindEndpoint } = await import('@gyblos/transport-iroh/endpoint');
+  const modelId = catalogModelId(values.model);
   const target = parseSellerTarget(
     await readJson(values.seller, MODEL_VERIFIER_CODES.INVALID_SELLER),
   );
@@ -77,7 +78,7 @@ async function verify(values: Record<string, string | undefined>) {
     http: false,
   });
   try {
-    const seller = await openSeller(endpoint, target, values.model);
+    const seller = await openSeller(endpoint, target, modelId);
     try {
       const { signed, answers, unscored } = await runVerification({
         target,
