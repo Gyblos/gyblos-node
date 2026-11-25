@@ -420,14 +420,17 @@ past prices stay traceable after it republishes, withdraws or leaves.
   presence never touches the history: accepting a catalog clears the presence,
   but the period stays open. Times follow the index's clock but never move
   backwards for one NodeId: a period ends no earlier than its last renewal, and
-  the next one starts no earlier than that end.
+  the next one starts no earlier than that end, and neither passes the signed
+  `expiresAt`.
 - **Writes.** The period and its offers are written in the publish batch, under
   the same high-water guard as the record, so a replayed or rejected record
-  writes nothing. Offers are stored once per distinct content (a SHA-256 of the
-  catalog's `models`), one row per offer with its exact atomic prices, `unit`,
-  network and asset. A renewal checks one offer key and the open period and
-  updates only the period; a change also writes the new content's offer rows,
-  all of them even when one price changed.
+  writes nothing, and neither does a second copy of an accepted record. Offers
+  are stored once per distinct content (a SHA-256 of the catalog's `models`
+  sorted by model, variant and quantization, so reordering them renews the
+  period), one row per offer with its exact atomic prices, `unit`, network and
+  asset. A renewal checks one offer key and the open period and updates only the
+  period; a change also writes the new content's offer rows, all of them even
+  when one price changed.
 - **Retention.** Periods and their offers are kept for about ten years after
   they end (`OFFER_HISTORY.retentionDays`, the same as uptime), then dropped
   with the other expired rows; offer rows go once no kept period uses them.

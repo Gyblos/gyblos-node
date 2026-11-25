@@ -113,7 +113,7 @@ eachStorage('dropping a model opens a period without it', async (harness) => {
   const { periods } = await history(harness, `node=${node.nodeId}`);
   assert.deepEqual(
     periods.map((period) => period.offers.map((offer) => offer.modelId)),
-    [[MODEL], [MODEL, 'other-1b']],
+    [[MODEL], ['other-1b', MODEL]],
   );
 });
 

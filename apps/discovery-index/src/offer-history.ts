@@ -6,6 +6,7 @@ import {
   INDEX_ROUTES,
   OFFER_HISTORY,
   PERIOD_END_REASONS,
+  REGISTRATION,
   type PeriodEndReason,
 } from './constants';
 import { indexFail, protocolStep } from './errors';
@@ -56,7 +57,6 @@ export interface OfferHistoryStorage {
 }
 
 const QUERY_KEYS: ReadonlySet<string> = new Set(['node', 'model', 'days']);
-const NODE = /^[0-9a-f]{64}$/;
 const DAYS = /^[1-9][0-9]?$/;
 
 export interface OfferHistoryRequest {
@@ -78,7 +78,7 @@ export async function parseOfferHistoryQuery(
   const node = params.get('node');
   const model = params.get('model');
   if ((node === null) === (model === null)) invalidQuery();
-  if (node !== null && !NODE.test(node)) invalidQuery();
+  if (node !== null && !REGISTRATION.nodeId.test(node)) invalidQuery();
   const requested = params.get('days');
   if (requested !== null && !DAYS.test(requested)) invalidQuery();
   const days =
@@ -179,6 +179,21 @@ function prunePeriods(
     if (!used.has(hash)) contents.delete(hash);
 }
 
+const periodStart = (
+  periods: readonly MemoryPeriod[],
+  entry: StoredEntry,
+  now: number,
+) =>
+  Math.min(
+    Math.max(
+      now,
+      ...periods
+        .filter((period) => period.nodeId === entry.nodeId)
+        .map((period) => period.endedAt ?? now),
+    ),
+    entry.expiresAt,
+  );
+
 export function memoryOfferHistory() {
   const contents = new Map<string, HistoryOffer[]>();
   const periods: MemoryPeriod[] = [];
@@ -203,17 +218,15 @@ export function memoryOfferHistory() {
       open.expiresAt > now
     ) {
       open.lastSequence = entry.sequence;
-      open.lastPublishedAt = Math.max(open.lastPublishedAt, now);
+      open.lastPublishedAt = Math.min(
+        Math.max(open.lastPublishedAt, now),
+        entry.expiresAt,
+      );
       open.expiresAt = entry.expiresAt;
       return;
     }
     if (open) close(open, now, PERIOD_END_REASONS.REPLACED);
-    const start = Math.max(
-      now,
-      ...periods
-        .filter((period) => period.nodeId === entry.nodeId)
-        .map((period) => period.endedAt ?? now),
-    );
+    const start = periodStart(periods, entry, now);
     periods.push({
       nodeId: entry.nodeId,
       firstSequence: entry.sequence,

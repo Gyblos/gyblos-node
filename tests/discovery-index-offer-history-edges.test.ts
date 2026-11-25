@@ -30,7 +30,12 @@ const OTHER_OWNER = '11111111111111111111111111111111';
 const NODE = 'ab'.repeat(32);
 const RETENTION = OFFER_HISTORY.retentionDays * DAY;
 
-function entry(sequence: number, now: number, price: string): StoredEntry {
+function entry(
+  sequence: number,
+  now: number,
+  price: string,
+  expiresAt = now + 600_000,
+): StoredEntry {
   const offers = [
     {
       modelId: MODEL,
@@ -54,7 +59,7 @@ function entry(sequence: number, now: number, price: string): StoredEntry {
     owner: OTHER_OWNER,
     sequence,
     issuedAt: now,
-    expiresAt: now + 600_000,
+    expiresAt,
     digest: `digest-${sequence}`,
     models: [MODEL],
     signature: `signature-${sequence}`,
@@ -203,4 +208,42 @@ void test('pruning drops offer rows no kept period references', async (context) 
     .all()
     .map((row) => row.hash);
   assert.deepEqual(hashes, ['hash-2']);
+});
+
+eachStorage(
+  'a second copy of an accepted record leaves the history alone',
+  async ({ storage }) => {
+    assert.equal(await storage.put(entry(1, T0 + 1000, '1')), true);
+    assert.equal(await storage.put(entry(1, T0 + 5000, '1')), false);
+    const [period] = await periodsOf(storage);
+    assert.equal(period!.lastPublishedAt, T0 + 1000);
+  },
+);
+
+eachStorage(
+  'clamped times never pass the signed expiry',
+  async ({ storage }) => {
+    await storage.put(entry(1, T0 + 5000, '1'));
+    await storage.put(entry(2, T0 + 1000, '2'));
+    await storage.put(entry(3, T0 + 500, '2'));
+    for (const period of await periodsOf(storage)) {
+      assert.ok(period.startedAt <= period.lastPublishedAt);
+      assert.ok(period.lastPublishedAt <= period.expiresAt);
+    }
+  },
+);
+
+eachStorage('reordering the same offers renews the period', async (harness) => {
+  const node = indexNode();
+  await accepted(
+    harness,
+    priced(node, 1, '2', { models: [MODEL, 'other-1b'] }),
+  );
+  harness.clock.now += 1000;
+  await accepted(
+    harness,
+    priced(node, 2, '2', { models: ['other-1b', MODEL] }),
+  );
+  const { periods } = await history(harness, `node=${node.nodeId}`);
+  assert.equal(periods.length, 1);
 });

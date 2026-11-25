@@ -110,3 +110,5 @@ export const jsonOfferRows = (hash: string, json: string, guard: SQL) =>
   sql`select ${hash}, cast(key as integer), json_extract(value, '$.modelId'), json_extract(value, '$.variant'), json_extract(value, '$.quantization'), json_extract(value, '$.contextTokens'), json_extract(value, '$.reasoning'), json_extract(value, '$.pricing.inputAtomicPerMtok'), json_extract(value, '$.pricing.outputAtomicPerMtok'), json_extract(value, '$.pricing.unit'), json_extract(value, '$.pricing.network'), json_extract(value, '$.pricing.asset') from json_each(${json}) where ${guard}`;
 export const atLeast = (value: number, floor: SQLWrapper) =>
   sql<number>`max(${value}, coalesce((${floor}), ${value}))`;
+export const atMost = (value: SQL, cap: number) =>
+  sql<number>`min(${value}, ${cap})`;

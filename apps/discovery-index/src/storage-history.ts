@@ -7,6 +7,7 @@ import {
   gt,
   inArray,
   isNull,
+  lt,
   lte,
   max,
   ne,
@@ -27,6 +28,7 @@ import type { HistoryPeriod, HistoryQuery } from './offer-history';
 import { catalogPeriods, nodes, offerItems } from './schema';
 import {
   atLeast,
+  atMost,
   jsonOfferRows,
   jsonTextValues,
   maximum,
@@ -64,6 +66,7 @@ function closeOpen(
       and(
         eq(catalogPeriods.nodeId, entry.nodeId),
         isNull(catalogPeriods.endedAt),
+        lt(catalogPeriods.lastSequence, entry.sequence),
         won,
         unless,
       ),
@@ -94,12 +97,15 @@ function openQuery(
   open: SQL,
 ) {
   const now = entry.admission.now;
-  const start = atLeast(
-    now,
-    database
-      .select({ end: max(catalogPeriods.endedAt) })
-      .from(catalogPeriods)
-      .where(eq(catalogPeriods.nodeId, entry.nodeId)),
+  const start = atMost(
+    atLeast(
+      now,
+      database
+        .select({ end: max(catalogPeriods.endedAt) })
+        .from(catalogPeriods)
+        .where(eq(catalogPeriods.nodeId, entry.nodeId)),
+    ),
+    entry.expiresAt,
   );
   return database.insert(catalogPeriods).select(
     database
@@ -162,10 +168,13 @@ export function historyQueries(
       .update(catalogPeriods)
       .set({
         lastSequence: entry.sequence,
-        lastPublishedAt: maximum(catalogPeriods.lastPublishedAt, now),
+        lastPublishedAt: atMost(
+          maximum(catalogPeriods.lastPublishedAt, now),
+          entry.expiresAt,
+        ),
         expiresAt: entry.expiresAt,
       })
-      .where(and(open, won)),
+      .where(and(open, lt(catalogPeriods.lastSequence, entry.sequence), won)),
     openQuery(database, entry, content.hash, won, open),
   ];
 }
