@@ -68,14 +68,17 @@ export function OfferPriceCharts({
             countAxis={false}
             total={usdcDecimal(latest[side])}
             summary={`Latest quoted rate · ${selected.points.length} offer ${selected.points.length === 1 ? 'period' : 'periods'}`}
-            points={selected.points.map((point) => ({
-              day: new Date(point.at).toISOString(),
-              band: utcMinute(point.at).slice(0, 10),
-              tick: utcMinute(point.at).slice(11),
-              amount: usdcDecimal(point[side]),
-              value: Number(point[side]),
-              detail: 'Through ' + utcMinute(point.end) + ' UTC',
-            }))}
+            points={selected.points.map((point) => {
+              const [band, tick] = utcMinute(point.at).split(' ');
+              return {
+                day: new Date(point.at).toISOString(),
+                band,
+                tick,
+                amount: usdcDecimal(point[side]),
+                value: Number(point[side]),
+                detail: 'Through ' + utcMinute(point.end) + ' UTC',
+              };
+            })}
           />
         ))}
       </div>
