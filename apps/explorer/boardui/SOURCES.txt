@@ -1,0 +1,5 @@
+BoardUI (https://www.boardui.com), MIT license in ./LICENSE.
+Copied from the registry items at https://www.boardui.com/r/<name>.json on 2026-11-23 and adapted:
+pagination, buttons, badges/chip, skeleton, tooltip, direction, dashboard/stat-cards, utils/cx,
+utils/directional-icon, styles/boardui.css and styles/typography.css.
+Unused exports were removed; tokens are mapped to the explorer's theme in styles/tokens.css.

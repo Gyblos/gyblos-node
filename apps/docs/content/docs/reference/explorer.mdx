@@ -1,0 +1,72 @@
+---
+title: Explorer
+description: What the check marks, names and amounts in the Gyblos explorer mean.
+---
+
+The [Gyblos explorer](https://explorer.gyblos.com) shows the sellers, models, usage and payments of the
+network. This page explains what its marks and amounts mean. The **?** next to a section title in the
+explorer shows a short version of it.
+
+## Pages [#pages]
+
+| Page            | What it shows                                                                       |
+| --------------- | ----------------------------------------------------------------------------------- |
+| Network (`/`)   | An overview of the range, the first sellers and the latest channel transactions.    |
+| `/sellers`      | Every seller online now, and the ones offline or not published.                     |
+| `/models`       | Each model offered now, its lowest paid prices, and what was served over the range. |
+| `/transactions` | Every Gyblos channel transaction, newest first.                                     |
+| `/stats`        | Usage and payments over the range, with their daily tables and unserved demand.     |
+
+A seller counts as online when the discovery index lists it, so the overview count and the tables agree. Each section that covers a span of days (Overview, Models, Usage, Payments and a seller's Activity) has its own 7, 30 or 90 day control, kept in the page address. Columns with arrows sort the table: highest first, then lowest first, then the default order. The day columns and Unserved demand already show newest or most requests first, so their first click shows oldest or fewest first.
+
+The Tokens processed card on the Overview adds the input and output tokens of the receipts in the range, free and paid separately, with the same receipts as Requests. Large figures are shortened, for example 1.2M.
+
+## Check mark and names [#verified]
+
+A ✓ next to a seller means the discovery index checked that the named GitHub account published the
+seller's NodeId in a gist. It links the seller to that account. It does not identify a person and says
+nothing about the quality of the seller's answers. Sellers without it are not marked. Sellers set it up
+with [Verify your GitHub account](/en/sellers/identity#verify-github).
+
+A name in smaller type below an account or NodeId is a name the seller chose. Nobody verifies it, and
+another seller can use the same name. The ✓ always belongs to the GitHub account, never to the name.
+
+## Buyers [#buyers]
+
+The Buyers card, on the Overview and in Usage on Stats, counts distinct buyers of all time: free buyers
+by NodeId and paid buyers by wallet (or by NodeId when the receipt names no wallet), never added
+together. Below the all-time counts, the card shows the buyers new in the section's range. A buyer counts from its first receipt reported by the seller and not disputed by the buyer, and stays counted even if that receipt is disputed later. Both are counted up to the end of yesterday (UTC), so today's new buyers appear
+tomorrow. A count below 5, zero included, is shown as "< 5". See
+[Data and privacy](/en/reference/data-and-privacy#receipts) for what these counts can and cannot hide.
+
+## Channel transactions [#channel-transactions]
+
+Each row is one change to a Gyblos payment channel. The amount depends on the type:
+
+| Type            | Amount                                                                                                |
+| --------------- | ----------------------------------------------------------------------------------------------------- |
+| Deposit, Top-up | What the buyer put into the channel.                                                                  |
+| Settle          | What was newly settled.                                                                               |
+| Paid out        | What the seller side received (payee and payout recipients). It is green, unless it is a batch total. |
+| Refunded        | What went back to the buyer.                                                                          |
+
+Next to a payout, its own columns show the rest of its split:
+
+- **Gyblos fee**: the Gyblos protocol fee.
+- **Program**: the payment program's own treasury, for rounding remainders or a share it could
+  not deliver. It is not a Gyblos fee.
+- **To buyer**: what went back to the buyer.
+
+USDC that left the channel to no party the channel names has no column: a note under the amount says
+how much is unclassified. When a refund row's transaction also paid sellers, a note under the refund says
+how much went to sellers.
+
+One transaction can pay out several channels. Its batch total is shown on its first row, and the other
+rows point to that transaction. Don't add the amounts up: you would count the same USDC more than once.
+
+## A seller's transactions [#seller-transactions]
+
+A seller's page lists the channels whose payout recipient is the owner address the seller declared. The
+seller chooses that address, so it is not verified. When another listed seller declares the same address,
+the explorer says so, and the channels may belong to either seller. The amounts read as in
+[Channel transactions](#channel-transactions).

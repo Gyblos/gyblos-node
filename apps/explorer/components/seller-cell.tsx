@@ -24,7 +24,7 @@ export function SellerCell({
 }) {
   const label = github ? `@${github.account}` : short(nodeId);
   return (
-    <div className="flex items-center gap-2">
+    <div className="seller-cell flex items-center gap-2">
       {href ? (
         <Link href={href} aria-hidden="true" tabIndex={-1} className="shrink-0">
           <Identicon nodeId={nodeId} />
@@ -35,7 +35,10 @@ export function SellerCell({
       <div className="min-w-0">
         <div className="flex items-center gap-1 font-mono">
           {href ? (
-            <Link className="text-ink hover:text-brand" href={href}>
+            <Link
+              className="text-ink underline-offset-2 hover:underline"
+              href={href}
+            >
               {label}
             </Link>
           ) : (
@@ -43,7 +46,7 @@ export function SellerCell({
           )}
           {github ? (
             <a
-              className="inline-flex hover:text-brand"
+              className="inline-flex hover:text-ink hover:underline underline-offset-2"
               href={gistUrl(github)}
               title="GitHub account verified by the discovery index: open the proof gist"
             >

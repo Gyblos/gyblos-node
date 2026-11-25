@@ -64,7 +64,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm comments:check
         env:
-          COMMENT_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          COMMENT_BASE_SHA: ${{ (github.ref == 'refs/heads/main' || (github.base_ref == 'main' && (github.head_ref == 'develop' || startsWith(github.head_ref, 'release/')))) && github.sha || github.event.pull_request.base.sha || github.event.before }}
+      - run: pnpm typescript:check
       - run: pnpm exec prettier --check .
       - run: pnpm docs:build
       - run: pnpm docs:test
@@ -91,7 +92,7 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
         env:
-          COMMENT_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          COMMENT_BASE_SHA: ${{ (github.ref == 'refs/heads/main' || (github.base_ref == 'main' && (github.head_ref == 'develop' || startsWith(github.head_ref, 'release/')))) && github.sha || github.event.pull_request.base.sha || github.event.before }}
 
   # `pnpm test` split by file; the patterns match its script in package.json.
   test:

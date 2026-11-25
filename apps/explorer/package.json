@@ -9,6 +9,7 @@
     "./board-hovered": "./components/board/hovered.ts",
     "./chain-shape": "./lib/chain-shape.ts",
     "./chain-txs-shape": "./lib/chain-txs-shape.ts",
+    "./collector": "./lib/collector.ts",
     "./collector-shape": "./lib/collector-shape.ts",
     "./config": "./lib/config.ts",
     "./constants": "./lib/constants.ts",
@@ -19,6 +20,7 @@
     "./format": "./lib/format.ts",
     "./hash-target": "./lib/hash-target.ts",
     "./latency": "./lib/latency.ts",
+    "./layout": "./lib/layout.ts",
     "./model-family": "./lib/model-family.ts",
     "./model-table": "./lib/model-table.ts",
     "./network-status": "./lib/network-status.ts",
@@ -31,20 +33,23 @@
     "./usage": "./lib/usage.ts"
   },
   "scripts": {
-    "dev": "node scripts/build-registry.mjs && next dev --port 4190",
-    "build": "node scripts/build-registry.mjs && next build",
-    "registry:build": "node scripts/build-registry.mjs",
-    "build:cloudflare": "opennextjs-cloudflare build && node scripts/write-worker-entry.mjs",
+    "dev": "node scripts/build-registry.ts && next dev --port 4190",
+    "build": "node scripts/build-registry.ts && next build",
+    "registry:build": "node scripts/build-registry.ts",
+    "build:cloudflare": "opennextjs-cloudflare build && node scripts/write-worker-entry.ts",
     "start": "next start --port 4190"
   },
   "dependencies": {
     "@number-flow/react": "0.6.2",
+    "@remixicon/react": "4.9.0",
     "lucide-react": "1.68.0",
     "next": "16.4.6",
+    "nextjs-toploader": "3.9.17",
     "react": "19.3.1",
     "react-aria-components": "1.22.1",
     "react-dom": "19.3.1",
-    "recharts": "3.10.1"
+    "recharts": "3.10.1",
+    "tailwind-merge": "3.7.0"
   },
   "devDependencies": {
     "@opennextjs/cloudflare": "1.20.17",
@@ -54,6 +59,6 @@
     "@types/react-dom": "19.3.0",
     "postcss": "8.5.33",
     "tailwindcss": "4.3.5",
-    "typescript": "5.9.3"
+    "typescript": "6.0.3"
   }
 }

@@ -58,6 +58,6 @@ void test('a name shaped like an account, a badge or with hidden characters is d
 void test('the name hint says the name is self-chosen and not verified', () => {
   assert.equal(
     sellerNameHint('Nodo Santiago'),
-    'Nodo Santiago · self-chosen name, not verified',
+    'Nodo Santiago (self-chosen name, not verified)',
   );
 });

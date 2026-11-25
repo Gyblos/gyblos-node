@@ -1,10 +1,4 @@
-import {
-  DISPLAY,
-  IDENTITY,
-  SELLER_NAME,
-  SELLER_PAGE,
-  UNITS,
-} from './constants';
+import { DISPLAY, IDENTITY, PAGES, SELLER_NAME, UNITS } from './constants';
 import type { Seller } from './discovery-shape';
 import { count } from './format';
 import type { GithubAccount, NetworkStatus } from './network-status';
@@ -21,7 +15,7 @@ export function namesByNode(
   return names;
 }
 
-export const sellerNameHint = (name: string) => `${name} · ${SELLER_NAME.hint}`;
+export const sellerNameHint = (name: string) => `${name} (${SELLER_NAME.hint})`;
 
 export function githubByNode(
   network: NetworkStatus | null,
@@ -129,12 +123,21 @@ export function notOnlineMeta(
   if (verifiedShown !== null)
     return `${verifiedShown} verified ${verifiedShown === 1 ? 'seller' : 'sellers'} not online`;
   const { offline, unpublished } = network.counts;
-  return `${offline} offline · ${unpublished} not published`;
+  return `${offline} offline, ${unpublished} not published`;
 }
 
 export function sellerHref(nodeId: string, query?: ExplorerQuery): string {
-  const path = `${SELLER_PAGE.path}/${encodeURIComponent(nodeId)}`;
-  return query ? queryHref({ ...query, path, before: null, pages: {} }) : path;
+  const path = `${PAGES.sellers}/${encodeURIComponent(nodeId)}`;
+  return query
+    ? queryHref({
+        ...query,
+        path,
+        before: null,
+        pages: {},
+        ranges: {},
+        sorts: {},
+      })
+    : path;
 }
 
 const plural = (value: number, word: string) =>

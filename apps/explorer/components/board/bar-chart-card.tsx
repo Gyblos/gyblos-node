@@ -50,7 +50,7 @@ export function BarChartCard({
   kind: FlowKind;
   total: FlowValue;
   // The total's change against the previous period; hidden while a day is hovered.
-  change?: Delta;
+  change?: Delta | null;
   points: BarPoint[];
   // A count axis (whole numbers); amounts hide it and read from the headline instead.
   countAxis?: boolean;
@@ -67,7 +67,7 @@ export function BarChartCard({
         {change && !active ? <DeltaChip delta={change} /> : null}
         <span className="font-mono text-xs text-dim">
           {active
-            ? [active.day, active.detail].filter(Boolean).join(' · ')
+            ? [active.day, active.detail].filter(Boolean).join(', ')
             : `${points.length} days`}
         </span>
       </div>

@@ -8,12 +8,7 @@ import { resolve } from 'node:path';
 import test from 'node:test';
 
 import { INDEX_ROUTES } from '@gyblos/discovery-index/constants';
-import {
-  DISPLAY,
-  PAGING,
-  RANGE,
-  SELLER_PAGE,
-} from '@gyblos/explorer/constants';
+import { DISPLAY, PAGES, PAGING, RANGE } from '@gyblos/explorer/constants';
 import {
   AGGREGATES,
   COLLECTOR_ROUTES,
@@ -94,14 +89,15 @@ void test('the registry theme has the CSS tokens colors, light and dark, and the
 
 void test('llms.txt states the range presets, the buyer threshold, the longest range and the sources', () => {
   const llms = read('public/llms.txt');
-  const presets = RANGE.presets.map((days) => `\`?${RANGE.param}=${days}\``);
   assert.ok(
     llms.includes(
-      `last ${RANGE.presets.join(', ').replace(/, (\d+)$/, ' or $1')} days`,
+      `own ${RANGE.presets.join(', ').replace(/, (\d+)$/, ' or $1')} day control`,
     ),
   );
-  for (const preset of presets) assert.ok(llms.includes(preset), preset);
+  for (const { param } of Object.values(RANGE.sections))
+    assert.ok(llms.includes(`\`${param}\``), param);
   assert.ok(llms.includes(`; ${RANGE.defaultDays} is the default`));
+  assert.ok(llms.includes(`An older \`${RANGE.param}\` link`));
   assert.ok(llms.includes(` below ${DISPLAY.minPublicBuyers} `));
   assert.ok(llms.includes(`"< ${DISPLAY.minPublicBuyers}"`));
   assert.equal(DISPLAY.minPublicBuyers, AGGREGATES.minPublicBuyers);
@@ -134,12 +130,17 @@ void test('llms.txt states the range presets, the buyer threshold, the longest r
 void test('llms.txt states the table paging parameters and the seller page', () => {
   const llms = read('public/llms.txt');
   assert.ok(llms.includes(`${PAGING.rowsPerPage} rows per page`));
-  for (const param of Object.values(PAGING.params))
+  for (const param of [
+    ...Object.values(PAGING.params),
+    ...Object.values(PAGING.sortParams),
+    ...Object.values(RANGE.sections).map((section) => section.param),
+    ...Object.values(PAGES),
+  ])
     assert.ok(llms.includes(`\`${param}\``), param);
-  assert.ok(llms.includes(`\`${SELLER_PAGE.path}/<NodeId>\``));
+  assert.ok(llms.includes(`\`${PAGES.sellers}/<NodeId>\``));
   assert.ok(
     llms.includes(
-      'A range switch returns Models, Usage daily, Unserved demand and Daily on chain to page 1',
+      "A section's range switch returns only that section's tables to page 1",
     ),
   );
 });

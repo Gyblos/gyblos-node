@@ -8,6 +8,7 @@ import { Select } from './board/select';
 const OPTIONS = NETWORKS.map((network) => ({
   id: network.id,
   label: network.label,
+  icon: network.icon,
   ...(network.live ? {} : { hint: 'soon', disabled: true }),
 }));
 

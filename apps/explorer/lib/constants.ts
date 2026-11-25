@@ -62,6 +62,7 @@ export const LATENCY_BUCKETS_MS = [
 ] as const;
 
 export const DISPLAY = {
+  statCards: 4,
   // Digits of a short address on each side of the ellipsis.
   addressHead: 4,
   addressTail: 4,
@@ -74,8 +75,9 @@ export const DISPLAY = {
   weekWindow: 7,
   // Minimum width of wide tables, in px.
   wideTable: 860,
-  dailyTable: 820,
-  modelsTable: 1320,
+  txTable: 1180,
+  dailyTable: 1100,
+  modelsTable: 1800,
   narrowTable: 420,
   defaultTable: 640,
   // Median latency.
@@ -89,12 +91,13 @@ export const DISPLAY = {
 
 export const CHAIN_TXS = {
   param: 'before',
+  limitParam: 'limit',
   recipientParam: 'recipient',
-  pageRows: 25,
+  pageRows: 5,
 } as const;
 
 export const PAGING = {
-  rowsPerPage: 25,
+  rowsPerPage: 5,
   maxPageDigits: 6,
   params: {
     sellers: 'sellersPage',
@@ -114,13 +117,46 @@ export const PAGING = {
     chainDaily: 'daily-on-chain',
     transactions: 'channel-transactions',
   },
-  rangeTables: ['models', 'daily', 'demand', 'chainDaily'],
   cursorTable: 'transactions',
+  sortParams: {
+    sellers: 'sellersSort',
+    offline: 'offlineSort',
+    models: 'modelsSort',
+    daily: 'dailySort',
+    demand: 'demandSort',
+    chainDaily: 'chainDailySort',
+  },
+  sortKeys: {
+    sellers: ['context', 'input', 'output', 'uptimeDay', 'uptimeWeek', 'since'],
+    offline: ['lastSeen', 'firstSeen'],
+    models: ['input', 'output', 'context'],
+    daily: ['day'],
+    demand: ['requests'],
+    chainDaily: ['day', 'settled', 'paidOut'],
+  },
+  descendingPrefix: '-',
 } as const;
 
-export const SELLER_PAGE = {
-  path: '/sellers',
+export const PAGES = {
+  network: '/',
+  sellers: '/sellers',
+  models: '/models',
+  transactions: '/transactions',
+  stats: '/stats',
 } as const;
+
+export const HELP_TRIGGER = {
+  delay: 150,
+  shouldCloseOnPress: false,
+} as const;
+
+export const PAGE_LINKS = [
+  { label: 'Network', href: PAGES.network },
+  { label: 'Sellers', href: PAGES.sellers },
+  { label: 'Models', href: PAGES.models },
+  { label: 'Transactions', href: PAGES.transactions },
+  { label: 'Stats', href: PAGES.stats },
+] as const;
 
 export const HASH_SCROLL = {
   maxWaitMs: 15 * 1000,
@@ -129,8 +165,6 @@ export const HASH_SCROLL = {
 export const TX_TEXT = {
   batched: 'part of a payout of several channels; see the transaction',
   batchTotal: 'batch total',
-  deposit: 'buyer deposit',
-  refund: 'back to buyer',
 } as const;
 
 export const NODE_STATE = {
@@ -147,6 +181,13 @@ export const SELLER_STATUS = {
 // (AGGREGATES.maxRangeDays) and 30 by default.
 export const RANGE = {
   param: 'range',
+  sections: {
+    overview: { param: 'overviewRange', tables: [] },
+    models: { param: 'modelsRange', tables: ['models'] },
+    usage: { param: 'usageRange', tables: ['daily', 'demand'] },
+    payments: { param: 'paymentsRange', tables: ['chainDaily'] },
+    activity: { param: 'activityRange', tables: ['models', 'daily'] },
+  },
   presets: [7, 30, 90],
   defaultDays: 30,
   // "YYYY-MM-DD" from an ISO timestamp.

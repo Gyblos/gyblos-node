@@ -241,7 +241,7 @@ void test('a seller that hangs past the snapshot deadline is reported; a cancell
 });
 
 void test('a failure line names the seller briefly and carries no address', async () => {
-  const { sellerFailureLine } = await import('@gyblos/buyer/free-main');
+  const { sellerFailureLine } = await import('@gyblos/buyer-app/free-main');
   const line = sellerFailureLine({
     nodeId: '8f01b674c2f41e2a810c9f181eda4195134ee5925ec9ad3fdea3e3d1a5f7d560',
     phase: 'quote',

@@ -144,11 +144,29 @@ async function pageHtml(dir: string, state: State) {
         output += chunk.toString();
       });
     });
-    const response = await fetch(url + '/?range=7', {
-      signal: AbortSignal.timeout(60_000),
-    });
-    assert.equal(response.status, 200, output);
-    return await response.text();
+    let html = '';
+    let css = '';
+    const stylesheets = new Set<string>();
+    for (const path of ['/?range=7', '/stats?range=7']) {
+      const response = await fetch(url + path, {
+        signal: AbortSignal.timeout(60_000),
+      });
+      assert.equal(response.status, 200, output);
+      const page = await response.text();
+      html += page;
+      for (const [, href] of page.matchAll(
+        /<link\b[^>]*href="([^"]+\.css[^"]*)"/g,
+      ))
+        if (href) stylesheets.add(href);
+    }
+    for (const href of stylesheets) {
+      const response = await fetch(url + href, {
+        signal: AbortSignal.timeout(60_000),
+      });
+      assert.equal(response.status, 200);
+      css += await response.text();
+    }
+    return { html, css };
   } finally {
     app.kill();
     try {
@@ -165,7 +183,7 @@ function bodyFor(html: string, column: string) {
   const tables = html.matchAll(/<table\b[^>]*>(.*?)<\/table>/gs);
   for (const [, contents = ''] of tables) {
     const [head, body] = contents.split('<tbody>');
-    if (head?.includes('>' + column + '</th>') && body !== undefined)
+    if (head?.includes('>' + column + '<') && body !== undefined)
       return body.replace(/<\/tbody>$/, '');
   }
   assert.fail('Table missing: ' + column);
@@ -176,12 +194,13 @@ before(async () => {
   dir = await mkdtemp(join(tmpdir(), 'gyblos-explorer-'));
   for (const name of [
     'app',
+    'boardui',
     'components',
     'lib',
     'package.json',
     'tsconfig.json',
     'next.config.ts',
-    'postcss.config.mjs',
+    'postcss.config.json',
   ]) {
     await cp(new URL(name, APP), join(dir, name), { recursive: true });
   }
@@ -200,37 +219,78 @@ after(async () => {
   if (dir) await rm(dir, { recursive: true, force: true });
 });
 
+void test('Explorer pages expose one focusable main target after the first skip link', async () => {
+  const pages = (await pageHtml(dir, 'empty')).html.split(
+    /(?=<!DOCTYPE html>)/i,
+  );
+  assert.equal(pages.length, 2);
+  for (const html of pages) {
+    assert.equal(html.match(/<main\b/g)?.length, 1);
+    assert.equal(html.match(/\bid="main-content"/g)?.length, 1);
+    const main = /<main\b[^>]*>(.*?)<\/main>/s.exec(html)?.[0];
+    assert.ok(main);
+    assert.match(main, /^<main\b[^>]*\bid="main-content"/);
+    assert.match(main, /^<main\b[^>]*\btabindex="-1"/i);
+    assert.doesNotMatch(main, /<(header|footer)\b/);
+    const link = /<a\b[^>]*>(.*?)<\/a>/s.exec(html)?.[0];
+    assert.ok(link);
+    assert.match(link, /\bhref="#main-content"/);
+    assert.match(link, />Skip to content<\/a>$/);
+    assert.ok(html.indexOf(link) < html.indexOf('<header'));
+    assert.ok(html.indexOf('</header>') < html.indexOf('<main'));
+    assert.ok(html.indexOf('</main>') < html.indexOf('<footer'));
+  }
+});
+
 void test('Explorer gives offerless Sellers and inactive Daily one spanning row each', async () => {
-  const empty = await pageHtml(dir, 'empty');
+  const { html: empty } = await pageHtml(dir, 'empty');
   assert.match(
-    bodyFor(empty, 'Seller'),
-    /^<tr><td[^>]*\btext-muted\b[^>]*\bcolSpan="8"[^>]*>No offers from online sellers\.<\/td><\/tr>$/i,
+    bodyFor(empty, 'Online since'),
+    /^<tr><td[^>]*\btext-muted\b[^>]*\bcolSpan="9"[^>]*>No offers from online sellers\.<\/td><\/tr>$/i,
   );
   assert.match(
-    bodyFor(empty, 'Day (UTC)'),
-    /^<tr><td[^>]*\btext-muted\b[^>]*\bcolSpan="7"[^>]*>No daily activity in this range\.<\/td><\/tr>$/i,
+    bodyFor(empty, 'Seller first token p50'),
+    /^<tr><td[^>]*\btext-muted\b[^>]*\bcolSpan="12"[^>]*>No daily activity in this range\.<\/td><\/tr>$/i,
   );
 });
 
 void test('Explorer shows offer and active-day rows without empty rows', async () => {
-  const populated = await pageHtml(dir, 'populated');
-  const sellers = bodyFor(populated, 'Seller');
-  const daily = bodyFor(populated, 'Day (UTC)');
+  const { html: populated, css } = await pageHtml(dir, 'populated');
+  const sellers = bodyFor(populated, 'Online since');
+  const daily = bodyFor(populated, 'Seller first token p50');
   assert.match(sellers, /fixture-model/);
   assert.ok(daily.includes(activeDay));
   assert.ok(!daily.includes(inactiveDay));
   assert.doesNotMatch(sellers + daily, /colSpan=/i);
+  const tables = [...populated.matchAll(/<table\b/g)];
+  const edges = [
+    ...populated.matchAll(
+      /<\/table><\/div><div aria-hidden="true" class="explorer-table-edge"><\/div><\/div>/g,
+    ),
+  ];
+  assert.ok(tables.length > 0);
+  assert.equal(edges.length, tables.length);
+  assert.doesNotMatch(populated, /Scroll horizontally|explorer-table-hint/);
+  assert.match(css, /\.explorer-table-edge\s*\{[^}]*display:\s*none;/);
+  assert.match(
+    css,
+    /\.explorer-table-scroll\[data-scrollable\]:not\(\[data-scroll-end\]\)\s*\+\s*\.explorer-table-edge\s*\{\s*display:\s*block;/,
+  );
+  assert.match(
+    css,
+    /@media\s*\(forced-colors:\s*active\)\s*\{\s*\.explorer-table-edge\s*\{\s*border-right:\s*3px double CanvasText;/,
+  );
 });
 
 void test('Explorer keeps the unavailable panels when the sources fail', async () => {
-  const unavailable = await pageHtml(dir, 'unavailable');
+  const { html: unavailable } = await pageHtml(dir, 'unavailable');
   assert.match(
     unavailable,
-    />Network<\/h2><\/div><div[^>]*>Source unavailable\.<\/div>/,
+    />Network<\/h2><\/div><\/div><div[^>]*>Source unavailable\.<\/div>/,
   );
   assert.match(
     unavailable,
-    />Usage<\/h2><\/div><div[^>]*>Source unavailable\.<\/div>/,
+    />Usage<\/h2><\/div><\/div><div[^>]*>Source unavailable\.<\/div>/,
   );
   assert.doesNotMatch(unavailable, /<table\b/);
 });

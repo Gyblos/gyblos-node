@@ -5,7 +5,7 @@ import { rm, stat } from 'node:fs/promises';
 import test from 'node:test';
 import { promisify } from 'node:util';
 
-import { runBuyerInit } from '@gyblos/buyer/init';
+import { runBuyerInit } from '@gyblos/buyer-app/init';
 import { buildBuyerInit, type BuyerInitAnswers } from '@gyblos/node/buyer-init';
 import { BUYER_INIT_MODES } from '@gyblos/node/buyer-init-constants';
 
@@ -74,14 +74,14 @@ void test('wizard confirms an explicit USDC ceiling and passes validated answers
 
 void test('the actual executable offers offline help and refuses unattended initialization without files', async () => {
   const fixture = await home();
-  const executable = new URL('../apps/buyer/src/init.ts', import.meta.url)
+  const executable = new URL('../apps/buyer/src/bin.ts', import.meta.url)
     .pathname;
   const options = {
     cwd: fixture.directory,
     env: { ...process.env, ...fixture.environment },
     timeout: 10000,
   };
-  const args = ['--import', import.meta.resolve('tsx'), executable];
+  const args = ['--import', import.meta.resolve('tsx'), executable, 'init'];
   try {
     const help = await promisify(execFile)(
       process.execPath,

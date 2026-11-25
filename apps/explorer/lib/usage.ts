@@ -1,10 +1,8 @@
-// Owns what the Usage section computes over the collector's daily answers. Free and paid are never
-// added up: every figure is computed per side and shown as a "free · paid" pair. Percentiles come from
-// summed histograms, never from averaged percentiles. Pure functions, no I/O.
 import type {
+  BuyerCount,
   CollectorSnapshot,
+  NetworkBuyers,
   NetworkDay,
-  NetworkSide,
   Totals,
 } from './collector-shape';
 import { DISPLAY } from './constants';
@@ -37,6 +35,11 @@ export function sideFigures(sections: Section[]) {
       0,
     ),
     successRate: successRate(sections),
+    tokens: sections.reduce(
+      (sum, totals) =>
+        sum + (totals ? totals.tokens.input + totals.tokens.output : 0),
+      0,
+    ),
     outputTokens: sections.reduce(
       (sum, totals) => sum + (totals?.tokens.output ?? 0),
       0,
@@ -53,9 +56,6 @@ export function sideFigures(sections: Section[]) {
 }
 export type SideFigures = ReturnType<typeof sideFigures>;
 
-// "free · paid", each side formatted on its own.
-export const pair = <T>(free: T, paid: T, show: (value: T) => string) =>
-  `${show(free)} · ${show(paid)}`;
 export const rateText = (rate: number | null) =>
   rate === null ? '—' : percent(rate);
 export const countText = count;
@@ -111,14 +111,17 @@ export function usageMeta(
 ): string {
   if (!aggregatedAt) return 'no data yet';
   const updated = `updated ${utc(aggregatedAt)}`;
-  return compared ? `vs previous ${days} days · ${updated}` : updated;
+  return compared ? `vs previous ${days} days, ${updated}` : updated;
 }
 
-export const buyersText = (
-  side: Pick<NetworkSide, 'buyers' | 'withheld'> | null,
-) =>
+export const buyersText = (side: BuyerCount | null) =>
   !side
     ? '—'
     : side.withheld
       ? `< ${DISPLAY.minPublicBuyers}`
       : count(side.buyers ?? 0);
+
+export const newBuyersText = (buyers: NetworkBuyers | null, days: number) =>
+  buyers
+    ? `New in the last ${days} days: ${buyersText(buyers.free.newInRange)} free · ${buyersText(buyers.paid.newInRange)} paid`
+    : undefined;

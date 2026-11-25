@@ -1,8 +1,3 @@
-// The release path of the seller image: scripts/release-image.sh and scripts/publish-installer.sh refuse
-// malformed input and any run outside the release workflow before touching git, the registry or GitHub;
-// scripts/pin-installer.sh writes only a release reference into install.sh; scripts/semver-newer.mjs
-// decides which release becomes latest; and the identity install.sh trusts is exactly that workflow at
-// a version tag. Offline.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { readFileSync, statSync, writeFileSync } from 'node:fs';
@@ -16,7 +11,7 @@ import { REPOSITORY_ROOT } from './support/node-config-fixtures';
 const RELEASE = join(REPOSITORY_ROOT, 'scripts/release-image.sh');
 const PIN = join(REPOSITORY_ROOT, 'scripts/pin-installer.sh');
 const PUBLISH = join(REPOSITORY_ROOT, 'scripts/publish-installer.sh');
-const NEWER = join(REPOSITORY_ROOT, 'scripts/semver-newer.mjs');
+const NEWER = join(REPOSITORY_ROOT, 'scripts/semver-newer.ts');
 const WORKFLOW = '.github/workflows/release-seller-image.yml';
 const read = (path: string) =>
   readFileSync(join(REPOSITORY_ROOT, path), 'utf8');

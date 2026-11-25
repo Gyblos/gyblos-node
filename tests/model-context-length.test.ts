@@ -12,9 +12,9 @@ import {
 import {
   cachedRouteContext,
   routeContextTokens,
-} from '../apps/buyer/src/free-context';
-import { startFreeBuyerHttp } from '../apps/buyer/src/free-http';
-import type { ModelRoute } from '../apps/buyer/src/model-routes';
+} from '../packages/buyer/src/free-context';
+import { startFreeBuyerHttp } from '../packages/buyer/src/free-http';
+import type { ModelRoute } from '../packages/buyer/src/model-routes';
 import {
   MODEL,
   nodeId,

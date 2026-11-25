@@ -2,14 +2,15 @@
 // and paid by the buyer's wallet; prints one JSON line per channel and a summary, never keys or URLs.
 // Run it again after `retryAfterSeconds` while it exits 2.
 import {
+  PAID_WITHDRAW_CODES,
+  PAID_WITHDRAW_EXIT,
+} from '@gyblos/buyer/constants';
+import { buyerRole, paidChainFailure } from '@gyblos/buyer/paid-chain';
+import {
   buyerChainWithdraw,
   WITHDRAW_STEPS,
   type UptoBuyerWithdrawStep,
 } from '@gyblos/node/buyer-withdraw';
-import { isMain } from '@gyblos/runtime';
-
-import { PAID_WITHDRAW_CODES, PAID_WITHDRAW_EXIT } from './constants';
-import { buyerRole, paidChainFailure } from './paid-chain';
 
 // Steps after which the channel still needs another run.
 const AGAIN: readonly UptoBuyerWithdrawStep[] = [
@@ -55,5 +56,3 @@ export async function main(
     return undefined;
   }
 }
-
-if (isMain(import.meta.url)) await main();

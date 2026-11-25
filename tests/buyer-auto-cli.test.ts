@@ -24,7 +24,7 @@ void test('the Auto CLI updates only discovery and explicit tariffs and refuses 
   const run = (...args: string[]) =>
     spawnSync(
       process.execPath,
-      ['--import', 'tsx', 'apps/buyer/src/auto-cli.ts', ...args],
+      ['--import', 'tsx', 'apps/buyer/src/bin.ts', 'auto', ...args],
       { env: { ...process.env, ...fixture.environment }, encoding: 'utf8' },
     );
   const before = buildBuyerInit(input);

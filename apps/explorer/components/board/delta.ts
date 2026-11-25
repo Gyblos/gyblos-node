@@ -17,7 +17,7 @@ export function delta(
   current: number | bigint,
   previous: number | bigint,
   better: Better = 'up',
-): Delta {
+): Delta | null {
   const now = asNumber(current);
   const before = asNumber(previous);
   if (now === before)
@@ -25,7 +25,7 @@ export function delta(
   const direction = now > before ? 'up' : 'down';
   const tone: DeltaTone =
     better === 'none' ? 'neutral' : direction === better ? 'good' : 'bad';
-  if (before === 0) return { label: 'New', direction, tone };
+  if (before === 0) return null;
   const change = ((now - before) / Math.abs(before)) * DELTA.percent;
   const size = Math.abs(change);
   const digits = size < DELTA.smallBelow ? DELTA.smallDigits : 0;

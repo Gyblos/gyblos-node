@@ -4,7 +4,7 @@ import { and, eq, min, sql, type SQL } from 'drizzle-orm';
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core';
 
 import { buyerIdentity, headlineReceipt, modelKey } from './aggregate-sql';
-import { FIRST_SEEN_KINDS } from './constants';
+import { FIRST_SEEN_KINDS, type FirstSeenKind } from './constants';
 import type { CollectorDatabase } from './d1-client';
 import type { DayBounds } from './days';
 import { firstSeen, receipts } from './schema';
@@ -13,7 +13,7 @@ import { dayOf, inRange, literal, ordered } from './sql-primitives';
 function upsert(
   database: CollectorDatabase,
   bounds: DayBounds,
-  kind: string,
+  kind: FirstSeenKind,
   id: SQL | SQLiteColumn,
   condition?: SQL,
 ) {
@@ -24,7 +24,7 @@ function upsert(
       database
         .select(
           ordered(firstSeen, {
-            kind: sql<string>`${literal(kind)}`,
+            kind: sql<FirstSeenKind>`${literal(kind)}`,
             id: sql<string>`${id}`,
             firstDay: dayOf(sql`${firstAt}`),
             firstAt: sql<number>`${firstAt}`,

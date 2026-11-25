@@ -1,17 +1,15 @@
-// Owns the Network section: sellers online and offline, the models offered and their cheapest prices,
-// each online seller's offers and uptime, and the registered sellers not online now, from the discovery
-// index. The per-model table lives in the Models section.
-import { Activity, BadgeCheck, Boxes, Server, Tag } from 'lucide-react';
+import { Server } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
-import { HOW_TO_VERIFY_URL } from '../lib/config';
-import { DISPLAY, PAGING } from '../lib/constants';
+import { Chip as CountChip } from '../boardui/components/base/badges/chip';
+import { HELP_TEXT } from '../lib/config';
+import { DISPLAY, PAGES, PAGING } from '../lib/constants';
 import type { DiscoverySnapshot, Seller } from '../lib/discovery';
 import { getDiscovery } from '../lib/discovery-render';
-import { count, percent, pricePerMtok, usdc, utc } from '../lib/format';
+import { count, percent, pricePerMtok, utc } from '../lib/format';
 import type { GithubAccount } from '../lib/network-status';
-import { summarizeOffers, uptimeRatio } from '../lib/offers';
+import { uptimeRatio } from '../lib/offers';
 import { queryHref, tablePager, type ExplorerQuery } from '../lib/paging';
 import {
   emptySellersMessage,
@@ -33,6 +31,7 @@ import {
   Addr,
   ModelName,
   moneyCell,
+  MoreLink,
   numberCell,
   SectionTitle,
   Table,
@@ -43,10 +42,14 @@ import {
 
 const ratioText = (ratio: number | undefined | null) =>
   ratio === undefined || ratio === null ? '—' : percent(ratio);
-const priceText = (value: bigint | null) =>
-  value === null ? '—' : usdc(value);
 
-export async function NetworkSection({ query }: { query: ExplorerQuery }) {
+export async function NetworkSection({
+  query,
+  preview = false,
+}: {
+  query: ExplorerQuery;
+  preview?: boolean;
+}) {
   const { verified } = query;
   const snapshot = await getDiscovery();
   if (snapshot.error)
@@ -56,16 +59,14 @@ export async function NetworkSection({ query }: { query: ExplorerQuery }) {
         anchors={[PAGING.anchors.sellers, PAGING.anchors.offline]}
       />
     );
-  const summary = summarizeOffers(snapshot);
   const accounts = githubByNode(snapshot.network);
   const names = namesByNode(snapshot.network);
   const ordered = orderSellers(snapshot.sellers, snapshot.generatedAt);
   const shown = verified ? verifiedOnly(ordered, accounts) : ordered;
   return (
     <>
-      <SectionTitle title="Network" meta={utc(snapshot.generatedAt)} />
       {snapshot.datedAt || snapshot.networkDatedAt ? (
-        <p className="-mt-2 mb-3 text-xs text-dim">
+        <p className="mt-10 -mb-8 text-xs text-dim">
           {snapshot.datedAt
             ? `Sellers and models as of ${utc(snapshot.datedAt)}. `
             : null}
@@ -74,37 +75,6 @@ export async function NetworkSection({ query }: { query: ExplorerQuery }) {
             : null}
         </p>
       ) : null}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <SellersOnline snapshot={snapshot} />
-        <StatCard
-          icon={Boxes}
-          label="Models"
-          value={<Flow value={summary.models.size} kind="count" />}
-          caption={`${count(summary.freeModels)} with a free seller`}
-        />
-        <StatCard
-          icon={Tag}
-          label="Lowest output price / 1M"
-          value={priceText(summary.minOutput)}
-          caption={
-            summary.minInput === null
-              ? 'No paid offers now'
-              : `Input from ${usdc(summary.minInput)}`
-          }
-          money={summary.minOutput !== null}
-        />
-        <StatCard
-          icon={Activity}
-          label="Uptime 24 h"
-          value={ratioText(summary.averageDayUptime)}
-          caption={
-            summary.averageDayUptime === null
-              ? undefined
-              : `Average over ${count(summary.sellersWithDayUptime)} of ${count(snapshot.sellers.length)} listed sellers`
-          }
-        />
-      </div>
-
       <SellersBlock
         query={query}
         sellers={shown}
@@ -112,36 +82,55 @@ export async function NetworkSection({ query }: { query: ExplorerQuery }) {
         names={names}
         accountsKnown={!!snapshot.network && !snapshot.network.truncated}
       />
-      <NotOnline
-        query={query}
-        network={snapshot.network}
-        accounts={verified ? accounts : null}
-      />
+      {preview ? (
+        <MoreLink href={PAGES.sellers} label="All sellers" />
+      ) : (
+        <NotOnline
+          query={query}
+          network={snapshot.network}
+          accounts={verified ? accounts : null}
+        />
+      )}
     </>
   );
 }
 
 // Online sellers out of every registered or recently seen one; without the index's network status,
 // only the online count is known.
-function SellersOnline({ snapshot }: { snapshot: DiscoverySnapshot }) {
+export function SellersOnline({
+  snapshot,
+  variant,
+}: {
+  snapshot: DiscoverySnapshot;
+  variant?: 'footer' | 'plain';
+}) {
   const counts = snapshot.network?.counts;
   return (
     <StatCard
+      variant={variant}
       icon={Server}
       label="Sellers online"
       value={
         <Flow value={counts?.online ?? snapshot.sellers.length} kind="count" />
       }
       caption={
-        counts
-          ? [
-              `${count(counts.online)} of ${count(counts.total)} registered`,
-              `${count(counts.offline)} offline`,
-              ...(counts.unpublished
-                ? [`${count(counts.unpublished)} not published`]
-                : []),
-            ].join(' · ')
-          : undefined
+        counts ? (
+          <span className="flex flex-wrap gap-1.5">
+            <CountChip variant="caption" color="soft">
+              {count(counts.total)} registered
+            </CountChip>
+            {counts.offline ? (
+              <CountChip variant="caption" color="soft">
+                {count(counts.offline)} offline
+              </CountChip>
+            ) : null}
+            {counts.unpublished ? (
+              <CountChip variant="caption" color="soft">
+                {count(counts.unpublished)} not published
+              </CountChip>
+            ) : null}
+          </span>
+        ) : undefined
       }
     />
   );
@@ -165,6 +154,7 @@ function SellersBlock({
       <SectionTitle
         id={PAGING.anchors.sellers}
         title="Sellers"
+        help={HELP_TEXT.verified}
         meta={<VerifiedFilter query={query} />}
       />
       <SellersTable
@@ -174,21 +164,6 @@ function SellersBlock({
         names={names}
         accountsKnown={accountsKnown}
       />
-      <p className="mt-2 flex items-center gap-1 text-xs text-dim">
-        <BadgeCheck
-          aria-hidden="true"
-          className="size-3.5 shrink-0 text-signal"
-        />
-        <span>
-          The discovery index checked that the named GitHub account published
-          the seller&apos;s NodeId. It links the seller to that account; it does
-          not identify a person and says nothing about quality. Names under an
-          account are chosen by sellers and not verified.{' '}
-          <a className="text-muted hover:text-brand" href={HOW_TO_VERIFY_URL}>
-            How to verify
-          </a>
-        </span>
-      </p>
     </>
   );
 }
@@ -222,12 +197,22 @@ const SELLERS_HEAD = [
   { label: 'Seller' },
   { label: 'Status' },
   { label: 'Model' },
-  { label: 'Context', right: true },
-  { label: 'Input / 1M', right: true },
-  { label: 'Output / 1M', right: true },
-  { label: 'Uptime 24 h · 7 d', right: true },
-  { label: 'Online since' },
+  { label: 'Context', right: true, sort: 'context' },
+  { label: 'Input / 1M', right: true, sort: 'input' },
+  { label: 'Output / 1M', right: true, sort: 'output' },
+  { label: '24 h', right: true, group: 'Uptime', sort: 'uptimeDay' },
+  { label: '7 d', right: true, group: 'Uptime', sort: 'uptimeWeek' },
+  { label: 'Online since', sort: 'since' },
 ];
+type Offer = ReturnType<typeof sellerOffers>[number];
+const SELLER_SORTS = {
+  context: ({ model }: Offer) => model.contextTokens,
+  input: ({ model }: Offer) => BigInt(model.pricing.inputAtomicPerMtok),
+  output: ({ model }: Offer) => BigInt(model.pricing.outputAtomicPerMtok),
+  uptimeDay: ({ seller }: Offer) => uptimeRatio(seller, DISPLAY.dayWindow),
+  uptimeWeek: ({ seller }: Offer) => uptimeRatio(seller, DISPLAY.weekWindow),
+  since: ({ seller }: Offer) => seller.uptime?.firstSeenAt,
+};
 
 const sellerOffers = (sellers: Seller[]) =>
   sellers.flatMap((seller) =>
@@ -269,7 +254,9 @@ function OfferRow({
         {pricePerMtok(model.pricing.outputAtomicPerMtok)}
       </td>
       <td className={numberCell}>
-        {ratioText(uptimeRatio(seller, DISPLAY.dayWindow))} ·{' '}
+        {ratioText(uptimeRatio(seller, DISPLAY.dayWindow))}
+      </td>
+      <td className={numberCell}>
         {ratioText(uptimeRatio(seller, DISPLAY.weekWindow))}
       </td>
       <td className={timeCell}>{utc(seller.uptime?.firstSeenAt ?? null)}</td>
@@ -297,10 +284,18 @@ function SellersTable({
     'sellers',
     offers,
     !query.verified || accountsKnown,
+    SELLER_SORTS,
   );
   return (
     <>
-      <Table minWidth={DISPLAY.wideTable} head={SELLERS_HEAD}>
+      <Table
+        minWidth={DISPLAY.wideTable}
+        head={SELLERS_HEAD}
+        sorting={{ query, table: 'sellers' }}
+        footer={
+          <Pager label="Sellers" view={tablePager(query, 'sellers', page)} />
+        }
+      >
         {empty ? (
           <tr>
             <td className={`${td} text-muted`} colSpan={SELLERS_HEAD.length}>
@@ -326,7 +321,6 @@ function SellersTable({
           />
         ))}
       </Table>
-      <Pager label="Sellers" view={tablePager(query, 'sellers', page)} />
       {offers.length ? (
         <p className="mt-2 text-xs text-dim">
           {offersCaption(offers.length, sellers.length)}

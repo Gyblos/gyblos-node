@@ -41,7 +41,7 @@ function childSource(options: ShutdownProbeOptions) {
   const resolver = `
     resolve(specifier, context, next) {
       if (specifier === '@gyblos/node' ||
-          (specifier === './free-startup' && context.parentURL?.endsWith('/apps/buyer/src/free-main.ts')))
+          (specifier === '@gyblos/buyer/free-startup' && context.parentURL?.endsWith('/apps/buyer/src/free-main.ts')))
         return { url: ${JSON.stringify(hostUrl)}, shortCircuit: true };
       if (specifier === '@gyblos/transport-iroh/relays')
         return { url: ${JSON.stringify(relaysUrl)}, shortCircuit: true };
@@ -51,7 +51,7 @@ function childSource(options: ShutdownProbeOptions) {
   const entry =
     options.entry === SHUTDOWN_PROBE_ENTRIES.SELLER
       ? '@gyblos/node-app/daemon'
-      : '@gyblos/buyer/free-main';
+      : '@gyblos/buyer-app/free-main';
   const invoke =
     options.entry === SHUTDOWN_PROBE_ENTRIES.HELPER
       ? `

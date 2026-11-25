@@ -19,42 +19,78 @@ import {
   type Served,
 } from '../lib/model-table';
 import { summarizeOffers } from '../lib/offers';
-import { tablePager, type ExplorerQuery } from '../lib/paging';
-import { pair } from '../lib/usage';
+import { rangeOf, tablePager, type ExplorerQuery } from '../lib/paging';
 import { pagedRows, Pager } from './pager';
 import {
   ModelName,
   moneyCell,
   numberCell,
   SectionTitle,
+  SideCells,
+  sideColumns,
   Table,
   td,
   Unavailable,
+  type Column,
 } from './ui';
 
-// "18 of 20 · 90%"; "—" without receipts on that side, or with cancellations only.
 function completedText(side: Served | null) {
   if (!side) return '—';
   const { done, of, ratio } = completion(side);
   return ratio === null
     ? '—'
-    : `${count(done)} of ${count(of)} · ${percent(ratio)}`;
+    : `${count(done)} of ${count(of)} (${percent(ratio)})`;
 }
 
 // The lowest paid input and output prices per million tokens (money), or "Free" when only free
 // sellers offer it now.
-function price(now: ModelRow['now']): { text: string; money: boolean } {
-  if (!now) return { text: '—', money: false };
-  if (now.minInput === null || now.minOutput === null)
-    return { text: now.free ? 'Free' : '—', money: false };
-  return {
-    text: `${usdc(now.minInput)} · ${usdc(now.minOutput)}`,
-    money: true,
-  };
+function PriceCells({ now }: { now: ModelRow['now'] }) {
+  if (!now || now.minInput === null || now.minOutput === null)
+    return (
+      <td className={`${numberCell} text-center`} colSpan={2}>
+        {now?.free ? 'Free' : '—'}
+      </td>
+    );
+  return (
+    <>
+      <td className={moneyCell}>{usdc(now.minInput)}</td>
+      <td className={moneyCell}>{usdc(now.minOutput)}</td>
+    </>
+  );
 }
+const orDash = (show: (value: number) => string) => (value: number | null) =>
+  value === null ? '—' : show(value);
+
+const MODELS_HEAD: Column[] = [
+  { label: 'Model' },
+  ...sideColumns('Sellers now'),
+  {
+    label: 'Input',
+    right: true,
+    group: 'Lowest paid / 1M',
+    sort: 'input',
+  },
+  {
+    label: 'Output',
+    right: true,
+    group: 'Lowest paid / 1M',
+    sort: 'output',
+  },
+  { label: 'Max context', right: true, sort: 'context' },
+  ...sideColumns('Completed'),
+  ...sideColumns('Cancelled'),
+  ...sideColumns('Seller first token p50'),
+  ...sideColumns('Buyer first token p50'),
+  ...sideColumns('Engine speed p50'),
+];
+const MODEL_SORTS = {
+  input: (row: ModelRow) => row.now?.minInput,
+  output: (row: ModelRow) => row.now?.minOutput,
+  context: (row: ModelRow) => row.now?.context,
+};
 
 export async function ModelsSection({ query }: { query: ExplorerQuery }) {
-  const { days } = query;
+  const days = rangeOf(query, 'models');
   const [discovery, collector] = await Promise.all([
     getDiscovery(),
     getCollector(days),
@@ -71,32 +107,27 @@ export async function ModelsSection({ query }: { query: ExplorerQuery }) {
     'models',
     rows,
     offersKnown && !collector.error,
+    MODEL_SORTS,
   );
   return (
     <>
       <SectionTitle
         id={PAGING.anchors.models}
         title="Models"
-        meta={`offered now · served over ${days} days`}
+        meta={`Offered now, served in the last ${days} days`}
+        range={{ section: 'models', days }}
       />
       <Table
         minWidth={DISPLAY.modelsTable}
-        head={[
-          { label: 'Model' },
-          { label: 'Sellers now free · paid', right: true },
-          { label: 'Lowest paid input · output / 1M', right: true },
-          { label: 'Max context', right: true },
-          { label: 'Completed free', right: true },
-          { label: 'Completed paid', right: true },
-          { label: 'Cancelled free · paid', right: true },
-          { label: 'Seller first token p50 free · paid', right: true },
-          { label: 'Buyer first token p50 free · paid', right: true },
-          { label: 'Engine speed p50 free · paid', right: true },
-        ]}
+        sorting={{ query, table: 'models' }}
+        head={MODELS_HEAD}
+        footer={
+          <Pager label="Models" view={tablePager(query, 'models', page)} />
+        }
       >
         {rows.length ? null : (
           <tr>
-            <td className={`${td} text-muted`} colSpan={10}>
+            <td className={`${td} text-muted`} colSpan={16}>
               No model offered now or served in the range.
             </td>
           </tr>
@@ -109,7 +140,6 @@ export async function ModelsSection({ query }: { query: ExplorerQuery }) {
           />
         ))}
       </Table>
-      <Pager label="Models" view={tablePager(query, 'models', page)} />
       {discovery.datedAt ? (
         <p className="mt-1 text-xs text-dim">
           Offers as of {utc(discovery.datedAt)}.
@@ -138,7 +168,6 @@ function ModelRowView({
   row: ModelRow;
   offersKnown: boolean;
 }) {
-  const shown = price(row.now);
   return (
     <tr className="border-t border-line">
       <td className={td}>
@@ -148,43 +177,40 @@ function ModelRowView({
           quantization={row.quantization}
         />
       </td>
-      <td className={numberCell}>
-        {row.now
-          ? pair(row.now.free, row.now.sellers - row.now.free, count)
-          : offersKnown
-            ? 'Not offered now'
-            : '—'}
-      </td>
-      <td className={shown.money ? moneyCell : numberCell}>{shown.text}</td>
+      {row.now ? (
+        <SideCells
+          free={row.now.free}
+          paid={row.now.sellers - row.now.free}
+          show={count}
+        />
+      ) : (
+        <td className={`${numberCell} text-center`} colSpan={2}>
+          {offersKnown ? 'Not offered now' : '—'}
+        </td>
+      )}
+      <PriceCells now={row.now} />
       <td className={numberCell}>{row.now ? count(row.now.context) : '—'}</td>
-      <td className={numberCell}>{completedText(row.free)}</td>
-      <td className={numberCell}>{completedText(row.paid)}</td>
-      <td className={numberCell}>
-        {pair(row.free?.cancelled, row.paid?.cancelled, (value) =>
-          value === undefined ? '—' : count(value),
-        )}
-      </td>
-      <td className={numberCell}>
-        {pair(
-          row.free?.firstToken ?? null,
-          row.paid?.firstToken ?? null,
-          latencyMs,
-        )}
-      </td>
-      <td className={numberCell}>
-        {pair(
-          row.free?.buyerFirstToken ?? null,
-          row.paid?.buyerFirstToken ?? null,
-          latencyMs,
-        )}
-      </td>
-      <td className={numberCell}>
-        {pair(
-          row.free?.engineSpeed ?? null,
-          row.paid?.engineSpeed ?? null,
-          tokensPerSecond,
-        )}
-      </td>
+      <SideCells free={row.free} paid={row.paid} show={completedText} />
+      <SideCells
+        free={row.free?.cancelled ?? null}
+        paid={row.paid?.cancelled ?? null}
+        show={orDash(count)}
+      />
+      <SideCells
+        free={row.free?.firstToken ?? null}
+        paid={row.paid?.firstToken ?? null}
+        show={latencyMs}
+      />
+      <SideCells
+        free={row.free?.buyerFirstToken ?? null}
+        paid={row.paid?.buyerFirstToken ?? null}
+        show={latencyMs}
+      />
+      <SideCells
+        free={row.free?.engineSpeed ?? null}
+        paid={row.paid?.engineSpeed ?? null}
+        show={tokensPerSecond}
+      />
     </tr>
   );
 }

@@ -1,16 +1,14 @@
+import { AutoSettingsError, withAutoPrices } from '@gyblos/buyer/auto-settings';
+import { BUYER_SELECTION } from '@gyblos/buyer/constants';
 import { ROLE_FILES, rolePathIn } from '@gyblos/config';
 import { checkBuyerInit } from '@gyblos/node/buyer-init';
 import { pricePerMtokToAtomicPerMtok } from '@gyblos/node/node-config-price';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
-import { isMain } from '@gyblos/runtime';
 import {
   acquireProcessLock,
   readPrivateFile,
   writePrivateFile,
 } from '@gyblos/runtime/private-file';
-
-import { AutoSettingsError, withAutoPrices } from './auto-settings';
-import { BUYER_SELECTION } from './constants';
 
 async function configure(args: string[]) {
   const disable = args.length === 1 && args[0] === 'off';
@@ -45,9 +43,9 @@ async function configure(args: string[]) {
     await lock.release();
   }
 }
-if (isMain(import.meta.url)) {
+export async function main(args: string[]) {
   try {
-    await configure(process.argv.slice(2));
+    await configure(args);
   } catch (error) {
     console.error(
       error instanceof AutoSettingsError

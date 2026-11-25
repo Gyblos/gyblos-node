@@ -171,6 +171,8 @@ export const FIRST_SEEN_KINDS = {
   BUYER_PAID: 'buyer-paid',
   MODEL: 'model',
 } as const;
+export type FirstSeenKind =
+  (typeof FIRST_SEEN_KINDS)[keyof typeof FIRST_SEEN_KINDS];
 // The single row of collector_agg_state.
 export const AGG_STATE_ID = 1;
 export const CHAIN_CURSOR_ID = 1;

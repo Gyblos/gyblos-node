@@ -3,25 +3,24 @@ import { stdin, stdout } from 'node:process';
 import { createInterface } from 'node:readline/promises';
 import type { Readable, Writable } from 'node:stream';
 
-import { prepareBuyerConversation } from '@gyblos/core/buyer-conversation';
-import { SESSION_VERDICTS } from '@gyblos/node/constants';
-import type { ChatMessage } from '@gyblos/protocol/chat';
-import { FREE_CHAT_ROLES } from '@gyblos/protocol/constants';
-import { isMain } from '@gyblos/runtime';
-
-import { startBuyer } from './buyer-main';
+import { startBuyer } from '@gyblos/buyer/buyer-main';
 import {
   chatTurn,
   type ChatTurnOptions,
   type ChatTurnResult,
-} from './chat-cli-turn';
-import type { ownedChat } from './chat-owned';
+} from '@gyblos/buyer/chat-cli-turn';
+import type { ownedChat } from '@gyblos/buyer/chat-owned';
 import {
   CHAT_COMMANDS,
   CHAT_INPUT_BYTES,
   CHAT_TURN_STATUSES,
   isFreeAtomic,
-} from './constants';
+} from '@gyblos/buyer/constants';
+import { prepareBuyerConversation } from '@gyblos/core/buyer-conversation';
+import { SESSION_VERDICTS } from '@gyblos/node/constants';
+import type { ChatMessage } from '@gyblos/protocol/chat';
+import { FREE_CHAT_ROLES } from '@gyblos/protocol/constants';
+
 import { startupMessage } from './free-main';
 
 export interface ChatSessionOptions {
@@ -280,4 +279,3 @@ export async function main(options?: {
     process.off('SIGINT', cancel);
   }
 }
-if (isMain(import.meta.url)) await main();

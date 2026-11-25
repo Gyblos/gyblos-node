@@ -17,7 +17,7 @@ import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import test from 'node:test';
 
-import * as legacy from '@gyblos/buyer/agent-cli';
+import * as legacy from '@gyblos/buyer-app/agent-cli';
 import {
   AGENT_TOOLS,
   agentFilePath,

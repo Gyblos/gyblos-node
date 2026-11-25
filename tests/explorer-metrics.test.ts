@@ -64,6 +64,7 @@ void test('free and paid figures are never added up', () => {
   const snapshot: CollectorSnapshot = {
     aggregatedAt: 1,
     models: [],
+    buyerTotals: null,
     error: null,
     days: [
       {

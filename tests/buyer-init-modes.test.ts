@@ -6,8 +6,8 @@ import { rm, stat } from 'node:fs/promises';
 import test from 'node:test';
 import { promisify } from 'node:util';
 
-import { chatSession } from '@gyblos/buyer/chat-cli';
-import { runBuyerInit } from '@gyblos/buyer/init';
+import { chatSession } from '@gyblos/buyer-app/chat-cli';
+import { runBuyerInit } from '@gyblos/buyer-app/init';
 import {
   buildBuyerInit,
   buyerInitDefaults,
@@ -196,9 +196,9 @@ for (const invalid of [false, true]) {
   void test(`executable ${invalid ? 'rejects unknown options' : 'explains --advanced offline'} before creating local state`, async () => {
     const fixture = await home();
     try {
-      const executable = new URL('../apps/buyer/src/init.ts', import.meta.url)
+      const executable = new URL('../apps/buyer/src/bin.ts', import.meta.url)
         .pathname;
-      const args = ['--import', import.meta.resolve('tsx'), executable];
+      const args = ['--import', import.meta.resolve('tsx'), executable, 'init'];
       const options = {
         cwd: fixture.directory,
         env: { ...process.env, ...fixture.environment },

@@ -5,6 +5,8 @@
 import { homedir } from 'node:os';
 import { parseArgs } from 'node:util';
 
+import { endpointRoutes } from '@gyblos/buyer/model-routes';
+import { loadBuyerSelectionConfig } from '@gyblos/buyer/selection-config';
 import { LOCALHOST, PORTS } from '@gyblos/config';
 import {
   AGENT_SETUP_CODES,
@@ -14,10 +16,6 @@ import {
   type AgentTool,
 } from '@gyblos/node/agent-setup';
 import { agentText, writeAgentFile } from '@gyblos/node/agent-setup-host';
-import { isMain } from '@gyblos/runtime';
-
-import { endpointRoutes } from './model-routes';
-import { loadBuyerSelectionConfig } from './selection-config';
 
 export { agentText, writeAgentFile } from '@gyblos/node/agent-setup-host';
 
@@ -116,5 +114,3 @@ function failure(error: unknown) {
     ? `Could not write ${path ?? 'the configuration'} (${code}).`
     : 'Could not prepare the configuration.';
 }
-
-if (isMain(import.meta.url)) await main();

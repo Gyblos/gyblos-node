@@ -4,7 +4,7 @@
 // without a border. Tables keep their line, which structures rows. Controls share one height: 44 px
 // touch targets on phones, 36 px from the small breakpoint up.
 export const SURFACE = {
-  card: 'rounded-2xl bg-panel',
+  card: 'rounded-xl bg-panel',
   // A tile or track inside a card: one tone lighter than the card.
   inset: 'bg-raised',
   control:

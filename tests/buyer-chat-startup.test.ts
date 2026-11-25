@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { Readable, Writable } from 'node:stream';
 import test from 'node:test';
 
-import { main } from '@gyblos/buyer/chat-cli';
+import { main } from '@gyblos/buyer-app/chat-cli';
 import { FREE_BUYER_STARTUP } from '@gyblos/buyer/constants';
 import { FreeBuyerStartupError } from '@gyblos/buyer/free-startup';
 import { RELAY_CONFIGURATION_CODES } from '@gyblos/transport-iroh/constants';
