@@ -37,6 +37,7 @@ import { mergedLatency } from '../../../lib/latency';
 import { modelLab } from '../../../lib/model-family';
 import { modelFromSlug, modelHref, modelKey } from '../../../lib/offers';
 import {
+  directoryHref,
   rangeOf,
   readQuery,
   tablePager,
@@ -312,6 +313,12 @@ export default async function ModelPage({
   return (
     <PageFrame title={model.modelId} crumb="Model">
       <ModelHeading model={model} />
+      <Link
+        className="mt-2 inline-block text-sm text-muted hover:text-ink hover:underline"
+        href={directoryHref(PAGES.models, query, 'models')}
+      >
+        All models →
+      </Link>
       {discovery.error ? (
         <Unavailable title="Current offers" />
       ) : (
@@ -340,12 +347,6 @@ export default async function ModelPage({
           </ul>
         </>
       )}
-      <Link
-        className="mt-5 inline-block text-sm text-muted hover:text-ink"
-        href={PAGES.models}
-      >
-        All models →
-      </Link>
     </PageFrame>
   );
 }

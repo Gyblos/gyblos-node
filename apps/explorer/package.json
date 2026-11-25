@@ -16,6 +16,7 @@
     "./discovery": "./lib/discovery.ts",
     "./discovery-shape": "./lib/discovery-shape.ts",
     "./discovery-snapshot": "./lib/discovery-snapshot.ts",
+    "./entity-search": "./lib/entity-search.ts",
     "./fetch-json": "./lib/fetch-json.ts",
     "./format": "./lib/format.ts",
     "./hash-target": "./lib/hash-target.ts",
@@ -41,6 +42,7 @@
     "start": "next start --port 4190"
   },
   "dependencies": {
+    "@gyblos/protocol": "workspace:*",
     "@number-flow/react": "0.6.2",
     "@remixicon/react": "4.9.0",
     "lucide-react": "1.68.0",

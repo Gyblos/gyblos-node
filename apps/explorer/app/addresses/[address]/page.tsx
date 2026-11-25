@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 
 import { TX_AMOUNT_HEAD, TxLine } from '../../../components/channel-txs';
 import { PageFrame } from '../../../components/page-frame';
-import { Pager } from '../../../components/pager';
+import { pagedRows, Pager } from '../../../components/pager';
 import { SellerCell } from '../../../components/seller-cell';
 import { SectionTitle, Table, td, Unavailable } from '../../../components/ui';
 import { getChainTxs } from '../../../lib/chain-txs';
@@ -10,8 +10,14 @@ import { txRow, type ChainTxPage } from '../../../lib/chain-txs-shape';
 import { addressHref, explorerAddressUrl } from '../../../lib/config';
 import { DISPLAY, PAGING } from '../../../lib/constants';
 import { getDiscovery } from '../../../lib/discovery-render';
+import { addressLookup } from '../../../lib/entity-search';
 import { short } from '../../../lib/format';
-import { readQuery, txPager, type ExplorerQuery } from '../../../lib/paging';
+import {
+  readQuery,
+  tablePager,
+  txPager,
+  type ExplorerQuery,
+} from '../../../lib/paging';
 import { githubByNode, namesByNode } from '../../../lib/seller-identity';
 
 export const dynamic = 'force-dynamic';
@@ -72,14 +78,17 @@ export default async function AddressPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { address } = await params;
-  if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address)) notFound();
+  if (!addressLookup(address)) notFound();
   const query = readQuery(await searchParams, addressHref(address));
   const [discovery, page] = await Promise.all([
     getDiscovery(),
     getChainTxs(query.before, address),
   ]);
-  const sellers = discovery.sellers.filter(
-    (seller) => seller.owner === address,
+  const sellers = pagedRows(
+    query,
+    'sellers',
+    discovery.sellers.filter((seller) => seller.owner === address),
+    !discovery.error,
   );
   const names = namesByNode(discovery.network);
   const accounts = githubByNode(discovery.network);
@@ -102,20 +111,31 @@ export default async function AddressPage({
       >
         View on Solana Explorer ↗
       </a>
-      {sellers.length > 0 && (
+      {sellers.total > 0 && (
         <>
-          <SectionTitle title="Listed sellers" />
-          <ul className="grid gap-3">
-            {sellers.map((seller) => (
-              <li key={seller.nodeId}>
-                <SellerCell
-                  nodeId={seller.nodeId}
-                  github={accounts.get(seller.nodeId) ?? null}
-                  name={names.get(seller.nodeId)}
-                />
-              </li>
+          <SectionTitle id={PAGING.anchors.sellers} title="Listed sellers" />
+          <Table
+            minWidth={DISPLAY.narrowTable}
+            head={[{ label: 'Seller' }]}
+            footer={
+              <Pager
+                label="Listed sellers"
+                view={tablePager(query, 'sellers', sellers)}
+              />
+            }
+          >
+            {sellers.rows.map((seller) => (
+              <tr key={seller.nodeId} className="border-t border-line">
+                <td className={td}>
+                  <SellerCell
+                    nodeId={seller.nodeId}
+                    github={accounts.get(seller.nodeId) ?? null}
+                    name={names.get(seller.nodeId)}
+                  />
+                </td>
+              </tr>
             ))}
-          </ul>
+          </Table>
         </>
       )}
       {discovery.error && (

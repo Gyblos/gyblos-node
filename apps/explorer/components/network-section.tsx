@@ -221,6 +221,7 @@ const sellerOffers = (sellers: Seller[]) =>
 
 function OfferRow({
   days,
+  closed,
   seller,
   model,
   cell,
@@ -229,6 +230,7 @@ function OfferRow({
   model: Seller['models'][number];
   cell: ReactNode;
   days: ExplorerQuery['days'];
+  closed?: boolean;
 }) {
   return (
     <tr className="border-t border-line">
@@ -244,6 +246,7 @@ function OfferRow({
       <td className={td}>
         <ModelName
           days={days}
+          closed={closed}
           modelId={model.modelId}
           variant={model.variant}
           quantization={model.quantization}
@@ -309,6 +312,7 @@ function SellersTable({
         {page.rows.map(({ seller, model }) => (
           <OfferRow
             days={query.days}
+            closed={query.closed}
             key={`${seller.nodeId}:${model.modelId}:${model.variant}:${model.quantization}`}
             seller={seller}
             model={model}

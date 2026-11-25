@@ -94,7 +94,13 @@ function Seller({
     );
   return (
     <span className="text-muted" title={row.payTo ?? undefined}>
-      Unlisted seller {row.payTo && <Addr value={row.payTo} />}
+      {row.payTo ? (
+        <>
+          Recipient <Addr value={row.payTo} />
+        </>
+      ) : (
+        '—'
+      )}
     </span>
   );
 }

@@ -1,6 +1,6 @@
 import { txCursor } from './chain-txs-shape';
 import { CHAIN_TXS, IDENTITY, PAGES, PAGING, RANGE, STATS } from './constants';
-import { count } from './format';
+import { numberedPager, rowSpan } from './pager-view';
 import {
   hasRangeAlias,
   parseRange,
@@ -10,6 +10,8 @@ import {
   type RangeDays,
   type RangeSection,
 } from './range';
+
+export { numberedPager } from './pager-view';
 
 export type PagedTable = keyof typeof PAGING.params;
 export type TablePages = Partial<Record<PagedTable, number>>;
@@ -177,7 +179,9 @@ export function readQuery(source: SearchSource, path = '/'): ExplorerQuery {
       parseRange(readParam(source, RANGE.param)),
     ranges,
     ...(path === PAGES.stats ||
-    ((path.startsWith(`${PAGES.models}/`) ||
+    ((path === PAGES.models ||
+      path === PAGES.sellers ||
+      path.startsWith(`${PAGES.models}/`) ||
       path.startsWith(`${PAGES.sellers}/`)) &&
       readParam(source, RANGE.closedParam) === '1')
       ? { closed: true }
@@ -318,6 +322,17 @@ export function sortedRows<T>(
 export const rangeOf = (query: ExplorerQuery, section: RangeSection) =>
   query.ranges[section] ?? query.days;
 
+export function directoryHref(
+  path: typeof PAGES.models | typeof PAGES.sellers,
+  query: ExplorerQuery,
+  section: RangeSection,
+) {
+  return queryHref(
+    { ...readQuery({}, path), closed: query.closed },
+    { days: rangeOf(query, section) },
+  );
+}
+
 export function sectionRangeHref(
   search: string,
   section: RangeSection,
@@ -374,42 +389,14 @@ export function pageRedirect(
 const anchored = (href: string, table: PagedTable) =>
   `${href}#${PAGING.anchors[table]}`;
 
-const rowSpan = (first: number, last: number) =>
-  `Rows ${count(first)}–${count(last)}`;
-
-const PAGER_WINDOW = 2;
-const PAGER_EDGE = 5;
-
 export function tablePager(
   query: ExplorerQuery,
   table: PagedTable,
   page: Page<unknown>,
 ): PagerView {
-  const targets = new Set<number>();
-  for (let offset = 0; offset < PAGER_EDGE; offset++) {
-    targets.add(1 + offset);
-    targets.add(page.pages - offset);
-  }
-  for (let offset = -PAGER_WINDOW; offset <= PAGER_WINDOW; offset++)
-    targets.add(page.page + offset);
-  const hrefs: Record<number, string> = {};
-  for (const target of targets)
-    if (target >= 1 && target <= page.pages)
-      hrefs[target] = anchored(
-        queryHref(query, { pages: { [table]: target } }),
-        table,
-      );
-  return {
-    rows: page.total
-      ? `${rowSpan(page.first, page.last)} of ${count(page.total)}`
-      : '0 rows',
-    page: page.page,
-    pages: page.pages,
-    hrefs,
-    showPages: true,
-    previousLabel: 'Previous',
-    nextLabel: 'Next',
-  };
+  return numberedPager(page, (target) =>
+    anchored(queryHref(query, { pages: { [table]: target } }), table),
+  );
 }
 
 export function txPager(

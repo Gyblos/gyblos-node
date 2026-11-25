@@ -1,32 +1,37 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 
-import { Identicon } from '../../components/identicon';
-import { ModelLogo } from '../../components/model-logo';
 import { PageFrame } from '../../components/page-frame';
-import { SectionTitle } from '../../components/ui';
+import { Pager } from '../../components/pager';
+import { SellerCell } from '../../components/seller-cell';
+import { Addr, ModelName, SectionTitle, Table, td } from '../../components/ui';
 import { getChainTxs } from '../../lib/chain-txs';
 import { CHAIN_TX_LABELS, operationHref } from '../../lib/chain-txs-shape';
 import { getCollector } from '../../lib/collector';
-import { addressHref } from '../../lib/config';
-import { RANGE, SEARCH_TERM_LIMIT } from '../../lib/constants';
+import { DISPLAY, RANGE, SEARCH_TERM_LIMIT } from '../../lib/constants';
 import { getDiscovery } from '../../lib/discovery-render';
+import {
+  addressLookup,
+  searchPageHref,
+  sellerMatches,
+} from '../../lib/entity-search';
 import { short } from '../../lib/format';
 import { modelLab } from '../../lib/model-family';
 import { modelRows } from '../../lib/model-table';
-import { modelHref, summarizeOffers } from '../../lib/offers';
-import { sellerHref } from '../../lib/seller-identity';
-
-const rowClass =
-  'flex items-center gap-3 rounded-lg px-3 py-3 hover:bg-raised focus-visible:outline-signal';
+import { modelKey, summarizeOffers } from '../../lib/offers';
+import { numberedPager, pageOf, parsePage } from '../../lib/paging';
+import { namesByNode } from '../../lib/seller-identity';
 
 export default async function SearchPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string | string[] }>;
+  searchParams: Promise<{ q?: string | string[]; page?: string | string[] }>;
 }) {
-  const raw = (await searchParams).q;
+  const params = await searchParams;
   const term =
-    typeof raw === 'string' ? raw.trim().slice(0, SEARCH_TERM_LIMIT) : '';
+    typeof params.q === 'string'
+      ? params.q.trim().slice(0, SEARCH_TERM_LIMIT)
+      : '';
   if (!term)
     return (
       <PageFrame title="Search Explorer">
@@ -42,32 +47,53 @@ export default async function SearchPage({
     getCollector(RANGE.defaultDays),
     getChainTxs(null),
   ]);
-  const results = catalogResults(term, discovery, collector);
-  results.push(
-    ...chainResults(
-      term,
-      discovery.sellers.map((seller) => seller.owner),
-      chain,
-    ),
+  const page = pageOf(
+    [
+      ...catalogResults(term, discovery, collector),
+      ...chainResults(
+        term,
+        discovery.sellers.map((seller) => seller.owner),
+        chain,
+      ),
+    ],
+    parsePage(params.page),
   );
+  const partial = !!(
+    discovery.error ||
+    collector.error ||
+    chain.error ||
+    discovery.network?.truncated
+  );
+  if (!partial && page.requested !== page.page)
+    redirect(searchPageHref(term, page.page));
   return (
     <PageFrame title="Search Explorer" crumb="Search">
       <SectionTitle title="Search results" meta={term} />
-      <div className="rounded-xl border border-line bg-panel p-2 text-sm">
-        {results.length ? (
-          results
-        ) : (
-          <p className="p-3 text-muted">
-            No matches in the model catalog, seller directory or recent
-            operations.
-          </p>
+      <Table
+        minWidth={DISPLAY.narrowTable}
+        head={[{ label: 'Type' }, { label: 'Match' }]}
+        footer={
+          <Pager
+            label="Search results"
+            view={numberedPager(page, (target) => searchPageHref(term, target))}
+          />
+        }
+      >
+        {page.rows}
+        {page.total === 0 && (
+          <tr>
+            <td colSpan={2} className={td}>
+              No matches in the model catalog, seller directory or recent
+              operations.
+            </td>
+          </tr>
         )}
-      </div>
-      {discovery.error || collector.error || chain.error ? (
+      </Table>
+      {partial && (
         <p className="mt-2 text-xs text-dim">
-          Some sources are unavailable. Results may be incomplete.
+          Some sources are incomplete. Results may be missing.
         </p>
-      ) : null}
+      )}
     </PageFrame>
   );
 }
@@ -78,41 +104,45 @@ function chainResults(
   chain: Awaited<ReturnType<typeof getChainTxs>>,
 ) {
   const results = [];
-  const addresses = new Set(
-    [
-      ...owners,
-      ...chain.transactions.flatMap((tx) => [tx.channel, ...tx.recipients]),
-      chain.treasury,
-      chain.programId,
-    ].filter(Boolean),
-  );
+  const addresses = new Set([
+    ...owners,
+    ...chain.transactions.flatMap((tx) => [tx.channel, ...tx.recipients]),
+    chain.treasury,
+    chain.programId,
+  ]);
+  const exact = addressLookup(term);
+  if (exact) addresses.add(exact);
   for (const address of addresses)
     if (address.includes(term))
       results.push(
-        <Link
-          key={addressHref(address)}
-          href={addressHref(address)}
-          className={rowClass}
-        >
-          <span>
-            <small className="block text-dim">Address</small>
-            <span className="break-all font-mono">{address}</span>
-          </span>
-        </Link>,
+        <tr key={address} className="border-t border-line">
+          <td className={td}>
+            {address === chain.programId
+              ? 'Payments program'
+              : address === chain.treasury
+                ? 'Program treasury'
+                : 'Address'}
+          </td>
+          <td className={td}>
+            <Addr value={address} />
+          </td>
+        </tr>,
       );
   for (const tx of chain.transactions)
     if (tx.signature.includes(term))
       results.push(
-        <Link
-          key={operationHref(tx)}
-          href={operationHref(tx)}
-          className={rowClass}
-        >
-          <span>
-            <small className="block text-dim">{CHAIN_TX_LABELS[tx.kind]}</small>
-            <span className="break-all font-mono">{tx.signature}</span>
-          </span>
-        </Link>,
+        <tr key={operationHref(tx)} className="border-t border-line">
+          <td className={td}>{CHAIN_TX_LABELS[tx.kind]}</td>
+          <td className={td}>
+            <Link
+              href={operationHref(tx)}
+              title={tx.signature}
+              className="font-mono underline decoration-line underline-offset-2"
+            >
+              {short(tx.signature)} · instruction {tx.instructionIndex}
+            </Link>
+          </td>
+        </tr>,
       );
   return results;
 }
@@ -123,55 +153,45 @@ function catalogResults(
   collector: Awaited<ReturnType<typeof getCollector>>,
 ) {
   const lower = term.toLowerCase();
-  const matches = (...values: (string | null | undefined)[]) =>
-    values.some((value) => value?.toLowerCase().includes(lower));
-  const models = modelRows(
-    summarizeOffers(discovery).models,
-    collector.models,
-  ).filter((model) =>
-    matches(
-      model.modelId,
-      modelLab(model.modelId),
-      model.variant,
-      model.quantization,
-    ),
-  );
+  const models = modelRows(summarizeOffers(discovery).models, collector.models);
+  const results = models
+    .filter((model) =>
+      [
+        model.modelId,
+        modelLab(model.modelId),
+        model.variant,
+        model.quantization,
+      ].some((value) => value?.toLowerCase().includes(lower)),
+    )
+    .map((model) => (
+      <tr key={modelKey(model)} className="border-t border-line">
+        <td className={td}>Model</td>
+        <td className={td}>
+          <ModelName {...model} />
+        </td>
+      </tr>
+    ));
   const nodes = new Map(
     discovery.network?.nodes.map((node) => [node.nodeId, node]),
   );
-  const sellers = new Set([
-    ...nodes.keys(),
-    ...discovery.sellers.map((seller) => seller.nodeId),
-  ]);
-  const results = [];
-  for (const model of models) {
-    results.push(
-      <Link key={modelHref(model)} href={modelHref(model)} className={rowClass}>
-        <ModelLogo modelId={model.modelId} />
-        <span>
-          <small className="block text-dim">
-            {modelLab(model.modelId) ?? 'Unknown lab'}
-          </small>
-          <span className="font-mono">
-            {[model.modelId, model.variant, model.quantization]
-              .filter(Boolean)
-              .join(' · ')}
-          </span>
-        </span>
-      </Link>,
-    );
-  }
-  for (const id of sellers) {
-    const node = nodes.get(id);
-    if (matches(id, node?.name, node?.github?.account))
+  const owners = new Map(
+    discovery.sellers.map((seller) => [seller.nodeId, seller.owner]),
+  );
+  const names = namesByNode(discovery.network);
+  for (const nodeId of new Set([...nodes.keys(), ...owners.keys()])) {
+    const owner = owners.get(nodeId);
+    const github = nodes.get(nodeId)?.github ?? null;
+    const name = names.get(nodeId);
+    if (sellerMatches({ nodeId, name, owner, github }, term))
       results.push(
-        <Link key={id} href={sellerHref(id)} className={rowClass}>
-          <Identicon nodeId={id} />
-          <span>
-            <small className="block text-dim">Seller</small>
-            {node?.name ?? node?.github?.account ?? short(id)}
-          </span>
-        </Link>,
+        <tr key={nodeId} className="border-t border-line">
+          <td className={td}>Seller</td>
+          <td className={td}>
+            <SellerCell nodeId={nodeId} name={name} github={github}>
+              {owner && <Addr value={owner} />}
+            </SellerCell>
+          </td>
+        </tr>,
       );
   }
   return results;

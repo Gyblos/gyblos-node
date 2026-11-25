@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 
@@ -7,10 +8,10 @@ import { SellerActivity } from '../../../components/seller-activity';
 import { SellerProfileSection } from '../../../components/seller-profile';
 import { SellerTxs } from '../../../components/seller-txs';
 import { Loading } from '../../../components/ui';
-import { ALL_TIME, SELLER_STATUS } from '../../../lib/constants';
+import { ALL_TIME, PAGES, SELLER_STATUS } from '../../../lib/constants';
 import { getDiscovery } from '../../../lib/discovery-render';
 import { short } from '../../../lib/format';
-import { rangeOf, readQuery } from '../../../lib/paging';
+import { directoryHref, rangeOf, readQuery } from '../../../lib/paging';
 import { sellerHref } from '../../../lib/seller-identity';
 import { sellerNodeId } from '../../../lib/seller-page';
 import { sellerProfile, unknownSeller } from '../../../lib/seller-profile';
@@ -59,7 +60,17 @@ export default async function SellerPage({ params, searchParams }: Props) {
       crumb={`Seller ${short(nodeId)}`}
     >
       <Suspense fallback={<Loading />}>
-        <SellerProfileSection nodeId={nodeId} />
+        <SellerProfileSection
+          nodeId={nodeId}
+          directory={
+            <Link
+              className="hover:text-ink hover:underline"
+              href={directoryHref(PAGES.sellers, query, 'activity')}
+            >
+              All sellers →
+            </Link>
+          }
+        />
       </Suspense>
       <Suspense
         key={`activity-${rangeOf(query, 'activity')}`}

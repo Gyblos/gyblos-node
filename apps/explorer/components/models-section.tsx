@@ -94,7 +94,7 @@ export async function ModelsSection({ query }: { query: ExplorerQuery }) {
   const days = rangeOf(query, 'models');
   const [discovery, collector] = await Promise.all([
     getDiscovery(),
-    getCollector(days),
+    getCollector(days, 0, query.closed),
   ]);
   if (discovery.error && collector.error)
     return <Unavailable title="Models" anchors={[PAGING.anchors.models]} />;
@@ -136,6 +136,7 @@ export async function ModelsSection({ query }: { query: ExplorerQuery }) {
         {page.rows.map((row) => (
           <ModelRowView
             days={days}
+            closed={query.closed}
             key={`${row.modelId}:${row.variant}:${row.quantization}`}
             row={row}
             offersKnown={offersKnown}
@@ -165,10 +166,12 @@ export async function ModelsSection({ query }: { query: ExplorerQuery }) {
 // answer, what is offered now reads unknown, never "not offered".
 function ModelRowView({
   days,
+  closed,
   row,
   offersKnown,
 }: {
   days: ExplorerQuery['days'];
+  closed?: boolean;
   row: ModelRow;
   offersKnown: boolean;
 }) {
@@ -177,6 +180,7 @@ function ModelRowView({
       <td className={td}>
         <ModelName
           days={days}
+          closed={closed}
           modelId={row.modelId}
           variant={row.variant}
           quantization={row.quantization}

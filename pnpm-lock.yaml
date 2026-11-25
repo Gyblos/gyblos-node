@@ -341,6 +341,9 @@ importers:
 
   apps/explorer:
     dependencies:
+      '@gyblos/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
       '@number-flow/react':
         specifier: 0.6.2
         version: 0.6.2(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
