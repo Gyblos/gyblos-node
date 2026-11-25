@@ -4,8 +4,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
+import { IPV6_LOOPBACK, LOCALHOST, ROUTES } from '@gyblos/config';
 import { CHALLENGE_SET } from '@gyblos/model-verifier/challenge-set';
-import { MODEL_VERIFIER } from '@gyblos/model-verifier/constants';
+import {
+  MODEL_VERIFIER,
+  MODEL_VERIFIER_CODES,
+  MODEL_VERIFIER_PHASES,
+} from '@gyblos/model-verifier/constants';
 import { main } from '@gyblos/model-verifier/main';
 import { referenceTag } from '@gyblos/model-verifier/reference';
 import { createSellerControlService } from '@gyblos/node/control';
@@ -25,7 +30,10 @@ import {
   freeExecutionDigest,
   parseFreeExecutionRequest,
 } from '@gyblos/protocol/free-execution';
-import { verifyModelVerification } from '@gyblos/protocol/model-verification';
+import {
+  MODEL_VERIFICATION_VERDICTS,
+  verifyModelVerification,
+} from '@gyblos/protocol/model-verification';
 import { signPublicV2 } from '@gyblos/protocol/public-v2';
 
 import { controlFixture } from './support/control-fixture';
@@ -143,7 +151,11 @@ void test(
     t.mock.method(
       EndpointBuilder.prototype,
       'applyN0',
-      EndpointBuilder.prototype.applyMinimal,
+      function (this: InstanceType<typeof EndpointBuilder>) {
+        this.applyMinimal();
+        this.bindAddr(`${LOCALHOST}:0`);
+        this.bindAddr(`${IPV6_LOOPBACK}:0`);
+      },
     );
     const home = await mkdtemp(join(tmpdir(), 'gyblos-verifier-evidence-'));
     t.after(() => rm(home, { recursive: true, force: true }));
@@ -155,20 +167,17 @@ void test(
       GYBLOS_RELAYS: 'https://127.0.0.1:1/',
       GYBLOS_RELAY_TOKEN: '',
     });
-    t.mock.method(globalThis, 'fetch', async (url: URL) =>
-      url.pathname === '/api/tags'
-        ? Response.json({
-            models: [
-              {
-                name: referenceTag(modelId),
-                digest: 'ab'.repeat(32),
-              },
-            ],
-          })
-        : Response.json({
-            logprobs: [{ top_logprobs: [{ token: ' w', logprob: -0.1 }] }],
-          }),
-    );
+    t.mock.method(globalThis, 'fetch', async (url: URL) => {
+      if (url.pathname === ROUTES.ollamaTags)
+        return Response.json({
+          models: [{ name: referenceTag(modelId), digest: 'ab'.repeat(32) }],
+        });
+      if (url.pathname === ROUTES.ollamaGenerate)
+        return Response.json({
+          logprobs: [{ top_logprobs: [{ token: ' w', logprob: -0.1 }] }],
+        });
+      assert.fail('Unexpected Ollama route.');
+    });
     const sellerFile = join(home, 'seller.json');
     const out = join(home, 'result');
     await writeFile(sellerFile, JSON.stringify(target));
@@ -192,12 +201,20 @@ void test(
     assert.ok('answers' in artifact && Array.isArray(artifact.answers));
     assert.ok('unscored' in artifact && Array.isArray(artifact.unscored));
     assert.deepEqual(artifact.unscored.slice(0, 2), [
-      { challenge: 1, phase: 'quote', code: CONTROL_CODES.BUSY },
-      { challenge: 2, phase: 'execution', code: FREE_EXECUTION_CODES.BUSY },
+      {
+        challenge: 1,
+        phase: MODEL_VERIFIER_PHASES.QUOTE,
+        code: CONTROL_CODES.BUSY,
+      },
+      {
+        challenge: 2,
+        phase: MODEL_VERIFIER_PHASES.EXECUTION,
+        code: FREE_EXECUTION_CODES.BUSY,
+      },
     ]);
     assert.equal(artifact.unscored.length, 3);
-    assert.equal(artifact.unscored[2]?.phase, 'scoring');
-    assert.equal(artifact.unscored[2]?.code, 'EMPTY_ANSWER');
+    assert.equal(artifact.unscored[2]?.phase, MODEL_VERIFIER_PHASES.SCORING);
+    assert.equal(artifact.unscored[2]?.code, MODEL_VERIFIER_CODES.EMPTY_ANSWER);
     assert.deepEqual(
       [...artifact.unscored, ...artifact.answers].map(
         (entry) => entry.challenge,
@@ -208,7 +225,7 @@ void test(
       await readFile(join(out, MODEL_VERIFIER.resultFile), 'utf8'),
     );
     const { result } = await verifyModelVerification(signed);
-    assert.equal(result.verdict, 'inconclusive');
+    assert.equal(result.verdict, MODEL_VERIFICATION_VERDICTS.INCONCLUSIVE);
     assert.equal(result.evidence.answers, CHALLENGE_SET.prompts.length - 3);
   },
 );

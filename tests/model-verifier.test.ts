@@ -7,6 +7,7 @@ import test from 'node:test';
 import { CHALLENGE_SET } from '@gyblos/model-verifier/challenge-set';
 import {
   MODEL_VERIFIER_CODES,
+  MODEL_VERIFIER_PHASES,
   ModelVerifierError,
 } from '@gyblos/model-verifier/constants';
 import { loadVerifierKey } from '@gyblos/model-verifier/key';
@@ -146,10 +147,11 @@ void test('a seller that answers too little is inconclusive and failures keep on
       });
     });
     assert.equal(silent.signed.result.evidence.checks, 0);
-    assert.deepEqual(
-      new Set(silent.failures),
-      new Set([MODEL_VERIFIER_CODES.UNKNOWN]),
-    );
+    assert.deepEqual(silent.unscored[0], {
+      challenge: 1,
+      phase: MODEL_VERIFIER_PHASES.EXECUTION,
+      code: MODEL_VERIFIER_CODES.UNKNOWN,
+    });
   });
 });
 
