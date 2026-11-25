@@ -233,8 +233,13 @@ honest rate and false positive bound, `failAt`, the nonce and one SHA-256 digest
 per answer) and the verdict, signed with the verifier's Ed25519 key. The parser
 recomputes `failAt` and the verdict from the evidence and refuses any result
 that does not match; a consumer still compares the signed rule with the
-challenge set's. The evidence file next to it keeps the prompts, answers and
-every check, and each reply that could not be scored with its reason.
+challenge set's. For a completed run, `evidence.json` has one outcome per
+prompt, with a one-based `challenge` number in either `answers` or `unscored`.
+Unscored entries include a normalized `code` and `phase`: `quote` for an offer
+request that failed, `execution` for a seller request that failed after quoting,
+or `scoring` for a reply that could not be scored. An unrecognized error code is
+recorded as `UNKNOWN`. Of the unscored entries, only scoring entries retain
+reply text; quote and execution failures never include exception details.
 
 ## Limits
 

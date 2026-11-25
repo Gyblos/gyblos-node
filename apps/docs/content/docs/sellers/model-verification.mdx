@@ -32,6 +32,10 @@ differences between a GPU and a CPU, while a smaller model sold as a larger one 
 A result covers one seller, one model and one version of the prompt set. It is evidence from one verifier, not
 a penalty: today it changes nothing in discovery, routing or payments.
 
+In `evidence.json`, each prompt has a numbered outcome. Unscored outcomes
+distinguish a failed quote, a failed execution or a reply that could not be
+scored. Quote and execution failures record a code, not raw error details.
+
 Only free offers of Qwen3 catalog models with a public Ollama tag are verified for now. Quantization is not
 checked.
 

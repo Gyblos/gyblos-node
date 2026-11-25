@@ -34,6 +34,11 @@ muestreo y las diferencias entre GPU y CPU, mientras que un modelo más chico ve
 Un resultado cubre un vendedor, un modelo y una versión del conjunto de preguntas. Es evidencia de un
 verificador, no una sanción: hoy no cambia nada en el descubrimiento, la selección de vendedores ni los pagos.
 
+En `evidence.json`, cada pregunta tiene un resultado numerado. Los resultados sin
+puntuación distinguen entre un fallo de cotización, un fallo de ejecución y una
+respuesta que no se pudo puntuar. Los fallos de cotización y ejecución registran
+un código, no los detalles originales del error.
+
 Por ahora solo se verifican ofertas gratis de modelos Qwen3 del catálogo que tienen una etiqueta pública en
 Ollama. La cuantización no se comprueba.
 

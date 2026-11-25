@@ -141,7 +141,9 @@ void test('a seller that answers too little is inconclusive and failures keep on
       new Set([FREE_EXECUTION_CODES.BUSY]),
     );
     const silent = await verifyWith(home, async () => {
-      throw new Error('no code');
+      throw Object.assign(new Error('secret seller text'), {
+        code: 'SECRET_CANARY',
+      });
     });
     assert.equal(silent.signed.result.evidence.checks, 0);
     assert.deepEqual(
@@ -195,7 +197,9 @@ void test('a blank answer or one with nothing to check counts as unanswered', as
     const { evidence, verdict } = outcome.signed.result;
     assert.equal(evidence.answers, CHALLENGE_SET.prompts.length - 3);
     assert.deepEqual(
-      outcome.unscored.map(({ text, code }) => ({ text, code })),
+      outcome.unscored
+        .filter((entry) => 'text' in entry)
+        .map(({ text, code }) => ({ text, code })),
       [
         { text: '', code: MODEL_VERIFIER_CODES.EMPTY_ANSWER },
         { text: '  \n\t ', code: MODEL_VERIFIER_CODES.EMPTY_ANSWER },
