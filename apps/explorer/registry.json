@@ -115,7 +115,7 @@
       "name": "animated-number",
       "type": "registry:component",
       "title": "Animated number",
-      "description": "A count, percent or exact USDC amount that rolls to its new value (NumberFlow), and a free \u00b7 paid pair.",
+      "description": "A count, percent or exact USDC amount that rolls to its new value (NumberFlow), and a free · paid pair.",
       "dependencies": ["@number-flow/react@0.6.2"],
       "registryDependencies": ["board-base"],
       "files": [
@@ -175,8 +175,12 @@
       "type": "registry:component",
       "title": "Bar chart card",
       "description": "A daily bar chart with an animated total, its change and a hover readout of each day.",
-      "dependencies": ["recharts@3.10.1"],
-      "registryDependencies": ["board-base", "animated-number", "delta-chip"],
+      "registryDependencies": [
+        "board-base",
+        "animated-number",
+        "delta-chip",
+        "chip"
+      ],
       "files": [
         {
           "path": "components/board/bar-chart-card.tsx",
@@ -192,6 +196,11 @@
           "path": "components/board/hovered.ts",
           "type": "registry:lib",
           "target": "components/board/hovered.ts"
+        },
+        {
+          "path": "components/board/day-bars.tsx",
+          "type": "registry:component",
+          "target": "components/board/day-bars.tsx"
         }
       ]
     },

@@ -19,7 +19,7 @@ export const getSellerStats = cache(
   async (
     nodeId: string,
     days: RangeDays,
-    closed = false,
+    closed = true,
   ): Promise<SellerStats> => {
     try {
       const body = await readStats(

@@ -1,4 +1,4 @@
-// Owns the date range the page shows: a preset number of UTC days ending today, read from the `range`
+// Owns the date range the page shows: a preset number of closed UTC days, read from the `range`
 // search parameter, and the collector query it maps to. Pure, no I/O.
 import { ALL_TIME, RANGE, UNITS } from './constants';
 
@@ -14,7 +14,7 @@ export const displayRange = (days: RangeDays) =>
 export const rangeValue = (days: RangeDays) =>
   days === 1 ? RANGE.dayParam : String(days);
 
-export const rangeEnd = (days: RangeDays, now: number, closed = false) =>
+export const rangeEnd = (days: RangeDays, now: number, closed = true) =>
   now - (days === 1 || closed ? UNITS.msPerDay : 0);
 
 export const previousRange = (days: RangeDays) =>

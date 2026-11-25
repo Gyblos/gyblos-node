@@ -246,3 +246,13 @@ void test('Network drill-down carries the chart period, metric and matching Stat
   assert.equal(readQuery({}, '/stats').closed, true);
   assert.equal(readQuery({ chainDailyPage: '2' }, '/stats').tab, 'payments');
 });
+
+void test('all Explorer collection windows default to the last closed UTC day', async () => {
+  const { rangeEnd } = await import('@gyblos/explorer/range');
+  const now = Date.parse('2026-11-24T00:01:00Z');
+  for (const days of [7, 30, 'all'] as const)
+    assert.equal(
+      new Date(rangeEnd(days, now)).toISOString().slice(0, 10),
+      '2026-11-23',
+    );
+});

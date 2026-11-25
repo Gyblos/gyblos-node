@@ -12,7 +12,7 @@ export type { ChainSnapshot } from './chain-shape';
 export async function getChainStats(
   days: RangeDays,
   periodsBack = 0,
-  closed = false,
+  closed = true,
   now = Date.now(),
 ): Promise<ChainSnapshot> {
   try {

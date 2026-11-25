@@ -3,16 +3,16 @@
 import { ArrowUpRight, Coins, Hash, MessagesSquare } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useState, type KeyboardEvent } from 'react';
+import { useState } from 'react';
 
-import { STATS, UNITS } from '../lib/constants';
+import { STATS } from '../lib/constants';
 import { compact, type TokenPoint } from '../lib/overview-activity';
 import { readQuery } from '../lib/paging';
 import type { RangeDays } from '../lib/range';
-import { Flow, type FlowKind, type FlowValue } from './board/animated-number';
+import { Flow, type FlowValue } from './board/animated-number';
 import { Chip } from './board/chip';
-import { CHART } from './board/constants';
 import { cx } from './board/cx';
+import { DayBars, dayLabel } from './board/day-bars';
 import type { Delta } from './board/delta';
 import { DeltaChip } from './board/delta-chip';
 import { StatCard } from './board/stat-card';
@@ -24,7 +24,6 @@ const METRICS = {
   requests: { label: 'Recorded requests', kind: 'count', icon: MessagesSquare },
   paidOut: { label: 'Paid to sellers', kind: 'usdc', icon: Coins },
 } as const;
-const DAY_WIDTH = 19;
 type Metric = keyof typeof METRICS;
 const keys = Object.keys(METRICS) as Metric[];
 type MetricData = {
@@ -36,26 +35,6 @@ type MetricData = {
 };
 type Metrics = Record<Metric, MetricData>;
 type Point = TokenPoint & { paidOut: FlowValue };
-
-function moveDay(event: KeyboardEvent<HTMLButtonElement>) {
-  const next =
-    event.key === 'ArrowRight'
-      ? event.currentTarget.nextElementSibling
-      : event.key === 'ArrowLeft'
-        ? event.currentTarget.previousElementSibling
-        : null;
-  if (next instanceof HTMLButtonElement) {
-    event.preventDefault();
-    next.focus();
-  }
-}
-
-function dayLabel(value: FlowValue, kind: FlowKind) {
-  if (value === null) return 'No observation';
-  return kind === 'usdc'
-    ? `${value} USDC`
-    : Number(value).toLocaleString('en-US');
-}
 
 interface OverviewChartProps {
   points: Point[];
@@ -123,7 +102,7 @@ export function OverviewChart({
           <span className="font-mono text-2xl tabular-nums">
             <Flow kind={kind} value={value} />
           </span>
-          <ComparisonChip metric={metric} />
+          {!point && <ComparisonChip metric={metric} />}
           <span className="text-xs text-muted">
             {point
               ? `${point.day} UTC${value === null ? ' · No observation' : ''}`
@@ -133,8 +112,13 @@ export function OverviewChart({
           </span>
         </div>
         <DayBars
-          points={points}
-          selected={selected}
+          points={points.map((row) => ({
+            day: row.day,
+            value: row[selected] === null ? null : Number(row[selected]),
+            amount: row[selected],
+          }))}
+          label={label}
+          kind={kind}
           maximum={maximum}
           active={active}
           setActive={setActive}
@@ -194,67 +178,6 @@ function MetricSelector({
           />
         );
       })}
-    </div>
-  );
-}
-
-function DayBars({
-  points,
-  selected,
-  maximum,
-  active,
-  setActive,
-}: {
-  points: Point[];
-  selected: Metric;
-  maximum: number;
-  active: number | null;
-  setActive: (index: number | null) => void;
-}) {
-  const { label, kind } = METRICS[selected];
-  return (
-    <div className="mt-4 overflow-x-auto" onMouseLeave={() => setActive(null)}>
-      <div
-        style={{ minWidth: points.length * DAY_WIDTH }}
-        className="flex gap-px"
-      >
-        {points.map((row, index) => {
-          const amount = row[selected];
-          const percentage =
-            maximum > 0 ? (Number(amount) / maximum) * UNITS.percent : 0;
-          return (
-            <button
-              type="button"
-              key={row.day}
-              className={cx(
-                'flex min-w-0 flex-1 cursor-crosshair flex-col items-center rounded-sm focus-visible:outline-signal',
-                index === active && 'bg-raised',
-              )}
-              aria-label={`${row.day} UTC, ${label}, ${dayLabel(amount, kind)}`}
-              tabIndex={index === (active ?? 0) ? 0 : -1}
-              onKeyDown={moveDay}
-              onMouseEnter={() => setActive(index)}
-              onFocus={() => setActive(index)}
-              onBlur={() => setActive(null)}
-              onClick={() => setActive(index)}
-            >
-              <span className="flex h-32 w-full items-end justify-center">
-                {amount === null ? (
-                  <span className="mb-px h-0 w-1/2 border-t border-dashed border-dim" />
-                ) : (
-                  <span
-                    className="w-3/4 rounded-t-sm bg-chart"
-                    style={{ height: `${percentage}%`, minHeight: 2 }}
-                  />
-                )}
-              </span>
-              <span className="mt-2 font-mono text-[10px] whitespace-nowrap text-dim [writing-mode:vertical-rl]">
-                {row.day.slice(CHART.monthDayStart)}
-              </span>
-            </button>
-          );
-        })}
-      </div>
     </div>
   );
 }

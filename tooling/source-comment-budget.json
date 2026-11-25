@@ -428,7 +428,7 @@
   "apps/explorer/app/robots.ts": 2,
   "apps/explorer/components/board/animated-number.tsx": 1,
   "apps/explorer/components/board/bar-axis.ts": 2,
-  "apps/explorer/components/board/bar-chart-card.tsx": 8,
+  "apps/explorer/components/board/bar-chart-card.tsx": 2,
   "apps/explorer/components/board/constants.ts": 8,
   "apps/explorer/components/board/delta.ts": 3,
   "apps/explorer/components/board/hovered.ts": 3,

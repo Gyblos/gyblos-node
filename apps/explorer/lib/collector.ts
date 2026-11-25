@@ -25,11 +25,8 @@ export type {
 // The last `days` UTC days of network totals and models, as aggregated by the collector, or the
 // span just before them with `periodsBack` 1. Read once per render and span: the Models and Usage
 // sections share the answer.
-export const getCollector = (
-  days: RangeDays,
-  periodsBack = 0,
-  closed = false,
-) => readCollector(days, periodsBack, closed);
+export const getCollector = (days: RangeDays, periodsBack = 0, closed = true) =>
+  readCollector(days, periodsBack, closed);
 // Memoized on both arguments always passed, so a default and an explicit 0 share one read.
 const readCollector = cache(
   async (
