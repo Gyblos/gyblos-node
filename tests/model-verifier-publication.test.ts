@@ -47,6 +47,7 @@ async function withVerifier(
   run: (
     parent: string,
     verify: (out: string) => Promise<number>,
+    lastError: () => unknown[] | undefined,
   ) => Promise<void>,
 ) {
   const home = await mkdtemp(join(tmpdir(), 'gyblos-verifier-publication-'));
@@ -60,7 +61,7 @@ async function withVerifier(
     ),
   );
   t.mock.method(console, 'log', () => {});
-  t.mock.method(console, 'error', () => {});
+  const stderr = t.mock.method(console, 'error', () => {});
   try {
     const input = join(home, 'seller.json');
     await writeFile(
@@ -72,16 +73,19 @@ async function withVerifier(
         directAddresses: ['127.0.0.1:4433'],
       }),
     );
-    await run(join(home, 'results'), (out) =>
-      main([
-        'verify',
-        '--seller',
-        input,
-        '--model',
-        'qwen3-1.7b',
-        '--out',
-        out,
-      ]),
+    await run(
+      join(home, 'results'),
+      (out) =>
+        main([
+          'verify',
+          '--seller',
+          input,
+          '--model',
+          'qwen3-1.7b',
+          '--out',
+          out,
+        ]),
+      () => stderr.mock.calls.at(-1)?.arguments,
     );
   } finally {
     if (previousHome === undefined) delete process.env.GYBLOS_HOME;
@@ -93,7 +97,7 @@ async function withVerifier(
 test.after(() => hooks.deregister());
 
 void test('verify does not add a result to an existing output directory', async (t) => {
-  await withVerifier(t, async (parent, verify) => {
+  await withVerifier(t, async (parent, verify, lastError) => {
     const stale = join(parent, 'stale');
     const empty = join(parent, 'empty');
     await mkdir(stale, { recursive: true });
@@ -102,9 +106,11 @@ void test('verify does not add a result to an existing output directory', async 
     await writeFile(evidence, 'old evidence');
 
     assert.equal(await verify(stale), 1);
+    assert.deepEqual(lastError(), ['{"ok":false,"code":"OUTPUT_EXISTS"}']);
     assert.deepEqual(await readdir(stale), [MODEL_VERIFIER.evidenceFile]);
     assert.equal(await readFile(evidence, 'utf8'), 'old evidence');
     assert.equal(await verify(empty), 1);
+    assert.deepEqual(lastError(), ['{"ok":false,"code":"OUTPUT_EXISTS"}']);
     assert.deepEqual(await readdir(empty), []);
     assert.deepEqual((await readdir(parent)).sort(), ['empty', 'stale']);
   });

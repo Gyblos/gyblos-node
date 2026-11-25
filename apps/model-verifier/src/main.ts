@@ -30,7 +30,7 @@ import {
 } from './constants';
 import { loadVerifierKey } from './key';
 import { catalogModelId, openReference } from './reference';
-import { runVerification } from './verify';
+import { runVerification, type VerificationOutput } from './verify';
 
 const OPTIONS = {
   seller: { type: 'string' },
@@ -71,12 +71,12 @@ function summary(signed: SignedModelVerification) {
 
 async function publishOutput(
   out: string,
-  { signed, answers, unscored }: Awaited<ReturnType<typeof runVerification>>,
+  { signed, answers, unscored }: VerificationOutput,
 ) {
   const destination = resolve(out);
   const parent = dirname(destination);
   await mkdir(parent, { recursive: true, mode: MODEL_VERIFIER.directoryMode });
-  const staging = await mkdtemp(join(parent, '.verification-'));
+  const staging = await mkdtemp(join(parent, MODEL_VERIFIER.stagingPrefix));
   let published = false;
   await withDiagnosticCleanup(
     async () => {
@@ -98,7 +98,8 @@ async function publishOutput(
           return false;
         },
       );
-      if (exists) throw new ModelVerifierError(MODEL_VERIFIER_CODES.INTERNAL);
+      if (exists)
+        throw new ModelVerifierError(MODEL_VERIFIER_CODES.OUTPUT_EXISTS);
       await rename(staging, destination);
       published = true;
     },
