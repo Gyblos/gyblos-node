@@ -4,11 +4,12 @@ import {
   mkdir,
   mkdtemp,
   readFile,
+  realpath,
   rename,
   rm,
   writeFile,
 } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { modelVerifierLayout } from '@gyblos/config/model-verifier-home';
@@ -73,9 +74,13 @@ async function publishOutput(
   out: string,
   { signed, answers, unscored }: VerificationOutput,
 ) {
-  const destination = resolve(out);
-  const parent = dirname(destination);
-  await mkdir(parent, { recursive: true, mode: MODEL_VERIFIER.directoryMode });
+  const parentPath = dirname(out);
+  await mkdir(parentPath, {
+    recursive: true,
+    mode: MODEL_VERIFIER.directoryMode,
+  });
+  const parent = await realpath(parentPath);
+  const destination = join(parent, basename(out));
   const staging = await mkdtemp(join(parent, MODEL_VERIFIER.stagingPrefix));
   let published = false;
   await withDiagnosticCleanup(

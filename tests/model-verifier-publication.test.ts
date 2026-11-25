@@ -5,11 +5,12 @@ import fs, {
   readdir,
   readFile,
   rm,
+  symlink,
   writeFile,
 } from 'node:fs/promises';
 import { registerHooks, syncBuiltinESMExports } from 'node:module';
 import { tmpdir } from 'node:os';
-import { basename, join } from 'node:path';
+import { basename, join, sep } from 'node:path';
 import test, { type TestContext } from 'node:test';
 
 import { CHALLENGE_SET } from '@gyblos/model-verifier/challenge-set';
@@ -173,3 +174,28 @@ void test('verify publishes both artifacts from the same run', async (t) => {
     });
   });
 });
+
+void test(
+  'verify follows a symlink before traversing the parent in --out',
+  { skip: process.platform === 'win32' },
+  async (t) => {
+    await withVerifier(t, async (parent, verify) => {
+      const physical = join(parent, 'physical');
+      const target = join(physical, 'target');
+      const link = join(parent, 'link');
+      await mkdir(target, { recursive: true });
+      await symlink(target, link, 'dir');
+      const out = `${link}${sep}..${sep}run`;
+      assert.equal(await verify(out), 0);
+      assert.deepEqual(
+        await readdir(physical).then((entries) => entries.sort()),
+        ['run', 'target'],
+      );
+      assert.deepEqual((await readdir(out)).sort(), [
+        MODEL_VERIFIER.evidenceFile,
+        MODEL_VERIFIER.resultFile,
+      ]);
+      assert.deepEqual((await readdir(parent)).sort(), ['link', 'physical']);
+    });
+  },
+);
