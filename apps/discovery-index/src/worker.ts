@@ -17,7 +17,9 @@ import {
   DISCOVERY_PUBLISH_ALLOWLIST_BINDING,
   DISCOVERY_SOLANA_RPC_BINDING,
   GITHUB_RECHECK_FAILED,
+  HEARTBEAT_FAILED,
 } from './constants';
+import { createD1Orm } from './d1-client';
 import { createD1GithubClaimStore } from './github-claim-store-d1';
 import { recheckGithubClaims } from './github-claims';
 import type { DiscoveryLimiters, RateLimiter } from './limits';
@@ -26,6 +28,7 @@ import { parsePublishAllowlist } from './publishers';
 import { createD1RegistrationStore } from './registration-store-d1';
 import type { RegistryReader } from './registrations';
 import { createD1Storage, type D1Database } from './storage-d1';
+import { createD1Uptime } from './uptime-d1';
 
 function binding(bindings: unknown, name: string): unknown {
   return bindings && typeof bindings === 'object'
@@ -171,6 +174,16 @@ export async function scheduledRecheck(
   }
 }
 
+export async function scheduledHeartbeat(bindings: unknown, now: number) {
+  const database = binding(bindings, DISCOVERY_DB_BINDING);
+  if (!isDatabase(database)) return;
+  try {
+    await createD1Uptime(createD1Orm(database)).markAlive(now);
+  } catch {
+    console.warn(HEARTBEAT_FAILED);
+  }
+}
+
 // The default worker creates its app cache on the first request, not on import.
 let worker: ReturnType<typeof createWorker> | undefined;
 export default {
@@ -184,5 +197,6 @@ export default {
     context: ExecutionContext,
   ) {
     context.waitUntil(scheduledRecheck(bindings, controller.scheduledTime));
+    context.waitUntil(scheduledHeartbeat(bindings, controller.scheduledTime));
   },
 };

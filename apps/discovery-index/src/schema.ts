@@ -263,6 +263,20 @@ export const uptimeSlots = sqliteTable(
   ],
 );
 
+export const indexHeartbeat = sqliteTable(
+  'discovery_index_heartbeat',
+  {
+    hour: integer('hour').primaryKey(),
+    slots: integer('slots').notNull(),
+  },
+  (table) => [
+    literalCheck(
+      'discovery_index_heartbeat_slots',
+      between(table.slots, 1, 2 ** UPTIME.slotsPerHour - 1),
+    ),
+  ],
+);
+
 export const githubClaims = sqliteTable(
   'discovery_github_claims',
   {

@@ -30,6 +30,11 @@ import { allowed } from './limits';
 import { modelsPage, parseModelsQuery } from './models';
 import { networkPage, parseNetworkQuery } from './network';
 import {
+  networkHistoryKey,
+  networkHistoryPage,
+  parseNetworkHistoryQuery,
+} from './network-history';
+import {
   offerHistoryKey,
   offerHistoryPage,
   parseOfferHistoryQuery,
@@ -261,6 +266,17 @@ function readRoutes(app: Hono<IndexEnv>, settings: IndexSettings) {
 }
 
 function historyRoutes(app: Hono<IndexEnv>, settings: IndexSettings) {
+  app.get(
+    INDEX_ROUTES.NETWORK_HISTORY,
+    cachedRead(settings, async (context) => {
+      const days = parseNetworkHistoryQuery(context.req.url);
+      return {
+        key: networkHistoryKey(new URL(context.req.url).origin, days),
+        body: () =>
+          networkHistoryPage(context.get('storage'), days, settings.now()),
+      };
+    }),
+  );
   app.get(
     INDEX_ROUTES.OFFER_HISTORY,
     cachedRead(settings, async (context) => {

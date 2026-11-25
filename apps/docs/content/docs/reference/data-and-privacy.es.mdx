@@ -186,6 +186,9 @@ por última vez y terminó (reemplazado, retirado o vencido). Cualquiera puede l
 modelo, hasta los últimos 92 días por consulta. Se conserva aunque dejes de publicar, unos diez años
 después de que termina cada catálogo, para que los precios pasados sigan siendo rastreables.
 
+El índice también publica cuántos vendedores estuvieron online cada día (`/v1/network/history`): el
+promedio y el máximo por día UTC, sin NodeIds, calculados con el mismo uptime que el índice ya guarda.
+
 Los compradores y la app de escritorio leen el índice para encontrar vendedores. `gyblos seller status
 --online` además le pide el uptime del propio vendedor por su NodeId, que el vendedor ya publica ahí. El
 índice usa las direcciones IP para limitar la tasa de solicitudes y no guarda ninguna.

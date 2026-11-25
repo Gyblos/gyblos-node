@@ -60,6 +60,7 @@ export const INDEX_ROUTES = {
   UPTIME: '/v1/uptime',
   VERSIONS: '/v1/versions',
   NETWORK: '/v1/network',
+  NETWORK_HISTORY: '/v1/network/history',
   OFFER_HISTORY: '/v1/offers/history',
   // POST a signed GitHub claim here; GET `${GITHUB_IDENTITY}/<nodeId>` reads one.
   GITHUB_IDENTITY: '/v1/identity/github',
@@ -73,6 +74,7 @@ export const PUBLIC_READ_ROUTES: ReadonlySet<string> = new Set([
   INDEX_ROUTES.UPTIME,
   INDEX_ROUTES.VERSIONS,
   INDEX_ROUTES.NETWORK,
+  INDEX_ROUTES.NETWORK_HISTORY,
   INDEX_ROUTES.OFFER_HISTORY,
 ]);
 // Public reads below a prefix (GET /v1/identity/github/<nodeId>), CORS-readable like the routes above.
@@ -267,6 +269,13 @@ export const NETWORK = {
   // Bytes reserved for the counts and framing around the node entries.
   framingBytes: 256,
 } as const;
+export const NETWORK_HISTORY = {
+  dayOptions: [7, 30, 90],
+  defaultDays: 7,
+  slotsPerDay: UPTIME.dayMs / UPTIME.slotMs,
+  heartbeatSlots: 2,
+} as const;
+export const HEARTBEAT_FAILED = 'DISCOVERY_HEARTBEAT_FAILED';
 export const OFFER_HISTORY = {
   defaultDays: 30,
   maxDays: 92,

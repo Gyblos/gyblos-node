@@ -27,6 +27,7 @@ Routes sit at the root of the index host. The client base URL is
 | `GET /v1/uptime?node=`             | Public uptime of one NodeId over the last day, week and month ([Uptime](#uptime)).              |
 | `GET /v1/versions[?node=<NodeId>]` | Active seller counts by release, or one active seller’s declared release.                       |
 | `GET /v1/network`                  | Every known seller, online, offline or unpublished, with counts ([Network](#network)).          |
+| `GET /v1/network/history`          | Average and peak sellers online per UTC day ([Network history](#network-history)).              |
 | `GET /v1/offers/history`           | Catalog periods and their exact prices, by NodeId or model ([Offer history](#offer-history)).   |
 | `GET /v1/health`                   | `{ ok: true, records, publish }`: unexpired record count and [publish mode](#publish-modes).    |
 | `POST /v1/registrations`           | Trade an invite code for publishing, once the NodeId is bound in the 8004 agent registry.       |
@@ -46,13 +47,13 @@ Common behavior:
 - **Headers.** Every response carries `X-Robots-Tag: noindex` and
   `X-Content-Type-Options: nosniff`. `GET` and `HEAD` on `/v1/sellers`,
   `/v1/models`, `/v1/uptime`, `/v1/versions`, `/v1/network`,
-  `/v1/offers/history`, `/v1/health`, `/v1/identity/github/<NodeId>` and
-  `/v1/profile/<NodeId>` carry `Access-Control-Allow-Origin: *` on every status,
-  errors included. A `200` from `/v1/sellers`, `/v1/models`, `/v1/uptime`,
-  `/v1/versions`, `/v1/network`, `/v1/offers/history`,
-  `/v1/identity/github/<NodeId>` or `/v1/profile/<NodeId>` carries
-  `Cache-Control: public, max-age=10`; everything else carries
-  `Cache-Control: no-store`.
+  `/v1/network/history`, `/v1/offers/history`, `/v1/health`,
+  `/v1/identity/github/<NodeId>` and `/v1/profile/<NodeId>` carry
+  `Access-Control-Allow-Origin: *` on every status, errors included. A `200`
+  from `/v1/sellers`, `/v1/models`, `/v1/uptime`, `/v1/versions`, `/v1/network`,
+  `/v1/network/history`, `/v1/offers/history`, `/v1/identity/github/<NodeId>` or
+  `/v1/profile/<NodeId>` carries `Cache-Control: public, max-age=10`; everything
+  else carries `Cache-Control: no-store`.
 
 ## Publish modes
 
@@ -207,12 +208,12 @@ signed a record; clients re-verify everything.
 
 Rate limits:
 
-| Limit                               | Key                                     | Budget                                   | Consumed by                                                                                                                                             |
-| ----------------------------------- | --------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DISCOVERY_IP_LIMITER`              | client IPv4 address, or IPv6 /64 prefix | set in `wrangler.jsonc`                  | every request                                                                                                                                           |
-| `DISCOVERY_PUBLISH_LIMITER`         | client IPv4 address, or IPv6 /64 prefix | set in `wrangler.jsonc`                  | publishes and registrations                                                                                                                             |
-| `DISCOVERY_READ_LIMITER`            | constant key `global`                   | set in `wrangler.jsonc`                  | storage reads only: a `/v1/sellers`, `/v1/models`, `/v1/uptime`, `/v1/versions`, `/v1/network` or `/v1/offers/history` cache miss, a stale health count |
-| NodeId publish quota (stored in D1) | NodeId                                  | 10 accepted records per fixed UTC minute | accepted records only                                                                                                                                   |
+| Limit                               | Key                                     | Budget                                   | Consumed by                                                                                                                                                                    |
+| ----------------------------------- | --------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `DISCOVERY_IP_LIMITER`              | client IPv4 address, or IPv6 /64 prefix | set in `wrangler.jsonc`                  | every request                                                                                                                                                                  |
+| `DISCOVERY_PUBLISH_LIMITER`         | client IPv4 address, or IPv6 /64 prefix | set in `wrangler.jsonc`                  | publishes and registrations                                                                                                                                                    |
+| `DISCOVERY_READ_LIMITER`            | constant key `global`                   | set in `wrangler.jsonc`                  | storage reads only: a `/v1/sellers`, `/v1/models`, `/v1/uptime`, `/v1/versions`, `/v1/network`, `/v1/network/history` or `/v1/offers/history` cache miss, a stale health count |
+| NodeId publish quota (stored in D1) | NodeId                                  | 10 accepted records per fixed UTC minute | accepted records only                                                                                                                                                          |
 
 - A Cloudflare limiter that refuses or fails gives `429 RATE_LIMITED` with
   `Retry-After: 60`. That `429` is `no-store` and never cached.
@@ -229,14 +230,15 @@ Rate limits:
 ## Caching
 
 - **Public reads.** `/v1/sellers`, `/v1/models`, `/v1/uptime`, `/v1/versions`,
-  `/v1/network`, `/v1/offers/history`, `/v1/identity/github/<NodeId>` and
-  `/v1/profile/<NodeId>` keep `200` answers in the Workers Cache API
-  (`caches.default`, per Cloudflare location) for 10 seconds, matching their
-  `max-age`. Keys are normalized:
+  `/v1/network`, `/v1/network/history`, `/v1/offers/history`,
+  `/v1/identity/github/<NodeId>` and `/v1/profile/<NodeId>` keep `200` answers
+  in the Workers Cache API (`caches.default`, per Cloudflare location) for 10
+  seconds, matching their `max-age`. Keys are normalized:
   - sellers: `cursor`, the effective `limit` (so `limit=5000` and `limit=200`
     share an entry) and `model`, in that order;
   - models and network: the route alone;
   - uptime: `?node=<NodeId>`, however the query was spelled;
+  - network history: the effective `days`;
   - offer history: `?node=<NodeId>` or `?model=<model>`, then the effective
     `days`;
   - GitHub claims: the route and the NodeId. A claim's new state can therefore
@@ -405,6 +407,50 @@ is `400 INVALID_QUERY`):
 - In open mode (`DISCOVERY_PUBLISH_ALLOWLIST="*"`) anyone can add entries by
   publishing from new NodeIds, as with uptime; the caps bound them, but the
   public counts are not Sybil resistant.
+
+## Network history
+
+`GET /v1/network/history?days=7|30|90` (default 7; any other value or parameter
+is `400 INVALID_QUERY`) gives, for each UTC day oldest first, how many sellers
+were online on average and at peak:
+
+```json
+{
+  "days": 7,
+  "slotMs": 300000,
+  "history": [
+    {
+      "day": "2026-11-24",
+      "averageOnline": 1.9861,
+      "peak": 2,
+      "nodeSlots": 572,
+      "coveredSlots": 288,
+      "expectedSlots": 288,
+      "partial": false
+    }
+  ],
+  "generatedAt": 1800000001000
+}
+```
+
+- It is read from the [uptime](#uptime) rows, so it counts NodeIds with an
+  accepted presence in each five-minute slot. That is close to, but not the same
+  as, the online rule of `/v1/network`, which also needs a current catalog.
+- `nodeSlots` is the sum over the day's slots of the NodeIds seen in each;
+  `averageOnline` is `nodeSlots / expectedSlots`, rounded to four decimals, and
+  `peak` is the most NodeIds seen in one slot.
+- `expectedSlots` is 288 for a past day. Today is `partial: true` and counts
+  only the slots so far, the current one included.
+- `coveredSlots` counts the slots in which the index itself was running. The
+  ten-minute cron writes a heartbeat (`discovery_index_heartbeat`, one row per
+  hour with one bit per slot) for its own slot and the one before. An empty
+  covered slot is a real zero; an uncovered one is unknown. Days before the
+  heartbeat was deployed have `coveredSlots: 0`.
+- Heartbeat rows are kept and pruned with the uptime rows. A failed heartbeat
+  write logs the static code `DISCOVERY_HEARTBEAT_FAILED` and nothing else.
+- **Cost.** One cache miss reads the uptime rows of the requested days (one per
+  NodeId and hour seen) through the `discovery_uptime_by_hour` index, plus at
+  most 24 heartbeat rows per day.
 
 ## Offer history
 

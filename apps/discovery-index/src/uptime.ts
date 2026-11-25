@@ -3,7 +3,12 @@
 // week and month. A window starts no earlier than the NodeId was first seen, so a new seller is not
 // counted down for time before it existed. Its sightings also feed GET /v1/network (network.ts). Built
 // only from records the index already verified.
-import { DISCOVERY_INDEX_LIMITS, INDEX_ERRORS, UPTIME } from './constants';
+import {
+  DISCOVERY_INDEX_LIMITS,
+  INDEX_ERRORS,
+  NETWORK_HISTORY,
+  UPTIME,
+} from './constants';
 import { indexFail } from './errors';
 
 export { UPTIME } from './constants';
@@ -37,12 +42,30 @@ export interface UptimeStorage {
   sightings(sinceHour: number, limit: number): Promise<Sighting[]>;
   // Drops rows older than the retention period (UPTIME.retentionDays).
   pruneUptime(now: number): Promise<void>;
+  markAlive(now: number): Promise<void>;
+  aliveSlots(sinceHour: number): Promise<AliveRow[]>;
+  onlineSlots(sinceHour: number): Promise<OnlineRow[]>;
+}
+
+export interface AliveRow {
+  hour: number;
+  slots: number;
+}
+
+export interface OnlineRow {
+  hour: number;
+  counts: number[];
 }
 
 export const slotOf = (now: number) => Math.floor(now / UPTIME.slotMs);
 export const hourOf = (now: number) => Math.floor(now / UPTIME.hourMs);
 export const slotBit = (now: number) =>
   1 << (slotOf(now) % UPTIME.slotsPerHour);
+export const vouchedSlots = (now: number) =>
+  Array.from(
+    { length: NETWORK_HISTORY.heartbeatSlots },
+    (_, back) => now - back * UPTIME.slotMs,
+  );
 // The first hour kept: rows before it are pruned.
 export const retainedHour = (now: number) =>
   hourOf(now - UPTIME.retentionDays * UPTIME.dayMs);
@@ -154,15 +177,60 @@ export async function uptimePage(
   });
 }
 
+function countOnline(
+  nodes: Iterable<Map<number, UptimeRow>>,
+  sinceHour: number,
+): OnlineRow[] {
+  const counts = new Map<number, number[]>();
+  for (const hours of nodes)
+    for (const row of hours.values()) {
+      if (row.hour < sinceHour) continue;
+      const hour =
+        counts.get(row.hour) ?? Array<number>(UPTIME.slotsPerHour).fill(0);
+      for (let bit = 0; bit < UPTIME.slotsPerHour; bit++)
+        hour[bit]! += (row.slots >> bit) & 1;
+      counts.set(row.hour, hour);
+    }
+  return [...counts]
+    .sort(([left], [right]) => left - right)
+    .map(([hour, slots]) => ({ hour, counts: slots }));
+}
+
+function memoryHeartbeat() {
+  const alive = new Map<number, number>();
+  return {
+    async markAlive(now: number) {
+      for (const at of vouchedSlots(now))
+        alive.set(hourOf(at), (alive.get(hourOf(at)) ?? 0) | slotBit(at));
+    },
+    async aliveSlots(sinceHour: number) {
+      return [...alive]
+        .filter(([hour]) => hour >= sinceHour)
+        .sort(([left], [right]) => left - right)
+        .map(([hour, slots]) => ({ hour, slots }));
+    },
+    pruneAlive(now: number) {
+      for (const hour of alive.keys())
+        if (hour < retainedHour(now)) alive.delete(hour);
+    },
+  };
+}
+
 // The in-memory adapter's uptime rows (storage.ts), with their pruning.
 export function memoryUptime() {
   const nodes = new Map<string, Map<number, UptimeRow>>();
   const first = new Map<string, number>();
+  const heartbeat = memoryHeartbeat();
   return {
+    ...heartbeat,
+    async onlineSlots(sinceHour: number) {
+      return countOnline(nodes.values(), sinceHour);
+    },
     async firstSeen(nodeId: string) {
       return first.get(nodeId) ?? null;
     },
     async pruneUptime(now: number) {
+      heartbeat.pruneAlive(now);
       for (const [id, hours] of nodes) {
         for (const hour of hours.keys())
           if (hour < retainedHour(now)) hours.delete(hour);
