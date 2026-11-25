@@ -1562,7 +1562,7 @@
   "tests/free-client-deadline.test.ts": 1,
   "tests/free-client-eof.test.ts": 3,
   "tests/free-client-expiry.test.ts": 1,
-  "tests/free-client.test.ts": 2,
+  "tests/free-client.test.ts": 1,
   "tests/free-control-settlement.test.ts": 1,
   "tests/free-conversation.test.ts": 14,
   "tests/free-declared-metering.test.ts": 8,
