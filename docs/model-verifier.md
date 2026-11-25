@@ -121,7 +121,9 @@ Assumptions behind the bound:
 - Partial runs are not measured separately. Excluded answers tend to be short,
   and a longer answer has more chances to deviate, so the worst case restricted
   to full-length answers (24 checks) is the relevant one: 17 deviant answers in
-  208, upper bound 12.0 %, which the assumed rate still covers.
+  208, one-sided upper bound 12.007 %, a hair above the assumed rate. At that
+  bound a 30-answer run still fails with probability 9.5 × 10⁻⁵, under the 10⁻⁴
+  bound.
 
 What the rule catches, and what it does not:
 
