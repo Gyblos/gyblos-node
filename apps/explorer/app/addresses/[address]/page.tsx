@@ -35,7 +35,7 @@ function RecipientTable({
     <>
       <SectionTitle
         id={PAGING.anchors.transactions}
-        title="Recipient transactions"
+        title="First-recipient transactions"
         meta="Newest first · All time"
       />
       <Table
@@ -47,7 +47,7 @@ function RecipientTable({
           { label: 'Transaction' },
           { label: 'Channel' },
         ]}
-        footer={<Pager label="Recipient transactions" view={page.pager} />}
+        footer={<Pager label="First-recipient transactions" view={page.pager} />}
       >
         {page.transactions.map((tx) => (
           <TxLine
@@ -57,7 +57,7 @@ function RecipientTable({
         ))}
         {!page.transactions.length && (
           <EmptyRow columns={8}>
-            No indexed channel operations listing this address as a recipient.
+            No indexed channel operations listing this address as the first recipient.
           </EmptyRow>
         )}
       </Table>
@@ -137,7 +137,7 @@ export default async function AddressPage({
         <p className="mt-4 text-sm text-muted">Seller lookup unavailable.</p>
       )}
       {page.error ? (
-        <Unavailable title="Recipient transactions" />
+        <Unavailable title="First-recipient transactions" />
       ) : (
         <RecipientTable page={page} query={query} />
       )}

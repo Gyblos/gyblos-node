@@ -60,7 +60,10 @@ function metrics(period: Period, compared: Period, previous: Period) {
     );
     const value = current[key];
     const change =
-      value !== null && baseline !== null && current.daysObserved > 0
+      value !== null &&
+      baseline !== null &&
+      current.finalDays === days &&
+      previous.activity.finalDays === days
         ? delta(value, baseline)
         : null;
     return {

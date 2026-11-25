@@ -81,6 +81,25 @@ void test('overview reconciles observed tokens and daily points without filling 
   assert.equal(overviewActivity(dates, null).requests, null);
 });
 
+void test('a finalized empty receipt day is measured zero', () => {
+  const day = '2026-11-16';
+  const row = parseNetworkDay({
+    day,
+    free: null,
+    paid: null,
+    observed: null,
+    demand: [],
+    coverage: { state: 'final' },
+  });
+  const activity = overviewActivity([day], {
+    days: [row],
+    version: 4,
+    updated: null,
+  });
+  assert.equal(activity.tokens, 0);
+  assert.equal(activity.points[0]?.requests, 0);
+});
+
 void test('an aggregate timestamp alone cannot certify a complete observation window', () => {
   const dates = ['2026-11-16'];
   const source = {
@@ -155,6 +174,7 @@ void test('lifetime activity begins at the oldest observed day, skipping empty p
     await import('@gyblos/explorer/overview-activity');
   const blank = {
     day: '2026-01-01',
+    coverage: null,
     free: null,
     paid: null,
     observed: null,
