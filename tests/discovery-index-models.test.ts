@@ -56,3 +56,45 @@ eachStorage(
     await expectError(await call('/v1/models?model=x'), 400, 'INVALID_QUERY');
   },
 );
+
+eachStorage(
+  'the model catalog adds each model family and lab without changing /v1/models',
+  async ({ publish, call }) => {
+    const seller = indexNode();
+    const catalog = seller.catalog(1, {
+      models: ['qwen3-0.6b', 'meta-llama/Llama-3.1-8B', 'mystery-7b'],
+    });
+    assert.equal((await publish(catalog)).status, 201);
+    assert.equal(
+      (await publish(await seller.presence(2, catalog))).status,
+      201,
+    );
+    const response = await call('/v1/models/catalog');
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('cache-control'), 'public, max-age=10');
+    assert.equal(response.headers.get('access-control-allow-origin'), '*');
+    const body = await response.json();
+    assert.deepEqual(
+      [...body.models].sort((a, b) => a.id.localeCompare(b.id)),
+      [
+        {
+          id: 'meta-llama/Llama-3.1-8B',
+          sellers: 1,
+          family: 'meta',
+          lab: 'Meta',
+        },
+        { id: 'mystery-7b', sellers: 1, family: null, lab: null },
+        { id: 'qwen3-0.6b', sellers: 1, family: 'qwen', lab: 'Alibaba · Qwen' },
+      ],
+    );
+    assert.equal(typeof body.generatedAt, 'number');
+    const plain = await (await call('/v1/models')).json();
+    for (const row of plain.models)
+      assert.deepEqual(Object.keys(row), ['id', 'sellers']);
+    await expectError(
+      await call('/v1/models/catalog?model=x'),
+      400,
+      'INVALID_QUERY',
+    );
+  },
+);

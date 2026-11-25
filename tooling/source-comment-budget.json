@@ -452,7 +452,7 @@
   "apps/explorer/lib/fetch-json.ts": 2,
   "apps/explorer/lib/format.ts": 8,
   "apps/explorer/lib/latency.ts": 4,
-  "apps/explorer/lib/model-family.ts": 3,
+  "apps/explorer/lib/model-family.ts": 1,
   "apps/explorer/lib/model-table.ts": 11,
   "apps/explorer/lib/network-status.ts": 5,
   "apps/explorer/lib/offers.ts": 3,
