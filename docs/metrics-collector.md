@@ -523,8 +523,8 @@ interval a count of one can reveal the token total of a single request.
 ### Chain stats
 
 `GET /v1/stats/chain` takes the same range and envelope, plus `network` (the
-CAIP-2 devnet id), `programId`, `mint` (devnet USDC) and `index`. The index reports its
-configured history start (`historyFloorMs`, epoch milliseconds),
+CAIP-2 devnet id), `programId`, `mint` (devnet USDC) and `index`. The index
+reports its configured history start (`historyFloorMs`, epoch milliseconds),
 whether it finished reading back to that start (`backfillDone`), and when the
 index last moved (`updatedAt`). The index is `null` before its first run. Until
 `backfillDone`, older days may still be missing. `days` lists every day of the
