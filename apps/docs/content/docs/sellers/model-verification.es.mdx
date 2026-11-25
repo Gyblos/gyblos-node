@@ -39,8 +39,8 @@ Ollama. La cuantización no se comprueba.
 Las preguntas son públicas, así que un `pass` no es prueba frente a un vendedor que las reconoce y las responde
 distinto que al tráfico real. Tampoco se detecta a un vendedor que sustituye otro modelo solo en unas pocas
 respuestas: si se puntúan las 30 y sus otras respuestas no tienen desviaciones, 11 o menos respuestas sustituidas
-quedan bajo el umbral de 12. Con menos respuestas puntuadas el umbral baja, y las desviaciones en respuestas
-genuinas también cuentan.
+quedan bajo el umbral de 12. El umbral se mantiene en 12 entre 26 y 30 respuestas puntuadas y baja por debajo de eso (11 entre 22 y
+25), y las desviaciones en respuestas genuinas también cuentan.
 
 ## Reproducir un resultado [#reproducir]
 

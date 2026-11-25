@@ -237,9 +237,9 @@ every check.
   `inconclusive`. Rotating private challenge sets and prompts shaped like real
   traffic are follow-ups.
 - **Partial substitution.** With all 30 answers scored and clean genuine
-  answers, substituting on 11 or fewer is not caught; with fewer scored answers
-  the threshold is lower, and deviations in genuine answers also count. See the
-  decision rule.
+  answers, substituting on 11 or fewer is not caught. The threshold stays at 12
+  from 26 to 30 scored answers and drops below that (11 at 22 to 25), and
+  deviations in genuine answers also count. See the decision rule.
 - **Free offers only.** Paid verification needs a budget decision.
 - **Reference hardware.** The verifier must run the declared model, so verifying
   a large model needs a machine that can load it.
