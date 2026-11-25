@@ -2,8 +2,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import { chatSession } from '@gyblos/buyer-app/chat-cli';
 import { startBuyer } from '@gyblos/buyer/buyer-main';
-import { chatSession } from '@gyblos/buyer/chat-cli';
 import { startFreeBuyer } from '@gyblos/buyer/free-startup';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
 import { OFFER_PRICING_KINDS } from '@gyblos/protocol/constants';

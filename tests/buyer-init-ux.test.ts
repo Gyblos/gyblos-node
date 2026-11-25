@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { runBuyerInit } from '@gyblos/buyer/init';
+import { runBuyerInit } from '@gyblos/buyer-app/init';
 import {
   buildBuyerInit,
   BuyerInitError,

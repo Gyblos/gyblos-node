@@ -67,6 +67,7 @@
   },
   "dependencies": {
     "@gyblos/buyer": "workspace:*",
+    "@gyblos/buyer-app": "workspace:*",
     "@gyblos/config": "workspace:*",
     "@gyblos/core": "workspace:*",
     "@gyblos/desktop": "workspace:*",

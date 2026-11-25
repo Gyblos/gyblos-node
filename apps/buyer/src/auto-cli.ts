@@ -1,3 +1,5 @@
+import { AutoSettingsError, withAutoPrices } from '@gyblos/buyer/auto-settings';
+import { BUYER_SELECTION } from '@gyblos/buyer/constants';
 import { ROLE_FILES, rolePathIn } from '@gyblos/config';
 import { checkBuyerInit } from '@gyblos/node/buyer-init';
 import { pricePerMtokToAtomicPerMtok } from '@gyblos/node/node-config-price';
@@ -7,9 +9,6 @@ import {
   readPrivateFile,
   writePrivateFile,
 } from '@gyblos/runtime/private-file';
-
-import { AutoSettingsError, withAutoPrices } from './auto-settings';
-import { BUYER_SELECTION } from './constants';
 
 async function configure(args: string[]) {
   const disable = args.length === 1 && args[0] === 'off';

@@ -7,7 +7,7 @@ import test from 'node:test';
 
 import { generateKeyPairSigner } from '@solana/kit';
 
-import { main } from '@gyblos/buyer/withdraw-paid';
+import { main } from '@gyblos/buyer-app/withdraw-paid';
 import { DEVNET, DEVNET_GENESIS, FILE_MODES } from '@gyblos/config';
 import { batchPoolPathsIn } from '@gyblos/config/home';
 import { buyerChainWithdraw } from '@gyblos/node/buyer-withdraw';

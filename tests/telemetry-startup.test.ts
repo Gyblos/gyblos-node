@@ -13,8 +13,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
+import { startupMessage } from '@gyblos/buyer-app/free-main';
 import { FREE_BUYER_STARTUP } from '@gyblos/buyer/constants';
-import { startupMessage } from '@gyblos/buyer/free-main';
 import { FILE_MODES, ROLE_FILES, rolePathIn } from '@gyblos/config';
 import { NODE_ERROR_CODES, NODE_SETTINGS } from '@gyblos/node/constants';
 import { NodeError } from '@gyblos/node/errors';

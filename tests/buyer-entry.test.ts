@@ -5,8 +5,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
+import { BUYER_ROUTES, run, type BuyerRoutes } from '@gyblos/buyer-app/entry';
 import { BUYER_COMMANDS } from '@gyblos/buyer/constants';
-import { BUYER_ROUTES, run, type BuyerRoutes } from '@gyblos/buyer/entry';
 
 const COMMANDS = Object.values(BUYER_COMMANDS);
 
