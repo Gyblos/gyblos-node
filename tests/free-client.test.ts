@@ -30,6 +30,7 @@ async function fixture(
   const request = await source.request();
   let writes = 0;
   let closes = 0;
+  let finishes = 0;
   let bodyReads = 0;
   let remoteId = source.options.nodeId;
   let relay: string | null = null;
@@ -58,7 +59,9 @@ async function fixture(
           writes++;
           await write();
         },
-        finish: async () => {},
+        finish: async () => {
+          finishes++;
+        },
       },
       recv: {
         readExact: async (length: number) => {
@@ -94,6 +97,7 @@ async function fixture(
     client,
     writes: () => writes,
     closes: () => closes,
+    finishes: () => finishes,
     bodyReads: () => bodyReads,
     setRemoteAddr: (value: string) => {
       remoteAddr = value;
@@ -346,8 +350,7 @@ void test('free client cuts slow frames at the absolute deadline and suppresses 
   });
   released.resolve();
   await item.client.settled();
-  assert.equal(item.writes(), 1);
-  assert.equal(item.closes(), 1);
+  assert.deepEqual([item.writes(), item.closes(), item.finishes()], [1, 1, 0]);
 });
 
 void test('free client checks the shared uncertainty barrier immediately before the first prompt write', async () => {
