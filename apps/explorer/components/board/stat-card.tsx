@@ -79,6 +79,81 @@ function Value({
   );
 }
 
+type CardProps = {
+  icon: ComponentType<{ className?: string; 'aria-hidden'?: boolean }>;
+  label: string;
+  value?: ReactNode;
+  sides?: Sides;
+  deltas?: (Delta | null)[];
+  caption?: ReactNode;
+  hint?: string;
+  money?: boolean;
+  variant?: Variant;
+  comparison?: ReactNode;
+  selection?: { pressed: boolean; controls: string; onPress: () => void };
+};
+
+function PlainCard({
+  icon: Icon,
+  label,
+  selection,
+  hint,
+  value,
+  sides,
+  money,
+  comparison,
+  caption,
+  changed,
+}: CardProps & { changed: (Delta | null)[] | null }) {
+  const frame =
+    'row-span-4 grid min-w-0 grid-rows-subgrid gap-y-0 rounded-xl bg-background-secondary-default p-4';
+  const content = (
+    <>
+      <span className="flex items-start justify-between gap-2">
+        <span className="flex items-center rounded-md bg-stat-card-icon-background p-1.5">
+          <Icon
+            aria-hidden
+            className="size-4 shrink-0 text-foreground-icon-primary"
+          />
+        </span>
+        {hint && !selection ? <StatHint label={label} hint={hint} /> : null}
+      </span>
+      <span className={cx('mt-3', LABEL)}>{label}</span>
+      <span className="@container mt-1 flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
+        <Value variant="plain" value={value} sides={sides} money={money} />
+        {comparison}
+      </span>
+      {changed || caption ? (
+        <span className="mt-1 flex min-w-0 flex-col gap-1 self-start">
+          {changed ? <Pills deltas={changed} sides={!!sides} /> : null}
+          {caption ? (
+            <span className="text-caption-1-medium text-text-tertiary">
+              {caption}
+            </span>
+          ) : null}
+        </span>
+      ) : null}
+    </>
+  );
+  return selection ? (
+    <button
+      type="button"
+      aria-controls={selection.controls}
+      aria-pressed={selection.pressed}
+      onClick={selection.onPress}
+      className={cx(
+        frame,
+        'cursor-pointer text-left hover:bg-raised focus-visible:outline-2 focus-visible:outline-signal',
+        selection.pressed && 'ring-1 ring-inset ring-signal',
+      )}
+    >
+      {content}
+    </button>
+  ) : (
+    <section className={frame}>{content}</section>
+  );
+}
+
 export function StatCard({
   icon: Icon,
   label,
@@ -89,45 +164,26 @@ export function StatCard({
   hint,
   money,
   variant = 'plain',
-}: {
-  icon: ComponentType<{ className?: string; 'aria-hidden'?: boolean }>;
-  label: string;
-  value?: ReactNode;
-  sides?: Sides;
-  deltas?: (Delta | null)[];
-  caption?: ReactNode;
-  hint?: string;
-  money?: boolean;
-  variant?: Variant;
-}) {
+  selection,
+  comparison,
+}: CardProps) {
   const changed = deltas?.some(Boolean) ? deltas : null;
   if (variant === 'plain')
     return (
-      <section className="row-span-4 grid min-w-0 grid-rows-subgrid gap-y-0 rounded-xl bg-background-secondary-default p-4">
-        <div className="flex items-start justify-between gap-2">
-          <span className="flex items-center rounded-md bg-stat-card-icon-background p-1.5">
-            <Icon
-              aria-hidden
-              className="size-4 shrink-0 text-foreground-icon-primary"
-            />
-          </span>
-          {hint ? <StatHint label={label} hint={hint} /> : null}
-        </div>
-        <p className={cx('mt-3', LABEL)}>{label}</p>
-        <div className="@container mt-1 flex min-w-0 items-baseline self-baseline">
-          <Value variant={variant} value={value} sides={sides} money={money} />
-        </div>
-        {changed || caption ? (
-          <div className="mt-1 flex min-w-0 flex-col gap-1 self-start">
-            {changed ? <Pills deltas={changed} sides={!!sides} /> : null}
-            {caption ? (
-              <p className="text-caption-1-medium text-text-tertiary">
-                {caption}
-              </p>
-            ) : null}
-          </div>
-        ) : null}
-      </section>
+      <PlainCard
+        icon={Icon}
+        {...{
+          label,
+          selection,
+          hint,
+          value,
+          sides,
+          money,
+          comparison,
+          caption,
+          changed,
+        }}
+      />
     );
   const band = caption ?? (changed ? COMPARED : null);
   return (

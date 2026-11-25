@@ -3,17 +3,13 @@
 // A single-value select, after BoardUI's Select (MIT, see ./LICENSE): a button trigger with a chevron
 // that turns while open, and a floating list with the same row surface for hover and selection. Built on
 // React Aria, so it is keyboard- and screen-reader-complete; disabled options stay listed with a hint.
-import { Check, ChevronDown } from 'lucide-react';
+import { Check } from 'lucide-react';
 import type { ReactNode } from 'react';
-import {
-  Select as AriaSelect,
-  Button,
-  ListBox,
-  ListBoxItem,
-  Popover,
-  SelectValue,
-} from 'react-aria-components';
 
+import {
+  Select as BoardSelect,
+  SelectItem,
+} from '../../boardui/components/base/select/select';
 import { cx } from './cx';
 import { SURFACE } from './styles';
 
@@ -50,67 +46,38 @@ export function Select<Id extends string>({
   selected: Id;
   onChange?: (id: Id) => void;
 }) {
+  const active = options.find((option) => option.id === selected);
   return (
-    <AriaSelect
+    <BoardSelect
       aria-label={label}
       selectedKey={selected}
       disabledKeys={options
         .filter((option) => option.disabled)
         .map((option) => option.id)}
+      triggerClassName={cx(SURFACE.control, 'font-mono text-xs')}
+      renderValue={() => (
+        <>
+          {leadingIcon}
+          <OptionIcon src={active?.icon} />
+          {active?.label}
+        </>
+      )}
       onSelectionChange={(key) => {
         const next = options.find((option) => option.id === key);
         if (next && next.id !== selected) onChange?.(next.id);
       }}
-      className="group"
     >
-      {({ isOpen }) => (
-        <>
-          <Button
-            className={cx(
-              'flex cursor-pointer items-center gap-2 px-3 font-mono text-xs text-ink',
-              SURFACE.control,
-              SURFACE.focus,
-            )}
-          >
-            {leadingIcon}
-            <SelectValue className="truncate" />
-            <ChevronDown
-              aria-hidden
-              className={cx(
-                'size-3.5 shrink-0 text-muted transition-transform duration-200',
-                isOpen && 'rotate-180',
-              )}
-            />
-          </Button>
-          <Popover
-            offset={6}
-            placement="bottom end"
-            className="min-w-(--trigger-width) rounded-xl border border-line bg-panel p-1.5 shadow-lg outline-none transition duration-150 ease-out data-[entering]:scale-95 data-[entering]:opacity-0 data-[exiting]:scale-95 data-[exiting]:opacity-0"
-          >
-            <ListBox className="flex flex-col gap-0.5 outline-none">
-              {options.map((option) => (
-                <ListBoxItem
-                  key={option.id}
-                  id={option.id}
-                  textValue={option.label}
-                  className={({ isFocused, isSelected, isDisabled }) =>
-                    cx(
-                      'flex cursor-pointer items-center justify-between gap-4 rounded-lg px-2.5 py-2 font-mono text-xs text-ink outline-none',
-                      (isFocused || isSelected) && 'bg-raised',
-                      isDisabled && 'cursor-not-allowed text-dim',
-                    )
-                  }
-                >
-                  {({ isSelected }) => (
-                    <OptionRow option={option} selected={isSelected} />
-                  )}
-                </ListBoxItem>
-              ))}
-            </ListBox>
-          </Popover>
-        </>
-      )}
-    </AriaSelect>
+      {options.map((option) => (
+        <SelectItem
+          key={option.id}
+          id={option.id}
+          textValue={option.label}
+          className="justify-between font-mono text-xs"
+        >
+          <OptionRow option={option} selected={option.id === selected} />
+        </SelectItem>
+      ))}
+    </BoardSelect>
   );
 }
 

@@ -21,3 +21,12 @@ apps/explorer/.open-next/
 apps/explorer/.wrangler/
 apps/explorer/next-env.d.ts
 apps/explorer/public/r/
+
+# Downloaded BoardUI design catalog and Next.js gallery output
+design/boardui/boardui/
+design/boardui/app/
+design/boardui/public/
+design/boardui/.cursor/
+design/boardui/preview/.next/
+design/boardui/preview/next-env.d.ts
+design/boardui/preview/AGENTS.md

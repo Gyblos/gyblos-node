@@ -220,13 +220,47 @@
       "type": "registry:component",
       "title": "Select",
       "description": "A single-value select with a button trigger and a floating list; disabled options keep a hint.",
-      "dependencies": ["react-aria-components@1.22.1", "lucide-react@1.68.0"],
+      "dependencies": [
+        "react-aria-components@1.22.1",
+        "lucide-react@1.68.0",
+        "@remixicon/react@4.9.0"
+      ],
       "registryDependencies": ["board-base"],
       "files": [
         {
           "path": "components/board/select.tsx",
           "type": "registry:component",
           "target": "components/board/select.tsx"
+        },
+        {
+          "path": "boardui/components/base/dropdown/menu-styles.ts",
+          "type": "registry:component",
+          "target": "boardui/components/base/dropdown/menu-styles.ts"
+        },
+        {
+          "path": "boardui/components/base/input/label.tsx",
+          "type": "registry:component",
+          "target": "boardui/components/base/input/label.tsx"
+        },
+        {
+          "path": "boardui/components/foundations/scroll-fade/scroll-fade.tsx",
+          "type": "registry:component",
+          "target": "boardui/components/foundations/scroll-fade/scroll-fade.tsx"
+        },
+        {
+          "path": "boardui/components/foundations/icons/chevrons.tsx",
+          "type": "registry:component",
+          "target": "boardui/components/foundations/icons/chevrons.tsx"
+        },
+        {
+          "path": "boardui/utils/use-dismiss-on-outside-press.ts",
+          "type": "registry:component",
+          "target": "boardui/utils/use-dismiss-on-outside-press.ts"
+        },
+        {
+          "path": "boardui/components/base/select/select.tsx",
+          "type": "registry:component",
+          "target": "boardui/components/base/select/select.tsx"
         }
       ]
     },

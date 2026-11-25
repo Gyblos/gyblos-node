@@ -9,6 +9,9 @@
 }
 
 @theme inline {
+  --color-accent-600: var(--signal);
+  --color-dropdown-item-hover-background: var(--raised);
+  --color-text-disabled: var(--dim);
   --color-segmented-control-background: var(--panel);
   --color-segmented-control-selected-background: var(--raised);
   --color-text-primary: var(--ink);

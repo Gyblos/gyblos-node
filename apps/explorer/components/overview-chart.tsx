@@ -13,6 +13,7 @@ import { CHART } from './board/constants';
 import { cx } from './board/cx';
 import type { Delta } from './board/delta';
 import { DeltaChip } from './board/delta-chip';
+import { StatCard } from './board/stat-card';
 import { SURFACE } from './board/styles';
 import { ChartRange } from './chart-range';
 
@@ -166,36 +167,23 @@ function MetricSelector({
         const { label: name, kind: format, icon: Icon } = METRICS[key];
         const metric = metrics[key];
         return (
-          <button
+          <StatCard
             key={key}
-            type="button"
-            aria-pressed={key === selected}
-            aria-controls="period-chart"
-            className={cx(
-              SURFACE.card,
-              SURFACE.focus,
-              'min-w-0 cursor-pointer p-4 text-left transition-colors hover:bg-raised sm:p-5',
-              key === selected && 'ring-1 ring-inset ring-signal',
-            )}
-            onClick={() => onSelect(key)}
-          >
-            <span className="flex items-center gap-2 text-sm text-muted">
-              <Icon size={16} aria-hidden />
-              {name}
-            </span>
-            <span className="mt-2 flex flex-wrap items-center gap-2">
-              <span className="font-mono text-2xl tabular-nums">
-                <Flow kind={format} value={metric.total} />
+            icon={Icon}
+            label={name}
+            selection={{
+              pressed: key === selected,
+              controls: 'period-chart',
+              onPress: () => onSelect(key),
+            }}
+            value={<Flow kind={format} value={metric.total} />}
+            comparison={<ComparisonChip metric={metric} />}
+            caption={
+              <span title={metric.detail}>
+                {metric.comparison} · {metric.sample}
               </span>
-              <ComparisonChip metric={metric} />
-            </span>
-            <span
-              className="mt-2 block text-xs text-muted"
-              title={metric.detail}
-            >
-              {metric.comparison} · {metric.sample}
-            </span>
-          </button>
+            }
+          />
         );
       })}
     </div>
