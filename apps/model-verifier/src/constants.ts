@@ -35,6 +35,7 @@ export const MODEL_VERIFIER_CODES = {
   EMPTY_ANSWER: 'EMPTY_ANSWER',
   UNKNOWN: 'UNKNOWN',
   INTERNAL: 'INTERNAL',
+  OUTPUT_CLEANUP_FAILED: 'OUTPUT_CLEANUP_FAILED',
 } as const;
 
 export type ModelVerifierCode =

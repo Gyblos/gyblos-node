@@ -1,6 +1,14 @@
 import { randomBytes } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import {
+  lstat,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rename,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
+import { dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { modelVerifierLayout } from '@gyblos/config/model-verifier-home';
@@ -9,6 +17,7 @@ import {
   type SignedModelVerification,
 } from '@gyblos/protocol/model-verification';
 import { isMain } from '@gyblos/runtime';
+import { withDiagnosticCleanup } from '@gyblos/runtime/diagnostic-cleanup';
 
 import { CHALLENGE_SET, challengeSetDigest } from './challenge-set';
 import {
@@ -60,6 +69,49 @@ function summary(signed: SignedModelVerification) {
   };
 }
 
+async function publishOutput(
+  out: string,
+  { signed, answers, unscored }: Awaited<ReturnType<typeof runVerification>>,
+) {
+  const destination = resolve(out);
+  const parent = dirname(destination);
+  await mkdir(parent, { recursive: true, mode: MODEL_VERIFIER.directoryMode });
+  const staging = await mkdtemp(join(parent, '.verification-'));
+  let published = false;
+  await withDiagnosticCleanup(
+    async () => {
+      const options = { flag: 'wx', mode: MODEL_VERIFIER.privateFileMode };
+      await writeFile(
+        join(staging, MODEL_VERIFIER.resultFile),
+        `${JSON.stringify(signed, null, 2)}\n`,
+        options,
+      );
+      await writeFile(
+        join(staging, MODEL_VERIFIER.evidenceFile),
+        `${JSON.stringify({ challengeSet: CHALLENGE_SET, answers, unscored }, null, 2)}\n`,
+        options,
+      );
+      const exists = await lstat(destination).then(
+        () => true,
+        (error: NodeJS.ErrnoException) => {
+          if (error.code !== 'ENOENT') throw error;
+          return false;
+        },
+      );
+      if (exists) throw new ModelVerifierError(MODEL_VERIFIER_CODES.INTERNAL);
+      await rename(staging, destination);
+      published = true;
+    },
+    async () => {
+      if (!published) await rm(staging, { recursive: true, force: true });
+    },
+    () =>
+      console.error(
+        JSON.stringify({ code: MODEL_VERIFIER_CODES.OUTPUT_CLEANUP_FAILED }),
+      ),
+  );
+}
+
 async function verify(values: Record<string, string | undefined>) {
   if (!values.seller || !values.model) throw usage();
   const { openSeller, parseSellerTarget } = await import('./seller');
@@ -80,7 +132,7 @@ async function verify(values: Record<string, string | undefined>) {
   try {
     const seller = await openSeller(endpoint, target, modelId);
     try {
-      const { signed, answers, unscored } = await runVerification({
+      const outcome = await runVerification({
         target,
         seller,
         reference,
@@ -98,19 +150,12 @@ async function verify(values: Record<string, string | undefined>) {
       });
       const out =
         values.out ??
-        join(paths.results, `${signed.result.issuedAt}-${target.nodeId}`);
-      await mkdir(out, { recursive: true, mode: MODEL_VERIFIER.directoryMode });
-      await writeFile(
-        join(out, MODEL_VERIFIER.resultFile),
-        `${JSON.stringify(signed, null, 2)}\n`,
-        { flag: 'wx', mode: MODEL_VERIFIER.privateFileMode },
-      );
-      await writeFile(
-        join(out, MODEL_VERIFIER.evidenceFile),
-        `${JSON.stringify({ challengeSet: CHALLENGE_SET, answers, unscored }, null, 2)}\n`,
-        { flag: 'wx', mode: MODEL_VERIFIER.privateFileMode },
-      );
-      return { ...summary(signed), out };
+        join(
+          paths.results,
+          `${outcome.signed.result.issuedAt}-${target.nodeId}`,
+        );
+      await publishOutput(out, outcome);
+      return { ...summary(outcome.signed), out };
     } finally {
       await seller.close();
     }
