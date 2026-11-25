@@ -44,6 +44,7 @@ import {
   type ReceiptTotals,
 } from './schema-aggregates';
 import { distinctWhere, histogramSum, total } from './sql-primitives';
+import { coverageQueries } from './stats-coverage';
 import type { StatsReader } from './stats-store';
 
 type TotalsTable = typeof aggSellerDaily | typeof aggNetworkDaily;
@@ -172,6 +173,7 @@ function network(orm: CollectorDatabase, range: DayRange, today: string) {
         ),
       )
       .groupBy(firstSeen.kind),
+    ...coverageQueries(orm, range),
   ]);
 }
 
@@ -309,9 +311,20 @@ export function statsReader(database: D1Database): StatsReader {
   const orm = createD1Orm(database);
   return {
     async network(range, today) {
-      const [networkRows, observed, demand, origins, failures, buyerTotals] =
-        await network(orm, range, today);
+      const [
+        networkRows,
+        observed,
+        demand,
+        origins,
+        failures,
+        buyerTotals,
+        days,
+        pending,
+        start,
+        demandTotals,
+      ] = await network(orm, range, today);
       return {
+        coverage: { days, pending, start, demand: demandTotals },
         network: networkRows,
         observed,
         demand,

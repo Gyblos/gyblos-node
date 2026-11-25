@@ -63,6 +63,13 @@ export const aggDirtyDays = sqliteTable('collector_agg_dirty_days', {
   day: text('day').primaryKey(),
 });
 
+export const aggDays = sqliteTable('collector_agg_days', {
+  day: text('day').primaryKey(),
+  formulaVersion: integer('formula_version').notNull(),
+  cutoff: integer('cutoff').notNull(),
+  revision: integer('revision').notNull(),
+});
+
 export const aggSellerDaily = sqliteTable(
   'collector_agg_seller_daily',
   {

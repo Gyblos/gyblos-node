@@ -45,8 +45,16 @@ export interface SellerDay {
   free: SellerSide | null;
   paid: SellerSide | null;
 }
+export const COVERAGE_STATES = [
+  'final',
+  'partial',
+  'pending',
+  'unknown',
+] as const;
+export type CoverageState = (typeof COVERAGE_STATES)[number];
 export interface NetworkDay {
   day: string;
+  coverage: CoverageState | null;
   free: NetworkSide | null;
   paid: NetworkSide | null;
   observed: {
@@ -208,6 +216,13 @@ function networkSide(value: unknown, where: string): NetworkSide {
     modelsServed: num(source.modelsServed, `${where}.modelsServed`),
   };
 }
+function coverageState(value: unknown): CoverageState | null {
+  if (value === undefined) return null;
+  const state = text(record(value, 'coverage').state, 'coverage.state');
+  const known = COVERAGE_STATES.find((option) => option === state);
+  if (!known) throw new SourceShapeError('coverage.state');
+  return known;
+}
 export function parseNetworkDay(value: unknown): NetworkDay {
   const source = record(value, 'day');
   const observed = nullable(source.observed, (present) =>
@@ -215,6 +230,7 @@ export function parseNetworkDay(value: unknown): NetworkDay {
   );
   return {
     day: text(source.day, 'day.day'),
+    coverage: coverageState(source.coverage),
     free: nullable(source.free, (present) => networkSide(present, 'free')),
     paid: nullable(source.paid, (present) => networkSide(present, 'paid')),
     observed: observed

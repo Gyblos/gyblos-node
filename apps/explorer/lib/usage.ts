@@ -1,6 +1,7 @@
 import type {
   BuyerCount,
   CollectorSnapshot,
+  CoverageState,
   NetworkBuyers,
   NetworkDay,
   Totals,
@@ -92,15 +93,29 @@ export function relayText(day: NetworkDay): string {
   return routes && routed ? percent(routes.relay / routed) : '—';
 }
 
+const COVERAGE_NOTES: Partial<Record<CoverageState, string>> = {
+  pending: 'pending',
+  unknown: 'not captured',
+};
+
 // One point per day of the range, oldest first: each side's headline requests (0 without receipts).
 export function dailyRequests(
-  days: readonly { day: string; free: Section; paid: Section }[],
+  days: readonly {
+    day: string;
+    free: Section;
+    paid: Section;
+    coverage?: CoverageState | null;
+  }[],
 ) {
-  return days.map((day) => ({
-    day: day.day,
-    free: day.free?.requests.headline ?? 0,
-    paid: day.paid?.requests.headline ?? 0,
-  }));
+  return days.map((day) => {
+    const note = day.coverage ? COVERAGE_NOTES[day.coverage] : undefined;
+    return {
+      day: day.day,
+      free: day.free?.requests.headline ?? 0,
+      paid: day.paid?.requests.headline ?? 0,
+      ...(note ? { note } : {}),
+    };
+  });
 }
 
 // The Usage title's note: the comparison is named only when the span before the range could be read.
