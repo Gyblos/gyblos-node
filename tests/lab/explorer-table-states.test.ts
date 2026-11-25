@@ -10,18 +10,55 @@ import { join } from 'node:path';
 import test, { after, before } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { AGGREGATES } from '@gyblos/metrics-collector/constants';
+
 const HOST = '127.0.0.1';
 const APP = new URL('../../apps/explorer/', import.meta.url);
 const next = createRequire(new URL('package.json', APP)).resolve(
   'next/dist/bin/next',
 );
-const today = new Date();
-const yesterday = new Date(today);
-yesterday.setUTCDate(today.getUTCDate() - 1);
-const activeDay = today.toISOString().slice(0, 10);
-const inactiveDay = yesterday.toISOString().slice(0, 10);
+const utcDay = (time: number) => new Date(time).toISOString().slice(0, 10);
+const now = Date.now();
+const activeDay = utcDay(now - AGGREGATES.dayMs);
+const inactiveDay = utcDay(now - 2 * AGGREGATES.dayMs);
 
 type State = 'empty' | 'populated' | 'unavailable';
+
+function networkWindow(
+  query: URLSearchParams,
+  state: State,
+  generatedAt: number,
+) {
+  const from = query.get('from');
+  const to = query.get('to');
+  assert.ok(from && to, 'the seven-day view requests explicit UTC bounds');
+  const days = [];
+  for (
+    let day = Date.parse(from);
+    day <= Date.parse(to);
+    day += AGGREGATES.dayMs
+  ) {
+    const date = utcDay(day);
+    days.push({
+      day: date,
+      free: null,
+      paid: null,
+      observed:
+        state === 'populated' && date === activeDay
+          ? { routes: { direct: 4, relay: 3, unknown: 0 } }
+          : null,
+      demand: [],
+    });
+  }
+  const observed = days.some((row) => row.observed);
+  return {
+    from,
+    to,
+    days,
+    aggregatedAt: observed ? generatedAt : null,
+    formulaVersion: observed ? AGGREGATES.formulaVersion : null,
+  };
+}
 
 function sources(state: State) {
   const generatedAt = Date.now();
@@ -32,18 +69,6 @@ function sources(state: State) {
     pricing: { inputAtomicPerMtok: '0', outputAtomicPerMtok: '0' },
   };
   const models = state === 'populated' ? [model] : [];
-  const inactive = {
-    day: inactiveDay,
-    free: null,
-    paid: null,
-    observed: null,
-    demand: [],
-  };
-  const active = {
-    ...inactive,
-    day: activeDay,
-    observed: { routes: { direct: 4, relay: 3, unknown: 0 } },
-  };
   const payloads = new Map<string, unknown>([
     ['/models', { generatedAt, models: [{ id: modelId }] }],
     [
@@ -73,18 +98,21 @@ function sources(state: State) {
       },
     ],
     ['/uptime', { firstSeenAt: generatedAt, windows: [] }],
-    [
-      '/stats/network',
-      { days: state === 'populated' ? [inactive, active] : [inactive] },
-    ],
     ['/stats/models', { models: [] }],
     ['/stats/chain', { days: [], index: { backfillDone: true } }],
   ]);
   return createServer((request, response) => {
-    const path = (request.url ?? '').split('?')[0] ?? '';
-    const payload = payloads.get(path);
-    if (state === 'unavailable' || !payload) {
-      response.writeHead(state === 'unavailable' ? 503 : 404).end();
+    if (state === 'unavailable') {
+      response.writeHead(503).end();
+      return;
+    }
+    const url = new URL(request.url ?? '/', 'http://' + HOST);
+    const payload =
+      url.pathname === '/stats/network'
+        ? networkWindow(url.searchParams, state, generatedAt)
+        : payloads.get(url.pathname);
+    if (!payload) {
+      response.writeHead(404).end();
       return;
     }
     response.writeHead(200, { 'content-type': 'application/json' });
@@ -280,7 +308,10 @@ void test('Explorer shows offer and active-day rows without empty rows', async (
   const sellers = tableFor(populated, 'Online since').body;
   const daily = tableFor(populated, 'Seller first token p50').body;
   assert.match(sellers, /fixture-model/);
+  assert.match(populated, /Through the last complete UTC day/);
+  assert.equal(daily.match(/<tr\b/g)?.length, 1);
   assert.ok(daily.includes(activeDay));
+  assert.match(daily, />42\.9%<\/td>/);
   assert.ok(!daily.includes(inactiveDay));
   assert.doesNotMatch(sellers + daily, /colSpan=/i);
   const tables = [...populated.matchAll(/<table\b/g)];

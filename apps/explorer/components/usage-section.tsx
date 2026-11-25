@@ -43,15 +43,7 @@ import {
   Unavailable,
 } from './ui';
 
-function FigureCells({
-  free,
-  paid,
-  latency,
-}: {
-  free: SideFigures;
-  paid: SideFigures;
-  latency: 'firstToken' | 'total';
-}) {
+function FigureCells({ free, paid }: { free: SideFigures; paid: SideFigures }) {
   return (
     <>
       <SideCells free={free.requests} paid={paid.requests} show={countText} />
@@ -65,17 +57,14 @@ function FigureCells({
         paid={paid.outputTokens}
         show={countText}
       />
-      <SideCells free={free[latency]} paid={paid[latency]} show={latencyText} />
+      <SideCells
+        free={free.firstToken}
+        paid={paid.firstToken}
+        show={latencyText}
+      />
     </>
   );
 }
-const figureHead = (latency: string) => [
-  ...sideColumns('Requests'),
-  ...sideColumns('Success'),
-  ...sideColumns('Output tokens'),
-  ...sideColumns(`${latency} p50`),
-];
-
 // Each side's change against the span just before the range; none when that span cannot be read.
 function changes(
   current: ReturnType<typeof summarizeUsage>,
@@ -117,6 +106,8 @@ function changes(
   };
 }
 
+const counted = (value: number | null) => <Flow value={value} kind="count" />;
+
 function UsageCards({
   usage,
   change,
@@ -137,8 +128,8 @@ function UsageCards({
         icon={MessagesSquare}
         label="Requests"
         sides={{
-          free: <Flow value={hasFree ? free.requests : null} kind="count" />,
-          paid: <Flow value={hasPaid ? paid.requests : null} kind="count" />,
+          free: counted(hasFree ? free.requests : null),
+          paid: counted(hasPaid ? paid.requests : null),
         }}
         deltas={change?.requests ?? [null]}
       />
@@ -157,12 +148,8 @@ function UsageCards({
         icon={Hash}
         label="Output tokens"
         sides={{
-          free: (
-            <Flow value={hasFree ? free.outputTokens : null} kind="count" />
-          ),
-          paid: (
-            <Flow value={hasPaid ? paid.outputTokens : null} kind="count" />
-          ),
+          free: counted(hasFree ? free.outputTokens : null),
+          paid: counted(hasPaid ? paid.outputTokens : null),
         }}
         deltas={change?.outputTokens ?? [null]}
       />
@@ -192,7 +179,7 @@ function UsageCards({
         icon={CircleOff}
         label="Unserved demand"
         hint="Requests buyers could not get served: no seller offered the model, or the seller refused."
-        value={<Flow value={usage.unserved} kind="count" />}
+        value={counted(usage.unserved)}
         deltas={change?.unserved ?? [null]}
       />
     </div>
@@ -302,7 +289,10 @@ function DailyTable({
   });
   const head = [
     { label: 'Day (UTC)', sort: 'day', ascendingFirst: true },
-    ...figureHead('Seller first token'),
+    ...sideColumns('Requests'),
+    ...sideColumns('Success'),
+    ...sideColumns('Output tokens'),
+    ...sideColumns('Seller first token p50'),
     ...sideColumns('Input tokens'),
     ...sideColumns('Buyers'),
     { label: 'Relay', right: true },
@@ -330,7 +320,6 @@ function DailyTable({
             <FigureCells
               free={sideFigures([day.free])}
               paid={sideFigures([day.paid])}
-              latency="firstToken"
             />
             <SideCells
               free={day.free?.tokens.input ?? null}
