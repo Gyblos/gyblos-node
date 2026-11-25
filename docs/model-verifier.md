@@ -236,8 +236,10 @@ every check.
   a seller that targets the verifier. Answers with nothing to check only yield
   `inconclusive`. Rotating private challenge sets and prompts shaped like real
   traffic are follow-ups.
-- **Partial substitution.** Substituting on 11 or fewer of 30 answers is not
-  caught; see the decision rule.
+- **Partial substitution.** With all 30 answers scored and clean genuine
+  answers, substituting on 11 or fewer is not caught; with fewer scored answers
+  the threshold is lower, and deviations in genuine answers also count. See the
+  decision rule.
 - **Free offers only.** Paid verification needs a budget decision.
 - **Reference hardware.** The verifier must run the declared model, so verifying
   a large model needs a machine that can load it.
