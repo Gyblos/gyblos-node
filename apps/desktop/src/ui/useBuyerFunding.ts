@@ -1,5 +1,5 @@
 // Discard obsolete balance reads when the selected offer or buyer changes.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import type { BuyerFunding } from '../funding/model';
 
@@ -9,19 +9,20 @@ export function useBuyerFunding(
   enabled = true,
 ) {
   const [attempt, setAttempt] = useState(0);
-  const generation = useRef(0);
   const [snapshot, setSnapshot] = useState<{
     payer?: string;
     offerId?: string;
     attempt: number;
-    generation: number;
     funding: BuyerFunding | null;
   }>();
+  const [enabledBefore, setEnabledBefore] = useState(enabled);
+  if (enabledBefore !== enabled) {
+    setEnabledBefore(enabled);
+    setSnapshot(undefined);
+  }
   useEffect(() => {
     if (!enabled) return;
     let active = true;
-    const readGeneration = generation.current;
-    setSnapshot(undefined);
     async function read() {
       let funding: BuyerFunding | null;
       try {
@@ -35,14 +36,12 @@ export function useBuyerFunding(
           payer,
           offerId,
           attempt,
-          generation: readGeneration,
           funding,
         });
     }
     void read();
     return () => {
       active = false;
-      generation.current += 1;
     };
   }, [payer, offerId, attempt, enabled]);
   const current =
@@ -50,8 +49,7 @@ export function useBuyerFunding(
     snapshot &&
     snapshot.payer === payer &&
     snapshot.offerId === offerId &&
-    snapshot.attempt === attempt &&
-    snapshot.generation === generation.current;
+    snapshot.attempt === attempt;
   return {
     loading: !current,
     funding: current ? snapshot.funding : null,
