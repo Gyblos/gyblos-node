@@ -195,7 +195,6 @@ export async function UsageSection({
   const days = query.days;
   const discovery = getDiscovery();
   const report = await reportPromise;
-  const { models } = await discovery;
   const focus =
     query.metric === 'tokens' || query.metric === 'requests'
       ? query.metric
@@ -209,6 +208,7 @@ export async function UsageSection({
       />
     );
   const usage = summarizeUsage(snapshot);
+  const models = usage.demand.length ? (await discovery).models : {};
   const change = changes(
     summarizeUsage({ days: report.compared.source?.days ?? [] }),
     report.compared.source?.version &&
