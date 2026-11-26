@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
+import { CatalogModelName } from '../../components/catalog-model-name';
 import { OperationChip } from '../../components/channel-txs';
 import { PageFrame } from '../../components/page-frame';
 import { Pager } from '../../components/pager';
@@ -8,7 +9,6 @@ import { SellerCell } from '../../components/seller-cell';
 import {
   Addr,
   EmptyRow,
-  ModelName,
   prefixedColumn,
   SectionTitle,
   Table,
@@ -164,13 +164,13 @@ function catalogResults(
 ) {
   const models = modelRows(summarizeOffers(discovery).models, collector.models);
   const results = models
-    .filter((model) => modelMatches(model, term))
+    .filter((model) => modelMatches(model, term, discovery.models))
     .map((model) => (
       <tr key={modelKey(model)} className="border-t border-line">
         <td className={td}>Model</td>
         <td className={td}>
           <span className="block ps-2">
-            <ModelName {...model} />
+            <CatalogModelName {...model} />
           </span>
         </td>
       </tr>

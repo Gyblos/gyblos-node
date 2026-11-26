@@ -34,10 +34,10 @@ import {
 import { Flow } from './board/animated-number';
 import { BarChartCard } from './board/bar-chart-card';
 import { StatCard } from './board/stat-card';
+import { CatalogModelName } from './catalog-model-name';
 import { pagedRows, Pager } from './pager';
 import {
   EmptyRow,
-  ModelName,
   moneyCell,
   numberCell,
   prefixedColumn,
@@ -157,7 +157,7 @@ function ModelsTable({
         {shown.rows.map((row) => (
           <tr key={row.key} className="border-t border-line">
             <td className={td}>
-              <ModelName
+              <CatalogModelName
                 days={rangeOf(query, 'activity')}
                 closed={query.closed}
                 modelId={row.modelId}

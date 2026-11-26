@@ -1,8 +1,8 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
-import { modelLab } from '@gyblos/protocol/model-family';
-
+import { CatalogModelName } from '../../../components/catalog-model-name';
+import { ModelCategories } from '../../../components/model-categories';
 import { ModelLogo } from '../../../components/model-logo';
 import { OfferPriceHistory } from '../../../components/offer-price-history';
 import { PageFrame } from '../../../components/page-frame';
@@ -11,7 +11,6 @@ import { SellerCell } from '../../../components/seller-cell';
 import {
   Addr,
   EmptyRow,
-  ModelName,
   moneyCell,
   numberCell,
   prefixedColumn,
@@ -39,6 +38,11 @@ import {
   utc,
 } from '../../../lib/format';
 import { mergedLatency } from '../../../lib/latency';
+import {
+  modelMaker,
+  modelView,
+  type CatalogModels,
+} from '../../../lib/model-catalog';
 import { getOfferPriceHistory } from '../../../lib/offer-price-history';
 import { modelFromSlug, modelHref, modelKey } from '../../../lib/offers';
 import {
@@ -258,20 +262,22 @@ function OffersTable({
 
 function ModelHeading({
   model,
+  models,
 }: {
   model: NonNullable<ReturnType<typeof modelFromSlug>>;
+  models: CatalogModels;
 }) {
+  const view = modelView(models, model.modelId);
   return (
     <span className="flex items-center gap-3">
-      <ModelLogo modelId={model.modelId} />
+      <ModelLogo modelId={model.modelId} view={view} />
       <span className="min-w-0">
-        <span className="block text-sm text-muted">
-          {modelLab(model.modelId)}
-        </span>
+        <span className="block text-sm text-muted">{modelMaker(view)}</span>
         <span className="block break-all">{model.modelId}</span>
         <span className="block font-mono text-sm text-muted">
           {[model.variant, model.quantization].filter(Boolean).join(' · ')}
         </span>
+        <ModelCategories categories={view.categories} />
       </span>
     </span>
   );
@@ -311,7 +317,10 @@ export default async function ModelPage({
       .map((item) => [modelKey(item), item]),
   );
   return (
-    <PageFrame title={<ModelHeading model={model} />} crumb="Model">
+    <PageFrame
+      title={<ModelHeading model={model} models={discovery.models} />}
+      crumb="Model"
+    >
       <Link
         className="mt-2 inline-block text-sm text-muted hover:text-ink hover:underline"
         href={directoryHref(PAGES.models, query, 'models')}
@@ -341,7 +350,11 @@ export default async function ModelPage({
           <ul className="grid gap-2">
             {Array.from(siblings, ([id, sibling]) => (
               <li key={id}>
-                <ModelName {...sibling} days={days} closed={query.closed} />
+                <CatalogModelName
+                  {...sibling}
+                  days={days}
+                  closed={query.closed}
+                />
               </li>
             ))}
           </ul>

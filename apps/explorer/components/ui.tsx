@@ -4,8 +4,6 @@ import { ChevronDown, ChevronsUpDown, ChevronUp } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactElement, ReactNode } from 'react';
 
-import { modelLab } from '@gyblos/protocol/model-family';
-
 import { Skeleton } from '../boardui/components/base/skeleton/skeleton';
 import { addressHref } from '../lib/config';
 import { DISPLAY, PAGING } from '../lib/constants';
@@ -15,6 +13,7 @@ import {
   FULL_OVERVIEW,
   overviewLayout,
 } from '../lib/layout';
+import { modelView, type CatalogModels } from '../lib/model-catalog';
 import { modelHref } from '../lib/offers';
 import { sortHref, type ExplorerQuery, type SortedTable } from '../lib/paging';
 import type { RangeDays, RangeSection } from '../lib/range';
@@ -369,13 +368,16 @@ export function ModelName({
   modelId,
   variant,
   quantization,
+  models,
 }: {
   days?: RangeDays;
   closed?: boolean;
   modelId: string;
   variant: string | null;
   quantization: string | null;
+  models?: Readonly<CatalogModels>;
 }) {
+  const view = modelView(models, modelId);
   const detail = [variant, quantization].filter(Boolean).join(' ');
   return (
     <Link
@@ -383,11 +385,9 @@ export function ModelName({
       className="hover:underline underline-offset-2 inline-flex max-w-full items-center gap-2"
       title={[modelId, detail].filter(Boolean).join(' ')}
     >
-      <ModelLogo modelId={modelId} />
+      <ModelLogo modelId={modelId} view={view} />
       <span className="truncate">
-        <span className="block text-xs font-sans text-muted">
-          {modelLab(modelId)}
-        </span>
+        <span className="block text-xs font-sans text-muted">{view.lab}</span>
         {modelId}
         {detail ? (
           <span className="ml-2 font-mono text-xs text-dim">{detail}</span>

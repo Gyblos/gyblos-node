@@ -20,6 +20,7 @@ import {
   type Uptime,
 } from './discovery-shape';
 import { fetchJson } from './fetch-json';
+import { parseCatalogModels, type CatalogModels } from './model-catalog';
 import { parseNetworkStatus, type NetworkStatus } from './network-status';
 import { list, nullable, num, record, text } from './validate';
 
@@ -28,6 +29,7 @@ export type { OfferedModel, Seller } from './discovery-shape';
 export interface DiscoverySnapshot {
   generatedAt: number;
   sellers: Seller[];
+  models: CatalogModels;
   // Null when no network status has been read (/network failing, or absent from an older index): only
   // online sellers are known.
   network: NetworkStatus | null;
@@ -49,6 +51,7 @@ interface Catalog {
   network: NetworkStatus | null;
   networkReadAt: number | null;
   sellers: Listed[];
+  models?: CatalogModels;
 }
 // A catalog read under way: the models listed when it began, how many of them are read, and their
 // sellers, by node.
@@ -60,6 +63,7 @@ interface Pending {
   modelIds: string[];
   model: number;
   sellers: Record<string, Listed>;
+  models?: CatalogModels;
 }
 // A seller's uptime: when it was last tried, and the last uptime read with when (kept when a try fails).
 interface UptimeRead {
@@ -87,6 +91,7 @@ export type RunProblem =
 export const unavailable = (error: string): DiscoverySnapshot => ({
   generatedAt: 0,
   sellers: [],
+  models: {},
   network: null,
   datedAt: null,
   networkDatedAt: null,
@@ -123,10 +128,9 @@ async function begin(
   now: number,
   last: Catalog | null,
 ): Promise<Pending> {
-  const listed = record(await run.read('/models'), 'models');
-  const modelIds = list(listed.models, 'models.models').map((entry) =>
-    text(record(entry, 'models.model').id, 'model.id'),
-  );
+  const listed = record(await run.read('/models/catalog'), 'models');
+  const models = parseCatalogModels(listed);
+  const modelIds = Object.keys(models);
   const network =
     run.left > 0
       ? await run
@@ -145,6 +149,7 @@ async function begin(
     modelIds,
     model: 0,
     sellers: {},
+    models,
   };
 }
 
@@ -304,7 +309,7 @@ export async function readIndex(
     stored.pending &&
     stored.pending.model >= stored.pending.modelIds.length
   ) {
-    const { startedAt, generatedAt, network, networkReadAt, sellers } =
+    const { startedAt, generatedAt, network, networkReadAt, sellers, models } =
       stored.pending;
     stored.catalog = {
       readAt: startedAt,
@@ -312,6 +317,7 @@ export async function readIndex(
       network,
       networkReadAt,
       sellers: Object.values(sellers),
+      models: models ?? {},
     };
     stored.pending = null;
     stored.progressAt = now();

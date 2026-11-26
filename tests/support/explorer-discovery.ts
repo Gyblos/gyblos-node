@@ -5,6 +5,10 @@ import type { DiscoveryKv } from '@gyblos/explorer/discovery-snapshot';
 export interface IndexShape {
   // Sellers per model, by model id.
   models: Record<string, string[]>;
+  catalog?: Record<
+    string,
+    { family: string; lab: string; source: string; categories: string[] }
+  >;
   // Node ids /network calls offline; null for no /network answer, 'malformed' for a bad one.
   offline?: string[] | null | 'malformed';
   down?: boolean;
@@ -57,10 +61,19 @@ export function fakeIndex(shape: IndexShape) {
     requests.push(`${url.pathname}${url.search}`);
     if (shape.down) return new Response('{}', { status: 503 });
     const json = (body: unknown) => Response.json(body);
-    if (url.pathname.endsWith('/models'))
+    if (url.pathname.endsWith('/models/catalog'))
       return json({
         generatedAt: 7,
-        models: Object.keys(shape.models).map((id) => ({ id })),
+        models: Object.keys(shape.models).map((id) => ({
+          id,
+          sellers: shape.models[id]?.length ?? 0,
+          ...(shape.catalog?.[id] ?? {
+            family: 'other',
+            lab: 'Unknown',
+            source: 'fallback',
+            categories: [],
+          }),
+        })),
       });
     if (url.pathname.endsWith('/sellers')) {
       const model = url.searchParams.get('model') ?? '';

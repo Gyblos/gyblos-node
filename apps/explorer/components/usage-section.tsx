@@ -30,11 +30,11 @@ import { BarChartCard } from './board/bar-chart-card';
 import { delta, type Delta } from './board/delta';
 import { StatCard } from './board/stat-card';
 import { BuyersCard } from './buyers-card';
+import { CatalogModelName } from './catalog-model-name';
 import { pagedRows, Pager } from './pager';
 import { StatsBreakdown } from './stats-breakdown';
 import {
   EmptyRow,
-  ModelName,
   numberCell,
   prefixedColumn,
   SectionTitle,
@@ -375,7 +375,7 @@ function DemandTable({
         {page.rows.map(([model, requests]) => (
           <tr key={model} className="border-t border-line">
             <td className={td}>
-              <ModelName
+              <CatalogModelName
                 days={query.days}
                 closed={query.closed}
                 modelId={model}

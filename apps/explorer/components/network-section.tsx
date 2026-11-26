@@ -20,13 +20,13 @@ import {
 } from '../lib/seller-identity';
 import { Chip } from './board/chip';
 import { StatusDot } from './board/status-dot';
+import { CatalogModelName } from './catalog-model-name';
 import { NotOnline } from './not-online';
 import { pagedRows, Pager } from './pager';
 import { SellerCell } from './seller-cell';
 import {
   Addr,
   EmptyRow,
-  ModelName,
   moneyCell,
   MoreLink,
   numberCell,
@@ -202,7 +202,7 @@ function OfferRow({
         </Chip>
       </td>
       <td className={td}>
-        <ModelName
+        <CatalogModelName
           days={days}
           closed={closed}
           modelId={model.modelId}

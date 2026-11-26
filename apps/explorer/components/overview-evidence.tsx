@@ -15,13 +15,13 @@ import {
   sellerHref,
   verifiedOnly,
 } from '../lib/seller-identity';
+import { CatalogModelName } from './catalog-model-name';
 import { OperationChip } from './channel-txs';
 import { pagedRows, Pager } from './pager';
 import { SellerCell } from './seller-cell';
 import {
   Addr,
   EmptyRow,
-  ModelName,
   moneyCell,
   numberCell,
   prefixedColumn,
@@ -154,7 +154,7 @@ export async function OverviewOffers({ query }: { query: ExplorerQuery }) {
             className="border-t border-line"
           >
             <td className={td}>
-              <ModelName {...model} days={days} closed />
+              <CatalogModelName {...model} days={days} closed />
             </td>
             <td className={td}>
               <SellerCell

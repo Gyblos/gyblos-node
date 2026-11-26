@@ -71,6 +71,23 @@ const LABS: Record<ModelFamily, string> = {
   zhipu: 'Zhipu AI',
   yi: '01.AI',
 };
+export const FAMILY_NAMES: Record<ModelFamily, string> = {
+  qwen: 'Qwen',
+  meta: 'Llama',
+  mistral: 'Mistral',
+  gemma: 'Gemma',
+  google: 'Gemini',
+  deepseek: 'DeepSeek',
+  microsoft: 'Phi',
+  openai: 'GPT',
+  claude: 'Claude',
+  nvidia: 'Nemotron',
+  ibm: 'Granite',
+  huggingface: 'SmolLM',
+  kimi: 'Kimi',
+  zhipu: 'GLM',
+  yi: 'Yi',
+};
 export const UNKNOWN_LAB = 'Unknown';
 export const OTHER_FAMILY = 'other';
 export const MODEL_IDENTITY_SOURCE = {

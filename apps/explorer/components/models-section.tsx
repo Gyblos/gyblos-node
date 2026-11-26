@@ -20,10 +20,10 @@ import {
 } from '../lib/model-table';
 import { summarizeOffers } from '../lib/offers';
 import { rangeOf, tablePager, type ExplorerQuery } from '../lib/paging';
+import { CatalogModelName } from './catalog-model-name';
 import { pagedRows, Pager } from './pager';
 import {
   EmptyRow,
-  ModelName,
   moneyCell,
   numberCell,
   prefixedColumn,
@@ -177,12 +177,13 @@ function ModelRowView({
   return (
     <tr className="border-t border-line">
       <td className={td}>
-        <ModelName
+        <CatalogModelName
           days={days}
           closed={closed}
           modelId={row.modelId}
           variant={row.variant}
           quantization={row.quantization}
+          withCategories
         />
       </td>
       {row.now ? (
