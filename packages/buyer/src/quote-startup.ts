@@ -10,7 +10,7 @@ import { executeApiKeyFree } from './api-key-execution';
 import { withBuyerApiKeys } from './api-key-runtime';
 import { ownedChat } from './chat-owned';
 import { PAID_BUYER, PAID_BUYER_CODES, PAID_BUYER_HTTP_MS } from './constants';
-import { executeSelectedBuyerFree } from './free-execution';
+import { executeSelectedBuyerFree, unfitOutcome } from './free-execution';
 import { selectWinner, type FreeSelectionOptions } from './free-selection';
 import type { ChatResult } from './free-sse';
 import type { BuyerExecutionFactory } from './free-startup';
@@ -90,6 +90,7 @@ function quoteExecutor(
   buyer: string,
 ): Runtime['execute'] {
   return async (input, signal, onDelta, model, permission) => {
+    let unfit = false;
     const request = routedRequest(context.prepared.config.request, model);
     const routed = await executeBuyerQuote<ChatResult>(
       {
@@ -128,6 +129,10 @@ function quoteExecutor(
               winner,
               executionSignal,
               onDelta,
+              undefined,
+              () => {
+                unfit = true;
+              },
             ),
           ),
         paid: async () => {
@@ -135,7 +140,9 @@ function quoteExecutor(
         },
       },
       signal,
-    );
+    ).catch((error: unknown) => {
+      throw unfit ? unfitOutcome(error) : error;
+    });
     return { ...routed.result, execution: routed.kind };
   };
 }

@@ -1051,12 +1051,13 @@ details matter when you change or debug the endpoint:
   the chosen seller's advertised context, estimating four bytes per token of the
   conversation and tools; the answer then ends with finish reason `length` if it
   runs out. A seller that would leave less than 256 tokens (or less than the
-  requested limit, if smaller) for the answer does not receive the prompt. On
-  the free route the buyer then tries another seller; through a session or an
-  API key the request ends there. When no seller can hold the conversation, when
-  a seller refuses it as too long before answering, or when it is over this
-  endpoint's own size or message count, the error is a 400 that coding agents
-  read as a full context: in the OpenAI format `code` is
+  requested limit, if smaller) for the answer does not receive the prompt, and
+  the buyer tries another seller, on the free route, through a session and with
+  an API key alike. Offers that meter declared usage are fitted with the same
+  count their seller admits by (`DECLARED_METER`). When no seller can hold the
+  conversation, when a seller refuses it as too long before answering, or when
+  it is over this endpoint's own size or message count, the error is a 400 that
+  coding agents read as a full context: in the OpenAI format `code` is
   `context_length_exceeded` (the Gyblos code in `gyblos_code`) and the message
   says the request exceeds the maximum context length; in the Anthropic format
   the message starts with `prompt is too long`. OpenCode and Claude Code then

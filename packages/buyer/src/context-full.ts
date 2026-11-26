@@ -21,5 +21,3 @@ export const contextFull = (body: {
   neverSent: boolean;
   message: string;
 }) => Boolean(body.contextFull) || (body.neverSent && FULL.has(body.message));
-export const endpointLimit = (body: { neverSent: boolean; message: string }) =>
-  body.neverSent && FULL.has(body.message);

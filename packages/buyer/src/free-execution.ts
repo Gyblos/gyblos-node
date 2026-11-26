@@ -4,6 +4,7 @@
 import { createHmac, randomBytes } from 'node:crypto';
 
 import { SELLER_SELECTION_CODES } from '@gyblos/core/constants';
+import { PaidBuyerError } from '@gyblos/node/buyer-paid-error';
 import type { BuyerReceiptEvidence } from '@gyblos/node/receipts';
 import { FREE_EXECUTION_CODES } from '@gyblos/protocol/constants';
 import type {
@@ -20,7 +21,7 @@ import { inferenceNeedsTools } from '@gyblos/protocol/inference';
 import type { TelemetrySink } from '@gyblos/protocol/telemetry';
 import { FreeClientError } from '@gyblos/transport-iroh/free-client';
 
-import { FREE_BUYER, FREE_BUYER_CODES } from './constants';
+import { FREE_BUYER, FREE_BUYER_CODES, PAID_BUYER_CODES } from './constants';
 import { FreeBuyerError } from './free-chat';
 import type { RouteContext } from './free-context';
 import { buyerReceiptObservation } from './free-receipts';
@@ -236,6 +237,7 @@ export async function executeSelectedBuyerFree(
   signal: AbortSignal,
   onDelta?: (text: string) => Promise<void>,
   beforeExecute?: () => void,
+  onUnfit?: () => void,
 ): Promise<FreeExecutionResult | undefined> {
   const result = await attemptSelectedFree(
     input,
@@ -246,7 +248,10 @@ export async function executeSelectedBuyerFree(
     beforeExecute,
     false,
   );
-  if (result instanceof Unfit) throw contextFull();
+  if (result instanceof Unfit) {
+    onUnfit?.();
+    return undefined;
+  }
   return result instanceof Resent ? undefined : result;
 }
 
@@ -261,7 +266,7 @@ async function attemptSelectedFree(
   beforeExecute: (() => void) | undefined,
   resend: boolean,
 ): Promise<FreeExecutionResult | Resent | Unfit | undefined> {
-  const maxTokens = fittedAnswer(input, winner.quote.offer.model.contextTokens);
+  const maxTokens = fittedAnswer(input, winner.quote.offer);
   if (maxTokens === undefined) return new Unfit();
   const request = buildFreeExecutionRequest(
     winner.quote,
@@ -306,4 +311,14 @@ async function attemptSelectedFree(
     if (resend && !visible && resendable(error)) return new Resent(error);
     throw error;
   }
+}
+
+export function unfitOutcome(error: unknown) {
+  const exhausted =
+    (error instanceof FreeSelectionFailure && error.retryAt === undefined) ||
+    (error instanceof FreeBuyerError &&
+      error.code === FREE_BUYER_CODES.UNAVAILABLE) ||
+    (error instanceof PaidBuyerError &&
+      error.code === PAID_BUYER_CODES.UNAVAILABLE);
+  return exhausted ? contextFull() : error;
 }

@@ -7,10 +7,13 @@ import {
   executeBuyerFree,
   executeSelectedBuyerFree,
   FreeSelectionFailure,
+  unfitOutcome,
 } from '@gyblos/buyer/free-execution';
 import { BYTES_PER_TOKEN, MIN_FITTED_ANSWER } from '@gyblos/buyer/input-size';
 import { SELLER_SELECTION_CODES } from '@gyblos/core/constants';
+import { DECLARED_METER } from '@gyblos/node/free-meter';
 import {
+  CONTROL_METERING_MODES,
   ENGINE_DONE_REASONS,
   FREE_EXECUTION_CODES,
 } from '@gyblos/protocol/constants';
@@ -126,21 +129,60 @@ void test('a small seller does not turn a cooling-down network into a full conte
   );
 });
 
-void test('the chosen seller of a session or API key reports a full context it cannot hold', async () => {
+void test('a session or API-key seller that cannot hold the conversation is passed over unsent', async () => {
   const { dependencies, asked } = rig({ a: 100 });
-  await assert.rejects(
-    executeSelectedBuyerFree(
-      input(2000, 4096),
-      dependencies,
-      { nodeId: 'a', quote: withContext(100) },
-      AbortSignal.timeout(5000),
-    ),
-    (error: unknown) =>
-      error instanceof FreeClientError &&
-      error.code === FREE_EXECUTION_CODES.LIMIT &&
-      !error.sent,
+  let unfit = false;
+  const result = await executeSelectedBuyerFree(
+    input(2000, 4096),
+    dependencies,
+    { nodeId: 'a', quote: withContext(100) },
+    AbortSignal.timeout(5000),
+    undefined,
+    undefined,
+    () => {
+      unfit = true;
+    },
   );
+  assert.equal(result, undefined);
+  assert.equal(unfit, true);
   assert.equal(asked.length, 0);
+});
+
+void test('after passing over unfit sellers, an exhausted route reports a full context and a cooling one does not', () => {
+  const full = unfitOutcome(new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE));
+  assert.ok(
+    full instanceof FreeClientError &&
+      full.code === FREE_EXECUTION_CODES.LIMIT &&
+      !full.sent,
+  );
+  const cooling = new FreeSelectionFailure(
+    { ok: false, code: SELLER_SELECTION_CODES.NO_CANDIDATES },
+    Date.now() + 30_000,
+  );
+  assert.equal(unfitOutcome(cooling), cooling);
+});
+
+void test('a declared-usage offer is fitted with the count its seller admits by', async () => {
+  const declared = {
+    ...withContext(8192),
+    offer: {
+      ...withContext(8192).offer,
+      meteringMode: CONTROL_METERING_MODES.DECLARED,
+    },
+  };
+  const request = input(6000, 4096);
+  const asked: number[] = [];
+  await executeBuyerFree(request, {
+    select: async (excluded) => {
+      if (excluded.size) throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE);
+      return { nodeId: 'd', quote: declared };
+    },
+    execute: async (_winner, sent) => {
+      asked.push(sent.input.maxTokens);
+      return ANSWER;
+    },
+  });
+  assert.deepEqual(asked, [8192 - DECLARED_METER.chat(request.messages)]);
 });
 
 const sellerRefusal = new FreeClientError(

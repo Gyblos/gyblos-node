@@ -36,12 +36,12 @@ void test('the automatic runtime forwards open zero-price selection to free exec
       globalThis.winner=${JSON.stringify({ nodeId: request.quote.offer.nodeId, quote: request.quote })};
       const sources={
         './free-selection': "export async function selectWinner(prepared,options,excluded,signal,request,route){globalThis.probe.selections.push({request,route});return globalThis.winner}",
-        './free-execution': "export async function executeSelectedBuyerFree(){globalThis.probe.executions++;return {text:'synthetic',usage:{inputTokens:1,outputTokens:1},finishReason:'${ENGINE_DONE_REASONS.STOP}'}}",
+        './free-execution': "export function unfitOutcome(error){return error} export async function executeSelectedBuyerFree(){globalThis.probe.executions++;return {text:'synthetic',usage:{inputTokens:1,outputTokens:1},finishReason:'${ENGINE_DONE_REASONS.STOP}'}}",
         './session-requirements': "export function endpointToken(){return undefined} export function checkDesktopPool(){throw Error('unexpected channel check')} export function checkPaidSellerRequest(){throw Error('unexpected paid check')} export function payments(){globalThis.probe.payments++;throw Error('unexpected payments')} export function tokenizer(){throw Error('unexpected tokenizer')}",
         '@gyblos/node/buyer-chain': "export async function buyerPaymentsUnresolved(){return false} export function buyerChainPayments(){globalThis.probe.payments++;throw Error('unexpected chain')}"
       };
       registerHooks({resolve(name,context,next){
-        const source=(context.parentURL===${JSON.stringify(target)} || context.parentURL===new URL('./session-startup.ts',${JSON.stringify(target)}).href)?sources[name]:undefined;
+        const source=[${JSON.stringify(target)},new URL('./session-startup.ts',${JSON.stringify(target)}).href,new URL('./session-free.ts',${JSON.stringify(target)}).href].includes(context.parentURL)?sources[name]:undefined;
         return source?{url:'data:text/javascript,'+encodeURIComponent(source),shortCircuit:true}:next(name,context);
       }});
       const {quoteBuyerExecution}=await import('@gyblos/buyer/quote-startup');

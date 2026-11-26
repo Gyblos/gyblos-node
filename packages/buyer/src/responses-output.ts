@@ -10,7 +10,7 @@ import type { FreeExecutionStop } from '@gyblos/protocol/free-execution';
 
 import type { ChatErrorBody } from './chat-api';
 import { FREE_BUYER, RESPONSES_CODES } from './constants';
-import { contextFull, endpointLimit } from './context-full';
+import { contextFull } from './context-full';
 import {
   executionFields,
   paymentFields,
@@ -112,7 +112,7 @@ export const responsesError = (body: ChatErrorBody) => ({
       : !body.neverSent
         ? RESPONSES_CODES.stopped
         : body.code,
-    ...(!body.neverSent || endpointLimit(body)
+    ...(!body.neverSent || contextFull(body)
       ? { [RESPONSES_CODES.field]: body.code }
       : {}),
     ...body.extra,
