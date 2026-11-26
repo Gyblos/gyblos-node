@@ -104,7 +104,7 @@ export function discoveryAdmission(policy?: DiscoveryAdmission) {
       // Negative observations still persist withdrawal/conflict floors and immediately release eligibility.
       if (configured.has(row.nodeId) || !discoveryRowLive(row, now))
         return true;
-      if (prior) return true;
+      if (prior || (inUse.get(row.nodeId) ?? 0) > now) return true;
       return admitted([...rows.values(), row], now).has(row.nodeId);
     },
   };

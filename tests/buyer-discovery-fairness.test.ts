@@ -174,3 +174,28 @@ void test('a seller chosen by hand is permitted even when its owner already hold
   state.use(chosen.nodeId);
   assert.equal(await permits(), true);
 });
+
+void test('a seller chosen by hand is stored and permitted on its first observation', async (t) => {
+  const { f } = await liveFixture(t, BUYER_DISCOVERY.openPerOwner, () =>
+    capacityOwner(0),
+  );
+  const state = await f.open();
+  const fifth = f.seller(BUYER_DISCOVERY.openPerOwner + 1);
+  const chosen = {
+    ...fifth,
+    catalog: { ...fifth.catalog, owner: capacityOwner(0) },
+    presence: { ...fifth.presence!, owner: capacityOwner(0) },
+  };
+  state.use(chosen.catalog.nodeId);
+  assert.equal(await state.observe(chosen), true);
+  const row = (await f.saved()).rows.at(-1) as { catalogDigest: string };
+  assert.equal(
+    await state.permits(
+      capacityOwner(0),
+      chosen.catalog.nodeId,
+      row.catalogDigest,
+      f.now(),
+    ),
+    true,
+  );
+});
