@@ -147,6 +147,7 @@
   gap: var(--space-2);
 }
 .desktop-frame .ui-inline-spinner {
+  display: inline-flex;
   width: var(--space-3);
   height: var(--space-3);
   flex: none;
@@ -158,6 +159,11 @@
 @media (prefers-reduced-motion: reduce) {
   .desktop-frame .ui-inline-spinner {
     animation: none;
+  }
+}
+@keyframes pk-spin {
+  to {
+    rotate: 360deg;
   }
 }
 .desktop-frame .ui-swatch {

@@ -36,7 +36,10 @@ export function ComposerFunding({
         ) : funding?.balanceAtomic == null ? (
           'Balance · ' + balanceStatus
         ) : (
-          fundingAmount(funding.balanceAtomic)
+          <>
+            <span className="sr-only">Balance · last checked · </span>
+            {fundingAmount(funding.balanceAtomic)}
+          </>
         )}
       </span>
       <span className="pk-tab-item pk-tab-limit">

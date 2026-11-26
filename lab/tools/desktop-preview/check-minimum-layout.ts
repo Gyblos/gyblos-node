@@ -5,8 +5,14 @@ export async function checkMinimumLayout() {
 
   async function visible(selector: string) {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      const element = document.querySelector<HTMLElement>(selector);
-      if (element?.getBoundingClientRect().width) return element;
+      const element = Array.from(
+        document.querySelectorAll<HTMLElement>(selector),
+      ).find(
+        (candidate) =>
+          !candidate.closest('.slide-stage') &&
+          candidate.getBoundingClientRect().width,
+      );
+      if (element) return element;
       await new Promise((resolve) => setTimeout(resolve, pollMs));
     }
     throw new Error('Missing ' + selector);
@@ -76,8 +82,7 @@ export async function checkMinimumLayout() {
   picker.click();
 
   let releaseReturn:
-    | ((value: Awaited<ReturnType<typeof read>>) => void)
-    | undefined;
+    ((value: Awaited<ReturnType<typeof read>>) => void) | undefined;
   const returning = new Promise<Awaited<ReturnType<typeof read>>>((resolve) => {
     releaseReturn = resolve;
   });

@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, useSyn
 
 import { AGENT_TOOLS, type AgentTool } from '@gyblos/node/agent-setup-constants';
 
-import { CHAT_FILTER, CHAT_STATE, PREVIEW_DENSITY } from '../../../../lab/tools/desktop-preview/constants';
+import { CHAT_FILTER, CHAT_STATE, PREVIEW_DENSITY, PREVIEW_FUNDING } from '../../../../lab/tools/desktop-preview/constants';
 import { DESKTOP_UPDATE } from '../constants';
 import { observeDesktopUpdates } from '../update-session';
 import { AddBuyerFunds } from './BuyerFunding';
@@ -367,12 +367,11 @@ declare global {
 }
 export const FUNDS_HOST = { CHAT: 'chat', PAYMENTS: 'payments' } as const;
 type FundsHost = (typeof FUNDS_HOST)[keyof typeof FUNDS_HOST];
-const FUNDS = { READY_ATOMIC: 2_000_000, ATOMIC_PER_USDC: 1_000_000 } as const;
 const fundsListeners = new Set<() => void>();
 function fundsState() {
   const funding = new URLSearchParams(location.search).get('funding');
   window.previewFunds ??= {
-    atomic: funding === 'ready' || funding === 'checking' ? FUNDS.READY_ATOMIC : 0,
+    atomic: funding === PREVIEW_FUNDING.READY || funding === PREVIEW_FUNDING.CHECKING ? PREVIEW_FUNDING.READY_ATOMIC : 0,
     open: false,
   };
   return window.previewFunds;
@@ -394,7 +393,7 @@ export function usePreviewBalance() {
   return useSyncExternalStore(subscribeFunds, () => fundsState().atomic);
 }
 export function previewUsdc(atomic: number) {
-  return (atomic / FUNDS.ATOMIC_PER_USDC).toFixed(2) + ' USDC';
+  return (atomic / PREVIEW_FUNDING.ATOMIC_PER_USDC).toFixed(2) + ' USDC';
 }
 type FundsModel = { id: string; name: string; free: boolean };
 export function usePreviewFunds(model: { name: string; free: boolean }, applies: boolean, models: readonly FundsModel[]) {
@@ -661,7 +660,10 @@ export function PreviewComposerTab({
                   Checking balance…
                 </>
               ) : (
-                previewUsdc(atomic)
+                <>
+                  <span className="sr-only">Balance · last checked · </span>
+                  {previewUsdc(atomic)}
+                </>
               )}
             </span>
             <span className="pk-tab-item pk-tab-limit" title="Spending limit used">
@@ -689,7 +691,7 @@ export function PreviewFundsDialog({ host, description }: { host: FundsHost; des
       {open && (
         <Modal title={'Add funds · ' + network} description={description} close={() => updateFunds({ open: false })}>
           {network === 'Testnet' ? <AddBuyerFunds /> : <PreviewMainnetFunds />}
-          <Button className="wide" onClick={() => updateFunds({ atomic: FUNDS.READY_ATOMIC, open: false })}>
+          <Button className="wide" onClick={() => updateFunds({ atomic: PREVIEW_FUNDING.READY_ATOMIC, open: false })}>
             Preview: simulate 2 USDC arriving
           </Button>
         </Modal>

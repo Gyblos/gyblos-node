@@ -3,6 +3,12 @@ export const PREVIEW_DENSITY = {
   COMPACT: 'compact',
   COMFORTABLE: 'comfortable',
 } as const;
+export const PREVIEW_FUNDING = {
+  READY: 'ready',
+  CHECKING: 'checking',
+  READY_ATOMIC: 2_000_000,
+  ATOMIC_PER_USDC: 1_000_000,
+} as const;
 export const CHAT_FILTER = {
   ALL: 'All chats',
   UNREAD: 'Unread',

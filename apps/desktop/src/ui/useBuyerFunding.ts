@@ -18,6 +18,7 @@ export function useBuyerFunding(
   useEffect(() => {
     if (!enabled) return;
     let active = true;
+    setSnapshot(undefined);
     async function read() {
       let funding: BuyerFunding | null;
       try {
