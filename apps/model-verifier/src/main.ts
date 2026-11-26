@@ -172,7 +172,7 @@ async function publishOutput(
 }
 
 async function verify(values: Record<string, string | undefined>) {
-  if (!values.seller || !values.model) throw usage();
+  if (!values.seller || !values.model || values.out === '') throw usage();
   const { openSeller, parseSellerTarget } = await import('./seller');
   const { bindEndpoint } = await import('@gyblos/transport-iroh/endpoint');
   const modelId = catalogModelId(values.model);
