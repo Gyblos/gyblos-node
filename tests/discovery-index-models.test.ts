@@ -2,6 +2,7 @@
 // first; a seller without a live presence, or that withdrew its catalog, does not count; the route takes no
 // parameters and is cached and CORS-readable like a sellers page. Both storage adapters.
 import assert from 'node:assert/strict';
+import test from 'node:test';
 
 import {
   MODEL_IDENTITY_SOURCE,
@@ -150,3 +151,12 @@ eachStorage(
     );
   },
 );
+
+void test('the model catalog wire values stay as documented', () => {
+  assert.deepEqual(MODEL_IDENTITY_SOURCE, {
+    RULES: 'rules',
+    FALLBACK: 'fallback',
+  });
+  assert.equal(OTHER_FAMILY, 'other');
+  assert.equal(UNKNOWN_LAB, 'Unknown');
+});

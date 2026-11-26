@@ -414,7 +414,7 @@ is `400 INVALID_QUERY`):
 ## Model catalog
 
 `GET /v1/models/catalog` takes no parameters and returns the `/v1/models` list
-with three more fields per model:
+(at most 500 models) with three more fields per model:
 
 ```json
 {

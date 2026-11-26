@@ -162,7 +162,6 @@ function catalogResults(
   discovery: Awaited<ReturnType<typeof getDiscovery>>,
   collector: Awaited<ReturnType<typeof getCollector>>,
 ) {
-  const lower = term.toLowerCase();
   const models = modelRows(summarizeOffers(discovery).models, collector.models);
   const results = models
     .filter((model) => modelMatches(model, term))
