@@ -237,13 +237,12 @@ publishes `result.json` (the signed result) and `evidence.json` (the prompts,
 the answers and every check, plus any reply that could not be scored and why)
 together in a new result directory. Publication is atomic for readers, but it
 does not fsync the files or directories, so an operating-system crash or power
-loss can still lose the new directory or leave incomplete artifacts. If you
-pass `--out`, choose a path that does not already exist. `check` verifies a
-result's signature and that its rule matches the published challenge set, and
-prints its verdict. `pnpm model-verifier address` prints the verifier's public
-address. The verifier key is created on first use in
-`model-verifier/verifier.key` inside the Gyblos home directory. The docs site
-explains the results for sellers:
+loss can still lose the new directory or leave incomplete artifacts. If you pass
+`--out`, choose a path that does not already exist. `check` verifies a result's
+signature and that its rule matches the published challenge set, and prints its
+verdict. `pnpm model-verifier address` prints the verifier's public address. The
+verifier key is created on first use in `model-verifier/verifier.key` inside the
+Gyblos home directory. The docs site explains the results for sellers:
 [Model verification](https://docs.gyblos.com/en/sellers/model-verification). The
 app uses public package entries only (protocol, core, the Iroh transport and the
 Ollama engine's chat template) and never imports the buyer, node or desktop
