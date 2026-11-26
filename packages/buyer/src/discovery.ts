@@ -23,6 +23,7 @@ import {
   BUYER_SELECTION_CODES,
 } from './constants';
 import type { BuyerDiscoveryConfig } from './discovery-config';
+import { readIndexPages } from './discovery-pages';
 import type { BuyerDiscoveryState } from './discovery-storage';
 import {
   BuyerSelectionError,
@@ -146,10 +147,7 @@ async function readAllPages(
   now: () => number,
   signal: AbortSignal,
 ) {
-  const entries: DiscoveredSeller[] = [];
-  const cursors = new Set<string>();
-  let cursor: string | undefined;
-  for (let page = 0; page < config.discovery.maxPages; page++) {
+  const read = async (cursor: string | undefined) => {
     signal.throwIfAborted();
     // Keep equal-sequence entries visible for digest comparison: a fork across pages reaches the store
     // through every remembered entry of a trusted seller (within one page the client keeps one entry per
@@ -166,14 +164,13 @@ async function readAllPages(
       cursor,
     });
     signal.throwIfAborted();
-    entries.push(...result.sellers);
-    if (result.next === null) return entries;
-    if (cursors.has(result.next) || page + 1 >= config.discovery.maxPages)
-      throw new BuyerSelectionError(BUYER_SELECTION_CODES.DISCOVERY_LIMIT);
-    cursors.add(result.next);
-    cursor = result.next;
-  }
-  return entries;
+    return result;
+  };
+  return readIndexPages(
+    read,
+    config.discovery.maxPages,
+    options.random ?? cryptoRandom,
+  );
 }
 
 // A NodeId the index lists: its newest entry, and every entry in index order. Once its identity is

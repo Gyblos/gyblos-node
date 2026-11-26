@@ -109,12 +109,14 @@ To use the default index, add `discovery` to the buyer's `selection.json`:
 ```
 
 Inside `discovery` you can set `baseUrl` (same URL policy as the client) and
-`maxPages` (1 to 8, default 3). Each page asks for 200 entries, the index's
-largest page, and the whole discovery step has a 10-second deadline. A cursor
-cycle, or a non-final page at the page cap, fails with `BUYER_DISCOVERY_LIMIT`,
-and no quotes are requested. An index error stops selection; it never switches
-the buyer to a different payment path. The rest of `selection.json` is described
-in
+`maxPages` (1 to 8, default 8). Each page asks for 200 entries, the index's
+largest page, and the whole discovery step has a 10-second deadline. The buyer
+reads every page up to `maxPages`. When the index has more, it reads `maxPages`
+pages again starting from a random NodeId and wrapping around to the start, so
+no NodeId range is favoured; it never fails because there are many sellers. A
+cursor cycle fails with `BUYER_DISCOVERY_LIMIT`, and no quotes are requested. An
+index error stops selection; it never switches the buyer to a different payment
+path. The rest of `selection.json` is described in
 [running-a-node.md](running-a-node.md#optional-buyer-selection-and-discovery).
 
 The index only supplies candidate NodeIds. The `sellers` list in
@@ -200,36 +202,19 @@ Open discovery has its own bounds:
   `declared-usage` badge, live records). It looks up the seller that served the
   conversation before and the one still holding it warm first, then the rest in
   a random order, so which sellers get a lookup never depends on the index's
-  order. When the 64 slots below are full, a lookup can still reach a seller
-  that then does not enter them.
+  order.
 - Each selection makes at most 16 identity lookups of index-only sellers.
   Configured sellers are checked on every selection besides. A failed check of
   an index-only seller (a registry refusal, an RPC failure, or a full identity
   history) skips that NodeId and owner for five minutes in this process, for at
   most 1,024 pairs.
-- At most 64 live unconfigured candidates are eligible at once, plus the sellers
-  in use below, counted under the discovery lock from signed expiry and
-  withdrawal or conflict state. Expiry, withdrawal or conflict frees a slot
-  without deleting any replay floor. Registry refusals take no slot.
-- Which stored live sellers fill the 64 slots is drawn again every 10 minutes.
-  The buyer ranks them with a random seed kept only in memory, drawn again
-  whenever the buyer starts, so a low NodeId or an early arrival wins nothing.
-  One owner fills at most 4 slots, so over time each owner with a stored live
-  seller gets a similar chance, and an owner with more than 4 shares its 4 slots
-  among them. This only raises the cost of a capture: an operator that registers
-  many owners and NodeIds still gets a share in proportion to them.
-- A seller this buyer used in the last 10 minutes, or the seller a user chose by
-  hand in the desktop app, keeps its slot when the window changes or the draw
-  would leave it out, so a conversation stays with its seller; at most 16 such
-  sellers are kept.
-- A newly seen seller is stored only if it would enter the slots now. A stored
-  seller outside the slots still records each newer presence, so its replay
-  floors keep moving.
-- Configured sellers never count toward the 64.
+- Every looked-up seller with a verified identity and live signed records is
+  eligible; there is no cap on how many. Expiry, withdrawal or conflict ends
+  eligibility without deleting any replay floor. Ranking among eligible sellers
+  is the selection's job, not admission's.
 - Identity and discovery histories each keep at most 1,024 rows, with room for
   configured sellers. A full history refuses new identities without affecting
-  known ones. Rows are never pruned, so an operator with many registered NodeIds
-  can fill an open-discovery buyer's history over time.
+  known ones.
 
 ## Seller duties
 

@@ -188,7 +188,7 @@ void test('cross-page same-sequence catalog forks are persisted as blocked, neve
     await home.close();
   }
 });
-void test('pagination loops and page caps fail closed without control queries', async () => {
+void test('a pagination loop fails closed and the page ceiling rereads instead of failing', async () => {
   const home = await discoveryHome();
   const run = await discoveryRun();
   try {
@@ -204,18 +204,20 @@ void test('pagination loops and page caps fail closed without control queries', 
       { code: BUYER_SELECTION_CODES.DISCOVERY_LIMIT },
     );
     assert.equal(calls, 2);
-    await assert.rejects(
-      discoverBuyerSellers(
-        { ...run.config, discovery: { ...run.config.discovery, maxPages: 1 } },
-        home.state,
-        {
-          fetch: async () => discoveryResponse([], 'next'),
-          now: run.context.now,
+    let pages = 0;
+    const capped = await discoverBuyerSellers(
+      { ...run.config, discovery: { ...run.config.discovery, maxPages: 1 } },
+      home.state,
+      {
+        fetch: async () => {
+          pages++;
+          return discoveryResponse([], 'next');
         },
-      ),
-      { code: BUYER_SELECTION_CODES.DISCOVERY_LIMIT },
+        now: run.context.now,
+      },
     );
-    assert.equal(run.wire.queries, 2);
+    assert.equal(pages, 2);
+    assert.ok(capped.sellers.length <= run.config.sellers.length);
   } finally {
     await run.wire.close();
     await home.close();

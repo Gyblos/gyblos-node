@@ -151,8 +151,7 @@ function admittedObservation(
     incoming,
     allowOwnerChange,
   );
-  if (admission && !admission.accepts(current, result.row, admission.now()))
-    return undefined;
+  if (admission && !admission(current, incoming.nodeId)) return undefined;
   if (
     !current.has(incoming.nodeId) &&
     current.size >= BUYER_DISCOVERY.maxStateRows
@@ -178,21 +177,17 @@ export async function buyerDiscoveryState(
     ) {
       if (failed) unavailable();
       return identities.filter((identity) =>
-        matchesDiscovery(rows, identity, now, admission),
+        matchesDiscovery(rows, identity, now),
       );
     },
     async permits(owner: string, nodeId: string, digest: string, now: number) {
       if (failed) unavailable();
       await privateDirectory(directory);
       rows = await readMonotonicRows(path, rows);
-      const permitted =
+      return (
         rows.get(nodeId)?.catalogDigest === digest &&
-        matchesDiscovery(rows, { owner, nodeId }, now, admission);
-      if (permitted) admission?.hold(nodeId, now);
-      return permitted;
-    },
-    use(nodeId: string) {
-      admission?.hold(nodeId, admission.now());
+        matchesDiscovery(rows, { owner, nodeId }, now)
+      );
     },
     async observe(
       seller: KnownSeller,

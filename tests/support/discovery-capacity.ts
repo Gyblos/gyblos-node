@@ -3,8 +3,6 @@ import { readFile, realpath, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { TestContext } from 'node:test';
 
-import { getBase58Decoder } from '@solana/kit';
-
 import { BUYER_DISCOVERY } from '@gyblos/buyer/constants';
 import {
   discoveryObservation,
@@ -19,18 +17,7 @@ import { CONTROL_RECORD_VERSION } from '@gyblos/protocol/constants';
 import { discoveryHome, discoveryRun } from './buyer-discovery';
 
 export const capacityNode = (n: number) => n.toString(16).padStart(64, '0');
-export const lastRankedNode = (n: number) =>
-  'f'.repeat(48) + n.toString(16).padStart(16, '0');
-export function capacityOwner(n: number) {
-  const bytes = new Uint8Array(32).fill(0xff);
-  new DataView(bytes.buffer).setUint32(28, n);
-  return getBase58Decoder().decode(bytes);
-}
-export async function discoveryCapacityFixture(
-  t: TestContext,
-  count: number = BUYER_DISCOVERY.openSellers,
-  owner: (n: number) => string = capacityOwner,
-) {
+export async function discoveryCapacityFixture(t: TestContext, count = 4) {
   const home = await discoveryHome();
   home.environment.GYBLOS_HOME = await realpath(home.directory);
   const run = await discoveryRun();
@@ -43,14 +30,11 @@ export async function discoveryCapacityFixture(
     homeLayout(home.environment).roles.buyer,
     BUYER_DISCOVERY.stateFile,
   );
-  const sellerAt = (nodeId: string, ownerId: string): KnownSeller => ({
+  const seller = (n: number): KnownSeller => ({
     ...run.known,
-    catalog: { ...run.known.catalog, owner: ownerId, nodeId },
-    presence: { ...run.known.presence!, owner: ownerId, nodeId },
+    catalog: { ...run.known.catalog, nodeId: capacityNode(n) },
+    presence: { ...run.known.presence!, nodeId: capacityNode(n) },
   });
-  const seller = (n: number) => sellerAt(capacityNode(n), owner(n));
-  const lastRanked = (n: number) =>
-    sellerAt(lastRankedNode(n), capacityOwner(n + 100_000));
   const rows: DiscoveryRow[] = [];
   for (let n = 1; n <= count; n++)
     rows.push(await discoveryObservation(seller(n)));
@@ -65,18 +49,13 @@ export async function discoveryCapacityFixture(
       { mode: FILE_MODES.privateFile },
     );
   await write(rows);
-  const policy: {
-    configuredNodeIds: string[];
-    now: () => number;
-    rank: (nodeId: string, window: number) => string;
-  } = { configuredNodeIds: [], now: () => now, rank: (nodeId) => nodeId };
+  const policy = { configuredNodeIds: [] as string[] };
   return {
     home,
     run,
     path,
     rows,
     seller,
-    lastRanked,
     policy,
     write,
     now: () => now,
