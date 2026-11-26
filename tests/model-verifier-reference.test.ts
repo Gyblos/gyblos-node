@@ -94,6 +94,8 @@ void test('a verification run refuses to sign when the reference changed', async
 
 void test('empty reference candidates are retried and cannot produce a signed seller verdict', async () => {
   const home = await mkdtemp(join(tmpdir(), 'gyblos-verifier-ref-'));
+  const previousHome = process.env.GYBLOS_HOME;
+  process.env.GYBLOS_HOME = home;
   try {
     let calls = 0;
     let recover = false;
@@ -150,6 +152,8 @@ void test('empty reference candidates are retried and cannot produce a signed se
     assert.equal(signed.result.verdict, MODEL_VERIFICATION_VERDICTS.PASS);
     assert.equal(calls, signed.result.evidence.checks + 1);
   } finally {
+    if (previousHome === undefined) delete process.env.GYBLOS_HOME;
+    else process.env.GYBLOS_HOME = previousHome;
     await rm(home, { recursive: true, force: true });
   }
 });
