@@ -74,7 +74,15 @@ async function withVerifier(
         String(input).endsWith('/api/generate')
           ? Response.json({
               logprobs: [
-                { top_logprobs: [{ token: ' scored', logprob: -0.1 }] },
+                {
+                  top_logprobs: Array.from(
+                    { length: CHALLENGE_SET.rule.topLogprobs },
+                    (_, index) => ({
+                      token: index === 0 ? ' scored' : ` token${index}`,
+                      logprob: -0.1,
+                    }),
+                  ),
+                },
               ],
             })
           : Response.json({
