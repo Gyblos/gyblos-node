@@ -7,7 +7,7 @@ export function ModelLogo({
   view,
 }: {
   modelId: string;
-  view: Pick<ModelView, 'family' | 'familyName'>;
+  view: Pick<ModelView, 'family'>;
 }) {
   const { family } = view;
   if (!family)
@@ -23,7 +23,6 @@ export function ModelLogo({
   return (
     <span
       aria-hidden
-      title={view.familyName ?? family}
       className="inline-flex size-5 shrink-0 items-center justify-center rounded-md bg-raised"
     >
       <span className="size-3.5 bg-ink" style={{ mask, WebkitMask: mask }} />

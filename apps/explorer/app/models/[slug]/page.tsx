@@ -1,8 +1,10 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
-import { CatalogModelName } from '../../../components/catalog-model-name';
-import { ModelCategories } from '../../../components/model-categories';
+import {
+  CatalogCategories,
+  CatalogModelName,
+} from '../../../components/catalog-model-name';
 import { ModelLogo } from '../../../components/model-logo';
 import { OfferPriceHistory } from '../../../components/offer-price-history';
 import { PageFrame } from '../../../components/page-frame';
@@ -38,11 +40,7 @@ import {
   utc,
 } from '../../../lib/format';
 import { mergedLatency } from '../../../lib/latency';
-import {
-  modelMaker,
-  modelView,
-  type CatalogModels,
-} from '../../../lib/model-catalog';
+import { modelMaker, modelView } from '../../../lib/model-catalog';
 import { getOfferPriceHistory } from '../../../lib/offer-price-history';
 import { modelFromSlug, modelHref, modelKey } from '../../../lib/offers';
 import {
@@ -260,14 +258,12 @@ function OffersTable({
   );
 }
 
-function ModelHeading({
+async function ModelHeading({
   model,
-  models,
 }: {
   model: NonNullable<ReturnType<typeof modelFromSlug>>;
-  models: CatalogModels;
 }) {
-  const view = modelView(models, model.modelId);
+  const view = modelView((await getDiscovery()).models, model.modelId);
   return (
     <span className="flex items-center gap-3">
       <ModelLogo modelId={model.modelId} view={view} />
@@ -277,7 +273,6 @@ function ModelHeading({
         <span className="block font-mono text-sm text-muted">
           {[model.variant, model.quantization].filter(Boolean).join(' · ')}
         </span>
-        <ModelCategories categories={view.categories} />
       </span>
     </span>
   );
@@ -317,10 +312,8 @@ export default async function ModelPage({
       .map((item) => [modelKey(item), item]),
   );
   return (
-    <PageFrame
-      title={<ModelHeading model={model} models={discovery.models} />}
-      crumb="Model"
-    >
+    <PageFrame title={<ModelHeading model={model} />} crumb="Model">
+      <CatalogCategories modelId={model.modelId} />
       <Link
         className="mt-2 inline-block text-sm text-muted hover:text-ink hover:underline"
         href={directoryHref(PAGES.models, query, 'models')}

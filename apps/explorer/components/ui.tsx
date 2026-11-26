@@ -13,7 +13,7 @@ import {
   FULL_OVERVIEW,
   overviewLayout,
 } from '../lib/layout';
-import { modelView, type CatalogModels } from '../lib/model-catalog';
+import * as catalog from '../lib/model-catalog';
 import { modelHref } from '../lib/offers';
 import { sortHref, type ExplorerQuery, type SortedTable } from '../lib/paging';
 import type { RangeDays, RangeSection } from '../lib/range';
@@ -375,9 +375,10 @@ export function ModelName({
   modelId: string;
   variant: string | null;
   quantization: string | null;
-  models?: Readonly<CatalogModels>;
+  models?: Readonly<catalog.CatalogModels>;
 }) {
-  const view = modelView(models, modelId);
+  const view = catalog.modelView(models, modelId);
+  const maker = catalog.modelMaker(view);
   const detail = [variant, quantization].filter(Boolean).join(' ');
   return (
     <Link
@@ -387,7 +388,7 @@ export function ModelName({
     >
       <ModelLogo modelId={modelId} view={view} />
       <span className="truncate">
-        <span className="block text-xs font-sans text-muted">{view.lab}</span>
+        <span className="block text-xs font-sans text-muted">{maker}</span>
         {modelId}
         {detail ? (
           <span className="ml-2 font-mono text-xs text-dim">{detail}</span>

@@ -20,7 +20,7 @@ import {
   type Uptime,
 } from './discovery-shape';
 import { fetchJson } from './fetch-json';
-import { parseCatalogModels, type CatalogModels } from './model-catalog';
+import { parseCatalog, type CatalogModels } from './model-catalog';
 import { parseNetworkStatus, type NetworkStatus } from './network-status';
 import { list, nullable, num, record, text } from './validate';
 
@@ -129,8 +129,7 @@ async function begin(
   last: Catalog | null,
 ): Promise<Pending> {
   const listed = record(await run.read('/models/catalog'), 'models');
-  const models = parseCatalogModels(listed);
-  const modelIds = Object.keys(models);
+  const { ids: modelIds, models } = parseCatalog(listed);
   const network =
     run.left > 0
       ? await run

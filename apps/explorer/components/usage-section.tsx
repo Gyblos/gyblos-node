@@ -9,6 +9,7 @@ import {
 
 import { type NetworkBuyers, type NetworkDay } from '../lib/collector';
 import { DISPLAY, PAGING } from '../lib/constants';
+import { getDiscovery } from '../lib/discovery-render';
 import { count, usdcDecimal } from '../lib/format';
 import { tablePager, type ExplorerQuery } from '../lib/paging';
 import type { RangeDays } from '../lib/range';
@@ -191,6 +192,7 @@ export async function UsageSection({
   reportPromise: ReturnType<typeof readComparison>;
 }) {
   const days = query.days;
+  void getDiscovery();
   const report = await reportPromise;
   const focus =
     query.metric === 'tokens' || query.metric === 'requests'

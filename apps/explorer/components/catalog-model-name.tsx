@@ -23,3 +23,8 @@ export async function CatalogModelName({
     </>
   );
 }
+
+export async function CatalogCategories({ modelId }: { modelId: string }) {
+  const { models } = await getDiscovery();
+  return <ModelCategories categories={modelView(models, modelId).categories} />;
+}

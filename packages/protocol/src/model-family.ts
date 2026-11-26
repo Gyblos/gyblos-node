@@ -54,6 +54,12 @@ export function modelFamily(modelId: string): ModelFamily | null {
   return PUBLISHERS.get(publisher) ?? familyByName(name);
 }
 
+export function namedFamily(modelId: string): ModelFamily | null {
+  const [publisher, name] = modelId.toLowerCase().split('/');
+  const named = name ?? publisher;
+  return named ? familyByName(named) : null;
+}
+
 const LABS: Record<ModelFamily, string> = {
   qwen: 'Alibaba · Qwen',
   meta: 'Meta',
@@ -124,5 +130,3 @@ export function modelIdentity(modelId: string): ModelIdentity {
     source: MODEL_IDENTITY_SOURCE.FALLBACK,
   };
 }
-
-export const modelLab = (modelId: string) => modelIdentity(modelId).lab;

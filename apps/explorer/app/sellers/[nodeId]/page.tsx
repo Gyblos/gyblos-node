@@ -87,7 +87,7 @@ export default async function SellerPage({ params, searchParams }: Props) {
         <Suspense fallback={<Loading cards />}>
           <SellerActivity nodeId={nodeId} query={query} />
         </Suspense>
-        <OfferPriceHistory history={history} />
+        <OfferPriceHistory history={history} models={snapshot.models} />
       </QueryRegion>
       <Suspense fallback={<Loading />}>
         <SellerTxs nodeId={nodeId} query={query} />

@@ -1,9 +1,11 @@
+import type { ModelCategory } from '@gyblos/protocol/model-categories';
+
 import { Chip } from './board/chip';
 
 export function ModelCategories({
   categories,
 }: {
-  categories: readonly string[];
+  categories: readonly ModelCategory[];
 }) {
   if (!categories.length) return null;
   return (
