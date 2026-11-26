@@ -140,6 +140,14 @@ void test('verify does not add a result to an existing output directory', async 
   });
 });
 
+void test('verify rejects an empty output path before verification', async (t) => {
+  await withVerifier(t, async (_parent, verify, lastError, fetchCalls) => {
+    assert.equal(await verify(''), 1);
+    assert.deepEqual(lastError(), ['{"ok":false,"code":"USAGE"}']);
+    assert.equal(fetchCalls(), 0);
+  });
+});
+
 void test('verify rejects an output created during publication', async (t) => {
   await withVerifier(t, async (parent, verify, lastError, fetchCalls) => {
     const out = join(parent, 'run');
