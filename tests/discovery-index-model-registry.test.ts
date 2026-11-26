@@ -334,7 +334,7 @@ void test('the operator script refuses bad input with exit code 2 and touches no
     throw new Error('wrangler failed');
   })(['--unclassified', '--remote']);
   assert.equal(broken.code, 2);
-  assert.equal(broken.err, 'The model registry check could not read D1.\n');
+  assert.equal(broken.err, 'The model registry command could not reach D1.\n');
 });
 
 void test('unclassified lists the live catalog models without an entry and exits 1 until none remain', async (context) => {
@@ -351,6 +351,9 @@ void test('unclassified lists the live catalog models without an entry and exits
   await publishCatalog(call, ['qwen3-0.6b', 'acme/new-1b']);
   await publishCatalog(call, ['acme/new-1b']);
   await publishCatalog(call, ['offline/only'], false);
+  db.raw.exec(
+    `insert into discovery_model_registry (model_id, family, lab, categories_json, updated_at) values ('acme/new-1b', 'qwen', 'Lab', '["poetry"]', 1)`,
+  );
   const run = admin(db);
   const open = run(['--unclassified', '--remote']);
   assert.equal(open.code, 1);

@@ -1,6 +1,6 @@
 import { parseArgs } from 'node:util';
 
-import { asc, eq, isNull } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
 
 import { controlIdentifier } from '@gyblos/protocol/control-validation';
 import {
@@ -9,8 +9,8 @@ import {
 } from '@gyblos/protocol/model-categories';
 import { isMain } from '@gyblos/runtime';
 
-import { DISCOVERY_INDEX_LIMITS, MODEL_REGISTRY } from '../src/constants';
-import { isRegistryFamily } from '../src/model-registry';
+import { MODEL_REGISTRY } from '../src/constants';
+import { isRegistryFamily, storedEntry } from '../src/model-registry';
 import { modelRegistry as table } from '../src/schema';
 import { modelsQuery } from '../src/storage-queries';
 import {
@@ -23,7 +23,7 @@ import {
 
 const USAGE =
   'usage: pnpm index:models [--remote]\n       pnpm index:models --unclassified [--remote]\n       pnpm index:models --set <model> --family <family> --lab <lab> --categories <a,b> --local|--remote\n       pnpm index:models --remove <model> --local|--remote\n';
-const READ_FAILED = 'The model registry check could not read D1.\n';
+const D1_FAILED = 'The model registry command could not reach D1.\n';
 const { exitPending, exitFailure } = MODEL_REGISTRY;
 
 export interface ModelRegistryIo {
@@ -71,16 +71,18 @@ export const removeSql = (modelId: string) =>
 
 export const unclassifiedSql = (now: number) =>
   compileSql((database) => {
-    const live = modelsQuery(
-      database,
-      now,
-      DISCOVERY_INDEX_LIMITS.maxModels,
-    ).as('live');
+    const live = modelsQuery(database, now, MODEL_REGISTRY.maxListedRows).as(
+      'live',
+    );
     return database
-      .select({ modelId: live.modelId })
+      .select({
+        modelId: live.modelId,
+        family: table.family,
+        lab: table.lab,
+        categories: table.categories,
+      })
       .from(live)
       .leftJoin(table, eq(table.modelId, live.modelId))
-      .where(isNull(table.modelId))
       .orderBy(asc(live.modelId));
   });
 
@@ -118,10 +120,23 @@ function list(io: ModelRegistryIo, remote: boolean) {
 }
 
 function unclassified(io: ModelRegistryIo, remote: boolean) {
-  const rows = io.query(unclassifiedSql(io.now()), remote);
-  for (const row of rows) io.stdout(`${cellText(field(row, 'model_id'))}\n`);
-  io.stdout(`${rows.length} unclassified model(s)\n`);
-  return rows.length ? exitPending : 0;
+  const live = io.query(unclassifiedSql(io.now()), remote);
+  const pending = live.filter(
+    (row) =>
+      storedEntry(
+        field(row, 'model_id'),
+        field(row, 'family'),
+        field(row, 'lab'),
+        field(row, 'categories_json'),
+      ).length === 0,
+  );
+  for (const row of pending) io.stdout(`${cellText(field(row, 'model_id'))}\n`);
+  io.stdout(
+    live.length >= MODEL_REGISTRY.maxListedRows
+      ? `${pending.length} unclassified model(s); the check stops at 1,000 live models\n`
+      : `${pending.length} unclassified model(s)\n`,
+  );
+  return pending.length ? exitPending : 0;
 }
 
 function validId(value: string | undefined) {
@@ -222,7 +237,7 @@ export function runModelRegistry(argv: readonly string[], io: ModelRegistryIo) {
     const remote = values.remote === true;
     return values.unclassified ? unclassified(io, remote) : list(io, remote);
   } catch {
-    io.stderr(READ_FAILED);
+    io.stderr(D1_FAILED);
     return exitFailure;
   }
 }

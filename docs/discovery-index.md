@@ -445,8 +445,8 @@ buyers reject extra keys there.
 A model with an entry in the operator's registry (`discovery_model_registry`)
 takes its `family`, `lab` and `categories` from that entry instead, with
 `source: "registry"`. Without one, `categories` is `[]`. Categories come from
-one fixed list (`@gyblos/protocol/model-categories`): `general`, `coding`,
-`agentic`, `reasoning`, `classification`, `extraction`, `embedding`,
+one fixed list (`MODEL_CATEGORIES` in `@gyblos/protocol/constants`): `general`,
+`coding`, `agentic`, `reasoning`, `classification`, `extraction`, `embedding`,
 `reranking`, `vision`, `speech-to-text`, `text-to-speech`, `translation`,
 `moderation`, `image-generation`, `image-editing`, `image-upscaling`,
 `video-generation`, `audio-generation` and `document-understanding`. They
@@ -474,12 +474,12 @@ deletes one. Like the other operator scripts, it compiles its SQL with Drizzle
 and runs it through Wrangler; the index has no admin route.
 
 `pnpm index:models --unclassified [--remote]` is the check for new models: it
-lists every model `/v1/models` offers now (a live catalog with a matching live
-presence, not withdrawn) that has no registry entry, and exits with code 1 while
-any remain, so it can run on a schedule. A usage error or a failed D1 read exits
-with code 2, so a schedule can tell the two apart. A model the rules recognize
-still counts until it has an entry, because only the registry carries
-categories.
+lists every model offered now (a live catalog with a matching live presence, not
+withdrawn; up to 1,000, and it says when it stops there) that has no valid
+registry entry, and exits with code 1 while any remain, so it can run on a
+schedule. A usage error or a failed D1 call exits with code 2, so a schedule can
+tell the two apart. A model the rules recognize still counts until it has an
+entry, because only the registry carries categories.
 
 ## Network history
 
