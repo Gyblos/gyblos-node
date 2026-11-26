@@ -185,10 +185,14 @@ export async function buyerDiscoveryState(
       if (failed) unavailable();
       await privateDirectory(directory);
       rows = await readMonotonicRows(path, rows);
-      return (
+      const permitted =
         rows.get(nodeId)?.catalogDigest === digest &&
-        matchesDiscovery(rows, { owner, nodeId }, now, admission)
-      );
+        matchesDiscovery(rows, { owner, nodeId }, now, admission);
+      if (permitted) admission?.hold(nodeId, now);
+      return permitted;
+    },
+    use(nodeId: string) {
+      admission?.hold(nodeId, admission.now());
     },
     async observe(
       seller: KnownSeller,

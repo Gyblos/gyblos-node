@@ -114,6 +114,10 @@ export const BUYER_DISCOVERY = {
   // Open discovery: lookup work per selection, live unconfigured candidates, and cached identity refusals.
   openLookups: 16,
   openSellers: 64,
+  openPerOwner: 4,
+  openWindowMs: 600_000,
+  openSeedBytes: 32,
+  openInUse: 16,
   openRefusals: 1024,
   openRefusalMs: 300_000,
 } as const;
