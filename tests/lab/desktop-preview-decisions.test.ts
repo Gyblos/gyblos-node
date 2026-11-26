@@ -139,6 +139,7 @@ void test('preview disables paid-only models without funds unless the free fallb
 void test('preview composer shows an inline spinner while the buyer balance is checked', async () => {
   const kit = await view('PreviewKit.tsx.preview');
   assert.match(kit, /export function PreviewInlineSpinner\(/);
+  assert.match(kit, /className="ui-inline-spinner"/);
   assert.match(kit, /checking = false/);
   assert.match(kit, /<PreviewInlineSpinner \/>/);
   assert.match(kit, /aria-busy=\{checking\}/);
@@ -152,12 +153,12 @@ void test('preview composer shows an inline spinner while the buyer balance is c
   );
   const funding = await readFile(new URL('funding.ts', preview), 'utf8');
   assert.match(funding, /funding'\) === 'checking'/);
-  const css = await previewStyles();
-  assert.match(css, /\.pk-inline-spinner\s*\{/);
+  const css = await readFile('apps/desktop/src/ui/ui.css', 'utf8');
+  assert.match(css, /\.ui-inline-spinner\s*\{/);
   assert.match(css, /animation: pk-spin 800ms linear infinite;/);
   assert.match(
     css,
-    /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.pk-inline-spinner[\s\S]*animation: none;/,
+    /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.ui-inline-spinner[\s\S]*animation: none;/,
   );
 });
 
@@ -315,14 +316,8 @@ void test('preview menus, number fields and model rows follow the shared compone
     'apps/desktop/src/ui/ModelDropdown.tsx',
     'utf8',
   );
-  assert.match(desktop, /<ModelMenuBalance/);
+  assert.doesNotMatch(desktop, /<ModelMenuBalance/);
   assert.doesNotMatch(dropdown, /<ModelMenuBalance/);
-  const balance = await readFile(
-    'apps/desktop/src/ui/ModelMenuBalance.tsx',
-    'utf8',
-  );
-  assert.match(balance, /<span>Balance<\/span>/);
-  assert.match(balance, /className="pk-balance-add"/);
 });
 
 void test('model picker lets Paid speak for itself and sizes the seller flyout to its content', async () => {
@@ -353,8 +348,6 @@ void test('preview stylesheet declares each picker and flyout rule once, on shar
     'html .app.desktop-frame .compact-dropdown .dropdown-row[data-strategy] {',
     'html .app.desktop-frame .preview-strategy-icon {',
     'html .app.desktop-frame .preview-flyout-title {',
-    'html .app.desktop-frame .pk-balance-line {',
-    'html .app.desktop-frame .pk-balance-line strong {',
     'html .app.desktop-frame .preview-model-list .ui-item-title {',
   ]) {
     assert.equal(css.split('\n' + selector).length - 1, 1, selector);
