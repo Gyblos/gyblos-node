@@ -250,7 +250,7 @@ void test('verify publishes both artifacts from the same run', async (t) => {
     const digest = createHash('sha256').update(scoredAnswer).digest('hex');
     assert.deepEqual(result.evidence.answerDigests, [digest]);
     const unscoredDigest = createHash('sha256').update('').digest('hex');
-    assert.partialDeepStrictEqual(evidence, {
+    assert.deepEqual(evidence, {
       challengeSet: CHALLENGE_SET,
       answers: [
         {
