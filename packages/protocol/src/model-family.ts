@@ -20,6 +20,9 @@ const FAMILIES = [
 ] as const;
 
 export type ModelFamily = (typeof FAMILIES)[number][0];
+export const MODEL_FAMILIES: readonly ModelFamily[] = FAMILIES.map(
+  ([family]) => family,
+);
 
 const PUBLISHERS = new Map<string, ModelFamily>([
   ['qwen', 'qwen'],
@@ -73,6 +76,7 @@ export const OTHER_FAMILY = 'other';
 export const MODEL_IDENTITY_SOURCE = {
   RULES: 'rules',
   FALLBACK: 'fallback',
+  REGISTRY: 'registry',
 } as const;
 export type ModelIdentity =
   | {
@@ -84,6 +88,11 @@ export type ModelIdentity =
       family: typeof OTHER_FAMILY;
       lab: string;
       source: typeof MODEL_IDENTITY_SOURCE.FALLBACK;
+    }
+  | {
+      family: ModelFamily | typeof OTHER_FAMILY;
+      lab: string;
+      source: typeof MODEL_IDENTITY_SOURCE.REGISTRY;
     };
 
 export function modelIdentity(modelId: string): ModelIdentity {

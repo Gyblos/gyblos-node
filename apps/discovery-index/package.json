@@ -10,6 +10,9 @@
   "exports": {
     "./admin": "./scripts/admin.ts",
     "./github-claims-admin": "./scripts/github-claims.ts",
+    "./model-registry": "./src/model-registry.ts",
+    "./model-registry-admin": "./scripts/model-registry.ts",
+    "./model-registry-d1": "./src/model-registry-d1.ts",
     "./seller-profiles-admin": "./scripts/seller-profiles.ts",
     "./wrangler-d1": "./scripts/wrangler-d1.ts",
     "./app": "./src/app.ts",

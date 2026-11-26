@@ -223,7 +223,7 @@ function readRoutes(app: Hono<IndexEnv>, settings: IndexSettings) {
       const url = new URL(context.req.url);
       return {
         key: `${url.origin}${INDEX_ROUTES.MODEL_CATALOG}`,
-        body: () => modelCatalogPage(context.get('storage'), settings.now()),
+        body: () => modelCatalogPage(context.get('storage'), settings),
       };
     }),
   );
