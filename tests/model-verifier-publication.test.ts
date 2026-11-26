@@ -232,7 +232,7 @@ void test('verify leaves no published directory or staging files after a partial
           return originalWrite(...args);
         const staged = await readdir(parent);
         assert.equal(staged.length, 1);
-        assert.match(staged[0]!, /^\.verification-/);
+        assert.ok(staged[0]!.startsWith(MODEL_VERIFIER.stagingPrefix));
         assert.notEqual(staged[0], 'run');
         await originalWrite(path, '{', options);
         failedEvidenceWrites++;
