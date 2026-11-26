@@ -1,6 +1,6 @@
 // Persists the sandbox payment journal under an exclusive process lock, without inference content.
 // A reviewed attempt remains sealed until its decision and confirmed outcome are durable.
-import { paypalSandboxPaths } from '@gyblos/config/home';
+import { paypalSandboxPaths } from '@gyblos/config/home-paypal';
 import {
   acquireProcessLock,
   ensurePrivateDirectory,

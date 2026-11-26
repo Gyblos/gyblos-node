@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 
-import { desktopActivityPaths } from '@gyblos/config/home';
+import { desktopActivityPaths } from '@gyblos/config/home-desktop';
 import { createActivityHandlers } from '@gyblos/desktop/activity-handlers';
 import { ActivityHistory } from '@gyblos/desktop/activity-history';
 import { parseActivityResult } from '@gyblos/desktop/activity-model';

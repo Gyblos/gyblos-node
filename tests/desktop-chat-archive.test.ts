@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 
-import { desktopChatPaths } from '@gyblos/config/home';
+import { desktopChatPaths } from '@gyblos/config/home-desktop';
 import { createChatArchiveHandlers } from '@gyblos/desktop/chat-archive-handlers';
 import {
   CHAT_STORAGE,

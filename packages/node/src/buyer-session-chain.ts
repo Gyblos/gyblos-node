@@ -1,5 +1,8 @@
 // Lazy role-to-batch adapter composition; only a selected priced quote reaches the buyer's signing key.
-import { batchPoolPathsIn, batchSessionPathsIn } from '@gyblos/config/home';
+import {
+  batchPoolPathsIn,
+  batchSessionPathsIn,
+} from '@gyblos/config/home-payments';
 import {
   openBatchBuyerBackend,
   openBatchBuyerPool,

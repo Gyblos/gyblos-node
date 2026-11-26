@@ -1,6 +1,6 @@
 ---
 title: Model verification
-description: How Gyblos checks that a seller serves the model it declares, what pass, fail and inconclusive mean, and how to reproduce a result.
+description: How Gyblos checks that a seller serves the model it declares, what pass, fail and inconclusive mean, and how anyone can repeat a check.
 ---
 
 A seller declares the model it serves, for example `qwen3-1.7b`. The model verifier checks that claim from the
@@ -45,28 +45,12 @@ scored and its other answers show no deviation, 11 or fewer substituted answers 
 The threshold stays at 12 from 26 to 30 scored answers and drops below that (11 at 22 to 25), and deviations in
 genuine answers count toward it too.
 
-## Reproduce a result [#reproduce]
+## Repeat a check [#reproduce]
 
-From a checkout of the repository, with [Ollama](https://ollama.com) running and the declared model pulled
-(`ollama pull qwen3:1.7b`), write the seller's public details to a file:
+The verifier is open source, so anyone with [Ollama](https://ollama.com) and the declared model can run the
+same check against a seller and get a result they can compare. The steps to run it are in the
+[model verifier design note](https://github.com/Gyblos/gyblos-node/blob/develop/docs/model-verifier.md#run-it) in the repository.
 
-```json title="seller.json"
-{
-  "owner": "SELLER_OWNER_ADDRESS",
-  "nodeId": "SELLER_NODE_ID",
-  "relayUrl": "https://na1.relay.gyblos.com/",
-  "directAddresses": []
-}
-```
-
-Then run:
-
-```sh
-pnpm model-verifier verify --seller seller.json --model qwen3-1.7b
-pnpm model-verifier check RESULT_DIRECTORY/result.json
-```
-
-`verify` prints the verdict and writes `result.json` (the signed result) and `evidence.json` (the prompts, the
-answers and every check, plus any reply that could not be scored and why) to a new directory. `check` verifies a result's signature and prints its verdict.
-`pnpm model-verifier address` prints the verifier's public address. The verifier key is created on first use in
-`model-verifier/verifier.key` inside the Gyblos home directory.
+A run writes the signed result and an evidence file next to it. The evidence keeps the prompts, the answers and
+every check, plus any reply that could not be scored and why, so someone else can review how the verdict was
+reached.

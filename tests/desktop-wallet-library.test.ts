@@ -14,7 +14,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { desktopWalletLibraryPaths } from '@gyblos/config/home';
+import { desktopWalletLibraryPaths } from '@gyblos/config/home-desktop';
 import {
   BACKUP_VERIFICATION,
   createWalletService,

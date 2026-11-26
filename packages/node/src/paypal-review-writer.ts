@@ -3,7 +3,7 @@
 import {
   paypalSandboxPaths,
   paypalSandboxReviewPaths,
-} from '@gyblos/config/home';
+} from '@gyblos/config/home-paypal';
 import { canonicalJson } from '@gyblos/protocol';
 import {
   ensurePrivateDirectory,

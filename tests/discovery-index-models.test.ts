@@ -2,6 +2,13 @@
 // first; a seller without a live presence, or that withdrew its catalog, does not count; the route takes no
 // parameters and is cached and CORS-readable like a sellers page. Both storage adapters.
 import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import {
+  MODEL_IDENTITY_SOURCE,
+  OTHER_FAMILY,
+  UNKNOWN_LAB,
+} from '@gyblos/protocol/model-family';
 
 import {
   eachStorage,
@@ -56,3 +63,100 @@ eachStorage(
     await expectError(await call('/v1/models?model=x'), 400, 'INVALID_QUERY');
   },
 );
+
+eachStorage(
+  'the model catalog adds each model family and lab without changing /v1/models',
+  async ({ publish, call }) => {
+    const seller = indexNode();
+    const catalog = seller.catalog(1, {
+      models: [
+        'qwen3-0.6b',
+        'meta-llama/Llama-3.1-8B',
+        'google/gemma-3-4b',
+        'unsloth/Qwen3-8B-GGUF',
+        'acme/mystery-7b',
+        'mystery-7b',
+      ],
+    });
+    assert.equal((await publish(catalog)).status, 201);
+    assert.equal(
+      (await publish(await seller.presence(2, catalog))).status,
+      201,
+    );
+    const response = await call('/v1/models/catalog');
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('cache-control'), 'public, max-age=10');
+    assert.equal(response.headers.get('access-control-allow-origin'), '*');
+    const body = await response.json();
+    const plain = await (await call('/v1/models')).json();
+    assert.deepEqual(
+      body.models.map((row: { id: string }) => row.id),
+      plain.models.map((row: { id: string }) => row.id),
+    );
+    const byId = Object.fromEntries(
+      body.models.map((row: { id: string }) => [row.id, row]),
+    );
+    assert.deepEqual(byId, {
+      'qwen3-0.6b': {
+        id: 'qwen3-0.6b',
+        sellers: 1,
+        family: 'qwen',
+        lab: 'Alibaba · Qwen',
+        source: MODEL_IDENTITY_SOURCE.RULES,
+      },
+      'meta-llama/Llama-3.1-8B': {
+        id: 'meta-llama/Llama-3.1-8B',
+        sellers: 1,
+        family: 'meta',
+        lab: 'Meta',
+        source: MODEL_IDENTITY_SOURCE.RULES,
+      },
+      'google/gemma-3-4b': {
+        id: 'google/gemma-3-4b',
+        sellers: 1,
+        family: 'gemma',
+        lab: 'Google DeepMind',
+        source: MODEL_IDENTITY_SOURCE.RULES,
+      },
+      'unsloth/Qwen3-8B-GGUF': {
+        id: 'unsloth/Qwen3-8B-GGUF',
+        sellers: 1,
+        family: 'qwen',
+        lab: 'Alibaba · Qwen',
+        source: MODEL_IDENTITY_SOURCE.RULES,
+      },
+      'acme/mystery-7b': {
+        id: 'acme/mystery-7b',
+        sellers: 1,
+        family: OTHER_FAMILY,
+        lab: 'acme',
+        source: MODEL_IDENTITY_SOURCE.FALLBACK,
+      },
+      'mystery-7b': {
+        id: 'mystery-7b',
+        sellers: 1,
+        family: OTHER_FAMILY,
+        lab: UNKNOWN_LAB,
+        source: MODEL_IDENTITY_SOURCE.FALLBACK,
+      },
+    });
+    assert.equal(typeof body.generatedAt, 'number');
+    assert.equal(plain.models.length, 6);
+    for (const row of plain.models)
+      assert.deepEqual(Object.keys(row), ['id', 'sellers']);
+    await expectError(
+      await call('/v1/models/catalog?model=x'),
+      400,
+      'INVALID_QUERY',
+    );
+  },
+);
+
+void test('the model catalog wire values stay as documented', () => {
+  assert.deepEqual(MODEL_IDENTITY_SOURCE, {
+    RULES: 'rules',
+    FALLBACK: 'fallback',
+  });
+  assert.equal(OTHER_FAMILY, 'other');
+  assert.equal(UNKNOWN_LAB, 'Unknown');
+});
