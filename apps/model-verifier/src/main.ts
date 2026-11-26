@@ -82,6 +82,30 @@ function withoutTrailingCurrentDirectory(path: string) {
   return result;
 }
 
+async function pathExists(path: string) {
+  return lstat(path).then(
+    () => true,
+    (error: NodeJS.ErrnoException) => {
+      if (error.code !== 'ENOENT') throw error;
+      return false;
+    },
+  );
+}
+
+async function rejectExistingOutput(out: string) {
+  const output = withoutTrailingCurrentDirectory(out);
+  const parent = await realpath(dirname(output)).then(
+    (value) => value,
+    (error: NodeJS.ErrnoException) => {
+      if (error.code !== 'ENOENT') throw error;
+      return null;
+    },
+  );
+  if (parent === null) return;
+  if (await pathExists(join(parent, basename(output))))
+    throw new ModelVerifierError(MODEL_VERIFIER_CODES.OUTPUT_EXISTS);
+}
+
 async function publishOutput(
   out: string,
   { signed, answers, unscored }: VerificationOutput,
@@ -115,14 +139,7 @@ async function publishOutput(
         `${JSON.stringify({ challengeSet: CHALLENGE_SET, answers, unscored }, null, 2)}\n`,
         options,
       );
-      const exists = await lstat(destination).then(
-        () => true,
-        (error: NodeJS.ErrnoException) => {
-          if (error.code !== 'ENOENT') throw error;
-          return false;
-        },
-      );
-      if (exists)
+      if (await pathExists(destination))
         throw new ModelVerifierError(MODEL_VERIFIER_CODES.OUTPUT_EXISTS);
       await rename(staging, destination);
       published = true;
@@ -146,6 +163,7 @@ async function verify(values: Record<string, string | undefined>) {
   const target = parseSellerTarget(
     await readJson(values.seller, MODEL_VERIFIER_CODES.INVALID_SELLER),
   );
+  if (values.out) await rejectExistingOutput(values.out);
   const paths = modelVerifierLayout(process.env);
   const key = await loadVerifierKey(paths.key, true);
   const reference = await openReference(

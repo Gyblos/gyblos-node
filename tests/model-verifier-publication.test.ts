@@ -171,8 +171,25 @@ void test('verify leaves no published directory or staging files after a partial
 
 void test('verify records a failed staging cleanup separately from the primary error', async (t) => {
   await withVerifier(t, async (parent, verify, stderr) => {
-    const out = join(parent, 'existing');
-    await mkdir(out, { recursive: true });
+    const out = join(parent, 'run');
+    const originalWrite = writeFile;
+    const writes = t.mock.method(
+      fs,
+      'writeFile',
+      async (...args: Parameters<typeof writeFile>) => {
+        const [path, , options] = args;
+        if (
+          typeof path === 'string' &&
+          basename(path) === MODEL_VERIFIER.evidenceFile
+        ) {
+          await originalWrite(path, '{', options);
+          throw Object.assign(new Error('synthetic partial write'), {
+            code: 'ENOSPC',
+          });
+        }
+        return originalWrite(...args);
+      },
+    );
     const cleanup = t.mock.method(fs, 'rm', () =>
       Promise.reject(new Error('synthetic private path')),
     );
@@ -180,11 +197,12 @@ void test('verify records a failed staging cleanup separately from the primary e
     try {
       assert.equal(await verify(out), 1);
     } finally {
+      writes.mock.restore();
       cleanup.mock.restore();
       syncBuiltinESMExports();
     }
     assert.equal(cleanup.mock.callCount(), 1);
-    assert.deepEqual(stderr(), ['{"ok":false,"code":"OUTPUT_EXISTS"}']);
+    assert.deepEqual(stderr(), ['{"ok":false,"code":"INTERNAL"}']);
     const diagnostic = stderr(2)?.[0];
     assert.equal(typeof diagnostic, 'string');
     assert.doesNotMatch(String(diagnostic), /synthetic private path/);
