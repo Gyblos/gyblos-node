@@ -1,24 +1,4 @@
-export const MODEL_CATEGORIES = [
-  'general',
-  'coding',
-  'agentic',
-  'reasoning',
-  'classification',
-  'extraction',
-  'embedding',
-  'reranking',
-  'vision',
-  'speech-to-text',
-  'text-to-speech',
-  'translation',
-  'moderation',
-  'image-generation',
-  'image-editing',
-  'image-upscaling',
-  'video-generation',
-  'audio-generation',
-  'document-understanding',
-] as const;
+import { MODEL_CATEGORIES } from './constants';
 
 export type ModelCategory = (typeof MODEL_CATEGORIES)[number];
 

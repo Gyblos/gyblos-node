@@ -6,14 +6,11 @@ import {
   MODEL_REGISTRY,
   PUBLISH_MODES,
 } from '@gyblos/discovery-index/constants';
-import {
-  createMemoryModelRegistry,
-  type ModelRegistryStore,
-} from '@gyblos/discovery-index/model-registry';
+import type { ModelRegistryStore } from '@gyblos/discovery-index/model-registry';
 import { runModelRegistry } from '@gyblos/discovery-index/model-registry-admin';
 import { createD1ModelRegistry } from '@gyblos/discovery-index/model-registry-d1';
 import { createD1Storage } from '@gyblos/discovery-index/storage-d1';
-import { MODEL_CATEGORIES } from '@gyblos/protocol/model-categories';
+import { MODEL_CATEGORIES } from '@gyblos/protocol/constants';
 import { MODEL_IDENTITY_SOURCE } from '@gyblos/protocol/model-family';
 
 import { createSqliteD1, type SqliteD1 } from './support/d1-sqlite';
@@ -24,6 +21,7 @@ import {
   indexNode,
   T0,
 } from './support/discovery-index-fixture';
+import { createMemoryModelRegistry } from './support/model-registry-fixture';
 
 const NOW = T0 + 1000;
 const registry = createMemoryModelRegistry([
