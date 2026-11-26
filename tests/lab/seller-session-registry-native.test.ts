@@ -5,7 +5,7 @@ import { syncBuiltinESMExports } from 'node:module';
 import { test } from 'node:test';
 
 import { FILE_MODES } from '@gyblos/config';
-import { batchSellerBuyerPaths } from '@gyblos/config/home';
+import { batchSellerBuyerPaths } from '@gyblos/config/home-payments';
 import { openBatchSellerBackend } from '@gyblos/payments-upto/batch-session';
 import {
   SESSION_CODES,

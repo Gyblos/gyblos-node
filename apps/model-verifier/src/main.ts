@@ -12,7 +12,7 @@ import {
 import { basename, dirname, join } from 'node:path';
 import { parseArgs } from 'node:util';
 
-import { modelVerifierLayout } from '@gyblos/config/model-verifier-home';
+import { modelVerifierLayout } from '@gyblos/config/home-model-verifier';
 import {
   verifyModelVerification,
   type SignedModelVerification,

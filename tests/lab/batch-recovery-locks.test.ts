@@ -4,7 +4,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { hostname } from 'node:os';
 import test from 'node:test';
 
-import { batchSessionPathsIn } from '@gyblos/config/home';
+import { batchSessionPathsIn } from '@gyblos/config/home-payments';
 import { PROCESS_LOCK } from '@gyblos/runtime/constants';
 
 import { batchRecoveryCrash } from '../support/batch-recovery-crash';

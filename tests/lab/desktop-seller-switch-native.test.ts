@@ -11,7 +11,7 @@ import {
   reserveApiKey,
 } from '@gyblos/buyer/api-key-execution';
 import { PROTOCOL_FEE } from '@gyblos/config';
-import { batchSessionPathsIn } from '@gyblos/config/home';
+import { batchSessionPathsIn } from '@gyblos/config/home-payments';
 import { createBuyerApiKeys } from '@gyblos/node/buyer-api-keys';
 import { createBuyerSessionManager } from '@gyblos/node/buyer-session';
 import { startSellerSessions } from '@gyblos/node/seller-sessions';

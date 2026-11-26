@@ -1,4 +1,8 @@
 import { controlAddress } from '@gyblos/protocol/control-validation';
+import {
+  MODEL_IDENTITY_SOURCE,
+  modelIdentity,
+} from '@gyblos/protocol/model-family';
 
 import type { GithubAccount } from './network-status';
 
@@ -34,5 +38,22 @@ export function sellerMatches(
     account?.includes(lower) ||
     seller.name?.toLowerCase().includes(lower) ||
     seller.owner?.includes(term)
+  );
+}
+
+export function modelMatches(
+  model: {
+    modelId: string;
+    variant?: string | null;
+    quantization?: string | null;
+  },
+  term: string,
+) {
+  const lower = term.toLowerCase();
+  const identity = modelIdentity(model.modelId);
+  const lab =
+    identity.source === MODEL_IDENTITY_SOURCE.RULES ? identity.lab : undefined;
+  return [model.modelId, lab, model.variant, model.quantization].some((value) =>
+    value?.toLowerCase().includes(lower),
   );
 }

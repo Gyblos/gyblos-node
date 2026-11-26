@@ -6,7 +6,7 @@ import test from 'node:test';
 import { startFreeBuyerHttp } from '@gyblos/buyer/free-http';
 import { classifyPaidError } from '@gyblos/buyer/session-errors';
 import { DEVNET } from '@gyblos/config';
-import { batchSessionPathsIn } from '@gyblos/config/home';
+import { batchSessionPathsIn } from '@gyblos/config/home-payments';
 import { X402Budget } from '@gyblos/desktop/x402-budget';
 import { X402Client } from '@gyblos/desktop/x402-client';
 import { createBuyerSessionManager } from '@gyblos/node/buyer-session';

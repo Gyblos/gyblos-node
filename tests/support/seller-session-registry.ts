@@ -13,7 +13,10 @@ import { SOLANA_TESTNET_CAIP2 } from '@x402/svm';
 import { uptoTokenAccount } from 'x402-upto-metered';
 
 import { PROTOCOL_FEE } from '@gyblos/config';
-import { batchSellerPathsIn, batchSessionPathsIn } from '@gyblos/config/home';
+import {
+  batchSellerPathsIn,
+  batchSessionPathsIn,
+} from '@gyblos/config/home-payments';
 import {
   createBatchBuyer,
   openBatchSellerRegistry,
