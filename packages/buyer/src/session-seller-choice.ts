@@ -37,6 +37,7 @@ export function prepareChosenSeller(
     directAddresses: [],
     manualTrust: false,
   };
+  prepared.discovery.use(seller.nodeId);
   return {
     seller,
     prepared: {

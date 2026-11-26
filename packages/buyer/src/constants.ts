@@ -117,6 +117,7 @@ export const BUYER_DISCOVERY = {
   openPerOwner: 4,
   openWindowMs: 600_000,
   openSeedBytes: 32,
+  openInUse: 16,
   openRefusals: 1024,
   openRefusalMs: 300_000,
 } as const;

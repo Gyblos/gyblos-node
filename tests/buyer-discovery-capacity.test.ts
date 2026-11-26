@@ -36,7 +36,7 @@ void test('expiry releases capacity at the exact boundary without deleting repla
     ),
     true,
   );
-  assert.equal(await restarted.observe(f.seller(-100)), false);
+  assert.equal(await restarted.observe(f.lastRanked(100)), false);
 });
 
 void test('withdrawal releases a slot and its tombstone survives a restart', async (t) => {
@@ -171,7 +171,7 @@ void test('two handles cannot over-admit the last live slot and expected capacit
     1,
   );
   const restarted = await f.open();
-  assert.equal(await restarted.observe(f.seller(-101)), false);
+  assert.equal(await restarted.observe(f.lastRanked(101)), false);
   assert.equal(await restarted.observe(f.seller(1)), true);
 });
 
@@ -210,8 +210,14 @@ void test('preexisting excess live history has deterministic bounded eligibility
     ),
     false,
   );
+  await state.observe(f.seller(BUYER_DISCOVERY.openSellers + 1));
   assert.equal(
-    await state.observe(f.seller(BUYER_DISCOVERY.openSellers + 1)),
+    await state.permits(
+      f.rows.at(-1)!.owner,
+      f.rows.at(-1)!.nodeId,
+      f.rows.at(-1)!.catalogDigest,
+      f.now(),
+    ),
     false,
   );
   assert.equal((await f.saved()).rows.length, BUYER_DISCOVERY.openSellers + 1);

@@ -107,3 +107,70 @@ void test('the default rank is secret per buyer process, stable within a window 
   assert.notDeepEqual(admittedIds(b, candidates, now), first);
   assert.notDeepEqual(admittedIds(a, candidates, now + WINDOW), first);
 });
+
+void test('a seller in use keeps its slot across a window change until it goes unused for a window', async (t) => {
+  const { f, rows, candidates } = await liveFixture(t, 200);
+  f.policy.rank = fixedRank;
+  const state = await f.open();
+  const end = (Math.floor(f.now() / WINDOW) + 1) * WINDOW - 1;
+  const [before, next, later] = [end, end + 1, end + 1 + WINDOW].map((now) =>
+    admittedIds(state, candidates, now),
+  );
+  const row = rows.find(
+    ({ nodeId }) =>
+      before!.has(nodeId) && !next!.has(nodeId) && !later!.has(nodeId),
+  )!;
+  assert.equal(
+    await state.permits(row.owner, row.nodeId, row.catalogDigest, end),
+    true,
+  );
+  assert.ok(admittedIds(state, candidates, end + 1).has(row.nodeId));
+  assert.ok(!admittedIds(state, candidates, end + 1 + WINDOW).has(row.nodeId));
+});
+
+void test('a stored seller outside the slots still records its newer presence', async (t) => {
+  const { f, candidates } = await liveFixture(t, SLOTS + 1);
+  const state = await f.open();
+  const outside = f.seller(SLOTS + 1);
+  assert.ok(
+    !admittedIds(state, candidates, f.now()).has(outside.catalog.nodeId),
+  );
+  const highWater = (await f.saved()).rows.at(-1).highWater as number;
+  await state.observe({
+    ...outside,
+    presence: { ...outside.presence!, sequence: highWater + 1 },
+  });
+  assert.equal((await f.saved()).rows.at(-1).highWater, highWater + 1);
+});
+
+void test('a fifth seller of one owner is not stored while the slots are open', async (t) => {
+  const { f } = await liveFixture(t, BUYER_DISCOVERY.openPerOwner, () =>
+    capacityOwner(0),
+  );
+  const state = await f.open();
+  const fifth = f.seller(BUYER_DISCOVERY.openPerOwner + 1);
+  assert.equal(
+    await state.observe({
+      ...fifth,
+      catalog: { ...fifth.catalog, owner: capacityOwner(0) },
+      presence: { ...fifth.presence!, owner: capacityOwner(0) },
+    }),
+    false,
+  );
+  assert.equal((await f.saved()).rows.length, BUYER_DISCOVERY.openPerOwner);
+});
+
+void test('a seller chosen by hand is permitted even when its owner already holds four slots', async (t) => {
+  const { f, rows } = await liveFixture(
+    t,
+    BUYER_DISCOVERY.openPerOwner + 1,
+    () => capacityOwner(0),
+  );
+  const state = await f.open();
+  const chosen = rows.at(-1)!;
+  const permits = () =>
+    state.permits(chosen.owner, chosen.nodeId, chosen.catalogDigest, f.now());
+  assert.equal(await permits(), false);
+  state.use(chosen.nodeId);
+  assert.equal(await permits(), true);
+});

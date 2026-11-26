@@ -36,9 +36,17 @@ export function discoveryAdmission(policy?: DiscoveryAdmission) {
     let value = drawn.ranks.get(nodeId);
     if (value === undefined) {
       if (drawn.ranks.size >= BUYER_DISCOVERY.maxStateRows) drawn.ranks.clear();
-      drawn.ranks.set(nodeId, (value = draw(nodeId, window)));
+      value = draw(nodeId, window);
+      drawn.ranks.set(nodeId, value);
     }
     return value;
+  };
+  const inUse = new Map<string, number>();
+  const hold = (nodeId: string, now: number) => {
+    inUse.delete(nodeId);
+    inUse.set(nodeId, now + BUYER_DISCOVERY.openWindowMs);
+    if (inUse.size > BUYER_DISCOVERY.openInUse)
+      inUse.delete(inUse.keys().next().value!);
   };
   const live = (rows: Iterable<DiscoveryRow>, now: number) =>
     [...rows].filter(
@@ -57,9 +65,9 @@ export function discoveryAdmission(policy?: DiscoveryAdmission) {
     const chosen = new Set<string>();
     for (const { row } of ranked) {
       if (chosen.size >= BUYER_DISCOVERY.openSellers) break;
-      const held = owners.get(row.owner) ?? 0;
-      if (held >= BUYER_DISCOVERY.openPerOwner) continue;
-      owners.set(row.owner, held + 1);
+      const count = owners.get(row.owner) ?? 0;
+      if (count >= BUYER_DISCOVERY.openPerOwner) continue;
+      owners.set(row.owner, count + 1);
       chosen.add(row.nodeId);
     }
     return chosen;
@@ -68,10 +76,14 @@ export function discoveryAdmission(policy?: DiscoveryAdmission) {
     rows: ReadonlyMap<string, DiscoveryRow>,
     nodeId: string,
     now: number,
-  ) => configured.has(nodeId) || admitted(rows.values(), now).has(nodeId);
+  ) =>
+    configured.has(nodeId) ||
+    (inUse.get(nodeId) ?? 0) > now ||
+    admitted(rows.values(), now).has(nodeId);
   return {
     now: policy.now ?? Date.now,
     permits,
+    hold,
     accepts(
       rows: ReadonlyMap<string, DiscoveryRow>,
       row: DiscoveryRow,
@@ -92,13 +104,8 @@ export function discoveryAdmission(policy?: DiscoveryAdmission) {
       // Negative observations still persist withdrawal/conflict floors and immediately release eligibility.
       if (configured.has(row.nodeId) || !discoveryRowLive(row, now))
         return true;
-      const others = [...rows.values()].filter(
-        (held) => held.nodeId !== row.nodeId,
-      );
-      return (
-        live(others, now).length < BUYER_DISCOVERY.openSellers ||
-        admitted([...others, row], now).has(row.nodeId)
-      );
+      if (prior) return true;
+      return admitted([...rows.values(), row], now).has(row.nodeId);
     },
   };
 }
