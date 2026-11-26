@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { BUYER_SELECTION_CODES } from '@gyblos/buyer/constants';
 import { discoverBuyerSellers } from '@gyblos/buyer/discovery';
+import { readIndexPages } from '@gyblos/buyer/discovery-pages';
 
 import {
   discoveryHome,
@@ -11,61 +13,110 @@ import {
 
 const node = (byte: number) =>
   byte.toString(16).padStart(2, '0').padEnd(64, '0');
-const INDEX = Array.from({ length: 12 }, (_, i) => node((i + 1) * 20));
+const TWELVE = Array.from({ length: 12 }, (_, i) => node((i + 1) * 20));
+const HALF = () => 0.5;
 
-function pagedIndex(pageSize: number) {
-  const cursors: (string | null)[] = [];
-  const fetch = async (input: string | URL | Request) => {
-    const url = new URL(input instanceof Request ? input.url : input);
-    const cursor = url.searchParams.get('cursor');
+function pagedIndex(ids: string[], pageSize: number) {
+  const cursors: (string | undefined)[] = [];
+  const read = async (cursor: string | undefined) => {
     cursors.push(cursor);
-    const rest = INDEX.filter((id) => cursor === null || id > cursor);
+    const rest = ids.filter((id) => cursor === undefined || id > cursor);
     const page = rest.slice(0, pageSize);
-    return discoveryResponse([], rest.length > pageSize ? page.at(-1)! : null);
+    return {
+      sellers: page.map((nodeId) => ({ catalog: { nodeId } })),
+      next: rest.length > pageSize ? page.at(-1)! : null,
+    };
   };
-  return { cursors, fetch };
+  return { cursors, read };
 }
+const ids = (entries: { catalog: { nodeId: string } }[]) =>
+  entries.map((entry) => entry.catalog.nodeId);
 
-void test('past the page ceiling the buyer rereads from a random NodeId and wraps around', async () => {
+void test('an index of one page is read once', async () => {
+  const index = pagedIndex(TWELVE, 20);
+  assert.deepEqual(ids(await readIndexPages(index.read, 8, HALF)), TWELVE);
+  assert.equal(index.cursors.length, 1);
+});
+
+void test('an index within the page ceiling is covered once, without duplicates, in at most one extra read', async () => {
+  const index = pagedIndex(TWELVE, 2);
+  const seen = ids(await readIndexPages(index.read, 6, HALF));
+  assert.deepEqual([...new Set(seen)].sort(), TWELVE);
+  assert.ok(index.cursors.length <= 7);
+});
+
+void test('past the page ceiling the window starts at a random NodeId and wraps', async () => {
+  const index = pagedIndex(TWELVE, 2);
+  const seen = ids(await readIndexPages(index.read, 3, HALF));
+  assert.deepEqual(seen, [...TWELVE.slice(0, 2), ...TWELVE.slice(6, 12)]);
+  assert.equal(index.cursors[1], '80000000'.padEnd(64, '0'));
+  assert.ok(index.cursors.length <= 4);
+  const late = pagedIndex(TWELVE, 2);
+  const wrapped = ids(await readIndexPages(late.read, 3, () => 0.9));
+  assert.deepEqual(wrapped, [
+    ...TWELVE.slice(0, 2),
+    ...TWELVE.slice(11),
+    ...TWELVE.slice(2, 6),
+  ]);
+});
+
+void test('a wanted seller outside the window is read from its own page', async () => {
+  const index = pagedIndex(TWELVE, 2);
+  const seen = ids(await readIndexPages(index.read, 3, HALF, [TWELVE[2]!]));
+  assert.ok(seen.includes(TWELVE[2]!));
+  assert.equal(seen.filter((id) => id === TWELVE[2]).length, 1);
+});
+
+void test('a cursor cycle in any pass fails closed', async () => {
+  await assert.rejects(
+    readIndexPages(async () => ({ sellers: [], next: node(10) }), 4, HALF),
+    { code: BUYER_SELECTION_CODES.DISCOVERY_LIMIT },
+  );
+});
+
+void test('discovery passes the index cursors through to the index', async () => {
   const home = await discoveryHome();
   const run = await discoveryRun();
   try {
-    const index = pagedIndex(2);
+    const cursors: (string | null)[] = [];
     await discoverBuyerSellers(
-      { ...run.config, discovery: { ...run.config.discovery, maxPages: 4 } },
+      { ...run.config, discovery: { ...run.config.discovery, maxPages: 2 } },
       home.state,
-      { fetch: index.fetch, now: run.context.now, random: () => 0.5 },
+      {
+        fetch: async (input: string | URL | Request) => {
+          const url = new URL(input instanceof Request ? input.url : input);
+          const cursor = url.searchParams.get('cursor');
+          cursors.push(cursor);
+          return discoveryResponse([], cursor === null ? node(40) : null);
+        },
+        now: run.context.now,
+        random: HALF,
+      },
     );
-    const start = '80000000'.padEnd(64, '0');
-    assert.deepEqual(index.cursors, [
-      null,
-      node(40),
-      node(80),
-      node(120),
-      start,
-      node(160),
-      node(200),
-      null,
-    ]);
+    assert.deepEqual(cursors, [null, '80000000'.padEnd(64, '0'), node(40)]);
   } finally {
     await run.wire.close();
     await home.close();
   }
 });
 
-void test('an index within the page ceiling is read once from the start', async () => {
-  const home = await discoveryHome();
-  const run = await discoveryRun();
-  try {
-    const index = pagedIndex(4);
-    await discoverBuyerSellers(
-      { ...run.config, discovery: { ...run.config.discovery, maxPages: 3 } },
-      home.state,
-      { fetch: index.fetch, now: run.context.now, random: () => 0.5 },
-    );
-    assert.deepEqual(index.cursors, [null, node(80), node(160)]);
-  } finally {
-    await run.wire.close();
-    await home.close();
-  }
+void test('an index with opaque cursors is read in order up to the ceiling without failing', async () => {
+  const pages = [[node(20)], [node(40)], [node(60)]];
+  const cursors: (string | undefined)[] = [];
+  const seen = ids(
+    await readIndexPages(
+      async (cursor) => {
+        cursors.push(cursor);
+        const index = Number(cursor ?? 0);
+        return {
+          sellers: pages[index]!.map((nodeId) => ({ catalog: { nodeId } })),
+          next: index + 1 < pages.length ? String(index + 1) : null,
+        };
+      },
+      2,
+      HALF,
+    ),
+  );
+  assert.deepEqual(seen, [node(20), node(40)]);
+  assert.deepEqual(cursors, [undefined, '1']);
 });

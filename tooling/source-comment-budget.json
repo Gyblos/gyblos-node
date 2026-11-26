@@ -45,7 +45,7 @@
   "packages/buyer/src/discovery-config.ts": 4,
   "packages/buyer/src/discovery-state.ts": 3,
   "packages/buyer/src/discovery-storage.ts": 3,
-  "packages/buyer/src/discovery.ts": 31,
+  "packages/buyer/src/discovery.ts": 28,
   "packages/buyer/src/execution-observation.ts": 1,
   "packages/buyer/src/free-chat-error.ts": 3,
   "packages/buyer/src/free-chat.ts": 13,

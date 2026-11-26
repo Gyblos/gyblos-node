@@ -58,9 +58,6 @@ async function rememberEntry(
     { allowOwnerChange },
   );
 }
-// Failed identity checks of index-only sellers (a registry refusal, an RPC failure or a full identity
-// history), by NodeId and owner, so they are not repeated soon. The 64-candidate bound is applied by
-// discovery observations instead, so its refusals never enter this cache.
 interface OpenMemory {
   refused: Map<string, number>;
 }
@@ -170,6 +167,10 @@ async function readAllPages(
     read,
     config.discovery.maxPages,
     options.random ?? cryptoRandom,
+    [
+      ...conversationSellers(config),
+      ...(config.pinnedNodeId ? [config.pinnedNodeId] : []),
+    ],
   );
 }
 

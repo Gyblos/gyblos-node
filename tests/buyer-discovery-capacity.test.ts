@@ -20,7 +20,7 @@ void test('open discovery admits every live verified seller, well beyond 64', as
   assert.equal((await f.saved()).rows.length, 201);
 });
 
-void test('expiry ends eligibility without deleting replay history, including restart', async (t) => {
+void test('expiry ends eligibility without deleting replay history', async (t) => {
   const f = await discoveryCapacityFixture(t);
   f.rows[0]!.presenceExpiresAt = f.now() + 1;
   await f.write(f.rows);
@@ -105,7 +105,7 @@ void test('two handles cannot overfill the last history row', async (t) => {
   assert.equal((await f.saved()).rows.length, BUYER_DISCOVERY.maxStateRows);
 });
 
-void test('buyer startup applies open admission with the original configured IDs', async (t) => {
+void test('buyer startup composes open admission: a full history refuses softly', async (t) => {
   const f = await discoveryCapacityFixture(t, BUYER_DISCOVERY.maxStateRows);
   const config = {
     ...f.run.config,

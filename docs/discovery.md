@@ -111,12 +111,17 @@ To use the default index, add `discovery` to the buyer's `selection.json`:
 Inside `discovery` you can set `baseUrl` (same URL policy as the client) and
 `maxPages` (1 to 8, default 8). Each page asks for 200 entries, the index's
 largest page, and the whole discovery step has a 10-second deadline. The buyer
-reads every page up to `maxPages`. When the index has more, it reads `maxPages`
-pages again starting from a random NodeId and wrapping around to the start, so
-no NodeId range is favoured; it never fails because there are many sellers. A
-cursor cycle fails with `BUYER_DISCOVERY_LIMIT`, and no quotes are requested. An
-index error stops selection; it never switches the buyer to a different payment
-path. The rest of `selection.json` is described in
+reads the first page; when the index has more, it reads up to `maxPages` more
+pages starting from a random NodeId and wrapping around to the start (or in
+order, if the index's cursors are not NodeIds), so an index that fits is read
+whole and a larger one is sampled from a different point each time instead of
+failing. The page of the seller this conversation used, its warm seller and a
+pinned seller are read directly when they fall outside that window. A window is
+a run of consecutive NodeIds, so an operator that registers many NodeIds just
+below a seller can still crowd it out of most windows. A cursor cycle fails with
+`BUYER_DISCOVERY_LIMIT`, and no quotes are requested. An index error stops
+selection; it never switches the buyer to a different payment path. The rest of
+`selection.json` is described in
 [running-a-node.md](running-a-node.md#optional-buyer-selection-and-discovery).
 
 The index only supplies candidate NodeIds. The `sellers` list in
@@ -214,7 +219,9 @@ Open discovery has its own bounds:
   is the selection's job, not admission's.
 - Identity and discovery histories each keep at most 1,024 rows, with room for
   configured sellers. A full history refuses new identities without affecting
-  known ones.
+  known ones. Rows are never pruned, and every looked-up seller is stored, so an
+  operator with many registered NodeIds can fill an open-discovery buyer's
+  history; pruning is tracked in #629.
 
 ## Seller duties
 
