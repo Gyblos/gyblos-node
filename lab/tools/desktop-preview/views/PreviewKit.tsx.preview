@@ -39,6 +39,10 @@ export function Tag({ tone = TONE.NEUTRAL, dot = false, pill = false, children }
   );
 }
 
+export function PreviewInlineSpinner() {
+  return <span className="pk-inline-spinner" aria-hidden="true" />;
+}
+
 /** One-line notice with a tone: replacement, fallback or limit messages that must stay visible. */
 export function Notice({ tone = TONE.WARNING, children }: { tone?: Tone; children: ReactNode }) {
   const Glyph = tone === TONE.WARNING || tone === TONE.DANGER ? Warning : Info;
@@ -288,6 +292,11 @@ export function PreviewKitShowcase() {
           <PreviewAgentLogos />
           <PreviewChatState state={CHAT_STATE.RUNNING} />
           <PreviewChatState state={CHAT_STATE.UNREAD} />
+          <span className="pk-tab-item">
+            <Wallet size={14} aria-hidden="true" />
+            <PreviewInlineSpinner />
+            Checking balance…
+          </span>
         </div>
       </Panel>
       <Panel title="Tags">
@@ -361,8 +370,9 @@ type FundsHost = (typeof FUNDS_HOST)[keyof typeof FUNDS_HOST];
 const FUNDS = { READY_ATOMIC: 2_000_000, ATOMIC_PER_USDC: 1_000_000 } as const;
 const fundsListeners = new Set<() => void>();
 function fundsState() {
+  const funding = new URLSearchParams(location.search).get('funding');
   window.previewFunds ??= {
-    atomic: new URLSearchParams(location.search).get('funding') === 'ready' ? FUNDS.READY_ATOMIC : 0,
+    atomic: funding === 'ready' || funding === 'checking' ? FUNDS.READY_ATOMIC : 0,
     open: false,
   };
   return window.previewFunds;
@@ -599,10 +609,12 @@ export function PreviewComposerTab({
   funds,
   models,
   onSelectModel,
+  checking = false,
 }: {
   funds: ReturnType<typeof usePreviewFunds>;
   models: readonly { id: string; name: string; free: boolean }[];
   onSelectModel: (id: string) => void;
+  checking?: boolean;
 }) {
   const atomic = usePreviewBalance();
   const { spent, limit, limited, freeOnly } = useSpending();
@@ -641,9 +653,16 @@ export function PreviewComposerTab({
               <span className="pk-dot" aria-hidden="true" />
               {network}
             </span>
-            <span className="pk-tab-item">
+            <span className="pk-tab-item" aria-live="polite" aria-busy={checking}>
               <Wallet size={14} aria-hidden="true" />
-              {previewUsdc(atomic)}
+              {checking ? (
+                <>
+                  <PreviewInlineSpinner />
+                  Checking balance…
+                </>
+              ) : (
+                previewUsdc(atomic)
+              )}
             </span>
             <span className="pk-tab-item pk-tab-limit" title="Spending limit used">
               <span

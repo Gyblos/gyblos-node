@@ -6,6 +6,7 @@ import {
   Check,
   CurrencyCircleDollar,
   Lightning,
+  Plus,
   ShieldCheck,
   Sparkle,
   type Icon,
@@ -24,10 +25,9 @@ import { Modal } from './Modal';
 import { MotionPresence } from './Motion';
 import type { ModelOption } from './model-types';
 import { ModelMenuBadges } from './ModelMenuBadges';
-import { ModelMenuBalance } from './ModelMenuBalance';
 import { ModelImage } from './ModelImage';
 import { priceRange, usdPerMtok } from './model-price';
-import { feeLabel, openPreviewFunds, PREVIEW_COPY, previewUsdc, READY_SELLER_MODES, Tag, usePreviewBalance, usePreviewSetting, type SellerMode } from './PreviewKit';
+import { feeLabel, openPreviewFunds, PREVIEW_COPY, READY_SELLER_MODES, Tag, usePreviewBalance, usePreviewSetting, type SellerMode } from './PreviewKit';
 import { Badge, MenuItem } from './UI';
 
 export type { ModelOption } from './model-types';
@@ -355,15 +355,6 @@ export function ModelDropdown({
         const current = !!active && (active === model.name || offers.some((item) => item.id === model.id));
         return (
           <>
-            {!contextLabel && (
-              <ModelMenuBalance
-                amount={previewUsdc(balance)}
-                onAdd={() => {
-                  close();
-                  openPreviewFunds();
-                }}
-              />
-            )}
             <div
               className="preview-model-list"
               onKeyDown={(event) => {
@@ -425,15 +416,30 @@ export function ModelDropdown({
                 No models found
               </p>
             )}
-            {showBrowse && (
-              <MenuItem
-                footer
-                label="View all models"
-                onClick={() => {
-                  close();
-                  onBrowse();
-                }}
-              />
+            {(showBrowse || (networkOnly && !contextLabel)) && (
+              <div className="preview-menu-actions">
+                {networkOnly && !contextLabel && (
+                  <MenuItem
+                    footer
+                    label="Add funds"
+                    leading={<Plus size={13} weight="bold" aria-hidden="true" />}
+                    onClick={() => {
+                      close();
+                      openPreviewFunds();
+                    }}
+                  />
+                )}
+                {showBrowse && (
+                  <MenuItem
+                    footer
+                    label="View all models"
+                    onClick={() => {
+                      close();
+                      onBrowse();
+                    }}
+                  />
+                )}
+              </div>
             )}
             <div
               ref={flyout}

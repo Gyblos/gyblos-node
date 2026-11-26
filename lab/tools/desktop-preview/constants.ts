@@ -25,6 +25,7 @@ export const PREVIEW = {
   minuteMs: 60000,
   halfHourMs: 1800000,
   replyDelayMs: 1400,
+  balanceCheckDelayMs: 10000,
   priceScale: 1_000_000,
   medianMinOffers: 3,
   replyCents: 10,

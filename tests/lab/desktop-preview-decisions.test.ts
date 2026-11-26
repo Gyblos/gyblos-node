@@ -146,7 +146,9 @@ void test('preview composer shows an inline spinner while the buyer balance is c
   const { CHAT_FUNDS_REWRITES } =
     await import('../../lab/tools/desktop-preview/funds-build');
   assert.ok(
-    CHAT_FUNDS_REWRITES.some(([, to]) => to.includes('checking={loading}')),
+    CHAT_FUNDS_REWRITES.some(([, to]) =>
+      to.includes('checking={active && usingX402 && !!payer && loading}'),
+    ),
   );
   const funding = await readFile(new URL('funding.ts', preview), 'utf8');
   assert.match(funding, /funding'\) === 'checking'/);
@@ -313,8 +315,8 @@ void test('preview menus, number fields and model rows follow the shared compone
     'apps/desktop/src/ui/ModelDropdown.tsx',
     'utf8',
   );
-  for (const picker of [desktop, dropdown])
-    assert.match(picker, /<ModelMenuBalance/);
+  assert.match(desktop, /<ModelMenuBalance/);
+  assert.doesNotMatch(dropdown, /<ModelMenuBalance/);
   const balance = await readFile(
     'apps/desktop/src/ui/ModelMenuBalance.tsx',
     'utf8',
