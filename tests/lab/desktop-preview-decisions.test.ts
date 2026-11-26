@@ -136,6 +136,45 @@ void test('preview disables paid-only models without funds unless the free fallb
   );
 });
 
+void test('preview composer shows an inline spinner while the buyer balance is checked', async () => {
+  const kit = await view('PreviewKit.tsx.preview');
+  assert.match(kit, /export function PreviewInlineSpinner\(/);
+  assert.match(kit, /checking = false/);
+  assert.match(kit, /<PreviewInlineSpinner \/>/);
+  assert.match(kit, /aria-busy=\{checking\}/);
+  assert.match(kit, /Checking balance…/);
+  const { CHAT_FUNDS_REWRITES } =
+    await import('../../lab/tools/desktop-preview/funds-build');
+  assert.ok(
+    CHAT_FUNDS_REWRITES.some(([, to]) => to.includes('checking={loading}')),
+  );
+  const funding = await readFile(new URL('funding.ts', preview), 'utf8');
+  assert.match(funding, /funding'\) === 'checking'/);
+  const css = await previewStyles();
+  assert.match(css, /\.pk-inline-spinner\s*\{/);
+  assert.match(css, /animation: pk-spin 800ms linear infinite;/);
+  assert.match(
+    css,
+    /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.pk-inline-spinner[\s\S]*animation: none;/,
+  );
+});
+
+void test('preview chat model picker keeps funds actions compact and leaves the balance in the composer tab', async () => {
+  const dropdown = await view('ModelDropdown.tsx.preview');
+  assert.doesNotMatch(dropdown, /ModelMenuBalance/);
+  assert.doesNotMatch(dropdown, /previewUsdc\(balance\)/);
+  assert.match(dropdown, /className="preview-menu-actions"/);
+  assert.match(dropdown, /label="Add funds"/);
+  assert.match(dropdown, /label="View all models"/);
+  assert.ok(
+    dropdown.indexOf('label="Add funds"') <
+      dropdown.indexOf('label="View all models"'),
+  );
+  const css = await previewStyles();
+  assert.match(css, /\.preview-menu-actions\s*\{[^}]*display: flex/);
+  assert.match(css, /\.preview-menu-actions \.dropdown-footer\s*\{/);
+});
+
 void test('preview hides Testnet behind a developer setting', async () => {
   const network = await view('NetworkSwitch.tsx.preview');
   assert.match(network, /usePreviewSetting\('showTestnet'\)/);
