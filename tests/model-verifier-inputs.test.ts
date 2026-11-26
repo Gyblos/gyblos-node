@@ -10,6 +10,7 @@ import {
 } from '@gyblos/model-verifier/challenge-set';
 import {
   MODEL_VERIFIER_CODES,
+  MODEL_VERIFIER_COMMANDS,
   ModelVerifierError,
 } from '@gyblos/model-verifier/constants';
 import { loadVerifierKey } from '@gyblos/model-verifier/key';
@@ -88,14 +89,16 @@ const evidenceCases = [
     'accepts counts at both published limits',
     prompts.length,
     0,
+    1,
     rule.checksPerAnswer,
     0,
   ],
-  ['rejects one check above the full maximum', prompts.length, 1, 0, 1],
+  ['rejects one check above the full maximum', prompts.length, 1, 0, 0, 1],
   [
     'rejects one check above the maximum for the answered prompts',
     prompts.length - 1,
     1,
+    0,
     0,
     1,
   ],
@@ -103,15 +106,34 @@ const evidenceCases = [
     'rejects one deviation above the maximum for one deviant answer',
     prompts.length,
     0,
+    1,
     rule.checksPerAnswer + 1,
     1,
   ],
+  [
+    'accepts deviations at the maximum for two deviant answers',
+    prompts.length,
+    0,
+    2,
+    2 * rule.checksPerAnswer,
+    0,
+  ],
+  [
+    'rejects one deviation above the maximum for two deviant answers',
+    prompts.length,
+    0,
+    2,
+    2 * rule.checksPerAnswer + 1,
+    1,
+  ],
+  ['accepts a partial run at its own maximum', prompts.length - 1, 0, 0, 0, 0],
 ] as const;
 
 for (const [
   name,
   answers,
   extraChecks,
+  deviantAnswers,
   deviations,
   exitCode,
 ] of evidenceCases) {
@@ -125,7 +147,7 @@ for (const [
         answers,
         checks: answers * rule.checksPerAnswer + extraChecks,
         deviations,
-        deviantAnswers: deviations > 0 ? 1 : 0,
+        deviantAnswers,
         minimumChecks,
         honestRatePpm,
         falsePositivePpm,
@@ -163,7 +185,10 @@ for (const [
       const resultFile = join(home, 'result.json');
       await writeFile(resultFile, JSON.stringify(signed));
       const reportError = context.mock.method(console, 'error', () => {});
-      assert.equal(await main(['check', resultFile]), exitCode);
+      assert.equal(
+        await main([MODEL_VERIFIER_COMMANDS.CHECK, resultFile]),
+        exitCode,
+      );
       if (exitCode === 1)
         assert.deepEqual(
           reportError.mock.calls.map((call) => call.arguments),
