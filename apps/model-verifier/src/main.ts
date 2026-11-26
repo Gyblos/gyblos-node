@@ -18,8 +18,12 @@ import {
   type SignedModelVerification,
 } from '@gyblos/protocol/model-verification';
 import { isMain } from '@gyblos/runtime';
+import { DIAGNOSTIC_OUTCOMES } from '@gyblos/runtime/constants';
 import { withDiagnosticCleanup } from '@gyblos/runtime/diagnostic-cleanup';
-import { createDiagnostics } from '@gyblos/runtime/diagnostics';
+import {
+  createDiagnostics,
+  diagnosticCause,
+} from '@gyblos/runtime/diagnostics';
 
 import { CHALLENGE_SET, challengeSetDigest } from './challenge-set';
 import {
@@ -147,10 +151,12 @@ async function publishOutput(
     async () => {
       if (!published) await rm(staging, { recursive: true, force: true });
     },
-    () =>
+    (error) =>
       diagnostics.report({
         phase: MODEL_VERIFIER_OUTPUT_DIAGNOSTICS.phases.cleanup,
         code: MODEL_VERIFIER_CODES.OUTPUT_CLEANUP_FAILED,
+        cause: diagnosticCause(error),
+        outcome: DIAGNOSTIC_OUTCOMES.CLEANUP_FAILURE,
       }),
   );
 }
