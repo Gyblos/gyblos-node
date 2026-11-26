@@ -14,15 +14,18 @@ prompt. No envíes contraseñas, llaves ni otros secretos. Consulta
 ## Selección automática de vendedor
 
 Auto deja que tu comprador elija un vendedor por ti. Por defecto usa solo ofertas gratis. Para que use ofertas
-pagadas, abre **Payments → Automatic seller selection** en la app de escritorio, marca **Allow paid offers in
-Auto**, escribe el máximo por respuesta y los precios máximos de entrada y salida que aceptas, en USDC por
-millón de tokens, y elige **Save Auto settings**. En el chat, abre el modelo y elige **Auto**.
+pagadas, abre **Usage & payments → Limits** en la app de escritorio y elige **Manage chat budget**. En
+**Automatic seller selection**, marca **Allow paid offers in Auto**, escribe el máximo por respuesta y los
+precios máximos de entrada y salida que aceptas, en USDC por millón de tokens, y elige **Save Auto settings**.
+La sección aparece cuando tu comprador busca vendedores por su cuenta (descubrimiento abierto). En el chat, abre
+el modelo y elige **Auto**.
 
 Estos límites se aplican al chat y a todas las claves API de este comprador, así que tus herramientas de código
-también los respetan. Auto pide ofertas firmadas a vendedores verificados. Se siguen respetando tu máximo por
-respuesta y el saldo de cada clave API, y una clave con límite `0` solo puede usar ofertas gratis. Auto puede
-liquidar el canal anterior antes de abrir otro con el depósito autorizado restante. Desactiva las ofertas
-pagadas para que Auto vuelva a usar solo ofertas gratis.
+también los respetan. El máximo por respuesta es el límite del comprador para toda respuesta pagada, no solo
+para Auto, y se mantiene cuando desactivas las ofertas pagadas. Auto pide ofertas firmadas a vendedores
+verificados. Se sigue respetando el saldo de cada clave API, y una clave con límite `0` solo puede usar ofertas
+gratis. Auto puede liquidar el canal anterior antes de abrir otro con el depósito autorizado restante.
+Para que Auto vuelva a usar solo ofertas gratis, desmarca **Allow paid offers in Auto** y elige **Save Auto settings**.
 
 ## Requisitos previos [#antes-de-empezar]
 

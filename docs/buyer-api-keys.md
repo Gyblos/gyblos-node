@@ -93,8 +93,8 @@ limits.
 
 ## Automatic seller selection from a checkout
 
-The desktop app sets Auto in **Payments → Automatic seller selection**. From a
-checkout, `pnpm buyer:auto` sets the same buyer policy. Use the same
+The desktop app sets Auto in **Usage & payments → Limits → Manage chat budget**.
+From a checkout, `pnpm buyer:auto` sets the same buyer policy. Use the same
 `GYBLOS_HOME` as the buyer that serves your coding tool, give the maximum input
 and output prices in USDC per million tokens, then restart the buyer:
 
@@ -102,9 +102,9 @@ and output prices in USDC per million tokens, then restart the buyer:
 pnpm buyer:auto 0.052 0.208
 ```
 
-The buyer needs open discovery, a channel policy and a positive per-response
-limit. `pnpm buyer:auto off` returns Auto to free offers only; restart the buyer
-afterwards.
+The buyer needs open discovery with no pinned or configured seller, a channel
+policy and a positive per-response limit. `pnpm buyer:auto off` returns Auto to
+free offers only; restart the buyer afterwards.
 
 ## Errors a client sees
 

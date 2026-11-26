@@ -12,16 +12,17 @@ prompt. Don't send passwords, keys or other secrets. See [Data and privacy](/en/
 
 ## Automatic seller selection
 
-Auto lets your buyer pick a seller for you. By default it uses free offers only. To let it use paid offers,
-open **Payments → Automatic seller selection** in the desktop app, choose **Allow paid offers in Auto**, enter
-the maximum per response and the maximum input and output prices you accept, in USDC per million tokens, and
-choose **Save Auto settings**. In chat, open the model and select **Auto**.
+Auto lets your buyer pick a seller for you. By default it uses free offers only. To let it use paid offers, open
+**Usage & payments → Limits** in the desktop app and choose **Manage chat budget**. Under **Automatic seller
+selection**, check **Allow paid offers in Auto**, enter the maximum per response and the maximum input and
+output prices you accept, in USDC per million tokens, and choose **Save Auto settings**. The section appears
+when your buyer finds sellers on its own (open discovery). In chat, open the model and select **Auto**.
 
-These limits apply to chat and to every API key on this buyer, so your coding tools follow them too. Auto asks
-verified sellers for signed offers. Your per-response limit and the remaining budget of each API key still
-apply, and a key with a limit of `0` can only use free offers. Auto may settle the previous channel before
-opening a replacement within the remaining deposit authority. Turn off paid offers to return Auto to free
-offers only.
+These limits apply to chat and to every API key on this buyer, so your coding tools follow them too. The maximum
+per response is the buyer's limit for every paid answer, not only Auto's, and it stays when you turn paid offers
+off. Auto asks verified sellers for signed offers. The remaining budget of each API key still applies, and a key
+with a limit of `0` can only use free offers. Auto may settle the previous channel before opening a replacement
+within the remaining deposit authority. To return Auto to free offers only, clear **Allow paid offers in Auto** and choose **Save Auto settings**.
 
 ## Prerequisites [#before-you-start]
 
