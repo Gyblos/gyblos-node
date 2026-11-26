@@ -30,7 +30,7 @@ import {
   completeBuyerTelemetry,
   failBuyerTelemetry,
 } from './free-telemetry';
-import { estimatedInputTokens } from './input-size';
+import { estimatedInputTokens, fittedInput, tooLong } from './input-size';
 import type { RoutedModel } from './model-routes';
 import type { SelectionDecision } from './selection';
 import type { StaticControlSeller } from './selection-config';
@@ -125,6 +125,7 @@ export async function executeBuyerFree(
     // The failure of a seller that already had the prompt: when no other seller can take it, or time
     // runs out, the client sees that failure, not a later selection's.
     let resent: FreeClientError | undefined;
+    let unfit: FreeClientError | undefined;
     let resends = 0;
     while (!signal.aborted) {
       const winner = await dependencies
@@ -140,6 +141,7 @@ export async function executeBuyerFree(
             error.code === FREE_BUYER_CODES.BUSY;
           // Every other seller taken by requests side by side: busy, so the client may try again.
           if (resent && !busy) throw resent;
+          if (unfit && !busy) throw unfit;
           // Local occupancy is not a network failure; retain request-local model telemetry.
           if (!signal.aborted && !busy && !resent)
             buyerUnserved(dependencies, Boolean(onDelta), model?.selection);
@@ -159,7 +161,11 @@ export async function executeBuyerFree(
           undefined,
           dependencies.resendAfterSend === true &&
             resends < FREE_BUYER.maxResends,
-        );
+        ).catch((error: unknown) => {
+          if (!tooLong(error)) throw error;
+          unfit = error;
+          return undefined;
+        });
         if (result instanceof Resent) {
           resent = result.error;
           resends++;
@@ -246,7 +252,10 @@ async function attemptSelectedFree(
   beforeExecute: (() => void) | undefined,
   resend: boolean,
 ): Promise<FreeExecutionResult | Resent | undefined> {
-  const request = buildFreeExecutionRequest(winner.quote, input);
+  const request = buildFreeExecutionRequest(
+    winner.quote,
+    fittedInput(input, winner.quote.offer.model.contextTokens),
+  );
   const observer = buyerExecutionTelemetry(
     request,
     dependencies,

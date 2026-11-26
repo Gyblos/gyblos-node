@@ -105,17 +105,18 @@ const FULL = new Set<string>([
   CHAT_MESSAGE_DETAILS.content,
   CHAT_MESSAGE_DETAILS.count,
 ]);
+export const contextFull = (body: ChatErrorBody) =>
+  Boolean(body.contextFull) || (body.neverSent && FULL.has(body.message));
 export const responsesError = (body: ChatErrorBody) => ({
   error: {
     message: body.message,
     type: FREE_BUYER.errorType,
     param: body.param,
-    code:
-      body.contextFull || (body.neverSent && FULL.has(body.message))
-        ? RESPONSES_CODES.contextFull
-        : !body.neverSent
-          ? RESPONSES_CODES.stopped
-          : body.code,
+    code: contextFull(body)
+      ? RESPONSES_CODES.contextFull
+      : !body.neverSent
+        ? RESPONSES_CODES.stopped
+        : body.code,
     ...(!body.neverSent || FULL.has(body.message)
       ? { [RESPONSES_CODES.field]: body.code }
       : {}),
