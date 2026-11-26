@@ -19,23 +19,23 @@ approval.
 Routes sit at the root of the index host. The client base URL is
 `https://discovery.gyblos.com/v1` (`DISCOVERY_INDEX_URL` in `@gyblos/config`).
 
-| Route                              | Purpose                                                                                         |
-| ---------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `POST /v1/records`                 | Publish one signed public v2 catalog, presence or withdrawal.                                   |
-| `GET /v1/sellers`                  | List live sellers of one model, paged by an opaque cursor.                                      |
-| `GET /v1/models`                   | List models from live sellers, ordered by seller count; no query parameters.                    |
-| `GET /v1/models/catalog`           | The same list with each model's `family`, `lab` and `source` ([Model catalog](#model-catalog)). |
-| `GET /v1/uptime?node=`             | Public uptime of one NodeId over the last day, week and month ([Uptime](#uptime)).              |
-| `GET /v1/versions[?node=<NodeId>]` | Active seller counts by release, or one active seller’s declared release.                       |
-| `GET /v1/network`                  | Every known seller, online, offline or unpublished, with counts ([Network](#network)).          |
-| `GET /v1/network/history`          | Average and peak sellers online per UTC day ([Network history](#network-history)).              |
-| `GET /v1/offers/history`           | Catalog periods and their exact prices, by NodeId or model ([Offer history](#offer-history)).   |
-| `GET /v1/health`                   | `{ ok: true, records, publish }`: unexpired record count and [publish mode](#publish-modes).    |
-| `POST /v1/registrations`           | Trade an invite code for publishing, once the NodeId is bound in the 8004 agent registry.       |
-| `POST /v1/identity/github`         | Submit a node-signed GitHub claim; the index checks its gist ([GitHub claims](#github-claims)). |
-| `GET /v1/identity/github/<NodeId>` | One seller's GitHub claim and the state of its last check.                                      |
-| `POST /v1/profile`                 | Set or clear a seller's node-signed display name ([Seller names](#seller-names)).               |
-| `GET /v1/profile/<NodeId>`         | One seller's display name, with its signed claim.                                               |
+| Route                              | Purpose                                                                                                       |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `POST /v1/records`                 | Publish one signed public v2 catalog, presence or withdrawal.                                                 |
+| `GET /v1/sellers`                  | List live sellers of one model, paged by an opaque cursor.                                                    |
+| `GET /v1/models`                   | List models from live sellers, ordered by seller count; no query parameters.                                  |
+| `GET /v1/models/catalog`           | The same list with each model's `family`, `lab`, `source` and `categories` ([Model catalog](#model-catalog)). |
+| `GET /v1/uptime?node=`             | Public uptime of one NodeId over the last day, week and month ([Uptime](#uptime)).                            |
+| `GET /v1/versions[?node=<NodeId>]` | Active seller counts by release, or one active seller’s declared release.                                     |
+| `GET /v1/network`                  | Every known seller, online, offline or unpublished, with counts ([Network](#network)).                        |
+| `GET /v1/network/history`          | Average and peak sellers online per UTC day ([Network history](#network-history)).                            |
+| `GET /v1/offers/history`           | Catalog periods and their exact prices, by NodeId or model ([Offer history](#offer-history)).                 |
+| `GET /v1/health`                   | `{ ok: true, records, publish }`: unexpired record count and [publish mode](#publish-modes).                  |
+| `POST /v1/registrations`           | Trade an invite code for publishing, once the NodeId is bound in the 8004 agent registry.                     |
+| `POST /v1/identity/github`         | Submit a node-signed GitHub claim; the index checks its gist ([GitHub claims](#github-claims)).               |
+| `GET /v1/identity/github/<NodeId>` | One seller's GitHub claim and the state of its last check.                                                    |
+| `POST /v1/profile`                 | Set or clear a seller's node-signed display name ([Seller names](#seller-names)).                             |
+| `GET /v1/profile/<NodeId>`         | One seller's display name, with its signed claim.                                                             |
 
 Common behavior:
 
@@ -414,7 +414,7 @@ is `400 INVALID_QUERY`):
 ## Model catalog
 
 `GET /v1/models/catalog` takes no parameters and returns the `/v1/models` list
-(at most 500 models) with three more fields per model:
+(at most 500 models) with four more fields per model:
 
 ```json
 {
@@ -424,22 +424,52 @@ is `400 INVALID_QUERY`):
       "sellers": 2,
       "family": "qwen",
       "lab": "Alibaba · Qwen",
-      "source": "rules"
+      "source": "registry",
+      "categories": ["general", "reasoning"]
     }
   ],
   "generatedAt": 1764028800000
 }
 ```
 
-`family`, `lab` and `source` are read from the model id itself
-(`@gyblos/protocol/model-family`), never from a seller's claim; rules ignore
-case, and are never `null`. A known publisher (`meta-llama/Llama-3.1-8B`)
+Without a registry entry, `family`, `lab` and `source` are read from the model
+id itself (`@gyblos/protocol/model-family`), never from a seller's claim; rules
+ignore case, and are never `null`. A known publisher (`meta-llama/Llama-3.1-8B`)
 decides the family (`google/gemma-…` is `gemma`); otherwise the name does, with
 or without a publisher (`unsloth/Qwen3-8B` and `qwen3-0.6b` are `qwen`). Those
 carry `source: "rules"`. An id no rule knows has `family: "other"`, its
 publisher as written as `lab` (`acme/foo-7b` gives `acme`, a bare id `Unknown`)
 and `source: "fallback"`. `/v1/models` keeps its two fields, because released
 buyers reject extra keys there.
+
+A model with an entry in the operator's registry (`discovery_model_registry`)
+takes its `family`, `lab` and `categories` from that entry instead, with
+`source: "registry"`. Without one, `categories` is `[]`. Categories come from
+one fixed list (`@gyblos/protocol/model-categories`): `general`, `coding`,
+`agentic`, `reasoning`, `classification`, `extraction`, `embedding`,
+`reranking`, `vision`, `speech-to-text`, `text-to-speech`, `translation`,
+`moderation`, `image-generation`, `image-editing`, `image-upscaling`,
+`video-generation`, `audio-generation` and `document-understanding`. They
+describe the model, not a seller's offer: modalities, context, quantization and
+price stay with each offer. A cache miss reads the registry rows of the listed
+models once.
+
+### Model registry
+
+`pnpm index:models [--remote]`
+(`apps/discovery-index/scripts/model-registry.ts`) lists the registry.
+`pnpm index:models --set <model> --family <family> --lab <lab> --categories <a,b> --local|--remote`
+adds or replaces an entry: `family` is one of the rule families or `other`,
+`lab` has 1 to 64 characters, and every category must be in the list above.
+`pnpm index:models --remove <model> --local|--remote` deletes one. Like the
+other operator scripts, it compiles its SQL with Drizzle and runs it through
+Wrangler; the index has no admin route.
+
+`pnpm index:models --unclassified [--remote]` is the check for new models: it
+lists every model in a catalog that has not expired and has no registry entry,
+and exits with code 1 while any remain, so it can run on a schedule. A model the
+rules recognize still counts until it has an entry, because only the registry
+carries categories.
 
 ## Network history
 

@@ -24,6 +24,7 @@ import { PUBLIC_RECORD_LIMITS } from '@gyblos/protocol/constants';
 import {
   DISCOVERY_LISTING_INDEXES,
   GITHUB_CLAIM_STATES,
+  MODEL_REGISTRY,
   REGISTRATION,
   REGISTRATION_STATUS,
   SELLER_PROFILE,
@@ -346,6 +347,34 @@ export const sellerProfiles = sqliteTable(
     literalCheck(
       'discovery_seller_profiles_held_empty',
       sql`${or(eq(table.held, SELLER_PROFILE.open), isNull(table.name))}`,
+    ),
+  ],
+);
+export const modelRegistry = sqliteTable(
+  'discovery_model_registry',
+  {
+    modelId: text('model_id').primaryKey(),
+    family: text('family').notNull(),
+    lab: text('lab').notNull(),
+    categories: text('categories_json').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [
+    literalCheck(
+      'discovery_model_registry_model_id',
+      between(
+        textLength(table.modelId),
+        1,
+        MODEL_REGISTRY.maxModelIdCharacters,
+      ),
+    ),
+    literalCheck(
+      'discovery_model_registry_lab',
+      between(textLength(table.lab), 1, MODEL_REGISTRY.maxLabCharacters),
+    ),
+    literalCheck(
+      'discovery_model_registry_categories',
+      sql`json_valid(${table.categories}) and json_type(${table.categories}) = 'array'`,
     ),
   ],
 );

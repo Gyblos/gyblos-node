@@ -23,6 +23,7 @@ import {
 import { createD1GithubClaimStore } from './github-claim-store-d1';
 import { recheckGithubClaims } from './github-claims';
 import type { DiscoveryLimiters, RateLimiter } from './limits';
+import { createD1ModelRegistry } from './model-registry-d1';
 import { rollupNetworkDays } from './network-history';
 import { createD1SellerProfileStore } from './profile-store-d1';
 import { parsePublishAllowlist } from './publishers';
@@ -120,6 +121,9 @@ function appFor(bindings: unknown, cache: WeakMap<object, DiscoveryIndex>) {
       gistFetch: edgeFetch(),
       profiles: isDatabase(database)
         ? createD1SellerProfileStore(database)
+        : undefined,
+      modelRegistry: isDatabase(database)
+        ? createD1ModelRegistry(database)
         : undefined,
       limiters: limitersOf(bindings),
       publishers: parsePublishAllowlist(

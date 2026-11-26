@@ -377,6 +377,12 @@ export const GITHUB_CLAIM = {
   msPerSecond: 1000,
 } as const;
 
+export const MODEL_REGISTRY = {
+  maxLabCharacters: 64,
+  maxModelIdCharacters: PUBLIC_RECORD_LIMITS.maxIdentifierCharacters,
+  maxListedRows: 1000,
+} as const;
+
 export const SELLER_PROFILE = {
   maxBodyBytes: 1024,
   maxAgeMs: 60_000,
