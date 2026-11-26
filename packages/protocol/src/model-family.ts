@@ -88,6 +88,11 @@ export type ModelIdentity =
       family: typeof OTHER_FAMILY;
       lab: string;
       source: typeof MODEL_IDENTITY_SOURCE.FALLBACK;
+    }
+  | {
+      family: ModelFamily | typeof OTHER_FAMILY;
+      lab: string;
+      source: typeof MODEL_IDENTITY_SOURCE.REGISTRY;
     };
 
 export function modelIdentity(modelId: string): ModelIdentity {

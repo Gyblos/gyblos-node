@@ -452,24 +452,34 @@ one fixed list (`@gyblos/protocol/model-categories`): `general`, `coding`,
 `video-generation`, `audio-generation` and `document-understanding`. They
 describe the model, not a seller's offer: modalities, context, quantization and
 price stay with each offer. A cache miss reads the registry rows of the listed
-models once.
+models once, by exact id (case matters, unlike the rules), so an edit shows
+after the response cache expires (up to 10 seconds per location). A registry
+that cannot be read (for example before migration `0012` is applied) or a stored
+row outside the taxonomy never fails the route: those models fall back to the
+rules with `categories: []`.
 
 ### Model registry
 
 `pnpm index:models [--remote]`
-(`apps/discovery-index/scripts/model-registry.ts`) lists the registry.
+(`apps/discovery-index/scripts/model-registry.ts`) lists the registry by model
+id (columns `model`, `family`, `lab`, `categories`, `updatedAt`; it stops at
+1,000 rows and says so).
 `pnpm index:models --set <model> --family <family> --lab <lab> --categories <a,b> --local|--remote`
-adds or replaces an entry: `family` is one of the rule families or `other`,
-`lab` has 1 to 64 characters, and every category must be in the list above.
-`pnpm index:models --remove <model> --local|--remote` deletes one. Like the
-other operator scripts, it compiles its SQL with Drizzle and runs it through
-Wrangler; the index has no admin route.
+adds or replaces an entry: the model is a protocol identifier (at most 128
+characters), `family` is one of the rule families or `other`, `lab` has 1 to 64
+characters with no surrounding spaces or control characters, and at least one
+category is required, each in the list above (spaces after commas are ignored,
+duplicates dropped). `pnpm index:models --remove <model> --local|--remote`
+deletes one. Like the other operator scripts, it compiles its SQL with Drizzle
+and runs it through Wrangler; the index has no admin route.
 
 `pnpm index:models --unclassified [--remote]` is the check for new models: it
-lists every model in a catalog that has not expired and has no registry entry,
-and exits with code 1 while any remain, so it can run on a schedule. A model the
-rules recognize still counts until it has an entry, because only the registry
-carries categories.
+lists every model `/v1/models` offers now (a live catalog with a matching live
+presence, not withdrawn) that has no registry entry, and exits with code 1 while
+any remain, so it can run on a schedule. A usage error or a failed D1 read exits
+with code 2, so a schedule can tell the two apart. A model the rules recognize
+still counts until it has an entry, because only the registry carries
+categories.
 
 ## Network history
 
@@ -875,11 +885,11 @@ stored or logged.
   and the migration is generated from it (see the migrations below); tests check
   its metadata against the migrations.
 - `storage-queries.ts`, `storage-writes.ts`, `registration-queries.ts`,
-  `uptime-d1.ts`, `github-claim-store-d1.ts` and `profile-store-d1.ts` build
-  every query through Drizzle. `d1-client.ts` runs only ORM-generated statements
-  and native transactional batches. The admin script uses the same schema and
-  mutation builders, rendered through Drizzle's SQLite dialect because the
-  Wrangler CLI takes SQL rather than bind parameters.
+  `uptime-d1.ts`, `github-claim-store-d1.ts`, `profile-store-d1.ts` and
+  `model-registry-d1.ts` build every query through Drizzle. `d1-client.ts` runs
+  only ORM-generated statements and native transactional batches. The admin
+  script uses the same schema and mutation builders, rendered through Drizzle's
+  SQLite dialect because the Wrangler CLI takes SQL rather than bind parameters.
 - A publish is one D1 batch (one transaction) that admits the high-water mark
   and NodeId quota together before writing the record. A failed batch rolls both
   back.
@@ -897,34 +907,37 @@ stored or logged.
 
 The only handwritten SQL expressions live in `src/sqlite-expressions.ts`:
 
-| Expression               | Why Drizzle can't express it                                                                                                    |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| `INDEXED BY`             | No index-hint builder. Without it SQLite reads tables holding signed JSON before pagination; a key-only `EXPLAIN` test pins it. |
-| `(VALUES (1))`           | The select builder needs a `FROM`; initial admission must still check capacity and references atomically on empty tables.       |
-| Two-argument `min`/`max` | Drizzle's versions are aggregates; retention, quota windows and uptime sightings need the scalar form inside atomic updates.    |
-| `coalesce`               | No builder; an inconclusive GitHub check moves `checked_at` forward from `NULL`, and a new offer period starts after the last.  |
-| `CASE`                   | No conditional builder; quota resets, uptime admission and closing an expired offer period use it atomically.                   |
-| `length`                 | No scalar builder; the schema keeps the database text-length checks.                                                            |
-| Bitwise OR               | No bitwise builder; concurrent uptime observations combine slot bits in one write.                                              |
-| `json_each`              | No builder; the network read matches names to the NodeIds it lists, and offer history rows come from one catalog JSON value.    |
-| `json_extract`, `cast`   | No builder; each offer row's fields and position are read from that catalog JSON value inside the guarded insert.               |
-| `NULL` select item       | The insert-select of a new offer period must name its still-empty end columns.                                                  |
-| Scalar subquery          | No correlated subquery in a SELECT list; the network read takes each NodeId's newest uptime row by primary key.                 |
+| Expression                | Why Drizzle can't express it                                                                                                                                                                       |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `INDEXED BY`              | No index-hint builder. Without it SQLite reads tables holding signed JSON before pagination; a key-only `EXPLAIN` test pins it.                                                                    |
+| `(VALUES (1))`            | The select builder needs a `FROM`; initial admission must still check capacity and references atomically on empty tables.                                                                          |
+| Two-argument `min`/`max`  | Drizzle's versions are aggregates; retention, quota windows and uptime sightings need the scalar form inside atomic updates.                                                                       |
+| `coalesce`                | No builder; an inconclusive GitHub check moves `checked_at` forward from `NULL`, and a new offer period starts after the last.                                                                     |
+| `CASE`                    | No conditional builder; quota resets, uptime admission and closing an expired offer period use it atomically.                                                                                      |
+| `length`                  | No scalar builder; the schema keeps the database text-length checks.                                                                                                                               |
+| Bitwise OR                | No bitwise builder; concurrent uptime observations combine slot bits in one write.                                                                                                                 |
+| `json_each`               | No builder; the network read matches names to the NodeIds it lists, the catalog reads registry rows for up to 500 ids in one bound value, and offer history rows come from one catalog JSON value. |
+| `json_valid`, `json_type` | No builder; the registry checks that its stored categories are a JSON array.                                                                                                                       |
+| `json_extract`, `cast`    | No builder; each offer row's fields and position are read from that catalog JSON value inside the guarded insert.                                                                                  |
+| `NULL` select item        | The insert-select of a new offer period must name its still-empty end columns.                                                                                                                     |
+| Scalar subquery           | No correlated subquery in a SELECT list; the network read takes each NodeId's newest uptime row by primary key.                                                                                    |
 
 Migrations, applied in order:
 
-| Migration                     | Adds                                                                                    |
-| ----------------------------- | --------------------------------------------------------------------------------------- |
-| `0001_discovery_index.sql`    | Record tables and their indexes.                                                        |
-| `0002_listing_indexes.sql`    | Covering listing indexes (index-only; listing answers `503` without them).              |
-| `0003_registrations.sql`      | Invite and registration tables.                                                         |
-| `0004_uptime.sql`             | Uptime tables.                                                                          |
-| `0005_node_publish_quota.sql` | The NodeId publish window and counter (publishing answers `503` without it).            |
-| `0006_presence_version.sql`   | Current presence release and attested sequence. Apply before rolling out the new index. |
-| `0007_github_claims.sql`      | Seller GitHub claims. Apply before deploying the claim routes and the cron trigger.     |
-| `0008_claim_signature.sql`    | The node signature of each GitHub claim, served by its GET route.                       |
-| `0009_seller_profiles.sql`    | Seller display names. Apply before deploying the profile routes.                        |
-| `0010_offer_history.sql`      | Offer history. Apply before deploying it, or catalog publishes fail with `503`.         |
+| Migration                     | Adds                                                                                     |
+| ----------------------------- | ---------------------------------------------------------------------------------------- |
+| `0001_discovery_index.sql`    | Record tables and their indexes.                                                         |
+| `0002_listing_indexes.sql`    | Covering listing indexes (index-only; listing answers `503` without them).               |
+| `0003_registrations.sql`      | Invite and registration tables.                                                          |
+| `0004_uptime.sql`             | Uptime tables.                                                                           |
+| `0005_node_publish_quota.sql` | The NodeId publish window and counter (publishing answers `503` without it).             |
+| `0006_presence_version.sql`   | Current presence release and attested sequence. Apply before rolling out the new index.  |
+| `0007_github_claims.sql`      | Seller GitHub claims. Apply before deploying the claim routes and the cron trigger.      |
+| `0008_claim_signature.sql`    | The node signature of each GitHub claim, served by its GET route.                        |
+| `0009_seller_profiles.sql`    | Seller display names. Apply before deploying the profile routes.                         |
+| `0010_offer_history.sql`      | Offer history. Apply before deploying it, or catalog publishes fail with `503`.          |
+| `0011_network_history.sql`    | The index heartbeat and daily network summaries. Apply before deploying network history. |
+| `0012_model_registry.sql`     | The model registry. Without it the catalog answers from the rules alone.                 |
 
 Migrations are generated with drizzle-kit from `src/schema.ts`
 (`pnpm index:db:generate --name <change>`, configured in

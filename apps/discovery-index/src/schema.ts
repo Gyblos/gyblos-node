@@ -30,7 +30,11 @@ import {
   SELLER_PROFILE,
   UPTIME,
 } from './constants';
-import { nullableTextLength, textLength } from './sqlite-expressions';
+import {
+  jsonArray,
+  nullableTextLength,
+  textLength,
+} from './sqlite-expressions';
 
 const literalCheck = (name: string, value: SQL) =>
   check(name, value.inlineParams());
@@ -374,7 +378,7 @@ export const modelRegistry = sqliteTable(
     ),
     literalCheck(
       'discovery_model_registry_categories',
-      sql`json_valid(${table.categories}) and json_type(${table.categories}) = 'array'`,
+      jsonArray(table.categories),
     ),
   ],
 );

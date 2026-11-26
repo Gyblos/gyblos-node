@@ -8,6 +8,7 @@ import {
   modelIdentity,
   OTHER_FAMILY,
   type ModelFamily,
+  type ModelIdentity,
 } from '@gyblos/protocol/model-family';
 
 export type RegistryFamily = ModelFamily | typeof OTHER_FAMILY;
@@ -26,20 +27,28 @@ export interface ModelRegistryStore {
 export const isRegistryFamily = (value: unknown): value is RegistryFamily =>
   value === OTHER_FAMILY || MODEL_FAMILIES.some((family) => family === value);
 
-export function registryEntry(
-  modelId: string,
+function parsedCategories(json: unknown): unknown {
+  try {
+    return typeof json === 'string' ? (JSON.parse(json) as unknown) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function storedEntry(
+  modelId: unknown,
   family: unknown,
   lab: unknown,
-  categories: unknown,
-): ModelRegistryEntry {
-  if (
-    !isRegistryFamily(family) ||
-    typeof lab !== 'string' ||
-    !Array.isArray(categories) ||
-    !categories.every(isModelCategory)
-  )
-    throw new TypeError('Unexpected model registry row.');
-  return { modelId, family, lab, categories };
+  json: unknown,
+): ModelRegistryEntry[] {
+  const categories = parsedCategories(json);
+  return typeof modelId === 'string' &&
+    isRegistryFamily(family) &&
+    typeof lab === 'string' &&
+    Array.isArray(categories) &&
+    categories.every(isModelCategory)
+    ? [{ modelId, family, lab, categories }]
+    : [];
 }
 
 export function createMemoryModelRegistry(
@@ -59,7 +68,7 @@ export function createMemoryModelRegistry(
 export function catalogIdentity(
   modelId: string,
   entry: ModelRegistryEntry | undefined,
-) {
+): ModelIdentity & { categories: ModelCategory[] } {
   if (!entry) return { ...modelIdentity(modelId), categories: [] };
   return {
     family: entry.family,

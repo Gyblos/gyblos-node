@@ -25,9 +25,8 @@ export async function modelCatalogPage(
 ) {
   const now = clock();
   const rows = await storage.models(now, DISCOVERY_INDEX_LIMITS.maxModels);
-  const entries = registry
-    ? await registry.get(rows.map((row) => row.modelId))
-    : [];
+  const ids = rows.map((row) => row.modelId);
+  const entries = registry ? await registry.get(ids).catch(() => []) : [];
   const byId = new Map(entries.map((entry) => [entry.modelId, entry]));
   const models = rows.map((row) => ({
     id: row.modelId,

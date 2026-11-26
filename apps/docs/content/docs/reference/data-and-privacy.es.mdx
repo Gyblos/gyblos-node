@@ -191,10 +191,10 @@ después de que termina cada catálogo, para que los precios pasados sigan siend
 El índice también publica cuántos vendedores estuvieron online cada día (`/v1/network/history`): el
 promedio y el máximo por día UTC, sin NodeIds, calculados con el mismo uptime que el índice ya guarda.
 
-`/v1/models/catalog` lista los modelos ofrecidos, hasta 500, cada uno con una `family` y un `lab` leídos del id del modelo,
+`/v1/models/catalog` lista los modelos ofrecidos, hasta 500, cada uno con una `family` y un `lab` leídos del id del modelo o del registro de Gyblos,
 nunca de lo que declara el vendedor. Un id que ninguna regla reconoce muestra la familia `other` y su
 publicador, o `Unknown`, como laboratorio, con `source: "fallback"`. Un modelo que Gyblos clasificó a mano muestra
-`source: "registry"` y sus `categories` (como `coding` o `reasoning`), que describen el modelo, no a un vendedor. No
+`source: "registry"` y sus `categories` (como `coding` o `reasoning`), que describen el modelo, no a un vendedor; los demás modelos muestran `categories: []`. No
 agrega datos del vendedor.
 
 Los compradores y la app de escritorio leen el índice para encontrar vendedores. `gyblos seller status

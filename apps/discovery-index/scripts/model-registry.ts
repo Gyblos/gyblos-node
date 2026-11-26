@@ -1,6 +1,6 @@
 import { parseArgs } from 'node:util';
 
-import { and, asc, eq, gt, isNull } from 'drizzle-orm';
+import { asc, eq, isNull } from 'drizzle-orm';
 
 import { controlIdentifier } from '@gyblos/protocol/control-validation';
 import {
@@ -9,9 +9,10 @@ import {
 } from '@gyblos/protocol/model-categories';
 import { isMain } from '@gyblos/runtime';
 
-import { MODEL_REGISTRY } from '../src/constants';
+import { DISCOVERY_INDEX_LIMITS, MODEL_REGISTRY } from '../src/constants';
 import { isRegistryFamily } from '../src/model-registry';
-import { catalogs, models, modelRegistry as table } from '../src/schema';
+import { modelRegistry as table } from '../src/schema';
+import { modelsQuery } from '../src/storage-queries';
 import {
   cellText,
   cellTime,
@@ -22,6 +23,8 @@ import {
 
 const USAGE =
   'usage: pnpm index:models [--remote]\n       pnpm index:models --unclassified [--remote]\n       pnpm index:models --set <model> --family <family> --lab <lab> --categories <a,b> --local|--remote\n       pnpm index:models --remove <model> --local|--remote\n';
+const READ_FAILED = 'The model registry check could not read D1.\n';
+const { exitPending, exitFailure } = MODEL_REGISTRY;
 
 export interface ModelRegistryIo {
   stdout: (text: string) => void;
@@ -67,36 +70,50 @@ export const removeSql = (modelId: string) =>
   );
 
 export const unclassifiedSql = (now: number) =>
-  compileSql((database) =>
-    database
-      .selectDistinct({ modelId: models.modelId })
-      .from(models)
-      .innerJoin(catalogs, eq(catalogs.nodeId, models.nodeId))
-      .leftJoin(table, eq(table.modelId, models.modelId))
-      .where(and(gt(catalogs.expiresAt, now), isNull(table.modelId)))
-      .orderBy(asc(models.modelId))
-      .limit(MODEL_REGISTRY.maxListedRows),
-  );
+  compileSql((database) => {
+    const live = modelsQuery(
+      database,
+      now,
+      DISCOVERY_INDEX_LIMITS.maxModels,
+    ).as('live');
+    return database
+      .select({ modelId: live.modelId })
+      .from(live)
+      .leftJoin(table, eq(table.modelId, live.modelId))
+      .where(isNull(table.modelId))
+      .orderBy(asc(live.modelId));
+  });
 
 const field = (row: unknown, key: string) =>
   row && typeof row === 'object' ? Reflect.get(row, key) : undefined;
 
+function categoryList(json: unknown) {
+  try {
+    const parsed = JSON.parse(cellText(json)) as unknown;
+    return Array.isArray(parsed) ? parsed.join(',') : '';
+  } catch {
+    return '';
+  }
+}
+
 function list(io: ModelRegistryIo, remote: boolean) {
   const rows = io.query(registrySql(), remote);
   io.stdout('model\tfamily\tlab\tcategories\tupdatedAt\n');
-  for (const row of rows) {
-    const categories = JSON.parse(cellText(field(row, 'categories_json')));
+  for (const row of rows)
     io.stdout(
       [
         cellText(field(row, 'model_id')),
         cellText(field(row, 'family')),
         cellText(field(row, 'lab')),
-        Array.isArray(categories) ? categories.join(',') : '',
+        categoryList(field(row, 'categories_json')),
         cellTime(field(row, 'updated_at')),
       ].join('\t') + '\n',
     );
-  }
-  io.stdout(`${rows.length} model(s)\n`);
+  io.stdout(
+    rows.length >= MODEL_REGISTRY.maxListedRows
+      ? `${rows.length} model(s); the list stops at 1,000 rows\n`
+      : `${rows.length} model(s)\n`,
+  );
   return 0;
 }
 
@@ -104,29 +121,32 @@ function unclassified(io: ModelRegistryIo, remote: boolean) {
   const rows = io.query(unclassifiedSql(io.now()), remote);
   for (const row of rows) io.stdout(`${cellText(field(row, 'model_id'))}\n`);
   io.stdout(`${rows.length} unclassified model(s)\n`);
-  return rows.length ? 1 : 0;
+  return rows.length ? exitPending : 0;
 }
 
 function validId(value: string | undefined) {
   if (value === undefined) return true;
   try {
-    return (
-      controlIdentifier(value) === value &&
-      value.length <= MODEL_REGISTRY.maxModelIdCharacters
-    );
+    return controlIdentifier(value) === value;
   } catch {
     return false;
   }
 }
 
+const categoriesOf = (value: unknown) =>
+  typeof value === 'string'
+    ? value.split(',').map((category) => category.trim())
+    : [];
+
 function validSet(values: Record<string, string | boolean | undefined>) {
-  const categories =
-    typeof values.categories === 'string' ? values.categories.split(',') : [];
+  const categories = categoriesOf(values.categories);
   const lab = typeof values.lab === 'string' ? values.lab : '';
   return (
     isRegistryFamily(values.family) &&
     lab.length > 0 &&
     lab.length <= MODEL_REGISTRY.maxLabCharacters &&
+    lab === lab.trim() &&
+    !MODEL_REGISTRY.unsafeLab.test(lab) &&
     categories.length > 0 &&
     categories.every(isModelCategory)
   );
@@ -168,12 +188,10 @@ function parse(argv: readonly string[]) {
   }
 }
 
-export function runModelRegistry(argv: readonly string[], io: ModelRegistryIo) {
-  const values = parse(argv);
-  if (!values) {
-    io.stderr(USAGE);
-    return 1;
-  }
+function write(
+  io: ModelRegistryIo,
+  values: NonNullable<ReturnType<typeof parse>>,
+) {
   const remote = values.remote === true;
   const database = remote ? 'remote' : 'local';
   if (values.set !== undefined) {
@@ -181,18 +199,32 @@ export function runModelRegistry(argv: readonly string[], io: ModelRegistryIo) {
       modelId: values.set,
       family: values.family ?? '',
       lab: values.lab ?? '',
-      categories: sortedCategories((values.categories ?? '').split(',')),
+      categories: sortedCategories(categoriesOf(values.categories)),
     };
     io.execute(setSql(entry, io.now()), remote);
     io.stdout(`Set in the ${database} database: ${entry.modelId}.\n`);
     return 0;
   }
-  if (values.remove !== undefined) {
-    io.execute(removeSql(values.remove), remote);
-    io.stdout(`Removed from the ${database} database: ${values.remove}.\n`);
-    return 0;
+  io.execute(removeSql(values.remove ?? ''), remote);
+  io.stdout(`Removed from the ${database} database: ${values.remove}.\n`);
+  return 0;
+}
+
+export function runModelRegistry(argv: readonly string[], io: ModelRegistryIo) {
+  const values = parse(argv);
+  if (!values) {
+    io.stderr(USAGE);
+    return exitFailure;
   }
-  return values.unclassified ? unclassified(io, remote) : list(io, remote);
+  try {
+    if (values.set !== undefined || values.remove !== undefined)
+      return write(io, values);
+    const remote = values.remote === true;
+    return values.unclassified ? unclassified(io, remote) : list(io, remote);
+  } catch {
+    io.stderr(READ_FAILED);
+    return exitFailure;
+  }
 }
 
 if (isMain(import.meta.url))

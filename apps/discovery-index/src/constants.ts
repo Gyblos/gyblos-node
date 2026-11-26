@@ -381,6 +381,9 @@ export const MODEL_REGISTRY = {
   maxLabCharacters: 64,
   maxModelIdCharacters: PUBLIC_RECORD_LIMITS.maxIdentifierCharacters,
   maxListedRows: 1000,
+  unsafeLab: /[\p{Cc}\p{Cf}]/u,
+  exitPending: 1,
+  exitFailure: 2,
 } as const;
 
 export const SELLER_PROFILE = {
