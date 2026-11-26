@@ -5,7 +5,21 @@
 import { FREE_EXECUTION_CODES } from '@gyblos/protocol/constants';
 import type { FreeExecutionStop } from '@gyblos/protocol/free-execution';
 
+import { CHAT_MESSAGE_DETAILS } from './constants';
+
 export const sellerContextFull = (view: {
   code: string;
   stop: FreeExecutionStop;
 }) => view.code === FREE_EXECUTION_CODES.LIMIT && !view.stop.delivered;
+
+const FULL = new Set<string>([
+  CHAT_MESSAGE_DETAILS.content,
+  CHAT_MESSAGE_DETAILS.count,
+]);
+export const contextFull = (body: {
+  contextFull?: boolean;
+  neverSent: boolean;
+  message: string;
+}) => Boolean(body.contextFull) || (body.neverSent && FULL.has(body.message));
+export const endpointLimit = (body: { neverSent: boolean; message: string }) =>
+  body.neverSent && FULL.has(body.message);

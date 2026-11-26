@@ -30,7 +30,7 @@ import {
   completeBuyerTelemetry,
   failBuyerTelemetry,
 } from './free-telemetry';
-import { estimatedInputTokens, fittedInput, tooLong } from './input-size';
+import { estimatedInputTokens, fittedAnswer } from './input-size';
 import type { RoutedModel } from './model-routes';
 import type { SelectionDecision } from './selection';
 import type { StaticControlSeller } from './selection-config';
@@ -125,7 +125,8 @@ export async function executeBuyerFree(
     // The failure of a seller that already had the prompt: when no other seller can take it, or time
     // runs out, the client sees that failure, not a later selection's.
     let resent: FreeClientError | undefined;
-    let unfit: FreeClientError | undefined;
+    let unfit = false;
+    let fitted = false;
     let resends = 0;
     while (!signal.aborted) {
       const winner = await dependencies
@@ -141,7 +142,10 @@ export async function executeBuyerFree(
             error.code === FREE_BUYER_CODES.BUSY;
           // Every other seller taken by requests side by side: busy, so the client may try again.
           if (resent && !busy) throw resent;
-          if (unfit && !busy) throw unfit;
+          const cooling =
+            error instanceof FreeSelectionFailure &&
+            error.retryAt !== undefined;
+          if (unfit && !fitted && !busy && !cooling) throw contextFull();
           // Local occupancy is not a network failure; retain request-local model telemetry.
           if (!signal.aborted && !busy && !resent)
             buyerUnserved(dependencies, Boolean(onDelta), model?.selection);
@@ -161,11 +165,12 @@ export async function executeBuyerFree(
           undefined,
           dependencies.resendAfterSend === true &&
             resends < FREE_BUYER.maxResends,
-        ).catch((error: unknown) => {
-          if (!tooLong(error)) throw error;
-          unfit = error;
-          return undefined;
-        });
+        );
+        if (result instanceof Unfit) {
+          unfit = true;
+          continue;
+        }
+        fitted = true;
         if (result instanceof Resent) {
           resent = result.error;
           resends++;
@@ -206,6 +211,9 @@ export function createConversationKey() {
 class Resent {
   constructor(readonly error: FreeClientError) {}
 }
+class Unfit {}
+const contextFull = () =>
+  new FreeClientError(FREE_EXECUTION_CODES.LIMIT, false);
 // Failures after sending that another seller can fix: the seller dropped (the connection broke) or
 // stalled (this buyer's own timeout). Both count against that seller (free-memory.ts `sellerFault`).
 // An error the seller itself answered is not resent: a refusal (busy, caps) would let a seller read
@@ -238,6 +246,7 @@ export async function executeSelectedBuyerFree(
     beforeExecute,
     false,
   );
+  if (result instanceof Unfit) throw contextFull();
   return result instanceof Resent ? undefined : result;
 }
 
@@ -251,10 +260,12 @@ async function attemptSelectedFree(
   onDelta: ((text: string) => Promise<void>) | undefined,
   beforeExecute: (() => void) | undefined,
   resend: boolean,
-): Promise<FreeExecutionResult | Resent | undefined> {
+): Promise<FreeExecutionResult | Resent | Unfit | undefined> {
+  const maxTokens = fittedAnswer(input, winner.quote.offer.model.contextTokens);
+  if (maxTokens === undefined) return new Unfit();
   const request = buildFreeExecutionRequest(
     winner.quote,
-    fittedInput(input, winner.quote.offer.model.contextTokens),
+    maxTokens === input.maxTokens ? input : { ...input, maxTokens },
   );
   const observer = buyerExecutionTelemetry(
     request,

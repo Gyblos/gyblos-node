@@ -19,6 +19,7 @@ import {
   FREE_BUYER,
   RESPONSES_CODES,
 } from './constants';
+import { contextFull } from './context-full';
 import { parseFreeChat, type FreeChatInput } from './free-chat';
 import {
   executionFields,
@@ -33,7 +34,6 @@ import { BYTES_PER_TOKEN } from './input-size';
 import type { ModelRoute } from './model-routes';
 import { parseResponsesChat } from './responses-chat';
 import {
-  contextFull,
   responsesCompletion,
   responsesError,
   responsesStream,
@@ -104,7 +104,7 @@ const openAi: ChatApi = {
     return {
       error: {
         message: full ? CONTEXT_FULL_ERRORS.openAi(body.message) : body.message,
-        type: full ? CONTEXT_FULL_ERRORS.openAiType : FREE_BUYER.errorType,
+        type: full ? anthropicErrorKind(body.status) : FREE_BUYER.errorType,
         param: body.param,
         code: full ? RESPONSES_CODES.contextFull : body.code,
         ...(full ? { [RESPONSES_CODES.field]: body.code } : {}),
@@ -122,9 +122,7 @@ const anthropic: ChatApi = {
   error: (body) => ({
     type: 'error',
     error: {
-      type: contextFull(body)
-        ? CONTEXT_FULL_ERRORS.anthropicType
-        : anthropicErrorKind(body.status),
+      type: anthropicErrorKind(body.status),
       message: contextFull(body)
         ? CONTEXT_FULL_ERRORS.anthropic(body.message)
         : body.message,

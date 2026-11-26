@@ -71,9 +71,9 @@ export GYBLOS_API_KEY=YOUR_API_KEY
 Replace `YOUR_API_KEY` with the key you copied.
 
 When the app can't learn a model's context size, the configuration uses 32,768 tokens of context, and the
-output limit is the buyer's answer limit. The buyer shortens the answer limit to fit the seller it picks
-and skips sellers too small for the conversation. When no seller can hold it, your tool gets a standard
-"context too long" error and compacts the conversation instead of stopping.
+output limit is the buyer's answer limit. The buyer shortens the answer limit to fit the seller it picks.
+When the conversation does not fit, your tool gets a standard "context too long" error and compacts the
+conversation instead of stopping.
 When the models change, choose **Write configuration** again.
 
 Then pick a Gyblos model with `/models` (OpenCode), `/model` (pi and Claude Code) or

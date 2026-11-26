@@ -292,8 +292,6 @@ export const RESPONSES_CODES = {
 } as const;
 
 export const CONTEXT_FULL_ERRORS = {
-  openAiType: 'invalid_request_error',
-  anthropicType: 'invalid_request_error',
   openAi: (message: string) =>
     `This request exceeds the model's maximum context length. ${message}`,
   anthropic: (message: string) => `prompt is too long: ${message}`,

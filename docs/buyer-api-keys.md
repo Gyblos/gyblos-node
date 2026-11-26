@@ -86,7 +86,10 @@ What the generated configuration does:
   output tokens, or the buyer's lower output limit
   (`packages/node/src/agent-setup-constants.ts`). Codex profiles carry this
   limit so compaction starts earlier. The fallback is not a verified seller
-  capacity: a seller can offer a smaller window and refuse the request.
+  capacity: the buyer lowers `max_tokens` to fit the chosen seller, and a
+  conversation that does not fit gets a full-context error
+  (`context_length_exceeded`, or `prompt is too long` in the Anthropic format)
+  so the tool compacts it ([running-a-node.md](running-a-node.md)).
 
 No extra inference server starts. Switching models uses the same buyer, key and
 limits.
