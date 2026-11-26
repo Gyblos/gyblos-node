@@ -145,7 +145,17 @@ async function publishOutput(
       );
       if (await pathExists(destination))
         throw new ModelVerifierError(MODEL_VERIFIER_CODES.OUTPUT_EXISTS);
-      await rename(staging, destination);
+      try {
+        await rename(staging, destination);
+      } catch (error) {
+        const occupied = await lstat(destination).then(
+          () => true,
+          () => false,
+        );
+        if (occupied)
+          throw new ModelVerifierError(MODEL_VERIFIER_CODES.OUTPUT_EXISTS);
+        throw error;
+      }
       published = true;
     },
     async () => {
