@@ -91,7 +91,7 @@ export function modelIdentity(modelId: string): ModelIdentity {
   if (family)
     return { family, lab: LABS[family], source: MODEL_IDENTITY_SOURCE.RULES };
   const [publisher, name] = modelId.split('/');
-  const lab = name !== undefined && publisher ? publisher : UNKNOWN_LAB;
+  const lab = name && publisher ? publisher : UNKNOWN_LAB;
   return {
     family: OTHER_FAMILY,
     lab,

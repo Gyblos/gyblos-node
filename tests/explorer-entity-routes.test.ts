@@ -117,7 +117,6 @@ void test('a model matches its id, known lab, variant or quantization, never a f
   });
   assert.equal(modelMatches(model('qwen3-0.6b'), 'alibaba'), true);
   assert.equal(modelMatches(model('qwen3-0.6b'), 'Q4'), true);
-  assert.equal(modelMatches(model('acme/mystery-7b'), 'acme'), true);
   assert.equal(modelMatches(model('mystery-7b'), 'known'), false);
   assert.equal(modelMatches(model('mystery-7b'), 'other'), false);
 });

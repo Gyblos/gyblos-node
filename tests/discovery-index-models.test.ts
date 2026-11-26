@@ -4,6 +4,12 @@
 import assert from 'node:assert/strict';
 
 import {
+  MODEL_IDENTITY_SOURCE,
+  OTHER_FAMILY,
+  UNKNOWN_LAB,
+} from '@gyblos/protocol/model-family';
+
+import {
   eachStorage,
   expectError,
   indexNode,
@@ -95,52 +101,48 @@ eachStorage(
         sellers: 1,
         family: 'qwen',
         lab: 'Alibaba · Qwen',
-        source: 'rules',
+        source: MODEL_IDENTITY_SOURCE.RULES,
       },
       'meta-llama/Llama-3.1-8B': {
         id: 'meta-llama/Llama-3.1-8B',
         sellers: 1,
         family: 'meta',
         lab: 'Meta',
-        source: 'rules',
+        source: MODEL_IDENTITY_SOURCE.RULES,
       },
       'google/gemma-3-4b': {
         id: 'google/gemma-3-4b',
         sellers: 1,
         family: 'gemma',
         lab: 'Google DeepMind',
-        source: 'rules',
+        source: MODEL_IDENTITY_SOURCE.RULES,
       },
       'unsloth/Qwen3-8B-GGUF': {
         id: 'unsloth/Qwen3-8B-GGUF',
         sellers: 1,
         family: 'qwen',
         lab: 'Alibaba · Qwen',
-        source: 'rules',
+        source: MODEL_IDENTITY_SOURCE.RULES,
       },
       'acme/mystery-7b': {
         id: 'acme/mystery-7b',
         sellers: 1,
-        family: 'other',
+        family: OTHER_FAMILY,
         lab: 'acme',
-        source: 'fallback',
+        source: MODEL_IDENTITY_SOURCE.FALLBACK,
       },
       'mystery-7b': {
         id: 'mystery-7b',
         sellers: 1,
-        family: 'other',
-        lab: 'Unknown',
-        source: 'fallback',
+        family: OTHER_FAMILY,
+        lab: UNKNOWN_LAB,
+        source: MODEL_IDENTITY_SOURCE.FALLBACK,
       },
     });
     assert.equal(typeof body.generatedAt, 'number');
     assert.equal(plain.models.length, 6);
     for (const row of plain.models)
       assert.deepEqual(Object.keys(row), ['id', 'sellers']);
-    for (const row of body.models) {
-      assert.equal(typeof row.family, 'string');
-      assert.equal(typeof row.lab, 'string');
-    }
     await expectError(
       await call('/v1/models/catalog?model=x'),
       400,

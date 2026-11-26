@@ -2,8 +2,6 @@
 // follows the theme; a model of no known family shows its initial instead.
 import { modelFamily } from '@gyblos/protocol/model-family';
 
-import { modelMarkUrl } from '../lib/model-family';
-
 export function ModelLogo({ modelId }: { modelId: string }) {
   const family = modelFamily(modelId);
   if (!family)
@@ -15,7 +13,7 @@ export function ModelLogo({ modelId }: { modelId: string }) {
         {modelId.slice(0, 1)}
       </span>
     );
-  const mask = `url(${modelMarkUrl(family)}) center / contain no-repeat`;
+  const mask = `url(/models/${family}.svg) center / contain no-repeat`;
   return (
     <span
       aria-hidden

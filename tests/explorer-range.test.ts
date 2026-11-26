@@ -143,12 +143,14 @@ void test('a fall from 100 to 80 unserved attempts is favorable', () => {
   });
 });
 
-void test('model labels name a recognized lab and leave an unknown family unattributed', async () => {
-  const { modelLab } = await import('@gyblos/protocol/model-family');
+void test('model labels name a recognized lab, else the id publisher or Unknown', async () => {
+  const { modelLab, UNKNOWN_LAB } =
+    await import('@gyblos/protocol/model-family');
   assert.equal(modelLab('qwen3-0.6b'), 'Alibaba · Qwen');
   assert.equal(modelLab('deepseek-ai/DeepSeek-R1-Distill-Qwen-7B'), 'DeepSeek');
   assert.equal(modelLab('acme/metadata-analyzer'), 'acme');
-  assert.equal(modelLab('custom-local-model'), 'Unknown');
+  assert.equal(modelLab('custom-local-model'), UNKNOWN_LAB);
+  assert.equal(modelLab('acme/'), UNKNOWN_LAB);
   assert.equal(modelLab('unsloth/Qwen3-8B-GGUF'), 'Alibaba · Qwen');
 });
 

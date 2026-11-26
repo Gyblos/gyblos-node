@@ -432,14 +432,14 @@ with three more fields per model:
 ```
 
 `family`, `lab` and `source` are read from the model id itself
-(`@gyblos/protocol/model-family`), never from a seller's claim, ignoring case,
-and are never `null`. A known publisher (`meta-llama/Llama-3.1-8B`) decides the
-family (`google/gemma-…` is `gemma`); otherwise the name does, with or without a
-publisher (`unsloth/Qwen3-8B` and `qwen3-0.6b` are `qwen`). Those carry
-`source: "rules"`. An id no rule knows has `family: "other"`, its publisher as
-`lab` (`acme/foo-7b` gives `acme`, a bare id `Unknown`) and
-`source: "fallback"`. `/v1/models` keeps its two fields, because released buyers
-reject extra keys there.
+(`@gyblos/protocol/model-family`), never from a seller's claim; rules ignore
+case, and are never `null`. A known publisher (`meta-llama/Llama-3.1-8B`)
+decides the family (`google/gemma-…` is `gemma`); otherwise the name does, with
+or without a publisher (`unsloth/Qwen3-8B` and `qwen3-0.6b` are `qwen`). Those
+carry `source: "rules"`. An id no rule knows has `family: "other"`, its
+publisher as written as `lab` (`acme/foo-7b` gives `acme`, a bare id `Unknown`)
+and `source: "fallback"`. `/v1/models` keeps its two fields, because released
+buyers reject extra keys there.
 
 ## Network history
 
