@@ -1,5 +1,3 @@
-// Owns the explorer's one HTTP read of a public JSON source: the answer is returned as unknown, to be
-// checked by the caller (validate.ts); a non-2xx status or a read past FETCH.timeoutMs throws.
 import { DISCOVERY_READ_LIMITS } from '@gyblos/protocol/constants';
 
 import { FETCH } from './constants';

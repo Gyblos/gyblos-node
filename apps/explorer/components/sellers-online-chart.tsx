@@ -7,11 +7,11 @@ import {
   sellersOnlinePoints,
   sellersOnlineSummary,
   type SellersOnlineDay,
-} from '../lib/network-history';
+} from '../lib/sellers-online';
 import { BarChartCard } from './board/bar-chart-card';
 import { SegmentedControl } from './board/segmented-control';
 
-type Window = (typeof SELLERS_ONLINE.windows)[number];
+type ShownDays = (typeof SELLERS_ONLINE.windows)[number];
 const OPTIONS = SELLERS_ONLINE.windows.map((days) => ({
   value: days,
   label: `${days}d`,
@@ -22,8 +22,8 @@ export function SellersOnlineChart({
 }: {
   days: readonly SellersOnlineDay[];
 }) {
-  const [window, setWindow] = useState<Window>(SELLERS_ONLINE.defaultWindow);
-  const shown = days.slice(-window);
+  const [count, setCount] = useState<ShownDays>(SELLERS_ONLINE.defaultWindow);
+  const shown = days.slice(-count);
   const { average, fullDays } = sellersOnlineSummary(shown);
   return (
     <div className="grid gap-3">
@@ -31,8 +31,8 @@ export function SellersOnlineChart({
         <SegmentedControl
           label="Days of sellers online"
           options={OPTIONS}
-          selected={window}
-          onChange={setWindow}
+          selected={count}
+          onChange={setCount}
         />
       </div>
       <BarChartCard

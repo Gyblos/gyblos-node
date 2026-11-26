@@ -448,7 +448,6 @@
   "apps/explorer/lib/discovery-shape.ts": 3,
   "apps/explorer/lib/discovery-snapshot.ts": 13,
   "apps/explorer/lib/discovery.ts": 45,
-  "apps/explorer/lib/fetch-json.ts": 2,
   "apps/explorer/lib/format.ts": 8,
   "apps/explorer/lib/latency.ts": 4,
   "apps/explorer/lib/model-table.ts": 11,

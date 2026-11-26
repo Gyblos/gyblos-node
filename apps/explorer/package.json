@@ -35,6 +35,7 @@
     "./seller-identity": "./lib/seller-identity.ts",
     "./seller-page": "./lib/seller-page.ts",
     "./seller-profile": "./lib/seller-profile.ts",
+    "./sellers-online": "./lib/sellers-online.ts",
     "./usage": "./lib/usage.ts"
   },
   "scripts": {

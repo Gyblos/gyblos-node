@@ -233,9 +233,9 @@ export const SELLERS_ONLINE = {
   fetchDays: 90,
   windows: [7, 30, 90],
   defaultWindow: 30,
-  averageScale: 10_000,
+  averageScale: 1_000,
   anchor: 'sellers-online',
-  dayOfMonth: 8,
+  dayOfMonthStart: 8,
   isoDay: /^\d{4}-\d{2}-\d{2}$/,
 } as const;
 
