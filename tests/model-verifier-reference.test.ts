@@ -158,6 +158,114 @@ void test('empty reference candidates are retried and cannot produce a signed se
   }
 });
 
+void test('truncated reference candidates cannot produce a signed seller verdict', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'gyblos-verifier-ref-'));
+  const previousHome = process.env.GYBLOS_HOME;
+  process.env.GYBLOS_HOME = home;
+  try {
+    let calls = 0;
+    const fetchImpl: typeof fetch = async (input) => {
+      if (String(input).endsWith('/api/tags'))
+        return Response.json({
+          models: [{ name: 'qwen3:1.7b', digest: DIGEST }],
+        });
+      calls++;
+      return Response.json({
+        response: ' unlikely',
+        done: true,
+        logprobs: [
+          { top_logprobs: [{ token: ' unlikely', logprob: -0.1 }] },
+        ],
+      });
+    };
+    const reference = await openReference(
+      'http://127.0.0.1:11434',
+      'qwen3-1.7b',
+      fetchImpl,
+      0,
+    );
+    const key = await loadVerifierKey(join(home, 'verifier.key'), true);
+    await assert.rejects(
+      runVerification({
+        target: {
+          owner: key.address,
+          nodeId: 'ab'.repeat(32),
+          relayUrl: null,
+          directAddresses: [],
+        },
+        seller: {
+          selection: { modelId: 'qwen3-1.7b', variant: null, quantization: null },
+          ask: async () => Array.from({ length: 40 }, () => 'word').join(' '),
+        },
+        reference,
+        set: CHALLENGE_SET,
+        key,
+        now: () => 1_800_000_000_000,
+      }),
+      (error: unknown) =>
+        error instanceof ModelVerifierError &&
+        error.code === MODEL_VERIFIER_CODES.REFERENCE_UNAVAILABLE,
+    );
+    assert.equal(calls, MODEL_VERIFIER.referenceAttempts);
+  } finally {
+    if (previousHome === undefined) delete process.env.GYBLOS_HOME;
+    else process.env.GYBLOS_HOME = previousHome;
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
+void test('malformed reference candidates are rejected at the boundary', async () => {
+  const valid = Array.from(
+    { length: CHALLENGE_SET.rule.topLogprobs },
+    (_, index) => ({ token: ` token${index}`, logprob: -0.1 }),
+  );
+  const cases = [
+    ['truncated', valid.slice(0, 1)],
+    ['extra', [...valid, { token: ' extra', logprob: -0.1 }]],
+    [
+      'empty token',
+      valid.map((candidate, index) =>
+        index === 0 ? { ...candidate, token: '' } : candidate,
+      ),
+    ],
+    [
+      'positive logprob',
+      valid.map((candidate, index) =>
+        index === 0 ? { ...candidate, logprob: 0.1 } : candidate,
+      ),
+    ],
+  ] as const;
+  for (const [name, topLogprobs] of cases) {
+    let calls = 0;
+    const fetchImpl: typeof fetch = async (input) => {
+      if (String(input).endsWith('/api/tags'))
+        return Response.json({
+          models: [{ name: 'qwen3:1.7b', digest: DIGEST }],
+        });
+      calls++;
+      return Response.json({
+        response: ' token0',
+        done: true,
+        logprobs: [{ top_logprobs: topLogprobs }],
+      });
+    };
+    const reference = await openReference(
+      'http://127.0.0.1:11434',
+      'qwen3-1.7b',
+      fetchImpl,
+      0,
+    );
+    await assert.rejects(
+      reference.candidates('prompt', CHALLENGE_SET.rule.topLogprobs),
+      (error: unknown) =>
+        error instanceof ModelVerifierError &&
+        error.code === MODEL_VERIFIER_CODES.REFERENCE_UNAVAILABLE,
+      name,
+    );
+    assert.equal(calls, MODEL_VERIFIER.referenceAttempts, name);
+  }
+});
+
 void test('a catalog alias names the same offer as the catalog id', () => {
   assert.equal(catalogModelId('qwen3:1.7b'), 'qwen3-1.7b');
   assert.equal(catalogModelId('qwen3-1.7b'), 'qwen3-1.7b');
