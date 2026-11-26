@@ -4,6 +4,7 @@ import test from 'node:test';
 import { addressHref } from '@gyblos/explorer/config';
 import {
   addressLookup,
+  modelMatches,
   searchPageHref,
   sellerMatches,
 } from '@gyblos/explorer/entity-search';
@@ -106,4 +107,16 @@ void test('entity directory links retain the viewed activity window and discard 
     assert.equal(list.closed, true);
     assert.equal(list.days, 7);
   }
+});
+
+void test('a model matches its id, known lab, variant or quantization, never a fallback lab', () => {
+  const model = (modelId: string) => ({
+    modelId,
+    variant: 'base',
+    quantization: 'q4',
+  });
+  assert.equal(modelMatches(model('qwen3-0.6b'), 'alibaba'), true);
+  assert.equal(modelMatches(model('qwen3-0.6b'), 'Q4'), true);
+  assert.equal(modelMatches(model('mystery-7b'), 'known'), false);
+  assert.equal(modelMatches(model('mystery-7b'), 'other'), false);
 });

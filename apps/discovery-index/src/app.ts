@@ -27,7 +27,7 @@ import {
 import { IndexError } from './errors';
 import { githubClaimRoutes } from './github-claim-routes';
 import { allowed } from './limits';
-import { modelsPage, parseModelsQuery } from './models';
+import { modelCatalogPage, modelsPage, parseModelsQuery } from './models';
 import { networkPage, parseNetworkQuery } from './network';
 import {
   networkHistoryKey,
@@ -213,6 +213,17 @@ function readRoutes(app: Hono<IndexEnv>, settings: IndexSettings) {
       return {
         key: `${url.origin}${INDEX_ROUTES.MODELS}`,
         body: () => modelsPage(context.get('storage'), settings.now()),
+      };
+    }),
+  );
+  app.get(
+    INDEX_ROUTES.MODEL_CATALOG,
+    cachedRead(settings, async (context) => {
+      parseModelsQuery(context.req.url);
+      const url = new URL(context.req.url);
+      return {
+        key: `${url.origin}${INDEX_ROUTES.MODEL_CATALOG}`,
+        body: () => modelCatalogPage(context.get('storage'), settings.now()),
       };
     }),
   );

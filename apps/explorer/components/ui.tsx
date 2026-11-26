@@ -4,6 +4,8 @@ import { ChevronDown, ChevronsUpDown, ChevronUp } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactElement, ReactNode } from 'react';
 
+import { modelLab } from '@gyblos/protocol/model-family';
+
 import { Skeleton } from '../boardui/components/base/skeleton/skeleton';
 import { addressHref } from '../lib/config';
 import { DISPLAY, PAGING } from '../lib/constants';
@@ -13,7 +15,6 @@ import {
   FULL_OVERVIEW,
   overviewLayout,
 } from '../lib/layout';
-import { modelLab } from '../lib/model-family';
 import { modelHref } from '../lib/offers';
 import { sortHref, type ExplorerQuery, type SortedTable } from '../lib/paging';
 import type { RangeDays, RangeSection } from '../lib/range';
@@ -385,7 +386,7 @@ export function ModelName({
       <ModelLogo modelId={modelId} />
       <span className="truncate">
         <span className="block text-xs font-sans text-muted">
-          {modelLab(modelId) ?? 'Lab unknown'}
+          {modelLab(modelId)}
         </span>
         {modelId}
         {detail ? (
