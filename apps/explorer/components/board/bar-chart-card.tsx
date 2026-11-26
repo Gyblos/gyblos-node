@@ -14,6 +14,14 @@ import { SURFACE } from './styles';
 
 export type { BarPoint } from './day-bars';
 
+function activeDetail(active: BarPoint) {
+  const detail =
+    active.amount === null
+      ? (active.detail ?? 'No observation')
+      : active.detail;
+  return [active.day, detail].filter(Boolean).join(', ');
+}
+
 export function BarChartCard({
   title,
   kind,
@@ -23,6 +31,7 @@ export function BarChartCard({
   countAxis = true,
   comparison,
   summary,
+  startAtEnd,
 }: {
   title: string;
   kind: FlowKind;
@@ -34,6 +43,7 @@ export function BarChartCard({
   countAxis?: boolean;
   comparison?: string;
   summary?: string;
+  startAtEnd?: boolean;
 }) {
   const [index, setIndex] = useState<number | null>(null);
   const active = index === null ? null : points[index];
@@ -56,14 +66,7 @@ export function BarChartCard({
           ) : null)
         }
         detail={
-          active
-            ? [
-                active.day,
-                active.amount === null ? 'No observation' : active.detail,
-              ]
-                .filter(Boolean)
-                .join(', ')
-            : (summary ?? `${points.length} days`)
+          active ? activeDetail(active) : (summary ?? `${points.length} days`)
         }
       />
       <div className="flex min-w-0 gap-2">
@@ -84,6 +87,7 @@ export function BarChartCard({
             label={title}
             active={index}
             setActive={setIndex}
+            startAtEnd={startAtEnd}
           />
         </div>
       </div>

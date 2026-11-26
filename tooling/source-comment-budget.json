@@ -433,7 +433,6 @@
   "apps/explorer/components/live-refresh.tsx": 3,
   "apps/explorer/components/model-logo.tsx": 2,
   "apps/explorer/components/models-section.tsx": 7,
-  "apps/explorer/components/network-section.tsx": 2,
   "apps/explorer/components/network-select.tsx": 2,
   "apps/explorer/components/payments-section.tsx": 6,
   "apps/explorer/components/table-scroll.tsx": 1,

@@ -1,6 +1,6 @@
 'use client';
 
-import type { KeyboardEvent, ReactNode } from 'react';
+import { useEffect, useRef, type KeyboardEvent, type ReactNode } from 'react';
 
 import type { FlowKind, FlowValue } from './animated-number';
 import { CHART, DELTA } from './constants';
@@ -84,8 +84,10 @@ export function DayBars({
   active,
   setActive,
   calendar,
+  startAtEnd = false,
 }: {
   calendar?: ReactNode;
+  startAtEnd?: boolean;
   points: BarPoint[];
   label: string;
   kind: FlowKind;
@@ -95,8 +97,17 @@ export function DayBars({
 }) {
   const minWidth =
     points.length * (points[0]?.tick ? COMPACT_WIDTH : DAY_WIDTH);
+  const scroller = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const element = scroller.current;
+    if (startAtEnd && element) element.scrollLeft = element.scrollWidth;
+  }, [startAtEnd, points.length]);
   return (
-    <div className="mt-4 overflow-x-auto" onMouseLeave={() => setActive(null)}>
+    <div
+      ref={scroller}
+      className="mt-4 overflow-x-auto"
+      onMouseLeave={() => setActive(null)}
+    >
       {calendar || <AxisLabels points={points} minWidth={minWidth} />}
       <div
         data-loading-field="plot"

@@ -13,8 +13,9 @@ import {
 } from '@gyblos/protocol/control-validation';
 
 import { DISCOVERY_URL } from './config';
-import { ALL_TIME, FETCH, UNITS } from './constants';
+import { ALL_TIME, UNITS } from './constants';
 import type { OfferedModel } from './discovery-shape';
+import { fetchBoundedJson } from './fetch-json';
 import { rangeEnd, type RangeDays } from './range';
 import { flag, record, SourceShapeError } from './validate';
 
@@ -46,33 +47,7 @@ export interface OfferPriceHistory {
   to: number;
 }
 
-async function fetchHistory(url: string): Promise<unknown> {
-  const response = await fetch(url, {
-    headers: { accept: 'application/json' },
-    signal: AbortSignal.timeout(FETCH.timeoutMs),
-  });
-  if (!response.ok || !response.body)
-    throw new SourceShapeError('offer history');
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder('utf-8', { fatal: true });
-  let size = 0;
-  let json = '';
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      size += value.byteLength;
-      if (size > DISCOVERY_READ_LIMITS.maxResponseBytes) {
-        await reader.cancel();
-        throw new SourceShapeError('offer history size');
-      }
-      json += decoder.decode(value, { stream: true });
-    }
-    return JSON.parse(json + decoder.decode()) as unknown;
-  } finally {
-    reader.releaseLock();
-  }
-}
+const HISTORY = 'offer history';
 
 function addOffer(
   series: Map<string, OfferPriceSeries>,
@@ -169,7 +144,7 @@ export async function getOfferPriceHistory({
         ? DISCOVERY_READ_LIMITS.maxOfferHistoryDays
         : days + (closed || days === 1 ? 1 : 0);
     const url = `${DISCOVERY_URL}/offers/history?${field}=${encodeURIComponent(value)}&days=${count}`;
-    const source = record(await fetchHistory(url), 'offer history');
+    const source = record(await fetchBoundedJson(url, HISTORY), HISTORY);
     const retainedFrom = controlInteger(source.from);
     const snapshot = controlInteger(source.generatedAt);
     if (
