@@ -3,15 +3,17 @@ export async function checkMinimumLayout() {
   const pollMs = 50;
   const keyNameLength = 60;
 
+  function liveElement(selector: string) {
+    return Array.from(document.querySelectorAll<HTMLElement>(selector)).find(
+      (candidate) =>
+        !candidate.closest('.slide-stage') &&
+        candidate.getBoundingClientRect().width,
+    );
+  }
+
   async function visible(selector: string) {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      const element = Array.from(
-        document.querySelectorAll<HTMLElement>(selector),
-      ).find(
-        (candidate) =>
-          !candidate.closest('.slide-stage') &&
-          candidate.getBoundingClientRect().width,
-      );
+      const element = liveElement(selector);
       if (element) return element;
       await new Promise((resolve) => setTimeout(resolve, pollMs));
     }
@@ -188,6 +190,8 @@ export async function checkMinimumLayout() {
   if (document.documentElement.scrollWidth > innerWidth)
     throw new Error('Models overflow');
   (await visible('button[aria-label="Chat"]')).click();
+  if (liveElement('.pk-composer-tab .pk-tab-item[aria-busy="false"]'))
+    throw new Error('Stale balance presented during revalidation');
   const rechecking = await visible('.pk-composer-tab .ui-inline-spinner');
   const recheckLive = rechecking.closest('.pk-tab-item');
   if (
