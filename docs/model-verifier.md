@@ -214,10 +214,13 @@ A run takes a few minutes on this machine, mostly the seller's generation.
 With the `apps/model-verifier` app in the checkout,
 `pnpm model-verifier verify --seller seller.json --model qwen3-1.7b` runs the
 challenge set against one seller and publishes `result.json` and `evidence.json`
-together in a new result directory. If you pass `--out`, choose a path that does
-not already exist. `pnpm model-verifier check RESULT_DIRECTORY/result.json`
-verifies a result's signature and that its rule matches the published challenge
-set. The seller file and the full steps are on the docs site:
+together in a new result directory. Publication is atomic for readers, but it
+does not fsync the files or directories, so an operating-system crash or power
+loss can still lose the new directory or leave incomplete artifacts. If you pass
+`--out`, choose a path that does not already exist.
+`pnpm model-verifier check RESULT_DIRECTORY/result.json` verifies a result's
+signature and that its rule matches the published challenge set. The seller file
+and the full steps are on the docs site:
 [Model verification](https://docs.gyblos.com/en/sellers/model-verification). The
 app uses public package entries only (protocol, core, the Iroh transport and the
 Ollama engine's chat template) and never imports the buyer, node or desktop
