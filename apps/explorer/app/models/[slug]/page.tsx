@@ -266,7 +266,7 @@ function ModelHeading({
       <ModelLogo modelId={model.modelId} />
       <span className="min-w-0">
         <span className="block text-sm text-muted">
-          {modelLab(model.modelId) ?? 'Lab unknown'}
+          {modelLab(model.modelId)}
         </span>
         <span className="block break-all">{model.modelId}</span>
         <span className="block font-mono text-sm text-muted">

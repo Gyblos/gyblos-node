@@ -147,8 +147,9 @@ void test('model labels name a recognized lab and leave an unknown family unattr
   const { modelLab } = await import('@gyblos/protocol/model-family');
   assert.equal(modelLab('qwen3-0.6b'), 'Alibaba · Qwen');
   assert.equal(modelLab('deepseek-ai/DeepSeek-R1-Distill-Qwen-7B'), 'DeepSeek');
-  assert.equal(modelLab('acme/metadata-analyzer'), null);
-  assert.equal(modelLab('custom-local-model'), null);
+  assert.equal(modelLab('acme/metadata-analyzer'), 'acme');
+  assert.equal(modelLab('custom-local-model'), 'Unknown');
+  assert.equal(modelLab('unsloth/Qwen3-8B-GGUF'), 'Alibaba · Qwen');
 });
 
 void test('zero payouts require a closed and indexed day', () => {

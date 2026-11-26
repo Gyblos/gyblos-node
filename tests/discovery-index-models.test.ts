@@ -66,6 +66,8 @@ eachStorage(
         'qwen3-0.6b',
         'meta-llama/Llama-3.1-8B',
         'google/gemma-3-4b',
+        'unsloth/Qwen3-8B-GGUF',
+        'acme/mystery-7b',
         'mystery-7b',
       ],
     });
@@ -93,25 +95,52 @@ eachStorage(
         sellers: 1,
         family: 'qwen',
         lab: 'Alibaba · Qwen',
+        source: 'rules',
       },
       'meta-llama/Llama-3.1-8B': {
         id: 'meta-llama/Llama-3.1-8B',
         sellers: 1,
         family: 'meta',
         lab: 'Meta',
+        source: 'rules',
       },
       'google/gemma-3-4b': {
         id: 'google/gemma-3-4b',
         sellers: 1,
         family: 'gemma',
         lab: 'Google DeepMind',
+        source: 'rules',
       },
-      'mystery-7b': { id: 'mystery-7b', sellers: 1, family: null, lab: null },
+      'unsloth/Qwen3-8B-GGUF': {
+        id: 'unsloth/Qwen3-8B-GGUF',
+        sellers: 1,
+        family: 'qwen',
+        lab: 'Alibaba · Qwen',
+        source: 'rules',
+      },
+      'acme/mystery-7b': {
+        id: 'acme/mystery-7b',
+        sellers: 1,
+        family: 'other',
+        lab: 'acme',
+        source: 'fallback',
+      },
+      'mystery-7b': {
+        id: 'mystery-7b',
+        sellers: 1,
+        family: 'other',
+        lab: 'Unknown',
+        source: 'fallback',
+      },
     });
     assert.equal(typeof body.generatedAt, 'number');
-    assert.equal(plain.models.length, 4);
+    assert.equal(plain.models.length, 6);
     for (const row of plain.models)
       assert.deepEqual(Object.keys(row), ['id', 'sellers']);
+    for (const row of body.models) {
+      assert.equal(typeof row.family, 'string');
+      assert.equal(typeof row.lab, 'string');
+    }
     await expectError(
       await call('/v1/models/catalog?model=x'),
       400,

@@ -24,7 +24,7 @@ Routes sit at the root of the index host. The client base URL is
 | `POST /v1/records`                 | Publish one signed public v2 catalog, presence or withdrawal.                                   |
 | `GET /v1/sellers`                  | List live sellers of one model, paged by an opaque cursor.                                      |
 | `GET /v1/models`                   | List models from live sellers, ordered by seller count; no query parameters.                    |
-| `GET /v1/models/catalog`           | The same list with each model's `family` and `lab` ([Model catalog](#model-catalog)).           |
+| `GET /v1/models/catalog`           | The same list with each model's `family`, `lab` and `source` ([Model catalog](#model-catalog)). |
 | `GET /v1/uptime?node=`             | Public uptime of one NodeId over the last day, week and month ([Uptime](#uptime)).              |
 | `GET /v1/versions[?node=<NodeId>]` | Active seller counts by release, or one active seller’s declared release.                       |
 | `GET /v1/network`                  | Every known seller, online, offline or unpublished, with counts ([Network](#network)).          |
@@ -414,7 +414,7 @@ is `400 INVALID_QUERY`):
 ## Model catalog
 
 `GET /v1/models/catalog` takes no parameters and returns the `/v1/models` list
-with two more fields per model:
+with three more fields per model:
 
 ```json
 {
@@ -423,20 +423,23 @@ with two more fields per model:
       "id": "qwen3-0.6b",
       "sellers": 2,
       "family": "qwen",
-      "lab": "Alibaba · Qwen"
+      "lab": "Alibaba · Qwen",
+      "source": "rules"
     }
   ],
   "generatedAt": 1764028800000
 }
 ```
 
-`family` and `lab` are read from the model id itself
-(`@gyblos/protocol/model-family`), never from a seller's claim, ignoring case.
-An id with a publisher (`meta-llama/Llama-3.1-8B`) resolves by publisher only,
-so an unknown publisher gives `null` even for a known name (`unsloth/Qwen3-8B`);
-`google/gemma-…` is family `gemma`. A bare id (`qwen3-0.6b`) resolves by its
-leading name. An unknown id has `null` for both. `/v1/models` keeps its two
-fields, because released buyers reject extra keys there.
+`family`, `lab` and `source` are read from the model id itself
+(`@gyblos/protocol/model-family`), never from a seller's claim, ignoring case,
+and are never `null`. A known publisher (`meta-llama/Llama-3.1-8B`) decides the
+family (`google/gemma-…` is `gemma`); otherwise the name does, with or without a
+publisher (`unsloth/Qwen3-8B` and `qwen3-0.6b` are `qwen`). Those carry
+`source: "rules"`. An id no rule knows has `family: "other"`, its publisher as
+`lab` (`acme/foo-7b` gives `acme`, a bare id `Unknown`) and
+`source: "fallback"`. `/v1/models` keeps its two fields, because released buyers
+reject extra keys there.
 
 ## Network history
 

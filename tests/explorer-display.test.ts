@@ -141,6 +141,8 @@ void test('a model mark comes from the family in its id', () => {
     ['gpt-oss-20b', 'openai'],
     ['claude-sonnet', 'claude'],
     ['granite3.3', 'ibm'],
+    ['unsloth/Qwen3-8B-GGUF', 'qwen'],
+    ['acme/alpha-model', null],
     ['alpha-model', null],
     ['', null],
   ];

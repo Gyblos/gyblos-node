@@ -386,7 +386,7 @@ export function ModelName({
       <ModelLogo modelId={modelId} />
       <span className="truncate">
         <span className="block text-xs font-sans text-muted">
-          {modelLab(modelId) ?? 'Lab unknown'}
+          {modelLab(modelId)}
         </span>
         {modelId}
         {detail ? (

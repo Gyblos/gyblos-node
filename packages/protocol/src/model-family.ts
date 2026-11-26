@@ -48,7 +48,7 @@ export function modelFamily(modelId: string): ModelFamily | null {
   if (name === undefined) return familyByName(publisher);
   if (!name) return null;
   if (publisher === 'google' && familyByName(name) === 'gemma') return 'gemma';
-  return PUBLISHERS.get(publisher) ?? null;
+  return PUBLISHERS.get(publisher) ?? familyByName(name);
 }
 
 const LABS: Record<ModelFamily, string> = {
@@ -68,7 +68,17 @@ const LABS: Record<ModelFamily, string> = {
   zhipu: 'Zhipu AI',
   yi: '01.AI',
 };
-export function modelLab(modelId: string) {
+export const UNKNOWN_LAB = 'Unknown';
+export type ModelIdentity =
+  | { family: ModelFamily; lab: string; source: 'rules' }
+  | { family: 'other'; lab: string; source: 'fallback' };
+
+export function modelIdentity(modelId: string): ModelIdentity {
   const family = modelFamily(modelId);
-  return family ? LABS[family] : null;
+  if (family) return { family, lab: LABS[family], source: 'rules' };
+  const [publisher, name] = modelId.split('/');
+  const lab = name !== undefined && publisher ? publisher : UNKNOWN_LAB;
+  return { family: 'other', lab, source: 'fallback' };
 }
+
+export const modelLab = (modelId: string) => modelIdentity(modelId).lab;
