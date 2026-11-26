@@ -64,7 +64,10 @@ Apps are independent executables. They never import each other.
 The Explorer’s model and seller detail pages also read advertised price history
 directly from the discovery index through `GET /v1/offers/history`, and its
 Network page reads the daily sellers online through `GET /v1/network/history`.
-These live reads are separate from the scheduled discovery snapshot.
+The scheduled discovery read uses `GET /v1/models/catalog`, so every model shows
+the catalog's lab and family logo and, once Gyblos classifies it, its
+categories; search matches a model id, lab, family name or category. These live
+reads are separate from the scheduled discovery snapshot.
 
 Deploying a Worker or publishing a site is a maintainer action; see
 [public-decisions.md](public-decisions.md).
