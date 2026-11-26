@@ -61,9 +61,9 @@ reference. A point where the declared model's most likely next token ends the
 answer is not counted: Ollama returns no probabilities there, so the point says
 nothing either way.
 
-An empty candidate list is an invalid reference response, not a deviation by the
-seller. If retries do not recover, the run stops with `REFERENCE_UNAVAILABLE`
-and does not issue a signed result.
+An empty, incomplete or malformed candidate list is an invalid reference
+response, not a deviation by the seller. If retries do not recover, the run
+stops with `REFERENCE_UNAVAILABLE` and does not issue a signed result.
 
 This approach needs no log probabilities from the seller and no protocol change,
 it tolerates sampling, and it works for any engine that serves an open-weight

@@ -32,7 +32,7 @@ differences between a GPU and a CPU, while a smaller model sold as a larger one 
 A result covers one seller, one model and one version of the prompt set. It is evidence from one verifier, not
 a penalty: today it changes nothing in discovery, routing or payments.
 
-If the reference Ollama returns an empty candidate list and retries do not recover, the command stops with
+If the reference Ollama returns an empty, incomplete or malformed candidate list and retries do not recover, the command stops with
 `REFERENCE_UNAVAILABLE` and does not issue a signed result. This is a reference error, not a seller verdict.
 
 Only free offers of Qwen3 catalog models with a public Ollama tag are verified for now. Quantization is not

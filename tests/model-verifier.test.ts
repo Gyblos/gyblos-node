@@ -31,6 +31,13 @@ const TARGET = {
 const SELECTION = { modelId: 'qwen3-1.7b', variant: null, quantization: null };
 const answer = (word: string) =>
   `Answer: ${Array.from({ length: 40 }, () => word).join(' ')}.`;
+const topCandidates = () => [
+  { token: ' of', logprob: -0.1 },
+  ...Array.from({ length: 19 }, (_, index) => ({
+    token: ` token${index}`,
+    logprob: -1 - index / 10,
+  })),
+];
 
 function isCode(code: string) {
   return (error: unknown) =>
@@ -229,7 +236,7 @@ void test('the reference reads top candidates for the catalog alias of the decla
         models: [{ name: 'qwen3:1.7b', digest: DIGEST }],
       });
     return Response.json({
-      logprobs: [{ top_logprobs: [{ token: ' of', logprob: -0.1 }] }],
+      logprobs: [{ top_logprobs: topCandidates() }],
     });
   };
   const model = await openReference(
@@ -239,9 +246,9 @@ void test('the reference reads top candidates for the catalog alias of the decla
   );
   assert.equal(model.tag, 'qwen3:1.7b');
   assert.equal(model.digest, DIGEST);
-  assert.deepEqual(await model.candidates('prompt', 20), [
-    { token: ' of', logprob: -0.1 },
-  ]);
+  const candidates = await model.candidates('prompt', 20);
+  assert.equal(candidates?.length, 20);
+  assert.deepEqual(candidates?.[0], { token: ' of', logprob: -0.1 });
   assert.deepEqual(requests[1]!.body, {
     model: 'qwen3:1.7b',
     prompt: 'prompt',
@@ -269,7 +276,11 @@ void test('the reference reads top candidates for the catalog alias of the decla
   const broken: typeof fetch = async (input) =>
     String(input).endsWith('/api/tags')
       ? Response.json({ models: [{ name: 'qwen3:1.7b', digest: DIGEST }] })
-      : Response.json({ logprobs: [{ top_logprobs: [{ token: 1 }] }] });
+      : Response.json({
+          logprobs: [
+            { top_logprobs: [{ token: 1 }, ...topCandidates().slice(1)] },
+          ],
+        });
   const flaky = await openReference(
     'http://127.0.0.1:11434',
     'qwen3-1.7b',
@@ -292,7 +303,7 @@ void test('the reference retries a passing failure and gives up after a bounded 
     generates++;
     if (generates === 1) return new Response('busy', { status: 500 });
     return Response.json({
-      logprobs: [{ top_logprobs: [{ token: ' of', logprob: -0.1 }] }],
+      logprobs: [{ top_logprobs: topCandidates() }],
     });
   };
   const model = await openReference(
@@ -301,7 +312,7 @@ void test('the reference retries a passing failure and gives up after a bounded 
     flakyOnce,
     0,
   );
-  assert.equal((await model.candidates('prompt', 20))?.length, 1);
+  assert.equal((await model.candidates('prompt', 20))?.length, 20);
   assert.equal(generates, 2);
   let failures = 0;
   const down: typeof fetch = async (input) => {

@@ -13,6 +13,7 @@ import {
 import { challengeSetDigest, type ChallengeSet } from './challenge-set';
 import {
   MODEL_VERIFIER_CODES,
+  ModelVerifierError,
   SECRET_BYTES,
   TEMPLATE_MARKER,
   type ModelVerifierCode,
@@ -75,11 +76,16 @@ async function scoreAnswer(
       rendered + text.slice(0, at),
       rule.topLogprobs,
     );
-    if (candidates)
+    if (candidates) {
+      if (candidates.length === 0)
+        throw new ModelVerifierError(
+          MODEL_VERIFIER_CODES.REFERENCE_UNAVAILABLE,
+        );
       checks.push({
         at,
         deviation: isDeviation(text.slice(at), candidates, floor),
       });
+    }
   }
   return { prompt, text, digest, checks };
 }

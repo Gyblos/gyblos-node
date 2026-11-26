@@ -76,19 +76,24 @@ async function call(
   }
 }
 
-function parseCandidates(body: Record<string, unknown>): Candidate[] | null {
+function parseCandidates(
+  body: Record<string, unknown>,
+  topLogprobs: number,
+): Candidate[] | null {
   const logprobs = body.logprobs;
   if (logprobs === undefined && body.done === true && body.response === '')
     return null;
   const first = Array.isArray(logprobs) ? record(logprobs[0]) : {};
   const top = first.top_logprobs;
-  if (!Array.isArray(top) || top.length === 0) throw unavailable();
+  if (!Array.isArray(top) || top.length !== topLogprobs) throw unavailable();
   return top.map((item) => {
     const candidate = record(item);
     if (
       typeof candidate.token !== 'string' ||
+      candidate.token.length === 0 ||
       typeof candidate.logprob !== 'number' ||
-      !Number.isFinite(candidate.logprob)
+      !Number.isFinite(candidate.logprob) ||
+      candidate.logprob > 0
     )
       throw unavailable();
     return { token: candidate.token, logprob: candidate.logprob };
@@ -137,7 +142,10 @@ export async function openReference(
       };
       for (let attempt = 1; ; attempt++) {
         try {
-          return parseCandidates(await call(fetchImpl, generate, body));
+          return parseCandidates(
+            await call(fetchImpl, generate, body),
+            topLogprobs,
+          );
         } catch (error) {
           if (attempt >= MODEL_VERIFIER.referenceAttempts) throw error;
           await delay(retryMs * attempt);

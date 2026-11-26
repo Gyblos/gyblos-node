@@ -15,12 +15,36 @@ import { loadVerifierKey } from '@gyblos/model-verifier/key';
 import {
   catalogModelId,
   openReference,
+  type ReferenceModel,
 } from '@gyblos/model-verifier/reference';
 import { runVerification } from '@gyblos/model-verifier/verify';
 import { MODEL_VERIFICATION_VERDICTS } from '@gyblos/protocol/model-verification';
 
 const DIGEST = 'cd'.repeat(32);
 const OTHER = 'ef'.repeat(32);
+
+async function runReferenceVerification(
+  home: string,
+  reference: ReferenceModel,
+) {
+  const key = await loadVerifierKey(join(home, 'verifier.key'), true);
+  return runVerification({
+    target: {
+      owner: key.address,
+      nodeId: 'ab'.repeat(32),
+      relayUrl: null,
+      directAddresses: [],
+    },
+    seller: {
+      selection: { modelId: 'qwen3-1.7b', variant: null, quantization: null },
+      ask: async () => Array.from({ length: 40 }, () => 'word').join(' '),
+    },
+    reference,
+    set: CHALLENGE_SET,
+    key,
+    now: () => 1_800_000_000_000,
+  });
+}
 
 void test('the reference refuses a run whose Ollama tag changed weights', async () => {
   let tags = 0;
@@ -92,6 +116,25 @@ void test('a verification run refuses to sign when the reference changed', async
   }
 });
 
+void test('an empty reference candidate list is never scored as seller evidence', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'gyblos-verifier-ref-'));
+  try {
+    await assert.rejects(
+      runReferenceVerification(home, {
+        tag: 'qwen3:1.7b',
+        digest: DIGEST,
+        candidates: async () => [],
+        confirm: async () => {},
+      }),
+      (error: unknown) =>
+        error instanceof ModelVerifierError &&
+        error.code === MODEL_VERIFIER_CODES.REFERENCE_UNAVAILABLE,
+    );
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
 void test('empty reference candidates are retried and cannot produce a signed seller verdict', async () => {
   const home = await mkdtemp(join(tmpdir(), 'gyblos-verifier-ref-'));
   const previousHome = process.env.GYBLOS_HOME;
@@ -99,6 +142,13 @@ void test('empty reference candidates are retried and cannot produce a signed se
   try {
     let calls = 0;
     let recover = false;
+    const valid = Array.from(
+      { length: CHALLENGE_SET.rule.topLogprobs },
+      (_, index) => ({
+        token: index === 0 ? ' word' : ` token${index}`,
+        logprob: -0.1,
+      }),
+    );
     const fetchImpl: typeof fetch = async (input) => {
       if (String(input).endsWith('/api/tags'))
         return Response.json({
@@ -110,8 +160,7 @@ void test('empty reference candidates are retried and cannot produce a signed se
         done: true,
         logprobs: [
           {
-            top_logprobs:
-              recover && calls > 1 ? [{ token: ' word', logprob: -0.1 }] : [],
+            top_logprobs: recover && calls > 1 ? valid : [],
           },
         ],
       });
@@ -122,25 +171,8 @@ void test('empty reference candidates are retried and cannot produce a signed se
       fetchImpl,
       0,
     );
-    const key = await loadVerifierKey(join(home, 'verifier.key'), true);
-    const input = {
-      target: {
-        owner: key.address,
-        nodeId: 'ab'.repeat(32),
-        relayUrl: null,
-        directAddresses: [],
-      },
-      seller: {
-        selection: { modelId: 'qwen3-1.7b', variant: null, quantization: null },
-        ask: async () => Array.from({ length: 40 }, () => 'word').join(' '),
-      },
-      reference,
-      set: CHALLENGE_SET,
-      key,
-      now: () => 1_800_000_000_000,
-    };
     await assert.rejects(
-      runVerification(input),
+      runReferenceVerification(home, reference),
       (error: unknown) =>
         error instanceof ModelVerifierError &&
         error.code === MODEL_VERIFIER_CODES.REFERENCE_UNAVAILABLE,
@@ -148,7 +180,7 @@ void test('empty reference candidates are retried and cannot produce a signed se
     assert.equal(calls, MODEL_VERIFIER.referenceAttempts);
     calls = 0;
     recover = true;
-    const { signed } = await runVerification(input);
+    const { signed } = await runReferenceVerification(home, reference);
     assert.equal(signed.result.verdict, MODEL_VERIFICATION_VERDICTS.PASS);
     assert.equal(calls, signed.result.evidence.checks + 1);
   } finally {
@@ -173,9 +205,7 @@ void test('truncated reference candidates cannot produce a signed seller verdict
       return Response.json({
         response: ' unlikely',
         done: true,
-        logprobs: [
-          { top_logprobs: [{ token: ' unlikely', logprob: -0.1 }] },
-        ],
+        logprobs: [{ top_logprobs: [{ token: ' unlikely', logprob: -0.1 }] }],
       });
     };
     const reference = await openReference(
@@ -184,24 +214,8 @@ void test('truncated reference candidates cannot produce a signed seller verdict
       fetchImpl,
       0,
     );
-    const key = await loadVerifierKey(join(home, 'verifier.key'), true);
     await assert.rejects(
-      runVerification({
-        target: {
-          owner: key.address,
-          nodeId: 'ab'.repeat(32),
-          relayUrl: null,
-          directAddresses: [],
-        },
-        seller: {
-          selection: { modelId: 'qwen3-1.7b', variant: null, quantization: null },
-          ask: async () => Array.from({ length: 40 }, () => 'word').join(' '),
-        },
-        reference,
-        set: CHALLENGE_SET,
-        key,
-        now: () => 1_800_000_000_000,
-      }),
+      runReferenceVerification(home, reference),
       (error: unknown) =>
         error instanceof ModelVerifierError &&
         error.code === MODEL_VERIFIER_CODES.REFERENCE_UNAVAILABLE,
