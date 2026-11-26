@@ -211,9 +211,10 @@ A run takes a few minutes on this machine, mostly the seller's generation.
 
 ## Run it
 
-From a checkout of the repository, with [Ollama](https://ollama.com) running and
-the declared model pulled (`ollama pull qwen3:1.7b`), write the seller's public
-details to `seller.json`:
+From a checkout of the repository set up as in
+[CONTRIBUTING.md](../CONTRIBUTING.md#set-up-nodejs-and-pnpm), with
+[Ollama](https://ollama.com) running and the declared model pulled
+(`ollama pull qwen3:1.7b`), write the seller's public details to `seller.json`:
 
 ```json
 {
