@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 
-import { paypalSandboxPaths } from '@gyblos/config/home';
+import { paypalSandboxPaths } from '@gyblos/config/home-paypal';
 import {
   PAYPAL_SESSION_PHASE,
   PAYPAL_SESSION_REVIEW_ACTOR,

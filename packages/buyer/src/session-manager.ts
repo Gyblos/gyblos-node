@@ -1,7 +1,10 @@
 // Composes single-channel or shared-budget buyer sessions; all financial state stays in the adapter.
 import type { AsyncLocalStorage } from 'node:async_hooks';
 
-import { batchPoolPathsIn, batchSessionPathsIn } from '@gyblos/config/home';
+import {
+  batchPoolPathsIn,
+  batchSessionPathsIn,
+} from '@gyblos/config/home-payments';
 import type { ConfirmUnchargedKey } from '@gyblos/node/buyer-api-keys';
 import {
   createBuyerSessionManager,

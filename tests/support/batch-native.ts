@@ -11,7 +11,7 @@ import {
 } from 'x402-upto-metered';
 
 import { PROTOCOL_FEE } from '@gyblos/config';
-import { batchSessionPathsIn } from '@gyblos/config/home';
+import { batchSessionPathsIn } from '@gyblos/config/home-payments';
 import {
   batchFacilitatorFor,
   createBatchBuyer,

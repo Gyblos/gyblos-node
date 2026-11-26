@@ -2,7 +2,7 @@
 // Missing or contradictory private evidence seals the sandbox journal.
 import { createHash } from 'node:crypto';
 
-import { paypalSandboxVoidExceptionPath } from '@gyblos/config/home';
+import { paypalSandboxVoidExceptionPath } from '@gyblos/config/home-paypal';
 import { canonicalJson } from '@gyblos/protocol';
 import { readPrivateFile } from '@gyblos/runtime/private-file';
 

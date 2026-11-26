@@ -1,5 +1,5 @@
 // One local permission per managed desktop. A late buyer cannot send inference after retirement.
-import { desktopOpeningPaths } from '@gyblos/config/home';
+import { desktopOpeningPaths } from '@gyblos/config/home-desktop';
 import {
   controlAddress,
   controlAtomic,

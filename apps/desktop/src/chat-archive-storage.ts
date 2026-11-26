@@ -1,5 +1,5 @@
 // Stores conversations under the private desktop profile, separately from wallet and payment data.
-import { desktopChatPaths } from '@gyblos/config/home';
+import { desktopChatPaths } from '@gyblos/config/home-desktop';
 import {
   acquireProcessLock,
   ensurePrivateDirectory,
