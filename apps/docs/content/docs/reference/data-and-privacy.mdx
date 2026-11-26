@@ -186,6 +186,10 @@ ended, so past prices stay traceable.
 The index also publishes how many sellers were online each day (`/v1/network/history`): the average and
 peak counts per UTC day, without NodeIds, computed from the same uptime the index already keeps.
 
+`/v1/models/catalog` lists each offered model with a `family` and `lab` read from the model id, never
+from what the seller claims. An id no rule recognizes shows family `other` and its publisher, or
+`Unknown`, as lab, with `source: "fallback"`. It adds no seller data.
+
 Buyers and the desktop app read the index to find sellers. `gyblos seller status --online` also asks it
 for the seller's own uptime by NodeId, which the seller already publishes there. The index uses IP
 addresses for rate limiting and stores none.

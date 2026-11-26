@@ -1,8 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
-import { modelLab } from '@gyblos/protocol/model-family';
-
 import { OperationChip } from '../../components/channel-txs';
 import { PageFrame } from '../../components/page-frame';
 import { Pager } from '../../components/pager';
@@ -23,6 +21,7 @@ import { DISPLAY, RANGE, SEARCH_TERM_LIMIT } from '../../lib/constants';
 import { getDiscovery } from '../../lib/discovery-render';
 import {
   addressLookup,
+  modelMatches,
   searchPageHref,
   sellerMatches,
 } from '../../lib/entity-search';
@@ -166,14 +165,7 @@ function catalogResults(
   const lower = term.toLowerCase();
   const models = modelRows(summarizeOffers(discovery).models, collector.models);
   const results = models
-    .filter((model) =>
-      [
-        model.modelId,
-        modelLab(model.modelId),
-        model.variant,
-        model.quantization,
-      ].some((value) => value?.toLowerCase().includes(lower)),
-    )
+    .filter((model) => modelMatches(model, term))
     .map((model) => (
       <tr key={modelKey(model)} className="border-t border-line">
         <td className={td}>Model</td>

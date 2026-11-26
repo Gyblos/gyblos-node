@@ -69,16 +69,34 @@ const LABS: Record<ModelFamily, string> = {
   yi: '01.AI',
 };
 export const UNKNOWN_LAB = 'Unknown';
+export const OTHER_FAMILY = 'other';
+export const MODEL_IDENTITY_SOURCE = {
+  RULES: 'rules',
+  FALLBACK: 'fallback',
+} as const;
 export type ModelIdentity =
-  | { family: ModelFamily; lab: string; source: 'rules' }
-  | { family: 'other'; lab: string; source: 'fallback' };
+  | {
+      family: ModelFamily;
+      lab: string;
+      source: typeof MODEL_IDENTITY_SOURCE.RULES;
+    }
+  | {
+      family: typeof OTHER_FAMILY;
+      lab: string;
+      source: typeof MODEL_IDENTITY_SOURCE.FALLBACK;
+    };
 
 export function modelIdentity(modelId: string): ModelIdentity {
   const family = modelFamily(modelId);
-  if (family) return { family, lab: LABS[family], source: 'rules' };
+  if (family)
+    return { family, lab: LABS[family], source: MODEL_IDENTITY_SOURCE.RULES };
   const [publisher, name] = modelId.split('/');
   const lab = name !== undefined && publisher ? publisher : UNKNOWN_LAB;
-  return { family: 'other', lab, source: 'fallback' };
+  return {
+    family: OTHER_FAMILY,
+    lab,
+    source: MODEL_IDENTITY_SOURCE.FALLBACK,
+  };
 }
 
 export const modelLab = (modelId: string) => modelIdentity(modelId).lab;
