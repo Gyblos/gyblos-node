@@ -20,6 +20,10 @@ import {
   MODEL_VERIFIER_CODES,
 } from '@gyblos/model-verifier/constants';
 import { verifyModelVerification } from '@gyblos/protocol/model-verification';
+import {
+  DIAGNOSTIC_CAUSES,
+  DIAGNOSTIC_OUTCOMES,
+} from '@gyblos/runtime/constants';
 
 const scoredAnswer = 'first scored';
 const seller = `export function parseSellerTarget(value) { return value; }
@@ -212,6 +216,8 @@ void test('verify records a failed staging cleanup separately from the primary e
       operation: 'publish-output',
       phase: 'cleanup',
       code: 'OUTPUT_CLEANUP_FAILED',
+      outcome: DIAGNOSTIC_OUTCOMES.CLEANUP_FAILURE,
+      cause: DIAGNOSTIC_CAUSES.UNKNOWN,
     });
   });
 });
