@@ -15,17 +15,21 @@ prompt. No envíes contraseñas, llaves ni otros secretos. Consulta
 
 Auto deja que tu comprador elija un vendedor por ti. Por defecto usa solo ofertas gratis. Para que use ofertas
 pagadas, abre **Usage & payments → Limits** en la app de escritorio y elige **Manage chat budget**. En
-**Automatic seller selection**, marca **Allow paid offers in Auto**, escribe el máximo por respuesta y los
-precios máximos de entrada y salida que aceptas, en USDC por millón de tokens, y elige **Save Auto settings**.
-La sección aparece cuando tu comprador busca vendedores por su cuenta (descubrimiento abierto). En el chat, abre
-el modelo y elige **Auto**.
+**Automatic seller selection**, marca **Allow paid offers in Auto** y escribe:
+
+- el máximo por respuesta, en USDC;
+- el precio máximo de entrada y el precio máximo de salida, en USDC por millón de tokens.
+
+Luego elige **Save Auto settings**. La sección aparece cuando tu comprador busca vendedores por su cuenta
+(descubrimiento abierto), y solo se puede guardar para el comprador que maneja la app: para un comprador que conectaste por separado, la app rechaza el cambio. En el chat, abre el modelo y elige **Auto**. Por ahora, Auto pagado
+en el chat cubre solo `qwen3-0.6b`; los demás modelos siguen usando ofertas gratis.
 
 Estos límites se aplican al chat y a todas las claves API de este comprador, así que tus herramientas de código
 también los respetan. El máximo por respuesta es el límite del comprador para toda respuesta pagada, no solo
 para Auto, y se mantiene cuando desactivas las ofertas pagadas. Auto pide ofertas firmadas a vendedores
 verificados. Se sigue respetando el saldo de cada clave API, y una clave con límite `0` solo puede usar ofertas
-gratis. Auto puede liquidar el canal anterior antes de abrir otro con el depósito autorizado restante.
-Para que Auto vuelva a usar solo ofertas gratis, desmarca **Allow paid offers in Auto** y elige **Save Auto settings**.
+gratis. Auto puede liquidar el canal anterior antes de abrir otro con el depósito autorizado restante. Para que
+Auto vuelva a usar solo ofertas gratis, desmarca **Allow paid offers in Auto** y elige **Save Auto settings**.
 
 ## Requisitos previos [#antes-de-empezar]
 
