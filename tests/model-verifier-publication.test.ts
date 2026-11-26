@@ -5,13 +5,14 @@ import fs, {
   mkdtemp,
   readdir,
   readFile,
+  realpath,
   rm,
   symlink,
   writeFile,
 } from 'node:fs/promises';
 import { registerHooks, syncBuiltinESMExports } from 'node:module';
 import { tmpdir } from 'node:os';
-import { basename, join, sep } from 'node:path';
+import { basename, dirname, join, sep } from 'node:path';
 import test, { type TestContext } from 'node:test';
 
 import { CHALLENGE_SET } from '@gyblos/model-verifier/challenge-set';
@@ -139,6 +140,73 @@ void test('verify does not add a result to an existing output directory', async 
   });
 });
 
+void test('verify rejects an output created during publication', async (t) => {
+  await withVerifier(t, async (parent, verify, lastError, fetchCalls) => {
+    const out = join(parent, 'run');
+    const originalWrite = writeFile;
+    const writes = t.mock.method(
+      fs,
+      'writeFile',
+      async (...args: Parameters<typeof writeFile>) => {
+        const [path] = args;
+        const result = await originalWrite(...args);
+        if (
+          typeof path === 'string' &&
+          basename(path) === MODEL_VERIFIER.evidenceFile
+        )
+          await mkdir(out);
+        return result;
+      },
+    );
+    syncBuiltinESMExports();
+    try {
+      assert.equal(await verify(out), 1);
+    } finally {
+      writes.mock.restore();
+      syncBuiltinESMExports();
+    }
+    assert.ok(fetchCalls() > 0);
+    assert.deepEqual(lastError(), ['{"ok":false,"code":"OUTPUT_EXISTS"}']);
+    assert.deepEqual(await readdir(out), []);
+    assert.deepEqual(await readdir(parent), ['run']);
+  });
+});
+
+void test('verify reports a lost publication race as output exists', async (t) => {
+  await withVerifier(t, async (parent, verify, lastError) => {
+    const out = join(parent, 'run');
+    const destination = join(
+      await realpath(dirname(parent)),
+      basename(parent),
+      'run',
+    );
+    const originalRename = fs.rename;
+    const renames = t.mock.method(
+      fs,
+      'rename',
+      async (...args: Parameters<typeof fs.rename>) => {
+        if (String(args[1]) === destination) {
+          await mkdir(out);
+          throw Object.assign(new Error('synthetic rename collision'), {
+            code: 'ENOTEMPTY',
+          });
+        }
+        return originalRename(...args);
+      },
+    );
+    syncBuiltinESMExports();
+    try {
+      assert.equal(await verify(out), 1);
+    } finally {
+      renames.mock.restore();
+      syncBuiltinESMExports();
+    }
+    assert.deepEqual(lastError(), ['{"ok":false,"code":"OUTPUT_EXISTS"}']);
+    assert.deepEqual(await readdir(out), []);
+    assert.deepEqual(await readdir(parent), ['run']);
+  });
+});
+
 void test('verify leaves no published directory or staging files after a partial evidence write', async (t) => {
   await withVerifier(t, async (parent, verify) => {
     const out = join(parent, 'run');
@@ -154,6 +222,10 @@ void test('verify leaves no published directory or staging files after a partial
           basename(path) !== MODEL_VERIFIER.evidenceFile
         )
           return originalWrite(...args);
+        const staged = await readdir(parent);
+        assert.equal(staged.length, 1);
+        assert.match(staged[0]!, /^\.verification-/);
+        assert.notEqual(staged[0], 'run');
         await originalWrite(path, '{', options);
         failedEvidenceWrites++;
         throw Object.assign(new Error('synthetic partial write'), {
