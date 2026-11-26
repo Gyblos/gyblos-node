@@ -55,21 +55,27 @@ async function withVerifier(
     parent: string,
     verify: (out: string) => Promise<number>,
     stderr: (fromLast?: number) => readonly unknown[] | undefined,
+    fetchCalls: () => number,
   ) => Promise<void>,
 ) {
   const home = await mkdtemp(join(tmpdir(), 'gyblos-verifier-publication-'));
   const previousHome = process.env.GYBLOS_HOME;
   process.env.GYBLOS_HOME = home;
-  t.mock.method(globalThis, 'fetch', (input: Parameters<typeof fetch>[0]) =>
-    Promise.resolve(
-      String(input).endsWith('/api/generate')
-        ? Response.json({
-            logprobs: [{ top_logprobs: [{ token: ' scored', logprob: -0.1 }] }],
-          })
-        : Response.json({
-            models: [{ name: 'qwen3:1.7b', digest: 'cd'.repeat(32) }],
-          }),
-    ),
+  const requests = t.mock.method(
+    globalThis,
+    'fetch',
+    (input: Parameters<typeof fetch>[0]) =>
+      Promise.resolve(
+        String(input).endsWith('/api/generate')
+          ? Response.json({
+              logprobs: [
+                { top_logprobs: [{ token: ' scored', logprob: -0.1 }] },
+              ],
+            })
+          : Response.json({
+              models: [{ name: 'qwen3:1.7b', digest: 'cd'.repeat(32) }],
+            }),
+      ),
   );
   t.mock.method(console, 'log', () => {});
   const stderr = t.mock.method(console, 'error', () => {});
@@ -97,6 +103,7 @@ async function withVerifier(
           out,
         ]),
       (fromLast = 1) => stderr.mock.calls.at(-fromLast)?.arguments,
+      () => requests.mock.calls.length,
     );
   } finally {
     if (previousHome === undefined) delete process.env.GYBLOS_HOME;
@@ -108,7 +115,7 @@ async function withVerifier(
 test.after(() => hooks.deregister());
 
 void test('verify does not add a result to an existing output directory', async (t) => {
-  await withVerifier(t, async (parent, verify, lastError) => {
+  await withVerifier(t, async (parent, verify, lastError, fetchCalls) => {
     const stale = join(parent, 'stale');
     const empty = join(parent, 'empty');
     await mkdir(stale, { recursive: true });
@@ -124,6 +131,7 @@ void test('verify does not add a result to an existing output directory', async 
     assert.deepEqual(lastError(), ['{"ok":false,"code":"OUTPUT_EXISTS"}']);
     assert.deepEqual(await readdir(empty), []);
     assert.deepEqual((await readdir(parent)).sort(), ['empty', 'stale']);
+    assert.equal(fetchCalls(), 0);
   });
 });
 
