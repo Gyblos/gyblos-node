@@ -190,6 +190,18 @@ void test('verify records a failed staging cleanup separately from the primary e
   });
 });
 
+void test('verify publishes through a trailing current-directory suffix', async (t) => {
+  await withVerifier(t, async (parent, verify) => {
+    const run = join(parent, 'first');
+    assert.equal(await verify(`${run}${sep}.`), 0);
+    assert.deepEqual(await readdir(parent), ['first']);
+    assert.deepEqual((await readdir(run)).sort(), [
+      MODEL_VERIFIER.evidenceFile,
+      MODEL_VERIFIER.resultFile,
+    ]);
+  });
+});
+
 void test('verify publishes both artifacts from the same run', async (t) => {
   await withVerifier(t, async (parent, verify) => {
     const out = join(parent, 'run');
