@@ -203,7 +203,7 @@ void test('a pagination loop fails closed and the page ceiling rereads instead o
       }),
       { code: BUYER_SELECTION_CODES.DISCOVERY_LIMIT },
     );
-    assert.equal(calls, 3);
+    assert.equal(calls, 2);
     let pages = 0;
     const capped = await discoverBuyerSellers(
       { ...run.config, discovery: { ...run.config.discovery, maxPages: 1 } },

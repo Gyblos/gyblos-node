@@ -120,3 +120,18 @@ void test('an index with opaque cursors is read in order up to the ceiling witho
   assert.deepEqual(seen, [node(20), node(40)]);
   assert.deepEqual(cursors, [undefined, '1']);
 });
+
+void test('a random pass whose page points back to its start fails closed', async () => {
+  const start = '80000000'.padEnd(64, '0');
+  await assert.rejects(
+    readIndexPages(
+      async (cursor) => ({
+        sellers: [],
+        next: cursor === undefined ? node(10) : start,
+      }),
+      4,
+      HALF,
+    ),
+    { code: BUYER_SELECTION_CODES.DISCOVERY_LIMIT },
+  );
+});

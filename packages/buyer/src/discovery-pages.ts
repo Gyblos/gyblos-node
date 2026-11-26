@@ -19,7 +19,7 @@ async function readPass<T extends Listed>(
   until?: string,
 ) {
   const entries: T[] = [];
-  const cursors = new Set<string>();
+  const cursors = new Set<string>(start === undefined ? [] : [start]);
   let cursor = start;
   for (let used = 1; used <= pages; used++) {
     const page = await read(cursor);
