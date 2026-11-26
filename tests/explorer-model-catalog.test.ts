@@ -8,6 +8,7 @@ import {
   modelMaker,
   modelView,
   parseCatalog,
+  pickModels,
 } from '@gyblos/explorer/model-catalog';
 import {
   MODEL_IDENTITY_SOURCE,
@@ -195,4 +196,21 @@ void test('search matches a model by lab, family name and category, never by an 
       models,
     ),
   );
+});
+
+void test('the models a client component receives are a plain object of only the ids it shows', () => {
+  const { models } = parseCatalog({
+    models: [
+      row('__proto__', 'qwen', 'Proto Lab', MODEL_IDENTITY_SOURCE.RULES),
+      row('qwen3-0.6b', 'qwen', 'Qwen Team', MODEL_IDENTITY_SOURCE.REGISTRY, [
+        'coding',
+      ]),
+      row('other', 'qwen', 'Q', MODEL_IDENTITY_SOURCE.RULES),
+    ],
+  });
+  const picked = pickModels(models, ['qwen3-0.6b', '__proto__', 'missing']);
+  assert.equal(Object.getPrototypeOf(picked), Object.prototype);
+  assert.deepEqual(Object.keys(picked), ['qwen3-0.6b', '__proto__']);
+  assert.equal(modelView(picked, '__proto__').lab, 'Proto Lab');
+  assert.equal(modelView(picked, 'qwen3-0.6b').lab, 'Qwen Team');
 });

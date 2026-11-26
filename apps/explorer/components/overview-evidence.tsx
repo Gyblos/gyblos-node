@@ -15,13 +15,13 @@ import {
   sellerHref,
   verifiedOnly,
 } from '../lib/seller-identity';
-import { CatalogModelName } from './catalog-model-name';
 import { OperationChip } from './channel-txs';
 import { pagedRows, Pager } from './pager';
 import { SellerCell } from './seller-cell';
 import {
   Addr,
   EmptyRow,
+  ModelName,
   moneyCell,
   numberCell,
   prefixedColumn,
@@ -111,6 +111,7 @@ export async function OverviewOffers({ query }: { query: ExplorerQuery }) {
     return <Unavailable title={OFFERS} anchors={[PAGING.anchors.sellers]} />;
   const accounts = githubByNode(snapshot.network);
   const names = namesByNode(snapshot.network);
+  const catalog = snapshot.models;
   const sellers = query.verified
     ? verifiedOnly(snapshot.sellers, accounts)
     : snapshot.sellers;
@@ -154,7 +155,7 @@ export async function OverviewOffers({ query }: { query: ExplorerQuery }) {
             className="border-t border-line"
           >
             <td className={td}>
-              <CatalogModelName {...model} days={days} closed />
+              <ModelName {...model} days={days} closed models={catalog} />
             </td>
             <td className={td}>
               <SellerCell

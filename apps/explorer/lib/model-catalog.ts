@@ -96,3 +96,15 @@ export function modelMaker(view: Pick<ModelView, 'lab' | 'familyName'>) {
     ? `${lab} · ${familyName}`
     : lab;
 }
+
+export function pickModels(
+  models: Readonly<CatalogModels>,
+  ids: readonly string[],
+): CatalogModels {
+  return Object.fromEntries(
+    ids.flatMap((id) => {
+      const model = Object.hasOwn(models, id) ? models[id] : undefined;
+      return model ? [[id, model] as const] : [];
+    }),
+  );
+}

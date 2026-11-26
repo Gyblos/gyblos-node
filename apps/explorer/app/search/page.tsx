@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
-import { CatalogModelName } from '../../components/catalog-model-name';
 import { OperationChip } from '../../components/channel-txs';
 import { PageFrame } from '../../components/page-frame';
 import { Pager } from '../../components/pager';
@@ -9,6 +8,7 @@ import { SellerCell } from '../../components/seller-cell';
 import {
   Addr,
   EmptyRow,
+  ModelName,
   prefixedColumn,
   SectionTitle,
   Table,
@@ -170,7 +170,7 @@ function catalogResults(
         <td className={td}>Model</td>
         <td className={td}>
           <span className="block ps-2">
-            <CatalogModelName {...model} />
+            <ModelName {...model} models={discovery.models} />
           </span>
         </td>
       </tr>

@@ -11,6 +11,7 @@ import { type NetworkBuyers, type NetworkDay } from '../lib/collector';
 import { DISPLAY, PAGING } from '../lib/constants';
 import { getDiscovery } from '../lib/discovery-render';
 import { count, usdcDecimal } from '../lib/format';
+import type { CatalogModels } from '../lib/model-catalog';
 import { tablePager, type ExplorerQuery } from '../lib/paging';
 import type { RangeDays } from '../lib/range';
 import {
@@ -31,11 +32,11 @@ import { BarChartCard } from './board/bar-chart-card';
 import { delta, type Delta } from './board/delta';
 import { StatCard } from './board/stat-card';
 import { BuyersCard } from './buyers-card';
-import { CatalogModelName } from './catalog-model-name';
 import { pagedRows, Pager } from './pager';
 import { StatsBreakdown } from './stats-breakdown';
 import {
   EmptyRow,
+  ModelName,
   numberCell,
   prefixedColumn,
   SectionTitle,
@@ -192,8 +193,9 @@ export async function UsageSection({
   reportPromise: ReturnType<typeof readComparison>;
 }) {
   const days = query.days;
-  void getDiscovery();
+  const discovery = getDiscovery();
   const report = await reportPromise;
+  const { models } = await discovery;
   const focus =
     query.metric === 'tokens' || query.metric === 'requests'
       ? query.metric
@@ -236,7 +238,7 @@ export async function UsageSection({
         change={change?.requests ?? null}
       />
       {!focus && <DailyTable query={query} days={usage.active} />}
-      <DemandTable query={query} demand={usage.demand} />
+      <DemandTable query={query} demand={usage.demand} models={models} />
     </section>
   );
 }
@@ -340,9 +342,11 @@ function DailyTable({
 function DemandTable({
   query,
   demand,
+  models,
 }: {
   query: ExplorerQuery;
   demand: [string, number][];
+  models: CatalogModels;
 }) {
   const page = pagedRows(query, 'demand', demand, true, {
     requests: ([, requests]) => requests,
@@ -377,12 +381,13 @@ function DemandTable({
         {page.rows.map(([model, requests]) => (
           <tr key={model} className="border-t border-line">
             <td className={td}>
-              <CatalogModelName
+              <ModelName
                 days={query.days}
                 closed={query.closed}
                 modelId={model}
                 variant={null}
                 quantization={null}
+                models={models}
               />
             </td>
             <td className={numberCell}>{count(requests)}</td>

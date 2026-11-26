@@ -1,5 +1,5 @@
 import { utcMinute } from '../lib/format';
-import type { CatalogModels } from '../lib/model-catalog';
+import { pickModels, type CatalogModels } from '../lib/model-catalog';
 import type { getOfferPriceHistory } from '../lib/offer-price-history';
 import { OfferPriceCharts } from './offer-price-charts';
 import { SectionTitle, Unavailable } from './ui';
@@ -28,7 +28,13 @@ export function OfferPriceHistory({
         <OfferPriceCharts
           series={history.series}
           bySeller={bySeller}
-          models={models}
+          models={
+            models &&
+            pickModels(
+              models,
+              history.series.map((series) => series.modelId),
+            )
+          }
         />
       ) : (
         <p className="text-sm text-muted">

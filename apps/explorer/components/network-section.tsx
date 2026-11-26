@@ -6,6 +6,7 @@ import { DISPLAY, PAGES, PAGING } from '../lib/constants';
 import type { DiscoverySnapshot, Seller } from '../lib/discovery';
 import { getDiscovery } from '../lib/discovery-render';
 import { count, percent, pricePerMtok, utc } from '../lib/format';
+import type { CatalogModels } from '../lib/model-catalog';
 import type { GithubAccount } from '../lib/network-status';
 import { uptimeRatio } from '../lib/offers';
 import { queryHref, tablePager, type ExplorerQuery } from '../lib/paging';
@@ -20,13 +21,13 @@ import {
 } from '../lib/seller-identity';
 import { Chip } from './board/chip';
 import { StatusDot } from './board/status-dot';
-import { CatalogModelName } from './catalog-model-name';
 import { NotOnline } from './not-online';
 import { pagedRows, Pager } from './pager';
 import { SellerCell } from './seller-cell';
 import {
   Addr,
   EmptyRow,
+  ModelName,
   moneyCell,
   MoreLink,
   numberCell,
@@ -79,6 +80,7 @@ export async function NetworkSection({
         accounts={accounts}
         names={names}
         accountsKnown={!!snapshot.network && !snapshot.network.truncated}
+        models={snapshot.models}
       />
       {preview ? (
         <MoreLink href={PAGES.sellers} label="All sellers" />
@@ -99,12 +101,14 @@ function SellersBlock({
   accounts,
   names,
   accountsKnown,
+  models,
 }: {
   query: ExplorerQuery;
   sellers: Seller[];
   accounts: Map<string, GithubAccount>;
   names: Map<string, string>;
   accountsKnown: boolean;
+  models: CatalogModels;
 }) {
   return (
     <>
@@ -120,6 +124,7 @@ function SellersBlock({
         accounts={accounts}
         names={names}
         accountsKnown={accountsKnown}
+        models={models}
       />
     </>
   );
@@ -183,12 +188,14 @@ function OfferRow({
   seller,
   model,
   cell,
+  models,
 }: {
   seller: Seller;
   model: Seller['models'][number];
   cell: ReactNode;
   days: ExplorerQuery['days'];
   closed?: boolean;
+  models: CatalogModels;
 }) {
   return (
     <tr className="border-t border-line">
@@ -202,12 +209,13 @@ function OfferRow({
         </Chip>
       </td>
       <td className={td}>
-        <CatalogModelName
+        <ModelName
           days={days}
           closed={closed}
           modelId={model.modelId}
           variant={model.variant}
           quantization={model.quantization}
+          models={models}
         />
       </td>
       <td className={numberCell}>{count(model.contextTokens)}</td>
@@ -234,12 +242,14 @@ function SellersTable({
   accounts,
   names,
   accountsKnown,
+  models,
 }: {
   query: ExplorerQuery;
   sellers: Seller[];
   accounts: Map<string, GithubAccount>;
   names: Map<string, string>;
   accountsKnown: boolean;
+  models: CatalogModels;
 }) {
   const empty = emptySellersMessage(sellers, query.verified, accountsKnown);
   const offers = sellerOffers(sellers);
@@ -270,6 +280,7 @@ function SellersTable({
             key={`${seller.nodeId}:${model.modelId}:${model.variant}:${model.quantization}`}
             seller={seller}
             model={model}
+            models={models}
             cell={
               <SellerCell
                 nodeId={seller.nodeId}

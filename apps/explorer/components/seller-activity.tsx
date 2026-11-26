@@ -11,6 +11,7 @@ import type { SellerDay } from '../lib/collector-shape';
 import { DISPLAY, PAGING } from '../lib/constants';
 import { getDiscovery } from '../lib/discovery-render';
 import { count, pricePerMtok, usdcDecimal } from '../lib/format';
+import type { CatalogModels } from '../lib/model-catalog';
 import { rangeOf, tablePager, type ExplorerQuery } from '../lib/paging';
 import { displayRange } from '../lib/range';
 import {
@@ -34,10 +35,10 @@ import {
 import { Flow } from './board/animated-number';
 import { BarChartCard } from './board/bar-chart-card';
 import { StatCard } from './board/stat-card';
-import { CatalogModelName } from './catalog-model-name';
 import { pagedRows, Pager } from './pager';
 import {
   EmptyRow,
+  ModelName,
   moneyCell,
   numberCell,
   prefixedColumn,
@@ -121,11 +122,13 @@ function ModelsTable({
   rows,
   served,
   offersKnown,
+  models,
 }: {
   query: ExplorerQuery;
   rows: ReturnType<typeof sellerModelRows>;
   served: boolean;
   offersKnown: boolean;
+  models: CatalogModels;
 }) {
   const shown = pagedRows(query, 'models', rows);
   const figure = (row: (typeof rows)[number], name: Figure) => (
@@ -157,12 +160,13 @@ function ModelsTable({
         {shown.rows.map((row) => (
           <tr key={row.key} className="border-t border-line">
             <td className={td}>
-              <CatalogModelName
+              <ModelName
                 days={rangeOf(query, 'activity')}
                 closed={query.closed}
                 modelId={row.modelId}
                 variant={row.variant}
                 quantization={row.quantization}
+                models={models}
               />
             </td>
             <td className={numberCell}>
@@ -343,6 +347,7 @@ export async function SellerActivity({
         rows={sellerModelRows(offers, stats.models)}
         served={!stats.error}
         offersKnown={!snapshot.error}
+        models={snapshot.models}
       />
       {stats.error ? null : <DailyTable query={query} days={totals.active} />}
     </>
