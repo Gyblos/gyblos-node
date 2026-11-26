@@ -1,42 +1,18 @@
 'use client';
 
-// A daily bar chart in a card, after BoardUI's chart cards (MIT, see ./LICENSE), drawn with Recharts and
-// held to the explorer's chart rules: one series in the brand blue (its signal tone on dark surfaces, where
-// #0a28f0 reaches only 1.95:1 against the card; data marks need 3:1), no gradients, the headline readable
-// without hover. Hovering a day rolls the headline to that day's figure (NumberFlow), as BoardUI's
-// cards swap it. `value` only sets the bar's height; `amount` is the exact figure shown.
 import { useState } from 'react';
-import {
-  Bar,
-  BarChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
 
-import { Flow, type FlowKind, type FlowValue } from './animated-number';
+import type { FlowKind, FlowValue } from './animated-number';
 import { barAxis } from './bar-axis';
-import { CHART } from './constants';
+import { ChartReadout } from './chart-readout';
+import { Chip } from './chip';
 import { cx } from './cx';
+import { DayBars, type BarPoint } from './day-bars';
 import type { Delta } from './delta';
 import { DeltaChip } from './delta-chip';
-import { hoveredPoint } from './hovered';
 import { SURFACE } from './styles';
 
-const TICK = {
-  fill: 'var(--dim)',
-  fontSize: CHART.tickFontSize,
-  fontFamily: 'var(--font-mono)',
-};
-
-export interface BarPoint {
-  day: string;
-  value: number;
-  amount: FlowValue;
-  // Shown next to the day while hovered (e.g. "3 settlements").
-  detail?: string;
-}
+export type { BarPoint } from './day-bars';
 
 export function BarChartCard({
   title,
@@ -45,6 +21,8 @@ export function BarChartCard({
   points,
   change,
   countAxis = true,
+  comparison,
+  summary,
 }: {
   title: string;
   kind: FlowKind;
@@ -54,64 +32,65 @@ export function BarChartCard({
   points: BarPoint[];
   // A count axis (whole numbers); amounts hide it and read from the headline instead.
   countAxis?: boolean;
+  comparison?: string;
+  summary?: string;
 }) {
-  const [active, setActive] = useState<BarPoint | null>(null);
-  const dense = points.length > CHART.denseDays;
+  const [index, setIndex] = useState<number | null>(null);
+  const active = index === null ? null : points[index];
+  const maximum = points.reduce(
+    (peak, row) => Math.max(peak, row.value ?? 0),
+    0,
+  );
   return (
-    <div className={cx('p-4 sm:p-5', SURFACE.card)}>
+    <div className={cx('min-w-0 p-4 sm:p-5', SURFACE.card)}>
       <div className="text-sm text-muted">{title}</div>
-      <div className="mt-1 flex items-center gap-2">
-        <span className="font-mono text-2xl">
-          <Flow value={active ? active.amount : total} kind={kind} />
-        </span>
-        {change && !active ? <DeltaChip delta={change} /> : null}
-        <span className="font-mono text-xs text-dim">
-          {active
-            ? [active.day, active.detail].filter(Boolean).join(', ')
-            : `${points.length} days`}
-        </span>
-      </div>
-      <div className="mt-3" style={{ height: CHART.height }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart
-            data={points}
-            margin={{
-              top: CHART.topMargin,
-              right: CHART.rightMargin,
-              bottom: 0,
-              left: 0,
-            }}
-            onMouseMove={(state) =>
-              setActive(hoveredPoint(points, state.activeTooltipIndex))
-            }
-            onMouseLeave={() => setActive(null)}
+      <ChartReadout
+        kind={kind}
+        value={active ? active.amount : total}
+        badge={
+          !active &&
+          (change ? (
+            <DeltaChip delta={change} />
+          ) : comparison ? (
+            <Chip>No baseline</Chip>
+          ) : null)
+        }
+        detail={
+          active
+            ? [
+                active.day,
+                active.amount === null ? 'No observation' : active.detail,
+              ]
+                .filter(Boolean)
+                .join(', ')
+            : (summary ?? `${points.length} days`)
+        }
+      />
+      <div className="flex min-w-0 gap-2">
+        {!barAxis(countAxis).hide && maximum > 0 && (
+          <div
+            aria-hidden="true"
+            className="mt-4 flex h-32 flex-col justify-between text-right font-mono text-xs text-dim"
           >
-            <XAxis
-              dataKey="day"
-              tickFormatter={(day: string) => day.slice(CHART.monthDayStart)}
-              interval={dense ? 'preserveStartEnd' : 0}
-              tickLine={false}
-              axisLine={{ stroke: 'var(--line)' }}
-              tick={TICK}
-              minTickGap={CHART.minTickGap}
-            />
-            <YAxis
-              {...barAxis(countAxis)}
-              width={CHART.axisWidth}
-              tickLine={false}
-              axisLine={false}
-              tick={TICK}
-            />
-            <Tooltip cursor={{ fill: 'var(--line)' }} content={() => null} />
-            <Bar
-              dataKey="value"
-              fill="var(--chart)"
-              radius={[CHART.barRadius, CHART.barRadius, 0, 0]}
-              isAnimationActive={false}
-            />
-          </BarChart>
-        </ResponsiveContainer>
+            <span>{maximum.toLocaleString('en-US')}</span>
+            <span>0</span>
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
+          <DayBars
+            points={points}
+            maximum={maximum}
+            kind={kind}
+            label={title}
+            active={index}
+            setActive={setIndex}
+          />
+        </div>
       </div>
+      <p className="mt-2 min-h-4 text-xs text-dim">
+        {points.some((row) => row.value === null) &&
+          'Dashed mark · No observation'}
+      </p>
     </div>
   );
 }

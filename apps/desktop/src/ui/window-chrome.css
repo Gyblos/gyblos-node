@@ -21,10 +21,25 @@
   padding: 0 var(--space-3);
   padding-inline-end: calc(var(--space-3) + var(--window-controls-right));
   border-radius: 0;
-  border-bottom: 1px solid var(--line);
-  background: var(--side);
+  border-bottom: 0;
+  background:
+    linear-gradient(var(--line), var(--line)) right bottom /
+      calc(100% - var(--sidebar-surface-width)) 1px no-repeat,
+    linear-gradient(
+      90deg,
+      var(--sidebar-surface) var(--sidebar-surface-width),
+      var(--bg) var(--sidebar-surface-width)
+    );
   -webkit-app-region: drag;
   user-select: none;
+}
+.desktop-frame.sidebar-collapsed {
+  --sidebar-surface-width: var(--navigation-rail-width);
+}
+@media (max-width: 899px) {
+  .desktop-frame {
+    --sidebar-surface-width: var(--navigation-rail-width);
+  }
 }
 .desktop-frame > .buyer-sidebar {
   grid-row: 2 / 3;

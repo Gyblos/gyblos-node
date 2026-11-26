@@ -15,13 +15,12 @@
     "./execution-policy": "./src/execution-policy.ts",
     "./errors": "./src/errors.ts",
     "./models": "./src/models.ts",
-    "./offer": "./src/offer.ts",
+    "./model-family": "./src/model-family.ts",
     "./package.json": "./package.json",
     "./public-records": "./src/public-records.ts",
     "./public-types": "./src/public-types.ts",
     "./signing": "./src/signing.ts",
     "./vectors/public-discovery-v1.json": "./vectors/public-discovery-v1.json",
-    "./vectors/signed-inference-offer-v1.json": "./vectors/signed-inference-offer-v1.json",
     "./wire-usage": "./src/wire-usage.ts",
     "./control-types": "./src/control-types.ts",
     "./control-validation": "./src/control-validation.ts",
@@ -81,6 +80,8 @@
     "./identity-claim": "./src/identity-claim.ts",
     "./vectors/identity-claim-v1.json": "./vectors/identity-claim-v1.json",
     "./profile-claim": "./src/profile-claim.ts",
-    "./vectors/profile-claim-v1.json": "./vectors/profile-claim-v1.json"
+    "./vectors/profile-claim-v1.json": "./vectors/profile-claim-v1.json",
+    "./model-verification": "./src/model-verification.ts",
+    "./vectors/model-verification-v1.json": "./vectors/model-verification-v1.json"
   }
 }

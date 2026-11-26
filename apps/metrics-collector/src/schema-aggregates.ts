@@ -3,13 +3,14 @@
 import { eq } from 'drizzle-orm';
 import {
   check,
+  index,
   integer,
   primaryKey,
   sqliteTable,
   text,
 } from 'drizzle-orm/sqlite-core';
 
-import { AGG_STATE_ID } from './constants';
+import { AGG_STATE_ID, type FirstSeenKind } from './constants';
 
 // Additive receipt columns shared by the seller hourly, seller daily and network tables. Fresh
 // builders per table, as Drizzle requires.
@@ -61,6 +62,12 @@ export const aggState = sqliteTable(
 
 export const aggDirtyDays = sqliteTable('collector_agg_dirty_days', {
   day: text('day').primaryKey(),
+});
+
+export const aggDays = sqliteTable('collector_agg_days', {
+  day: text('day').primaryKey(),
+  cutoff: integer('cutoff').notNull(),
+  revision: integer('revision').notNull(),
 });
 
 export const aggSellerDaily = sqliteTable(
@@ -161,12 +168,15 @@ export const aggDemandDaily = sqliteTable(
 export const firstSeen = sqliteTable(
   'collector_first_seen',
   {
-    kind: text('kind').notNull(),
+    kind: text('kind').$type<FirstSeenKind>().notNull(),
     id: text('id').notNull(),
     firstDay: text('first_day').notNull(),
     firstAt: integer('first_at').notNull(),
   },
-  (table) => [primaryKey({ columns: [table.kind, table.id] })],
+  (table) => [
+    primaryKey({ columns: [table.kind, table.id] }),
+    index('collector_first_seen_by_first_day').on(table.firstDay),
+  ],
 );
 
 // The receipt total columns, in table order: the one list the aggregation, the reads and the response

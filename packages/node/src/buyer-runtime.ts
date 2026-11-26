@@ -1,5 +1,6 @@
 // Exclusive lifetime ownership of a buyer home across financial modes; no key loading or chain access.
-import { batchPoolPathsIn, type HomeEnvironment } from '@gyblos/config/home';
+import { type HomeEnvironment } from '@gyblos/config/home';
+import { batchPoolPathsIn } from '@gyblos/config/home-payments';
 import {
   acquireProcessLock,
   ensurePrivatePaymentPaths,

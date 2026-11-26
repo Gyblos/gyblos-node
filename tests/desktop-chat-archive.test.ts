@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 
-import { desktopChatPaths } from '@gyblos/config/home';
+import { desktopChatPaths } from '@gyblos/config/home-desktop';
 import { createChatArchiveHandlers } from '@gyblos/desktop/chat-archive-handlers';
 import {
   CHAT_STORAGE,
@@ -217,20 +217,28 @@ void test('private local conversation file survives close and reopen with owner-
   const storage = createChatArchiveStorage(profile);
   try {
     const loaded = await storage.store.load();
+    const chat = conversation();
+    chat.pinChat(chat.getSnapshot().activeId, true);
     storage.store.save({
       generation: loaded.generation,
       sequence: 1,
-      archive: projectChatArchive(conversation().getSnapshot()),
+      archive: projectChatArchive(chat.getSnapshot()),
     });
     await storage.close();
     const paths = desktopChatPaths(profile);
-    assert.match(await readFile(paths.state, 'utf8'), /Synthetic answer/);
+    const transcript = await readFile(paths.state, 'utf8');
+    assert.match(transcript, /Synthetic answer/);
+    assert.doesNotMatch(transcript, /"pinned"/);
     if (process.platform !== 'win32')
       assert.equal((await stat(paths.state)).mode & 0o777, 0o600);
     const reopened = createChatArchiveStorage(profile);
     assert.equal(
       (await reopened.store.load()).archive?.sessions[0]?.draft,
       'Unsent draft',
+    );
+    assert.equal(
+      (await reopened.store.load()).archive?.sessions[0]?.pinned,
+      true,
     );
     await reopened.close();
   } finally {
@@ -325,4 +333,23 @@ void test('pending preview prefixes survive restoration as stopped responses', (
   const restored = restoreChatArchive(archive);
   assert.equal(restored.sessions[0]?.messages[1]?.text, 'Already shown prefix');
   assert.equal(restored.sessions[0]?.messages[1]?.state, MESSAGE_STATE.STOPPED);
+});
+
+void test('pinned and renamed conversations survive reopening and deletion removes the archived conversation', () => {
+  const chat = new ChatController('original');
+  chat.setDraft('Local draft');
+  chat.renameChat('original', 'Renamed');
+  chat.pinChat('original', true);
+  const archive = projectChatArchive(chat.getSnapshot());
+  assert.ok(archive);
+  const reopened = new ChatController('empty');
+  reopened.restoreArchive(archive);
+  assert.equal(reopened.getSnapshot().sessions[0]?.title, 'Renamed');
+  assert.equal(reopened.getSnapshot().sessions[0]?.pinned, true);
+  reopened.deleteChat('original', 'next');
+  assert.deepEqual(
+    reopened.getSnapshot().sessions.map((s) => s.id),
+    ['next'],
+  );
+  assert.equal(reopened.getSnapshot().activeId, 'next');
 });

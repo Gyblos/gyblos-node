@@ -47,6 +47,7 @@ export const COLLECTOR_ROUTES = {
   // Every public stats route starts with this; it selects the read limiter.
   STATS_PREFIX: '/v1/stats/',
   STATS_NETWORK: '/v1/stats/network',
+  STATS_INTRADAY: '/v1/stats/intraday',
   STATS_MODELS: '/v1/stats/models',
   STATS_SELLER: '/v1/stats/sellers/:nodeId',
   STATS_CHAIN: '/v1/stats/chain',
@@ -153,6 +154,9 @@ export const AGGREGATES = {
   maxPublicModels: 100,
   maxPublicDemandPerDay: 20,
   // Public day ranges.
+  allTimeRange: 'all',
+  maxIntradayDays: 7,
+  halfHourMs: 1_800_000,
   maxRangeDays: 92,
   defaultRangeDays: 30,
   dayMs: 86_400_000,
@@ -171,6 +175,8 @@ export const FIRST_SEEN_KINDS = {
   BUYER_PAID: 'buyer-paid',
   MODEL: 'model',
 } as const;
+export type FirstSeenKind =
+  (typeof FIRST_SEEN_KINDS)[keyof typeof FIRST_SEEN_KINDS];
 // The single row of collector_agg_state.
 export const AGG_STATE_ID = 1;
 export const CHAIN_CURSOR_ID = 1;
@@ -259,7 +265,12 @@ export const CHAIN_CHANNEL_CLOSED = 'closed';
 export const CHAIN_TX_PAGE = {
   defaultLimit: 25,
   maxLimit: 50,
-  params: { BEFORE: 'before', LIMIT: 'limit', RECIPIENT: 'recipient' },
+  params: {
+    BEFORE: 'before',
+    LIMIT: 'limit',
+    RECIPIENT: 'recipient',
+    PAGE: 'page',
+  },
 } as const;
 // The address holds no channel of this program (another owner, or another size).
 export const CHAIN_CHANNEL_UNKNOWN = 'unknown';
@@ -323,3 +334,12 @@ export const COLLECTOR_ADMIN_TOKEN_BINDING = 'COLLECTOR_ADMIN_TOKEN';
 export const COLLECTOR_CHAIN_INDEX_FAILED = 'COLLECTOR_CHAIN_INDEX_FAILED';
 // Log code of every scheduled chain read: calls per endpoint, rate limits, work done and backlog.
 export const COLLECTOR_CHAIN_INDEX_RUN = 'COLLECTOR_CHAIN_INDEX_RUN';
+
+export const COVERAGE_STATES = {
+  FINAL: 'final',
+  PARTIAL: 'partial',
+  PENDING: 'pending',
+  UNKNOWN: 'unknown',
+} as const;
+export type CoverageState =
+  (typeof COVERAGE_STATES)[keyof typeof COVERAGE_STATES];

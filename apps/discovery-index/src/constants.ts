@@ -1,7 +1,10 @@
 // Owns the discovery index's canonical values: wire error codes, statuses, routes, limits and binding names.
 // It must not hold record formats or signing domains (protocol owns those) or operator URLs (config).
 import { LOOPBACK_HOST_NAMES } from '@gyblos/config/hosts';
-import { PUBLIC_RECORD_LIMITS } from '@gyblos/protocol/constants';
+import {
+  DISCOVERY_READ_LIMITS,
+  PUBLIC_RECORD_LIMITS,
+} from '@gyblos/protocol/constants';
 
 // Static `error` values on the wire (docs/discovery.md, "Running an index").
 export const INDEX_ERRORS = {
@@ -55,11 +58,14 @@ export const INDEX_ROUTES = {
   RECORDS: '/v1/records',
   SELLERS: '/v1/sellers',
   MODELS: '/v1/models',
+  MODEL_CATALOG: '/v1/models/catalog',
   HEALTH: '/v1/health',
   REGISTRATIONS: '/v1/registrations',
   UPTIME: '/v1/uptime',
   VERSIONS: '/v1/versions',
   NETWORK: '/v1/network',
+  NETWORK_HISTORY: '/v1/network/history',
+  OFFER_HISTORY: '/v1/offers/history',
   // POST a signed GitHub claim here; GET `${GITHUB_IDENTITY}/<nodeId>` reads one.
   GITHUB_IDENTITY: '/v1/identity/github',
   PROFILE: '/v1/profile',
@@ -68,10 +74,13 @@ export const INDEX_ROUTES = {
 export const PUBLIC_READ_ROUTES: ReadonlySet<string> = new Set([
   INDEX_ROUTES.SELLERS,
   INDEX_ROUTES.MODELS,
+  INDEX_ROUTES.MODEL_CATALOG,
   INDEX_ROUTES.HEALTH,
   INDEX_ROUTES.UPTIME,
   INDEX_ROUTES.VERSIONS,
   INDEX_ROUTES.NETWORK,
+  INDEX_ROUTES.NETWORK_HISTORY,
+  INDEX_ROUTES.OFFER_HISTORY,
 ]);
 // Public reads below a prefix (GET /v1/identity/github/<nodeId>), CORS-readable like the routes above.
 export const PUBLIC_READ_PREFIXES: readonly string[] = [
@@ -107,7 +116,7 @@ export const DISCOVERY_INDEX_LIMITS = {
   maxSellers: 200,
   // Models listed by GET /v1/models, most sellers first.
   maxModels: 500,
-  maxResponseBytes: 1024 * 1024,
+  maxResponseBytes: DISCOVERY_READ_LIMITS.maxResponseBytes,
   // Bytes reserved for the page framing around the seller entries.
   responseFramingBytes: 128,
   // Atomic cap on tracked NodeIds, checked while a new NodeId is admitted. NodeIds are free
@@ -265,6 +274,39 @@ export const NETWORK = {
   // Bytes reserved for the counts and framing around the node entries.
   framingBytes: 256,
 } as const;
+export const NETWORK_HISTORY = {
+  dayOptions: [7, 30, 90],
+  defaultDays: 7,
+  maxDays: 90,
+  slotsPerDay: UPTIME.dayMs / UPTIME.slotMs,
+  hoursPerDay: UPTIME.dayMs / UPTIME.hourMs,
+  heartbeatSlots: 2,
+  settleSlots: 3,
+  rollupDaysPerRun: 4,
+} as const;
+export const NETWORK_DAY_STATES = {
+  FINAL: 'final',
+  PARTIAL: 'partial',
+  PENDING: 'pending',
+} as const;
+export const HEARTBEAT_FAILED = 'DISCOVERY_HEARTBEAT_FAILED';
+export const NETWORK_ROLLUP_FAILED = 'DISCOVERY_NETWORK_ROLLUP_FAILED';
+export const OFFER_HISTORY = {
+  defaultDays: 30,
+  maxDays: DISCOVERY_READ_LIMITS.maxOfferHistoryDays,
+  maxPeriods: DISCOVERY_READ_LIMITS.maxOfferHistoryPeriods,
+  dayMs: 86_400_000,
+  retentionDays: UPTIME.retentionDays,
+  framingBytes: 256,
+} as const;
+export const PERIOD_END_REASONS = {
+  REPLACED: 'replaced',
+  WITHDRAWN: 'withdrawn',
+  EXPIRED: 'expired',
+} as const;
+export type PeriodEndReason =
+  (typeof PERIOD_END_REASONS)[keyof typeof PERIOD_END_REASONS];
+
 export const NETWORK_STATES = {
   ONLINE: 'online',
   OFFLINE: 'offline',

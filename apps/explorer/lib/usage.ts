@@ -1,12 +1,20 @@
 import type {
+  BuyerCount,
   CollectorSnapshot,
+  NetworkBuyers,
   NetworkDay,
-  NetworkSide,
   Totals,
 } from './collector-shape';
-import { DISPLAY } from './constants';
+import {
+  ALL_TIME,
+  COVERAGE_NOTES,
+  COVERAGE_STATES,
+  DISPLAY,
+  type CoverageState,
+} from './constants';
 import { count, latencyMs, percent, utc } from './format';
 import { mergedLatency } from './latency';
+import { previousRange, type RangeDays } from './range';
 
 type Section = Totals | null | undefined;
 // Requests that ended in success or failure; cancellations are not failures and stay out.
@@ -34,6 +42,11 @@ export function sideFigures(sections: Section[]) {
       0,
     ),
     successRate: successRate(sections),
+    tokens: sections.reduce(
+      (sum, totals) =>
+        sum + (totals ? totals.tokens.input + totals.tokens.output : 0),
+      0,
+    ),
     outputTokens: sections.reduce(
       (sum, totals) => sum + (totals?.tokens.output ?? 0),
       0,
@@ -55,7 +68,7 @@ export const rateText = (rate: number | null) =>
 export const countText = count;
 export const latencyText = latencyMs;
 
-export function summarizeUsage(snapshot: CollectorSnapshot) {
+export function summarizeUsage(snapshot: Pick<CollectorSnapshot, 'days'>) {
   const active = snapshot.days.filter(
     (day) => day.free || day.paid || day.observed || day.demand.length,
   );
@@ -66,14 +79,30 @@ export function summarizeUsage(snapshot: CollectorSnapshot) {
         model.modelId,
         (demand.get(model.modelId) ?? 0) + model.requests,
       );
+  const series = dailyRequests(snapshot.days);
+  const summarizeSide = (side: 'free' | 'paid') => {
+    const totals = sideFigures(active.map((day) => day[side]));
+    const requests = observedSum(series.map((row) => row[side]));
+    return {
+      ...totals,
+      requests,
+      outputTokens: requests === null ? null : totals.outputTokens,
+    };
+  };
+  const authorized = snapshot.days.flatMap((day) =>
+    day.paid?.authorizedAtomic != null
+      ? [BigInt(day.paid.authorizedAtomic)]
+      : !day.paid && day.coverage === COVERAGE_STATES.FINAL
+        ? [0n]
+        : [],
+  );
   return {
     active,
-    free: sideFigures(active.map((day) => day.free)),
-    paid: sideFigures(active.map((day) => day.paid)),
-    authorized: active.reduce(
-      (sum, day) => sum + BigInt(day.paid?.authorizedAtomic ?? '0'),
-      0n,
-    ),
+    free: summarizeSide('free'),
+    paid: summarizeSide('paid'),
+    authorized: authorized.length
+      ? authorized.reduce((sum, value) => sum + value)
+      : null,
     unserved: [...demand.values()].reduce((sum, value) => sum + value, 0),
     demand: [...demand].sort((left, right) => right[1] - left[1]),
   };
@@ -86,33 +115,57 @@ export function relayText(day: NetworkDay): string {
   return routes && routed ? percent(routes.relay / routed) : '—';
 }
 
-// One point per day of the range, oldest first: each side's headline requests (0 without receipts).
 export function dailyRequests(
-  days: readonly { day: string; free: Section; paid: Section }[],
+  days: readonly {
+    day: string;
+    free: Section;
+    paid: Section;
+    coverage?: CoverageState | null;
+  }[],
+  dates = days.map((row) => row.day),
 ) {
-  return days.map((day) => ({
-    day: day.day,
-    free: day.free?.requests.headline ?? 0,
-    paid: day.paid?.requests.headline ?? 0,
-  }));
+  const rows = new Map(days.map((row) => [row.day, row]));
+  return dates.map((day) => {
+    const row = rows.get(day);
+    const empty = row?.coverage === COVERAGE_STATES.FINAL ? 0 : null;
+    const note = row?.coverage ? COVERAGE_NOTES[row.coverage] : undefined;
+    return {
+      ...(note ? { note } : {}),
+      day,
+      free: row?.free?.requests.headline ?? empty,
+      paid: row?.paid?.requests.headline ?? empty,
+    };
+  });
+}
+
+export function observedSum(values: readonly (number | null)[]) {
+  const observed = values.filter((value) => value !== null);
+  return observed.length
+    ? observed.reduce((sum, value) => sum + value, 0)
+    : null;
 }
 
 // The Usage title's note: the comparison is named only when the span before the range could be read.
 export function usageMeta(
-  days: number,
+  days: RangeDays,
   aggregatedAt: number | null,
   compared: boolean,
 ): string {
   if (!aggregatedAt) return 'no data yet';
   const updated = `updated ${utc(aggregatedAt)}`;
-  return compared ? `vs previous ${days} days, ${updated}` : updated;
+  return compared && days !== ALL_TIME
+    ? `vs ${previousRange(days)}, ${updated}`
+    : updated;
 }
 
-export const buyersText = (
-  side: Pick<NetworkSide, 'buyers' | 'withheld'> | null,
-) =>
+export const buyersText = (side: BuyerCount | null) =>
   !side
     ? '—'
     : side.withheld
       ? `< ${DISPLAY.minPublicBuyers}`
       : count(side.buyers ?? 0);
+
+export const newBuyersText = (buyers: NetworkBuyers | null, days: RangeDays) =>
+  buyers && days !== ALL_TIME
+    ? `New in the ${days === 1 ? 'last complete UTC day' : `last ${days} days`}: ${buyersText(buyers.free.newInRange)} free · ${buyersText(buyers.paid.newInRange)} paid`
+    : undefined;

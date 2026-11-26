@@ -3,9 +3,8 @@
 // checked at the boundary (chain-shape.ts) on each render; the collector caches it at the edge.
 
 import { parseChainStats, type ChainSnapshot } from './chain-shape';
-import { COLLECTOR_URL } from './config';
-import { fetchJson } from './fetch-json';
-import { rangeQuery, type RangeDays } from './range';
+import { rangeEnd, type RangeDays } from './range';
+import { readStats } from './stats-window';
 
 export type { ChainSnapshot } from './chain-shape';
 
@@ -13,9 +12,14 @@ export type { ChainSnapshot } from './chain-shape';
 export async function getChainStats(
   days: RangeDays,
   periodsBack = 0,
+  closed = true,
+  now = Date.now(),
 ): Promise<ChainSnapshot> {
   try {
-    return { ...(await loadChainStats(days, periodsBack)), error: null };
+    return {
+      ...(await loadChainStats(days, periodsBack, rangeEnd(days, now, closed))),
+      error: null,
+    };
   } catch (error) {
     return {
       aggregatedAt: null,
@@ -26,11 +30,10 @@ export async function getChainStats(
   }
 }
 
-async function loadChainStats(days: RangeDays, periodsBack: number) {
-  return parseChainStats(
-    await fetchJson(
-      `${COLLECTOR_URL}/stats/chain${rangeQuery(days, Date.now(), periodsBack)}`,
-      'collector chain',
-    ),
-  );
+async function loadChainStats(
+  days: RangeDays,
+  periodsBack: number,
+  now: number,
+) {
+  return parseChainStats(await readStats('chain', days, now, periodsBack));
 }

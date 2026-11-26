@@ -46,7 +46,7 @@ use the same operations, on either role.
 | Concern                 | Today                                                                                                                                         | Target                                                                       |
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | Seller logic            | In `packages/node`; `apps/node` is a thin CLI and daemon                                                                                      | In a seller package; unchanged shape                                         |
-| Buyer logic             | Mostly in `apps/buyer`: selection, discovery, routing, the HTTP endpoint and buyer API keys                                                   | In a buyer package; `apps/buyer` is a thin executable                        |
+| Buyer logic             | In `packages/buyer`; `apps/buyer` keeps argument parsing and process lifecycle                                                                | In a buyer package; `apps/buyer` is a thin executable                        |
 | Buyer commands          | One buyer executable with eight subcommands, from a checkout only, behind the `pnpm buyer*` scripts                                           | `gyblos buyer <command>` in the released executable                          |
 | `packages/node`         | Both roles, PayPal, `config.toml`, receipts and agent setup in one package                                                                    | A shared node kit with nothing specific to one role                          |
 | Desktop app             | Bundles `apps/buyer` as a utility process and keeps its own Chat budget and permission state                                                  | A client of the buyer's local API; holds no financial state                  |
@@ -255,8 +255,8 @@ Rules that hold for all of them:
 - **One router.** A hosted gateway runs the same selection function with its own
   policy. No gateway reimplements filters, the offer race or recounting.
 - **A gateway is a host, not a stack.** It composes the buyer package, exactly
-  as the CLI and the desktop app do. This is why buyer logic must leave
-  `apps/buyer` before a hosted gateway exists.
+  as the CLI and the desktop app do. This is why buyer logic left `apps/buyer`
+  for `packages/buyer`.
 - **A ranking source only recommends.** The buyer applies every hard filter
   itself, verifies each seller independently and pays the seller directly. A
   recommendation never widens a permission, replaces a selection silently or
@@ -365,10 +365,10 @@ paths. Step numbers are stable names; the table is in the order of work.
 | Step | Change                                                                                                                                 | Kind       | When                     |
 | ---- | -------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ------------------------ |
 | 1    | One buyer entry with subcommands; the existing scripts point to it                                                                     | Behavior   | Done                     |
-| 5    | Move buyer orchestration from `apps/buyer` into a buyer package                                                                        | Structural | Next                     |
+| 5    | Move buyer orchestration from `apps/buyer` into a buyer package                                                                        | Structural | Done                     |
 | 2    | The released executable includes the buyer as `gyblos buyer`, importing that package, and the seller starts with `gyblos seller start` | Behavior   | After step 5             |
 | 3    | `--json` and non-interactive operation on seller and buyer commands                                                                    | Behavior   | After step 2             |
-| 4    | Remove v1 signed offers, which no product path uses                                                                                    | Removal    | Any time                 |
+| 4    | Remove v1 signed offers, which no product path uses                                                                                    | Removal    | Done                     |
 | 7    | Complete the local operator API in protocol and move the desktop app onto it                                                           | Behavior   | After step 3             |
 | 8    | Agent tool surface over the same operations                                                                                            | Behavior   | After step 7             |
 | 6    | Split `packages/node` into the seller package, the buyer package and the shared node kit                                               | Structural | After the mainnet launch |

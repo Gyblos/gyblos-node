@@ -4,7 +4,10 @@ import { readFile, stat, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { test } from 'node:test';
 
-import { batchPoolChannelPaths, batchPoolPathsIn } from '@gyblos/config/home';
+import {
+  batchPoolChannelPaths,
+  batchPoolPathsIn,
+} from '@gyblos/config/home-payments';
 import { openBatchBuyerPool } from '@gyblos/payments-upto/batch-session';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 

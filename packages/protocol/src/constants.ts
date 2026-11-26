@@ -47,12 +47,7 @@ export type EngineDoneReason =
 export type ProtocolErrorCode =
   (typeof PROTOCOL_ERROR_CODES)[keyof typeof PROTOCOL_ERROR_CODES];
 
-// Iroh ALPN for the seller's HTTP-over-QUIC stream; also the offer's `protocol` field.
 export const GYBLOS_ALPN = 'gyblos/http/1';
-
-// Signed private inference offer: domain prefix (real LF) and payload schema version.
-export const OFFER_DOMAIN = 'gyblos/signed-inference-offer/v1\n';
-export const OFFER_SCHEMA_VERSION = 1;
 
 export const PUBLIC_RECORD_KINDS = {
   CATALOG: 'catalog',
@@ -65,6 +60,12 @@ export const PUBLIC_RECORD_DOMAINS = {
   [PUBLIC_RECORD_KINDS.PRESENCE]: 'gyblos/presence/v1\n',
   [PUBLIC_RECORD_KINDS.WITHDRAWAL]: 'gyblos/withdrawal/v1\n',
 } as const satisfies Record<PublicRecordKind, string>;
+
+export const DISCOVERY_READ_LIMITS = {
+  maxResponseBytes: 1_048_576,
+  maxOfferHistoryDays: 92,
+  maxOfferHistoryPeriods: 50,
+} as const;
 
 export const PUBLIC_RECORD_LIMITS = {
   schemaVersion: 1,

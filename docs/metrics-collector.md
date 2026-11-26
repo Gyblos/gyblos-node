@@ -28,6 +28,7 @@ rules. The local receipt receiver for private testing is a different app
 | `POST /v1/observations`         | Upload one signed envelope of 1 to 200 content-free telemetry events.    |
 | `GET /v1/health`                | `{ "ok": true }` once storage and every limiter exist.                   |
 | `GET /v1/stats/network`         | Network totals per UTC day ([public stats](#public-stats-api)).          |
+| `GET /v1/stats/intraday`        | Network requests, tokens and seller payouts per closed UTC half hour.    |
 | `GET /v1/stats/models`          | Totals per model over a day range.                                       |
 | `GET /v1/stats/sellers/:nodeId` | One seller's totals per day and per model.                               |
 | `GET /v1/stats/chain`           | Payment-channels program activity per UTC day ([chain](#chain-stats)).   |
@@ -235,6 +236,16 @@ formula version, is `collector_agg_state`. A run recomputes at most 31 dirty
 days, newest first, so old days marked dirty can never starve today; the rest
 wait for the next run.
 
+**Closing days.** Data alone never marks a quiet day, so the scan also closes
+the calendar: every UTC day from the capture start (the earlier of the first
+`collector_first_seen` day and the first observation's day, both read through an
+index) up to yesterday, within the last 92 days, that has no
+`collector_agg_days` row computed after the day ended is marked dirty. A day
+with no rows is therefore recomputed once after it ends and published as a final
+zero, not left unknown. This costs two indexed reads per run, plus one read of
+`collector_agg_days` once the capture start is before today, and adds a
+statement to the scan batch only when some day is still open.
+
 **Source time.** Every item falls on the day of its own source time: a receipt
 on the day of the seller's signed `receivedAt`, an observation on the day of its
 own `at` (except in the per-model observations, where it falls on its receipt's
@@ -249,14 +260,20 @@ rather than stopping it.
 `INSERT … SELECT … GROUP BY` over that day's raw rows. The day leaves the dirty
 set in the same batch, so readers see the old day or the new one, never a mix. A
 day whose batch fails stays dirty for the next run and never blocks the others.
-The receipt part of a run is two reads, one scan batch of 5 statements (9 once
-after a formula change) and 23 statements per day, whatever the day's row count
-(the chain part follows with its own reads and batches); no statement binds more
-than a few values. Sums use SQLite `total()`, which cannot overflow: they are
-exact while a day's total stays below 2^53 (about 9 billion USDC in atomic
-units) and approximate above. A run whose days fail logs
-`COLLECTOR_AGGREGATION_FAILED` with the day names only. Every aggregate row
-stores `formula_version` (`AGGREGATES.formulaVersion`) and `aggregated_at`.
+Each day's batch also writes its `collector_agg_days` row: `cutoff` (the run's
+time: every raw row stored before it is counted) and `revision`, which grows by
+one each time the day is recomputed, so the day's totals and its coverage always
+change together. The receipt part of a run is four or five reads, one scan batch
+of 5 statements (one more while some day is open, four more once after a formula
+change) and 24 statements per day, whatever the day's row count (the chain part
+follows with its own reads and batches); no statement binds more than a few
+values, except the calendar's, one per open day (at most 92). Sums use SQLite
+`total()`, which cannot overflow: they are exact while a day's total stays below
+2^53 (about 9 billion USDC in atomic units) and approximate above. A run whose
+days fail logs `COLLECTOR_AGGREGATION_FAILED` with the day names only. Every
+aggregate row stores `formula_version` (`AGGREGATES.formulaVersion`) and
+`aggregated_at`; `collector_agg_days` (migration `0008_day_coverage.sql`) stores
+its `cutoff` and `revision` instead.
 
 | Table                                | One row per                             | Notes                                                         |
 | ------------------------------------ | --------------------------------------- | ------------------------------------------------------------- |
@@ -304,7 +321,9 @@ stores `formula_version` (`AGGREGATES.formulaVersion`) and `aggregated_at`.
   connect failures), and connect failures. A refusal by a chosen seller is not
   demand that no seller served.
 - **First seen:** the earliest headline receipt time per seller, free buyer,
-  paid buyer and model. Recomputing an earlier day can only move it earlier.
+  paid buyer and model. Recomputing an earlier day can only move it earlier. A
+  row is never removed: a buyer whose only receipt later turns disputed stays
+  counted in `buyerTotals`, while that day's `buyers` drops it.
 
 **What the numbers can and cannot prove.** Node keys are free. A seller-only
 receipt needs only the seller's signature, and a "bilateral" one can come from
@@ -383,20 +402,47 @@ observation. The one list of single rows is
 [chain transactions](#chain-transactions), which is public chain data. Query
 parameters `from` and `to` are UTC days (`YYYY-MM-DD`); the range is inclusive
 and at most 92 days long (for example 2026-08-17 to 2026-11-16). The default is
-the 30 days up to today. A malformed, impossible, reversed or too long range, or
-a NodeId that is not 64 lowercase hex characters, answers `400 INVALID_QUERY`.
-Without a database the stats routes answer `503 COLLECTOR_UNAVAILABLE`. Reads
-spend their own per-address budget (`COLLECTOR_READ_LIMITER`, 120 per minute). A
-successful answer is `Cache-Control: public, max-age=300` and the Worker keeps
-it in the edge cache, keyed by URL, so repeated reads cost no database query;
-errors are never cached.
+the 30 days up to today. For the complete published history, use `range=all`
+with an optional inclusive `to`. The collector discovers the earliest available
+day per resource, including the requested node on seller reads. All-time
+responses include `range: "all"` and `historyAvailable`. When the resource has
+no history through the cutoff, `historyAvailable` is false and `from` equals
+`to`. Combining `range=all` with `from` or a future `to` is invalid. A
+malformed, impossible, reversed or too long bounded range, or a NodeId that is
+not 64 lowercase hex characters, answers `400 INVALID_QUERY`. Without a database
+the stats routes answer `503 COLLECTOR_UNAVAILABLE`. Reads spend their own
+per-address budget (`COLLECTOR_READ_LIMITER`, 120 per minute). A successful
+answer is `Cache-Control: public, max-age=300` and the Worker keeps it in the
+edge cache, keyed by URL, so repeated reads cost no database query; errors are
+never cached.
 
-Every answer has `from`, `to`, `formulaVersion` (the version every row in the
-answer was computed with, or `null` when there is no data or a recompute after a
-formula change is under way) and `aggregatedAt` (when the newest row in the
-answer was computed, or `null` without data). Totals come in a `free` and a
-`paid` section, each `null` when there is no data; they are never summed. Each
-section has:
+Every daily aggregate answer has `from`, `to`, `formulaVersion` (the version
+every row in the answer was computed with, or `null` when there is no data or a
+recompute after a formula change is under way) and `aggregatedAt` (when the
+newest row in the answer was computed, or `null` without data).
+
+The network answer also says how complete each day is, so a reader can tell a
+real zero from a day not counted yet. Each day has `coverage`:
+
+- `state`: `final` (recomputed after the UTC day ended; a later receipt can
+  still raise its `revision`, which turns it `pending` until the next run),
+  `partial` (today, counted so far), `pending` (marked for recomputation, today
+  included while new rows wait for the next run, or past but not yet recomputed
+  after it ended) or `unknown` (before the capture start, after today, or
+  nothing captured yet);
+- `cutoff` and `revision` of the last computation, `null` when the day was never
+  computed.
+
+The envelope adds `completeThrough`: the last day of a run of `final` days from
+the start of the range (days before the capture start are skipped), or `null`
+when the first counted day is not final; it speaks for the range only. Answers
+are cached for 300 seconds, so a day can show its previous state for up to five
+minutes, and a day that just ended reads `pending` until the next run (at most
+10 minutes). Each day also has `demandModels` and `demandTotal`, the number of
+models and the requests in `demand` before the cut to 20 models.
+
+Totals come in a `free` and a `paid` section, each `null` when there is no data;
+they are never summed. Each section has:
 
 - `requests`: `headline`, `bilateral`, `sellerOnly`, `disputed`;
 - `outcomes`: `completed`, `failed`, `cancelled`, and `successRate` (`null`
@@ -422,25 +468,67 @@ the count is withheld: a seller's day and model totals (requests, tokens,
 authorized amounts) are published whatever its number of buyers, so on a day
 with one buyer they describe that one pseudonymous buyer's use of that seller.
 
-| Route                           | Answer                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `GET /v1/stats/network`         | `days`: every day of the range with `free` and `paid` (plus `conflicts`, `activeSellers`, `modelsServed`, `buyers`, `withheld`); `observed` (`buyerLatency.firstToken`, `buyerLatency.total`, `routes.direct`, `routes.relay`, `routes.unknown`), `null` without observations that day; and `demand`: up to 20 models per day, largest first, each `modelId`, `unserved`, `refusedBeforeSelection`, `connectFailed`; `origins`: each `client`, `paid`, `requests`, `outcomes` (`completed`, `failed`, `cancelled`), `buyers`, `withheld`; and `failures`: each `side`, `client`, `event`, `reason`, `events`, `buyers`, `withheld`, most events first. |
-| `GET /v1/stats/models`          | `models`: up to 100 models (model, variant and quantization) with the most completed requests, free and paid together, each with `free` and `paid` (plus `sellers`, and `observed`: `buyerFirstToken` as a latency, and `engineSpeed` with `samples`, `p50MinTokensPerSecond` (the lower bound of the median's bucket; `null` only without samples), `bucketsTokensPerSecond` and `counts`; `observed` is `null` without any observation joined to a receipt of that side, and either metric is empty, with `samples` 0, when only the other has data).                                                                                                |
-| `GET /v1/stats/sellers/:nodeId` | `days`: every day of the range with `free` and `paid` plus `buyers` and `withheld`; `models`: up to 100 of the seller's models over the range, ordered as above.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+The network answer also has `buyerTotals`, distinct buyers from
+`collector_first_seen` in a `free` section (NodeIds) and a `paid` section
+(wallets, or the NodeId when a paid receipt names no wallet), never added
+together. Each section has `allTime` (every buyer first seen before today, UTC,
+whatever the range) and `newInRange` (buyers whose first headline receipt falls
+on a day of the range before today), each a `buyers` count with `withheld` under
+the same rule: below 5, zero included, the count is `null`. Today's new buyers
+are left out until the UTC day ends, so repeated reads do not show when each new
+buyer arrived. The counts are published, never the buyers, but they can be
+subtracted: two ranges, or `allTime` and a range up to yesterday, give exact
+counts below 5, down to the new buyers of a single day. Self-made keys (see
+above) can also be used to cross the threshold of 5. `buyerTotals` is outside
+the envelope: `aggregatedAt` and `formulaVersion` describe the days only, and an
+answer whose days have no data can still carry `buyerTotals`.
 
-Each stats request is one batch of reads over aggregate tables: five statements
-for the network answer, three for the seller answer, two in one batch for
-models, two for chain, whatever the range; the chain transaction list is one
-statement per page. Histograms are summed and lists are capped in SQL.
+| Route                           | Answer                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /v1/stats/network`         | `days`: every day of the range with `free` and `paid` (plus `conflicts`, `activeSellers`, `modelsServed`, `buyers`, `withheld`); `observed` (`buyerLatency.firstToken`, `buyerLatency.total`, `routes.direct`, `routes.relay`, `routes.unknown`), `null` without observations that day; and `demand`: up to 20 models per day, largest first, each `modelId`, `unserved`, `refusedBeforeSelection`, `connectFailed`; `origins`: each `client`, `paid`, `requests`, `outcomes` (`completed`, `failed`, `cancelled`), `buyers`, `withheld`; and `failures`: each `side`, `client`, `event`, `reason`, `events`, `buyers`, `withheld`, most events first. Also `buyerTotals` with `free` and `paid`, each `allTime` and `newInRange` (`buyers`, `withheld`). |
+| `GET /v1/stats/models`          | `models`: up to 100 models (model, variant and quantization) with the most completed requests, free and paid together, each with `free` and `paid` (plus `sellers`, and `observed`: `buyerFirstToken` as a latency, and `engineSpeed` with `samples`, `p50MinTokensPerSecond` (the lower bound of the median's bucket; `null` only without samples), `bucketsTokensPerSecond` and `counts`; `observed` is `null` without any observation joined to a receipt of that side, and either metric is empty, with `samples` 0, when only the other has data).                                                                                                                                                                                                   |
+| `GET /v1/stats/sellers/:nodeId` | `days`: every day of the range with `free` and `paid` plus `buyers` and `withheld`; `models`: up to 100 of the seller's models over the range, ordered as above.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+
+Each daily stats request is one batch of reads over aggregate tables: eleven
+statements for the network answer, three for the seller answer, two in one batch
+for models, two for chain, whatever the range; the chain transaction list is one
+statement per page. Histograms are summed and lists are capped in SQL. The one
+read whose cost grows with history is the network answer's buyer totals: one
+grouped count over every first-seen buyer row, whatever the range.
+
+### Intraday network activity
+
+`GET /v1/stats/intraday?from=2026-11-10&to=2026-11-16` requires those two
+parameters in that order. Both bounds are inclusive UTC dates and the range can
+cover one to seven completed days. An open day, extra query field or
+noncanonical query returns `400 INVALID_QUERY`.
+
+The response is
+`{"rows":[{"at":1794268800000,"tokens":17,"requests":2,"paidOut":"80"}]}`. `at`
+is the inclusive half-hour start in epoch milliseconds. Rows are sorted oldest
+first. Each headline receipt counts once at the seller's signed `receivedAt`;
+tokens sum input and output across paid and free receipts. `paidOut` is decimal
+integer text in atomic devnet USDC, using the same balanced, Gyblos-attributed
+payout calculation as the daily chain totals. Block time assigns the payout to a
+half hour. Bins without a headline receipt or an attributed seller payout are
+omitted. A missing bin does not establish source coverage. Late uploads, index
+backfill and daily aggregation lag can cause temporary differences from the
+published daily totals.
+
+A read groups the indexed receipts and chain rows in one database batch. Only
+network-level counts and amounts leave the database. There are no seller, buyer,
+model, signature or receipt identifiers and no per-entity filters. In a quiet
+interval a count of one can reveal the token total of a single request.
 
 ### Chain stats
 
 `GET /v1/stats/chain` takes the same range and envelope, plus `network` (the
-CAIP-2 devnet id), `programId`, `mint` (devnet USDC) and `index`: whether the
-program's history is fully read (`backfillDone`) and when the index last moved
-(`updatedAt`), or `null` before its first run. Until `backfillDone`, older days
-may still be missing. `days` lists every day of the range with `program` and
-`gyblosClaimed`, each `null` without activity that day:
+CAIP-2 devnet id), `programId`, `mint` (devnet USDC) and `index`. The index
+reports its configured history start (`historyFloorMs`, epoch milliseconds),
+whether it finished reading back to that start (`backfillDone`), and when the
+index last moved (`updatedAt`). The index is `null` before its first run. Until
+`backfillDone`, older days may still be missing. `days` lists every day of the
+range with `program` and `gyblosClaimed`, each `null` without activity that day:
 
 - `program` (anyone's traffic, from the signature list only): `transactions`
   (successful and failed) and `failed`;
@@ -475,10 +563,16 @@ at most once and in this order:
   channels whose first split recipient as opened (`recipients[0]`, the seller's
   payout address for Gyblos sessions) is that owner. Channels whose open was not
   read never match. The filter goes into the page's row selection, so the page
-  stays one bounded read-only statement. It has no index of its own: it reads
-  Gyblos instructions newest first until the page is full, so a rare recipient
-  costs a scan of the history, which grows with it as the unfiltered page's
-  does.
+  uses one read-only statement in cursor mode. It has no index of its own: it
+  reads Gyblos instructions newest first until the page is full, so a rare
+  recipient costs a scan of the history, which grows with it as the unfiltered
+  page's does.
+- `page`: a one-based page number from 1 to 999999, mutually exclusive with
+  `before`. The answer adds `total` (matching instructions) and `page` (the page
+  returned). An empty feed or a page beyond the end returns page 1. The count
+  and the page come from one database snapshot. SQL applies the offset before
+  calculating amounts, so only the selected page and its one lookahead row
+  require amount calculations.
 
 Numbers are canonical (`0` or no leading zero). Any other parameter (an unnamed
 one included), a repeated one, another order, `limit=25` (the default is sent by
@@ -862,6 +956,7 @@ migrations to the remote database only with founder approval.
 | `src/schema-aggregates.ts`     | `0002_metrics_aggregates.sql` | `collector_agg_*`, `collector_first_seen`                 |
 | `src/schema-chain.ts`          | `0003_chain_index.sql`        | `collector_chain_*`                                       |
 | `src/schema-model-observed.ts` | `0007_model_observed.sql`     | `collector_agg_model_observed_daily`                      |
+| `src/schema-aggregates.ts`     | `0008_day_coverage.sql`       | `collector_agg_days`, an index on `first_day`             |
 
 Drizzle cannot declare `WITHOUT ROWID`, so tables created by generated
 migrations are ordinary rowid tables, and a change that makes drizzle-kit
@@ -921,7 +1016,7 @@ Cloudflare counts it per location, so it is approximate.
 | Policy      | `@gyblos/core/public-receipts`: receipt verification, classification and merge rules.                                                                                           |
 | Storage     | `src/storage.ts` (port), `src/storage-d1*.ts` and `src/storage-memory.ts` (adapters)                                                                                            |
 | Aggregation | `src/aggregate*.ts`, `src/sql-primitives.ts`                                                                                                                                    |
-| Stats reads | `src/stats-store.ts` (port), `src/stats-read.ts` (D1); `src/stats-chain-txs-read.ts` (D1, chain index tables)                                                                   |
+| Stats reads | `src/stats-store.ts` (port), `src/stats-read.ts` and `src/stats-coverage.ts` (D1); `src/stats-chain-txs-read.ts` (D1, chain index tables)                                       |
 | Chain index | `src/chain/`: the scheduled read (`indexer.ts`, `list.ts`, `follow.ts`), call budgets and fallback (`endpoints.ts`), the RPC client, decoding and writes; `src/schema-chain.ts` |
 | Values      | `src/constants.ts`, `src/errors.ts`                                                                                                                                             |
 

@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { readdir, readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 
+import { previewStyles } from '../support/desktop-preview-styles';
+
 void test('Payments uses a single history table for both sources', async () => {
   const { transformBrand } =
     await import('../../lab/tools/desktop-preview/brand-build');
@@ -259,7 +261,7 @@ void test('preview menus that open upward stay glued to their trigger when their
     transformBrand(dropdownSource, dropdown, 'apps/desktop') ?? dropdownSource;
   assert.match(
     dropdownView,
-    /menu\.style\.bottom = up \?/,
+    /menu\.style\.bottom = up\s*\?/,
     'an upward menu is anchored by its bottom edge, not a top computed from a stale height',
   );
   const picker = await readFile(
@@ -278,7 +280,7 @@ void test('preview model picker keeps one selection signal, short seller rows an
     'lab/tools/desktop-preview/views/ModelDropdown.tsx.preview',
     'utf8',
   );
-  const css = await readFile('lab/tools/desktop-preview/preview.css', 'utf8');
+  const css = await previewStyles();
   assert.doesNotMatch(
     picker,
     /' · Needs funds'|'Needs funds' : ''/,
@@ -345,25 +347,14 @@ void test('preview Connections leads with a tool grid and an inline setup guide'
   const source = await readFile(chat, 'utf8');
   const rendered = transformBrand(source, chat, 'apps/desktop') ?? source;
   assert.ok(
-    rendered.includes('<PreviewConnectEntry'),
+    rendered.includes('<ConnectEntry'),
     'the empty chat offers to connect a dev tool',
   );
 });
 
-void test('preview chat answers show a skeleton while the reply is pending', async () => {
-  const { transformBrand } =
-    await import('../../lab/tools/desktop-preview/brand-build');
-  const file = 'apps/desktop/src/ui/ChatAnswer.tsx';
-  const source = await readFile(file, 'utf8');
-  const rendered = transformBrand(source, file, 'apps/desktop') ?? source;
-  assert.ok(rendered.includes('<PreviewAnswerSkeleton'));
-  const css = await readFile('lab/tools/desktop-preview/preview.css', 'utf8');
-  assert.match(css, /\.preview-answer-skeleton/);
-  assert.match(
-    css,
-    /prefers-reduced-motion: reduce\)\s*\{[^}]*preview-answer-skeleton/,
-    'the shimmer stops for reduced motion',
-  );
+void test('the desktop preview uses the approved live turn activity component', async () => {
+  const source = await readFile('apps/desktop/src/ui/ChatAnswer.tsx', 'utf8');
+  assert.match(source, /<TurnActivity/);
 });
 
 void test('Compare sellers opens the detail of that model', async () => {
@@ -390,7 +381,7 @@ void test('Compare sellers opens the detail of that model', async () => {
 });
 
 void test('Payments history tables become cards in narrow layouts', async () => {
-  const css = await readFile('lab/tools/desktop-preview/preview.css', 'utf8');
+  const css = await previewStyles();
   assert.match(
     css,
     /@container \(max-width: 620px\)\s*\{[^@]*\.ui-table-region \.ui-data-table tbody tr \{\s*display: grid;/,

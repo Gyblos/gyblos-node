@@ -22,9 +22,11 @@ import { summarizeOffers } from '../lib/offers';
 import { rangeOf, tablePager, type ExplorerQuery } from '../lib/paging';
 import { pagedRows, Pager } from './pager';
 import {
+  EmptyRow,
   ModelName,
   moneyCell,
   numberCell,
+  prefixedColumn,
   SectionTitle,
   SideCells,
   sideColumns,
@@ -62,7 +64,7 @@ const orDash = (show: (value: number) => string) => (value: number | null) =>
   value === null ? '—' : show(value);
 
 const MODELS_HEAD: Column[] = [
-  { label: 'Model' },
+  prefixedColumn('Model', 'model'),
   ...sideColumns('Sellers now'),
   {
     label: 'Input',
@@ -93,7 +95,7 @@ export async function ModelsSection({ query }: { query: ExplorerQuery }) {
   const days = rangeOf(query, 'models');
   const [discovery, collector] = await Promise.all([
     getDiscovery(),
-    getCollector(days),
+    getCollector(days, 0, query.closed),
   ]);
   if (discovery.error && collector.error)
     return <Unavailable title="Models" anchors={[PAGING.anchors.models]} />;
@@ -114,7 +116,7 @@ export async function ModelsSection({ query }: { query: ExplorerQuery }) {
       <SectionTitle
         id={PAGING.anchors.models}
         title="Models"
-        meta={`Offered now, served in the last ${days} days`}
+        meta="Offered now · Recorded activity"
         range={{ section: 'models', days }}
       />
       <Table
@@ -126,14 +128,14 @@ export async function ModelsSection({ query }: { query: ExplorerQuery }) {
         }
       >
         {rows.length ? null : (
-          <tr>
-            <td className={`${td} text-muted`} colSpan={16}>
-              No model offered now or served in the range.
-            </td>
-          </tr>
+          <EmptyRow columns={16}>
+            No model offered now or served in the range.
+          </EmptyRow>
         )}
         {page.rows.map((row) => (
           <ModelRowView
+            days={days}
+            closed={query.closed}
             key={`${row.modelId}:${row.variant}:${row.quantization}`}
             row={row}
             offersKnown={offersKnown}
@@ -162,9 +164,13 @@ export async function ModelsSection({ query }: { query: ExplorerQuery }) {
 // One model: what is offered now, then what was served on each side. Without the discovery index's
 // answer, what is offered now reads unknown, never "not offered".
 function ModelRowView({
+  days,
+  closed,
   row,
   offersKnown,
 }: {
+  days: ExplorerQuery['days'];
+  closed?: boolean;
   row: ModelRow;
   offersKnown: boolean;
 }) {
@@ -172,6 +178,8 @@ function ModelRowView({
     <tr className="border-t border-line">
       <td className={td}>
         <ModelName
+          days={days}
+          closed={closed}
           modelId={row.modelId}
           variant={row.variant}
           quantization={row.quantization}

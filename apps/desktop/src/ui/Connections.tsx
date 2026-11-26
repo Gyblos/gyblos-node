@@ -18,6 +18,7 @@ import {
 } from './connection-state';
 import { BUTTON_VARIANT } from './constants';
 import { FormActions, FormField, FormInput } from './Form';
+import { ChoiceMenu } from './Management';
 import { Modal } from './Modal';
 import { ModelDropdown, type ModelOption } from './ModelDropdown';
 import { ServiceLogo } from './ServiceLogo';
@@ -129,22 +130,14 @@ export function ConnectionDialog({
           <Badge>Default</Badge>
         </div>
         <FormField htmlFor="connection-tool" label="Tool">
-          <select
+          <ChoiceMenu
             id="connection-tool"
-            className="ui-input"
+            label="Tool"
             value={selectedTool}
             disabled={!!existing}
-            onChange={(event) => {
-              const next = CONNECTION_TOOLS.find(
-                (item) => item === event.target.value,
-              );
-              if (next) setSelectedTool(next);
-            }}
-          >
-            {CONNECTION_TOOLS.map((item) => (
-              <option key={item}>{item}</option>
-            ))}
-          </select>
+            options={CONNECTION_TOOLS}
+            onChange={setSelectedTool}
+          />
         </FormField>
         <div className="ui-field">
           <span>Model</span>

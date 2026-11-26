@@ -5,7 +5,7 @@ import { syncBuiltinESMExports } from 'node:module';
 import { test } from 'node:test';
 
 import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
-import { batchPoolPathsIn } from '@gyblos/config/home';
+import { batchPoolPathsIn } from '@gyblos/config/home-payments';
 import {
   createBatchBuyer,
   createBatchSeller,

@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 
+import { previewStyles } from '../support/desktop-preview-styles';
+
 const views = new URL(
   '../../lab/tools/desktop-preview/views/',
   import.meta.url,
@@ -10,7 +12,8 @@ const transformed = async (file: string) => {
   const { transformBrand } =
     await import('../../lab/tools/desktop-preview/brand-build');
   return (
-    transformBrand(await readFile(file, 'utf8'), file, 'apps/desktop') ?? ''
+    transformBrand(await readFile(file, 'utf8'), file, 'apps/desktop') ??
+    (await readFile(file, 'utf8'))
   );
 };
 
@@ -60,7 +63,7 @@ void test('one preview code block shows the language, colors tokens and copies',
   assert.match(kit, /className="pk-code-language"/);
   assert.match(kit, /label=\{copied \? 'Copied' : 'Copy ' \+/);
   assert.match(kit, /data-token=\{token\.kind\}/);
-  const css = await readFile('lab/tools/desktop-preview/preview.css', 'utf8');
+  const css = await previewStyles();
   for (const kind of ['comment', 'string', 'key', 'number', 'keyword', 'flag'])
     assert.match(css, new RegExp(`\\[data-token='${kind}'\\]`));
 });
@@ -91,7 +94,7 @@ void test('detail dialogs share one summary component with room between rows', a
     assert.match(view, /<DetailSummary/, file);
     assert.doesNotMatch(view, /className="preview-detail-totals"/, file);
   }
-  const css = await readFile('lab/tools/desktop-preview/preview.css', 'utf8');
+  const css = await previewStyles();
   assert.match(css, /\.modal\[data-size\] > \* \{\s*flex-shrink: 0;/);
   assert.match(
     css,
@@ -120,14 +123,14 @@ void test('code block copy reports success only when the copy action confirms it
       await readFile(hookFile, 'utf8'),
       hookFile,
       'apps/desktop',
-    ) ?? '';
+    ) ?? (await readFile(hookFile, 'utf8'));
   assert.match(hook, /if \(!connection\) return false;/);
   assert.match(hook, /return copied === true;/);
 });
 
 void test('code token kinds and coding-tool languages use canonical closed values', async () => {
   const highlight = await readFile(
-    'lab/tools/desktop-preview/code-highlight.ts',
+    'apps/desktop/src/ui/code-highlight.ts',
     'utf8',
   );
   assert.match(highlight, /export const CODE_TOKEN = \{/);

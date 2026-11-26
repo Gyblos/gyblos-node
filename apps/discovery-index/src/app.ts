@@ -27,8 +27,18 @@ import {
 import { IndexError } from './errors';
 import { githubClaimRoutes } from './github-claim-routes';
 import { allowed } from './limits';
-import { modelsPage, parseModelsQuery } from './models';
+import { modelCatalogPage, modelsPage, parseModelsQuery } from './models';
 import { networkPage, parseNetworkQuery } from './network';
+import {
+  networkHistoryKey,
+  networkHistoryPage,
+  parseNetworkHistoryQuery,
+} from './network-history';
+import {
+  offerHistoryKey,
+  offerHistoryPage,
+  parseOfferHistoryQuery,
+} from './offer-history';
 import { profileRoutes } from './profile-routes';
 import { acceptRecord, type PublishContext } from './publish';
 import { publishModeOf } from './publishers';
@@ -207,6 +217,17 @@ function readRoutes(app: Hono<IndexEnv>, settings: IndexSettings) {
     }),
   );
   app.get(
+    INDEX_ROUTES.MODEL_CATALOG,
+    cachedRead(settings, async (context) => {
+      parseModelsQuery(context.req.url);
+      const url = new URL(context.req.url);
+      return {
+        key: `${url.origin}${INDEX_ROUTES.MODEL_CATALOG}`,
+        body: () => modelCatalogPage(context.get('storage'), settings.now()),
+      };
+    }),
+  );
+  app.get(
     INDEX_ROUTES.VERSIONS,
     cachedRead(settings, async (context) => {
       const url = new URL(context.req.url);
@@ -247,6 +268,36 @@ function readRoutes(app: Hono<IndexEnv>, settings: IndexSettings) {
             context.get('storage'),
             settings.registrations,
             { claims: settings.claims, profiles: settings.profiles },
+            settings.now(),
+            settings.maxResponseBytes,
+          ),
+      };
+    }),
+  );
+}
+
+function historyRoutes(app: Hono<IndexEnv>, settings: IndexSettings) {
+  app.get(
+    INDEX_ROUTES.NETWORK_HISTORY,
+    cachedRead(settings, async (context) => {
+      const days = parseNetworkHistoryQuery(context.req.url);
+      return {
+        key: networkHistoryKey(new URL(context.req.url).origin, days),
+        body: () =>
+          networkHistoryPage(context.get('storage'), days, settings.now()),
+      };
+    }),
+  );
+  app.get(
+    INDEX_ROUTES.OFFER_HISTORY,
+    cachedRead(settings, async (context) => {
+      const query = await parseOfferHistoryQuery(context.req.url);
+      return {
+        key: offerHistoryKey(new URL(context.req.url).origin, query),
+        body: () =>
+          offerHistoryPage(
+            context.get('storage'),
+            query,
             settings.now(),
             settings.maxResponseBytes,
           ),
@@ -299,6 +350,7 @@ export function createDiscoveryIndex(options: DiscoveryIndexOptions = {}) {
       registrationHandler(settings, registrations, registry),
     );
   readRoutes(app, settings);
+  historyRoutes(app, settings);
   githubClaimRoutes(app, settings);
   profileRoutes(app, settings);
   // Reports the publish mode only, never the allowlisted or registered NodeIds.

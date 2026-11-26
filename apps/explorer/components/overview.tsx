@@ -1,113 +1,70 @@
-import { Activity, MessagesSquare } from 'lucide-react';
-
-import { chainHistoryNote, summarizeChain } from '../lib/chain-shape';
-import { getChainStats } from '../lib/chain-stats';
-import { getCollector } from '../lib/collector';
-import { getDiscovery } from '../lib/discovery-render';
-import { count, percent, usdcDecimal } from '../lib/format';
-import { summarizeOffers } from '../lib/offers';
-import { rangeOf, type ExplorerQuery } from '../lib/paging';
-import { summarizeUsage } from '../lib/usage';
-import { Flow } from './board/animated-number';
-import { delta } from './board/delta';
-import { StatCard } from './board/stat-card';
-import { SellersOnline } from './network-section';
-import { UsdcIcon } from './token-logo';
+import { DISPLAY } from '../lib/constants';
+import { usdcDecimal } from '../lib/format';
+import { readHalfHours } from '../lib/intraday';
+import { rangeOf, statsBreakdownHref, type ExplorerQuery } from '../lib/paging';
+import { periodBars } from '../lib/period-bars';
+import { interval, readComparison } from './activity-report';
+import { OverviewChart } from './overview-chart';
 import { SectionTitle } from './ui';
 
 export async function Overview({ query }: { query: ExplorerQuery }) {
   const days = rangeOf(query, 'overview');
-  const [snapshot, usage, usageBefore, chain, chainBefore] = await Promise.all([
-    getDiscovery(),
-    getCollector(days),
-    getCollector(days, 1),
-    getChainStats(days),
-    getChainStats(days, 1),
+  const chartRange = query.ranges.chart ?? days;
+  const now = Date.now();
+  const [cards, chart] = await Promise.all([
+    readComparison(days, now),
+    readComparison(chartRange, now),
   ]);
-  const requests = usage.error ? null : summarizeUsage(usage);
-  const requestsBefore =
-    requests && !usageBefore.error ? summarizeUsage(usageBefore) : null;
-  const paid = chain.error ? null : summarizeChain(chain).totals.paidOut;
-  const paidBefore =
-    paid !== null && !chainBefore.error && chainBefore.backfillDone
-      ? summarizeChain(chainBefore).totals.paidOut
-      : null;
-  const offers = snapshot.error ? null : summarizeOffers(snapshot);
+  const { dates, source, activity, paid, chain } = chart.period;
+  const samples =
+    chartRange === 1 || chartRange === DISPLAY.weekWindow
+      ? await readHalfHours(dates)
+      : [];
   return (
-    <>
+    <section aria-label="Period activity">
       <SectionTitle
-        title={`Overview, last ${days} days`}
+        title="Period activity"
+        meta={
+          cards.period.dates.length ? interval(cards.period.dates) : 'All time'
+        }
         range={{ section: 'overview', days }}
       />
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {snapshot.error ? null : (
-          <SellersOnline snapshot={snapshot} variant="footer" />
+      <OverviewChart
+        points={periodBars(
+          activity.points.map((point, index) => {
+            const amount = paid.points[index];
+            return {
+              ...point,
+              paidOut: amount == null ? null : usdcDecimal(amount),
+            };
+          }),
+          chartRange,
+          samples,
         )}
-        <RequestsCard requests={requests} before={requestsBefore} />
-        <StatCard
-          variant="footer"
-          icon={UsdcIcon}
-          label="Paid to sellers"
-          value={
-            paid === null ? '—' : <Flow value={usdcDecimal(paid)} kind="usdc" />
-          }
-          deltas={
-            paid !== null && paidBefore !== null
-              ? [delta(paid, paidBefore)]
-              : undefined
-          }
-          money={!!paid}
-          caption={
-            paid !== null && chainHistoryNote(chain.backfillDone) ? (
-              <span className="inline-block first-letter:uppercase">
-                {chainHistoryNote(chain.backfillDone)}, partial total
-              </span>
-            ) : undefined
-          }
-        />
-        <StatCard
-          variant="footer"
-          icon={Activity}
-          label="Uptime 24 h"
-          value={
-            offers?.averageDayUptime == null
-              ? '—'
-              : percent(offers.averageDayUptime)
-          }
-          caption={
-            offers?.averageDayUptime == null || snapshot.error
-              ? undefined
-              : `Average of ${count(offers.sellersWithDayUptime)} ${offers.sellersWithDayUptime === 1 ? 'seller' : 'sellers'}`
-          }
-        />
-      </div>
-    </>
-  );
-}
+        metrics={cards.metrics}
+        chartMetrics={chart.metrics}
+        globalDays={days}
+        chartOverride={query.ranges.chart}
+        chartDates={interval(dates)}
+        links={{
+          tokens: statsBreakdownHref('tokens', chartRange),
+          requests: statsBreakdownHref('requests', chartRange),
+          paidOut: statsBreakdownHref('paidOut', chartRange),
+        }}
 
-function RequestsCard({
-  requests,
-  before,
-}: {
-  requests: ReturnType<typeof summarizeUsage> | null;
-  before: ReturnType<typeof summarizeUsage> | null;
-}) {
-  const side = (figure: 'free' | 'paid') =>
-    requests ? <Flow value={requests[figure].requests} kind="count" /> : '—';
-  return (
-    <StatCard
-      variant="footer"
-      icon={MessagesSquare}
-      label="Requests"
-      sides={{ free: side('free'), paid: side('paid') }}
-      deltas={
-        requests && before
-          ? [
-              delta(requests.free.requests, before.free.requests),
-              delta(requests.paid.requests, before.paid.requests),
-            ]
-          : undefined
-      }
-    />
+        receiptNote={
+          source
+            ? `Published receipts · ${activity.daysObserved} of ${dates.length} days with observations`
+            : 'Receipt data unavailable'
+        }
+        paymentNote={
+          chain.error
+            ? 'Chain data unavailable'
+            : paid.complete && dates.length
+              ? 'Indexed on-chain payouts'
+              : 'Partial chain history'
+        }
+      />
+    </section>
   );
 }

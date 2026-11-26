@@ -4,7 +4,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { parseChainStats, summarizeChain } from '@gyblos/explorer/chain-shape';
+import {
+  dailyPayouts,
+  dailySettled,
+  parseChainStats,
+  summarizeChain,
+} from '@gyblos/explorer/chain-shape';
 import {
   parseModel,
   parseNetworkDay,
@@ -64,10 +69,12 @@ void test('free and paid figures are never added up', () => {
   const snapshot: CollectorSnapshot = {
     aggregatedAt: 1,
     models: [],
+    buyerTotals: null,
     error: null,
     days: [
       {
         day: '2026-11-16',
+        coverage: 'final',
         free: { ...side(10_000, 9_900, 100, 50_000), authorizedAtomic: null },
         paid: { ...side(50, 30, 20, 400), authorizedAtomic: '1000' },
         observed: null,
@@ -186,6 +193,22 @@ void test('chain stats are checked at the boundary, summed exactly, and the fee 
     }),
     error: null,
   };
+  const beforeFloor = {
+    ...snapshot,
+    indexedAt: Date.parse('2026-11-18'),
+    historyFloorMs: Date.parse('2026-11-17'),
+  };
+  assert.deepEqual(
+    dailyPayouts(
+      snapshot.days.map((row) => row.day),
+      beforeFloor,
+    ).points,
+    [9600n, null, 0n],
+  );
+  assert.deepEqual(
+    dailySettled(beforeFloor).map((row) => row.settled),
+    [9007199254740993n, null, 7n],
+  );
   const summary = summarizeChain(snapshot);
   // Exact beyond 2^53, never a float.
   assert.equal(summary.totals.settled, 9007199254741000n);

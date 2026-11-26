@@ -29,10 +29,12 @@ import { pagedRows, Pager } from './pager';
 import { SellerCell } from './seller-cell';
 import {
   Addr,
+  EmptyRow,
   ModelName,
   moneyCell,
   MoreLink,
   numberCell,
+  prefixedColumn,
   SectionTitle,
   Table,
   td,
@@ -173,6 +175,7 @@ function VerifiedFilter({ query }: { query: ExplorerQuery }) {
     queryHref(query, { verified, pages: { sellers: 1, offline: 1 } });
   const option = (label: string, href: string, current: boolean) => (
     <Link
+      data-query-control=""
       href={href}
       scroll={false}
       aria-current={current ? 'true' : undefined}
@@ -194,9 +197,9 @@ function VerifiedFilter({ query }: { query: ExplorerQuery }) {
 }
 
 const SELLERS_HEAD = [
-  { label: 'Seller' },
-  { label: 'Status' },
-  { label: 'Model' },
+  prefixedColumn('Seller', 'seller'),
+  prefixedColumn('Status', 'online'),
+  prefixedColumn('Model', 'model'),
   { label: 'Context', right: true, sort: 'context' },
   { label: 'Input / 1M', right: true, sort: 'input' },
   { label: 'Output / 1M', right: true, sort: 'output' },
@@ -220,6 +223,8 @@ const sellerOffers = (sellers: Seller[]) =>
   );
 
 function OfferRow({
+  days,
+  closed,
   seller,
   model,
   cell,
@@ -227,6 +232,8 @@ function OfferRow({
   seller: Seller;
   model: Seller['models'][number];
   cell: ReactNode;
+  days: ExplorerQuery['days'];
+  closed?: boolean;
 }) {
   return (
     <tr className="border-t border-line">
@@ -234,13 +241,15 @@ function OfferRow({
         {cell}
       </td>
       <td className={td}>
-        <Chip tone="brand">
+        <Chip tone="online">
           <StatusDot />
           Online
         </Chip>
       </td>
       <td className={td}>
         <ModelName
+          days={days}
+          closed={closed}
           modelId={model.modelId}
           variant={model.variant}
           quantization={model.quantization}
@@ -297,14 +306,12 @@ function SellersTable({
         }
       >
         {empty ? (
-          <tr>
-            <td className={`${td} text-muted`} colSpan={SELLERS_HEAD.length}>
-              {empty}
-            </td>
-          </tr>
+          <EmptyRow columns={SELLERS_HEAD.length}>{empty}</EmptyRow>
         ) : null}
         {page.rows.map(({ seller, model }) => (
           <OfferRow
+            days={query.days}
+            closed={query.closed}
             key={`${seller.nodeId}:${model.modelId}:${model.variant}:${model.quantization}`}
             seller={seller}
             model={model}

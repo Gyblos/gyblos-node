@@ -3,3 +3,5 @@ Copied from the registry items at https://www.boardui.com/r/<name>.json on 2026-
 pagination, buttons, badges/chip, skeleton, tooltip, direction, dashboard/stat-cards, utils/cx,
 utils/directional-icon, styles/boardui.css and styles/typography.css.
 Unused exports were removed; tokens are mapped to the explorer's theme in styles/tokens.css.
+The period selector uses segmented-control from BoardUI CLI 0.5.9, installed on 2026-11-24.
+The Stats tabs and select menus use the public BoardUI tabs and select registry sources.

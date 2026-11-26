@@ -207,3 +207,40 @@ void test('desktop zero-authority release refuses paid permissions and mismatche
     }
   }
 });
+
+void test('live activity follows the first nonempty delta and terminal for its own turn', () => {
+  let clock = 10;
+  const chat = new ChatController('first', undefined, () => clock);
+  const model = {
+    id: 'local',
+    name: 'Local',
+    image: { src: 'local.svg' },
+    free: true,
+  };
+  const answer = () => chat.getSnapshot().sessions[0]?.messages.at(-1);
+  chat.startPaypal('Question', model, 'one', undefined, PAYMENT_METHOD.USDC);
+  assert.deepEqual(answer()?.activity, { started: 10 });
+  clock = 15;
+  chat.appendBuyer('first', 'one', '');
+  chat.appendBuyer('first', 'other', 'wrong');
+  assert.deepEqual(answer()?.activity, { started: 10 });
+  clock = 20;
+  chat.appendBuyer('first', 'one', 'Hello');
+  clock = 24;
+  chat.appendBuyer('first', 'one', ' world');
+  chat.stopBuyer('first', 'one');
+  clock = 99;
+  chat.failPaypal('first', 'one', 'late');
+  assert.deepEqual(answer()?.activity, { started: 10, first: 20, ended: 24 });
+  const archive = projectChatArchive(chat.getSnapshot());
+  assert.ok(archive);
+  assert.equal(archive.sessions[0]?.messages.at(-1)?.text, 'Hello world');
+  assert.ok(!JSON.stringify(archive).includes('activity'));
+  chat.startPaypal('Question', model, 'two');
+  chat.completePaypal('first', 'two', 'Answer', model);
+  assert.deepEqual(answer()?.activity, { started: 99, ended: 99 });
+  chat.startPaypal('Question', model, 'three');
+  clock = 101;
+  chat.failPaypal('first', 'three', 'Unavailable');
+  assert.deepEqual(answer()?.activity, { started: 99, ended: 101 });
+});

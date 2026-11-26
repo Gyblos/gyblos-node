@@ -4,7 +4,8 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import { HASH_SCROLL } from '../lib/constants';
-import { hashTarget } from '../lib/hash-target';
+import { pageScrollTarget } from '../lib/hash-target';
+import { useInPlaceDestination } from './query-region';
 
 const USER_INPUT = ['wheel', 'touchstart', 'keydown', 'pointerdown'] as const;
 
@@ -23,8 +24,13 @@ export function HashScroll() {
   const pathname = usePathname();
   const search = useSearchParams().toString();
   const hash = useHash();
+  const destination = useInPlaceDestination();
   useEffect(() => {
-    const id = hashTarget(window.location.hash);
+    const id = pageScrollTarget(
+      new URL(window.location.href),
+      destination?.current ?? null,
+    );
+    if (destination) destination.current = null;
     if (!id) return;
     const reach = () => document.getElementById(id)?.scrollIntoView();
     const observer = new MutationObserver(reach);
@@ -39,6 +45,6 @@ export function HashScroll() {
     observer.observe(document.body, { childList: true, subtree: true });
     reach();
     return stop;
-  }, [pathname, search, hash]);
+  }, [pathname, search, hash, destination]);
   return null;
 }

@@ -62,14 +62,14 @@ export function DeltaPill({
   return (
     <span
       className={cx(
-        'flex shrink-0 items-center gap-1 rounded-full py-0.5 pe-2 ps-1',
+        'flex shrink-0 items-center gap-1 rounded-full py-px pe-1.5 ps-1',
         pill,
       )}
     >
-      <Icon className={cx('size-4 shrink-0', className)} aria-hidden />
+      <Icon className={cx('size-3 shrink-0', className)} aria-hidden />
       <span
         className={cx(
-          'text-body-medium whitespace-nowrap tabular-nums',
+          'text-caption-1-medium whitespace-nowrap tabular-nums',
           className,
         )}
       >
@@ -92,7 +92,7 @@ export function StatHint({ label, hint }: { label: string; hint: string }) {
           type="button"
           aria-label={`About ${label}`}
           onClick={() => setOpen((isOpen) => !isOpen)}
-          className="flex shrink-0 cursor-pointer items-center justify-center rounded-full text-foreground-icon-secondary outline-none transition-colors duration-150 ease hover:text-foreground-icon-primary focus-visible:ring-2 focus-visible:ring-border-focus-ring"
+          className="flex size-11 shrink-0 cursor-pointer items-center sm:pointer-fine:size-auto justify-center rounded-full text-foreground-icon-secondary outline-none transition-colors duration-150 ease hover:text-foreground-icon-primary focus-visible:ring-2 focus-visible:ring-border-focus-ring"
         >
           <RiInformationFill className="size-5" aria-hidden />
         </button>

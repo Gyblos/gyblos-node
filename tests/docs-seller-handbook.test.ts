@@ -22,6 +22,7 @@ const JOURNEY = [
   'sellers/get-paid',
   'sellers/operate',
   'sellers/identity',
+  'sellers/model-verification',
   'buyers/desktop-app',
   'buyers/use-from-code',
   'reference/cli',
@@ -129,5 +130,19 @@ void test('docs handbook: English and Spanish preserve identical executable exam
       blocks(await page(slug, 'en')),
       slug,
     );
+  }
+});
+
+void test('docs handbook: seller and buyer pages never ask the reader to run a repository script', async () => {
+  for (const slug of JOURNEY.filter((entry) =>
+    /^(?:sellers|buyers)\//.test(entry),
+  )) {
+    for (const locale of ['en', 'es']) {
+      assert.doesNotMatch(
+        await page(slug, locale),
+        /(?:^|`|&&|\|\||;|\|)\s*\$?\s*pnpm\s/m,
+        `${locale}/${slug}`,
+      );
+    }
   }
 });

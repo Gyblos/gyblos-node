@@ -3,7 +3,11 @@ import { useEffect, useState } from 'react';
 
 import type { BuyerFunding } from '../funding/model';
 
-export function useBuyerFunding(payer?: string, offerId?: string) {
+export function useBuyerFunding(
+  payer?: string,
+  offerId?: string,
+  enabled = true,
+) {
   const [attempt, setAttempt] = useState(0);
   const [snapshot, setSnapshot] = useState<{
     payer?: string;
@@ -12,6 +16,7 @@ export function useBuyerFunding(payer?: string, offerId?: string) {
     funding: BuyerFunding | null;
   }>();
   useEffect(() => {
+    if (!enabled) return;
     let active = true;
     async function read() {
       let funding: BuyerFunding | null;
@@ -27,8 +32,9 @@ export function useBuyerFunding(payer?: string, offerId?: string) {
     return () => {
       active = false;
     };
-  }, [payer, offerId, attempt]);
+  }, [payer, offerId, attempt, enabled]);
   const current =
+    enabled &&
     snapshot &&
     snapshot.payer === payer &&
     snapshot.offerId === offerId &&

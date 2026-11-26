@@ -1,6 +1,6 @@
 # Architecture
 
-Gyblos Node is a pnpm workspace of small TypeScript packages, eight apps and a
+Gyblos Node is a pnpm workspace of small TypeScript packages, nine apps and a
 lab. This page explains how they fit together: which package owns what, the
 dependency rule, how a request flows between a buyer and a seller, and where
 local data lives.
@@ -24,7 +24,7 @@ layer of each package comes from `tooling/boundaries/config.ts`.
 | ---------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `packages/protocol`          | protocol   | Wire contracts: canonical JSON, signing domains, Iroh ALPNs, error codes, the model catalog, golden vectors. Ports: `Engine`, `PaymentClient`, `PaymentServer`, `ExecutionPolicy`, telemetry. No SDKs.         |
 | `packages/core`              | core       | Pure policy: pricing and metering, offer trust (`offers`), free admission, control admission and quotes, seller selection (`seller-selection*`), public receipt policy, shared engine HTTP helpers. No SDKs.   |
-| `packages/config`            | config     | Operator values: devnet addresses, ports, limits, relay, discovery index and collector URLs, `GYBLOS_*` variable names, and the local home layout (`home.ts`).                                                 |
+| `packages/config`            | config     | Operator values: devnet addresses, ports, limits, relay, discovery index and collector URLs, `GYBLOS_*` variable names, and the local home layout (`home*.ts`).                                                |
 | `packages/runtime`           | runtime    | Platform helpers: atomic JSON writes, private rotating logs, processes, memory probes, the loopback `Host` guard, rate-limit IP keys (`ip-key`), the diagnostic envelope.                                      |
 | `packages/inference`         | inference  | The SDK-free execution lifecycle and conversation pipeline over protocol ports. Node supplies engines, economic policy and observation.                                                                        |
 | `packages/engine-ollama`     | adapter    | Ollama client as an `Engine`, with the pinned tokenizer and model constants.                                                                                                                                   |
@@ -40,6 +40,7 @@ layer of each package comes from `tooling/boundaries/config.ts`.
 | `packages/telemetry-otel`    | adapter    | Bounded aggregate metrics through an injected OpenTelemetry exporter. Not composed by the node ([telemetry.md](telemetry.md#opentelemetry-adapter)).                                                           |
 | `packages/telemetry-console` | adapter    | Content-free telemetry through an injected write callback.                                                                                                                                                     |
 | `packages/node`              | node       | The local-node library for both roles. It composes adapters into the seller (offers, free and paid channels, sessions, control, receipts, registration) and the buyer runtime, and owns `config.toml` parsing. |
+| `packages/buyer`             | buyer      | Buyer orchestration over node: selection, discovery, routing, payment sessions, the buyer endpoint and buyer API keys. Imports no app.                                                                         |
 
 The local `@x402/svm` patch that `x402-upto-metered` relies on is described next
 to its entry in `pnpm-workspace.yaml`.
@@ -51,13 +52,18 @@ Apps are independent executables. They never import each other.
 | App                      | Run with                                           | Responsibility                                                                                                                                                                                                                                                                                                                                                                                                                |
 | ------------------------ | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `apps/node`              | `pnpm gyblos <command>`, `pnpm node:start`         | The seller daemon and the `gyblos` CLI (`start`, `doctor`, `logs`, `config validate`, `seller init/status/register/service`). Installs a systemd, launchd or Windows service.                                                                                                                                                                                                                                                 |
-| `apps/buyer`             | `pnpm buyer`, `pnpm buyer:chat`, `pnpm buyer:init` | The local buyer and its buyer endpoint: seller selection, offer race, free and paid calls, payment sessions, reconciliation and withdrawal ([buyer-init.md](buyer-init.md)).                                                                                                                                                                                                                                                  |
+| `apps/buyer`             | `pnpm buyer`, `pnpm buyer:chat`, `pnpm buyer:init` | The buyer executable over `packages/buyer`, which owns the buyer endpoint: seller selection, offer race, free and paid calls, payment sessions, reconciliation and withdrawal ([buyer-init.md](buyer-init.md)).                                                                                                                                                                                                               |
 | `apps/desktop`           | `pnpm desktop:start`, `pnpm desktop:package`       | The desktop app (Electron): Chat, wallet, buyer API keys, activity and payments over a separately bundled local buyer ([desktop.md](desktop.md)).                                                                                                                                                                                                                                                                             |
 | `apps/discovery-index`   | Cloudflare Worker                                  | The discovery index at `discovery.gyblos.com` (Hono, D1). Verifies records only through protocol ([discovery-index.md](discovery-index.md)).                                                                                                                                                                                                                                                                                  |
 | `apps/metrics-collector` | Cloudflare Worker                                  | The metrics collector at `collector.gyblos.com` (Hono, D1): receives signed receipts and observations, builds aggregates and serves public stats ([metrics-collector.md](metrics-collector.md)).                                                                                                                                                                                                                              |
 | `apps/receipt-collector` | `pnpm --filter @gyblos/receipt-collector start`    | The local receipt receiver: a private loopback receiver for testing, with bounded retention ([receipts.md](receipts.md)).                                                                                                                                                                                                                                                                                                     |
+| `apps/model-verifier`    | `pnpm model-verifier verify`                       | Checks that a seller's free offer serves the model it declares, as an external buyer, and signs a `pass`, `fail` or `inconclusive` result ([model-verifier.md](model-verifier.md)).                                                                                                                                                                                                                                           |
 | `apps/docs`              | `pnpm docs:dev`, `pnpm docs:build`                 | The public docs site at `docs.gyblos.com`: a Fumadocs static export in English and Spanish ([README](../apps/docs/README.md)).                                                                                                                                                                                                                                                                                                |
 | `apps/explorer`          | `pnpm explorer:dev`                                | The public metrics explorer at explorer.gyblos.com: a server-rendered Next.js app on Cloudflare Workers that reads the metrics collector's stats API (on-chain settlements included) and the discovery index through a scheduled run every 2 minutes into a KV snapshot. Pages: `/` (Network), `/sellers`, `/models`, `/transactions`, `/stats` and `/sellers/<NodeId>`; old `/` links to a moved table redirect to its page. |
+
+The Explorer’s model and seller detail pages also read advertised price history
+directly from the discovery index through `GET /v1/offers/history`. These live
+reads are separate from the scheduled discovery snapshot.
 
 Deploying a Worker or publishing a site is a maintainer action; see
 [public-decisions.md](public-decisions.md).
@@ -104,7 +110,7 @@ generated code behind it.
 
 ```text
 buyer machine                                  seller machine
-apps/buyer (buyer endpoint, loopback) ── Iroh ──▶ apps/node → packages/node seller
+packages/buyer (endpoint, loopback)   ── Iroh ──▶ apps/node → packages/node seller
   or apps/desktop (bundled local buyer)  direct     ├─ control, free, paid and session channels (Iroh ALPNs)
                                          or relay   └─ the seller's own engine: Ollama, an OpenAI-compatible
                                                        server or the Anthropic API (from config.toml)
@@ -179,17 +185,18 @@ by weighted sampling:
 - A pinned seller skips sampling, never the filters. A pinned seller in cooldown
   is refused with its cooldown end.
 
-The buyer app composes it: `apps/buyer/src/selection*.ts` builds the inputs and
-persists stats, and `offer-race.ts` asks the candidates for live offers. The
-operator view is in [payment-sessions.md](payment-sessions.md#buyer-routing).
+The buyer package composes it: `packages/buyer/src/selection*.ts` builds the
+inputs and persists stats, and `offer-race.ts` asks the candidates for live
+offers. The operator view is in
+[payment-sessions.md](payment-sessions.md#buyer-routing).
 
 ## Reusable payment session composition
 
 A reusable payment session is one capped, buyer-authorized deposit that pays for
 many requests through post-usage cumulative signatures, with autonomous seller
 finalization. The seller composes it at startup when paid selling is configured
-(`packages/node/src/seller.ts`); the buyer app activates its session manager
-from explicit buyer policy (`apps/buyer/src/session-startup.ts`).
+(`packages/node/src/seller.ts`); the buyer package activates its session manager
+from explicit buyer policy (`packages/buyer/src/session-startup.ts`).
 
 | Concern                        | Owner                                                                  |
 | ------------------------------ | ---------------------------------------------------------------------- |
@@ -231,8 +238,30 @@ name and its validation rule; the discovery index stores and lists it.
 
 ## Local data
 
-`packages/config/src/home.ts` owns every local path as a pure function of the
-environment. No other module builds `.local/...` paths.
+The `packages/config/src/home*.ts` files own every local path as pure functions
+of the environment or of a directory their caller passes. No other module builds
+`.local/...` paths. `home.ts` holds the homes, the role directories and their
+file names and the lab home; the other files hold one area each:
+
+- `home-payments.ts`: receipts stay in the private per-role receipt directory.
+  The seller's durable upto payment ledger and the buyer's journal of the
+  channels it authorized stay in the private per-role payments directory. Each
+  role has one bounded reusable channel journal with no prompts, answers or
+  signing keys. The buyer keeps a buyer-wide budget catalog with a deterministic
+  private slot per seller, and its legacy root files stay in place. The seller
+  keeps a bounded financial directory, and its legacy journals remain at their
+  original private path.
+- `home-desktop.ts`: the wallet library is isolated from the node role homes and
+  names identities by public base58 address. Desktop activity is private,
+  descriptive history, separate from payment journals. Conversations live in the
+  persistent desktop profile, outside disposable Chromium sessions. The chat
+  payment permission file holds confirmed payment references, never wallet keys.
+  The desktop and its managed buyer arbitrate one outstanding chat under a
+  private process lock in the buyer's payments directory.
+- `home-paypal.ts`: the PayPal sandbox uses an explicit, isolated directory and
+  never shares a journal with the chain payment adapter.
+- `home-model-verifier.ts`: the model verifier's key and results, under
+  `model-verifier/` in the product home.
 
 ```text
 $GYBLOS_HOME (default .local/gyblos from a checkout, ~/.gyblos for the packaged

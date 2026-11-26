@@ -1,6 +1,7 @@
 // Owns the public stats use case: turns aggregate rows from the read port into the typed answers of
 // GET /v1/stats/network, /v1/stats/models and /v1/stats/sellers/:nodeId (docs/metrics-collector.md).
 // Aggregates only: never a receipt, a buyer identity or a raw observation.
+import { FIRST_SEEN_KINDS, type FirstSeenKind } from './constants';
 import { daysOf, type DayRange } from './days';
 import {
   failureEntry,
@@ -8,6 +9,7 @@ import {
   type FailureEntry,
   type OriginEntry,
 } from './stats-breakdowns';
+import { dayCoverage, type DayCoverage } from './stats-coverage';
 import {
   bySide,
   latency,
@@ -46,6 +48,9 @@ type NetworkSide = {
 } & PublicBuyers;
 export interface NetworkDay extends Sides<NetworkSide, NetworkSide> {
   day: string;
+  coverage: DayCoverage;
+  demandModels: number;
+  demandTotal: number;
   observed: {
     buyerLatency: { firstToken: Latency; total: Latency };
     routes: { direct: number; relay: number; unknown: number };
@@ -65,8 +70,14 @@ export interface ModelEntry<F = object, P = object> extends Sides<F, P> {
   variant: string | null;
   quantization: string | null;
 }
+export interface BuyerTotals {
+  allTime: PublicBuyers;
+  newInRange: PublicBuyers;
+}
 export interface NetworkStats extends StatsEnvelope {
+  completeThrough: string | null;
   days: NetworkDay[];
+  buyerTotals: { free: BuyerTotals; paid: BuyerTotals };
 }
 // What buyers saw and how fast the engine generated, on one side of one model; null without any
 // observation joined to a receipt of that side.
@@ -145,18 +156,36 @@ export function groupBy<T>(rows: readonly T[], key: (row: T) => string) {
 export async function networkStats(
   reader: StatsReader,
   range: DayRange,
+  today: string,
 ): Promise<NetworkStats> {
-  const { network, observed, demand, origins, failures } =
-    await reader.network(range);
+  const {
+    coverage,
+    network,
+    observed,
+    demand,
+    origins,
+    failures,
+    buyerTotals,
+  } = await reader.network(range, today);
+  const covered = dayCoverage(coverage, range, today);
+  const buyersByKind = new Map(buyerTotals.map((row) => [row.kind, row]));
+  const totalsOf = (kind: FirstSeenKind): BuyerTotals => {
+    const row = buyersByKind.get(kind);
+    return {
+      allTime: publicBuyers(row?.allTime),
+      newInRange: publicBuyers(row?.newInRange),
+    };
+  };
   const originsByDay = groupBy(origins, (row) => row.day);
   const failuresByDay = groupBy(failures, (row) => row.day);
   const networkByDay = groupBy(network, (row) => row.day);
   const observedByDay = new Map(observed.map((row) => [row.day, row]));
   const demandByDay = groupBy(demand, (row) => row.day);
-  const days = daysOf(range).map((day): NetworkDay => {
+  const days = covered.days.map(({ day, ...extra }): NetworkDay => {
     const seen = observedByDay.get(day);
     return {
       day,
+      ...extra,
       ...bySide(networkByDay.get(day) ?? [], (row) => ({
         conflicts: row.conflicts,
         activeSellers: row.activeSellers,
@@ -195,7 +224,12 @@ export async function networkStats(
       ...origins.map(fromRow),
       ...failures.map(fromRow),
     ]),
+    completeThrough: covered.completeThrough,
     days,
+    buyerTotals: {
+      free: totalsOf(FIRST_SEEN_KINDS.BUYER_FREE),
+      paid: totalsOf(FIRST_SEEN_KINDS.BUYER_PAID),
+    },
   };
 }
 

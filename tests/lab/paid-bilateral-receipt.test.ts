@@ -4,7 +4,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { test } from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
 
-import { chatSession } from '@gyblos/buyer/chat-cli';
+import { chatSession } from '@gyblos/buyer-app/chat-cli';
 import { FILE_MODES, PROTOCOL_FEE, receiptPathsIn } from '@gyblos/config';
 import { listReceipts } from '@gyblos/node/receipts';
 import { loadRole } from '@gyblos/node/roles';

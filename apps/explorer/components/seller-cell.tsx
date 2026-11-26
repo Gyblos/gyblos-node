@@ -24,7 +24,7 @@ export function SellerCell({
 }) {
   const label = github ? `@${github.account}` : short(nodeId);
   return (
-    <div className="flex items-center gap-2">
+    <div className="seller-cell flex items-center gap-2">
       {href ? (
         <Link href={href} aria-hidden="true" tabIndex={-1} className="shrink-0">
           <Identicon nodeId={nodeId} />
@@ -36,7 +36,8 @@ export function SellerCell({
         <div className="flex items-center gap-1 font-mono">
           {href ? (
             <Link
-              className="text-ink underline-offset-2 hover:underline"
+              className="text-ink underline decoration-line underline-offset-2 hover:decoration-current"
+              title={nodeId}
               href={href}
             >
               {label}

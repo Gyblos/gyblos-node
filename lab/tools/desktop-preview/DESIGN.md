@@ -1,7 +1,6 @@
 # Desktop mockup design system
 
-Rules for the isolated web mockup in `lab/tools/desktop-preview`. They apply only to
-this preview until the founder approves porting a proposal to `apps/desktop`
+Rules for the isolated web mockup in `lab/tools/desktop-preview`. Approved styles and assets are shared with `apps/desktop`
 (see `apps/desktop/DESIGN.md` for the shipped renderer rules and approval gates).
 
 ## Sources
@@ -63,7 +62,8 @@ its transcript, draft and archive entry, and keep payment journals and receipts.
 
 | Need                              | Use                                                                                                                                                                                                | Not                                                    |
 | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| Button, icon-only button          | `Button`, `IconButton` (`./UI`)                                                                                                                                                                    | raw `<button>` with its own styles                     |
+| Button, icon-only button          | `Button`, `IconButton` (`./UI`); collapsible header action `ActionButton` (`./ActionButton`)                                                                                                       | raw `<button>` with its own styles                     |
+| Chat model menu balance           | `ModelMenuBalance` with a payer-scoped observation and Add funds action                                                                                                                            | custom wallet rows in pickers                          |
 | Pick one value from a list        | `Dropdown` + `MenuItem role="menuitemradio"`                                                                                                                                                       | native `<select>`                                      |
 | Pick among 2-5 visible options    | `FilterChips` (counts) or `ChoiceCard` (`./UI`)                                                                                                                                                    | ad-hoc pill rows                                       |
 | Turn a global setting on or off   | `Switch` in a settings row                                                                                                                                                                         | checkbox or custom toggle                              |
@@ -180,7 +180,7 @@ previous density for comparison.
 Instrument Sans for the interface and JetBrains Mono (bundled as `GeistMono`) for
 technical values. The preview loads no remote fonts (its CSP blocks network access).
 Interface / supporting text 14 / 12 px; tables 13 px with 12 px headers.
-`?font=inter` (Settings → Interface font) switches to Inter 4.1, bundled in `fonts/` under the OFL, for comparison only.
+`?font=inter` (Settings → Interface font) switches to Inter 4.1, bundled in `apps/desktop/public/assets/` under the OFL, for comparison only.
 
 ## Interaction
 

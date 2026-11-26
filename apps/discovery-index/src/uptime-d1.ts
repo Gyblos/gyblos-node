@@ -13,7 +13,13 @@ import {
   singleRow,
   valueField,
 } from './sqlite-expressions';
-import { hourOf, retainedHour, slotBit, type UptimeStorage } from './uptime';
+import {
+  hourOf,
+  retainedHour,
+  slotBit,
+  type NetworkHistoryStorage,
+  type UptimeStorage,
+} from './uptime';
 
 // Storage rows are our own, but a corrupted row fails closed (503) instead of being trusted.
 export function integer(value: unknown): number {
@@ -82,7 +88,9 @@ function seenQueries(
   return [first, slot] as const;
 }
 
-export function createD1Uptime(database: DiscoveryDatabase): UptimeStorage {
+export function createD1Uptime(
+  database: DiscoveryDatabase,
+): Omit<UptimeStorage, keyof NetworkHistoryStorage> {
   return {
     async markSeen(nodeId, now, maxNodes = DISCOVERY_INDEX_LIMITS.maxNodes) {
       const [first, slot] = seenQueries(database, nodeId, now, maxNodes);

@@ -3,7 +3,7 @@ import { test } from 'node:test';
 
 import { startFreeBuyerHttp } from '@gyblos/buyer/free-http';
 import { checkDesktopPool } from '@gyblos/buyer/session-requirements';
-import { batchPoolPathsIn } from '@gyblos/config/home';
+import { batchPoolPathsIn } from '@gyblos/config/home-payments';
 import { DEVNET, DEVNET_USDC } from '@gyblos/config/network';
 import { X402Budget } from '@gyblos/desktop/x402-budget';
 import { X402Client } from '@gyblos/desktop/x402-client';

@@ -8,21 +8,27 @@
     "./board-delta": "./components/board/delta.ts",
     "./board-hovered": "./components/board/hovered.ts",
     "./chain-shape": "./lib/chain-shape.ts",
+    "./chain-txs": "./lib/chain-txs.ts",
     "./chain-txs-shape": "./lib/chain-txs-shape.ts",
+    "./collector": "./lib/collector.ts",
     "./collector-shape": "./lib/collector-shape.ts",
     "./config": "./lib/config.ts",
     "./constants": "./lib/constants.ts",
     "./discovery": "./lib/discovery.ts",
     "./discovery-shape": "./lib/discovery-shape.ts",
     "./discovery-snapshot": "./lib/discovery-snapshot.ts",
+    "./entity-search": "./lib/entity-search.ts",
     "./fetch-json": "./lib/fetch-json.ts",
     "./format": "./lib/format.ts",
     "./hash-target": "./lib/hash-target.ts",
     "./latency": "./lib/latency.ts",
-    "./model-family": "./lib/model-family.ts",
+    "./layout": "./lib/layout.ts",
     "./model-table": "./lib/model-table.ts",
     "./network-status": "./lib/network-status.ts",
+    "./offer-price-history": "./lib/offer-price-history.ts",
     "./offers": "./lib/offers.ts",
+    "./overview-activity": "./lib/overview-activity.ts",
+    "./period-bars": "./lib/period-bars.ts",
     "./paging": "./lib/paging.ts",
     "./range": "./lib/range.ts",
     "./seller-identity": "./lib/seller-identity.ts",
@@ -38,6 +44,8 @@
     "start": "next start --port 4190"
   },
   "dependencies": {
+    "@gyblos/config": "workspace:*",
+    "@gyblos/protocol": "workspace:*",
     "@number-flow/react": "0.6.2",
     "@remixicon/react": "4.9.0",
     "lucide-react": "1.68.0",
@@ -57,6 +65,6 @@
     "@types/react-dom": "19.3.0",
     "postcss": "8.5.33",
     "tailwindcss": "4.3.5",
-    "typescript": "5.9.3"
+    "typescript": "6.0.3"
   }
 }

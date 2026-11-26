@@ -1,70 +1,238 @@
-// Shows local readiness in a sidebar dialog; never starts payments or changes wallet custody.
-import { useState, type ComponentProps } from 'react';
+import {
+  CheckCircle,
+  Info,
+  Warning,
+  WarningCircle,
+} from '@phosphor-icons/react';
+import { useState } from 'react';
 
-import { LOCAL_NODE_STATE } from '../node-status';
+import { LOCAL_NODE_STATE, type LocalNodeState } from '../node-status';
+import type { DesktopUpdate } from '../update-check';
 import { WALLET_STATUS } from '../wallet/model';
-import { SIDEBAR_ACTION } from './constants';
+import { LOCAL_NODE_LABELS } from './constants';
 import { Modal } from './Modal';
+import { MotionPresence } from './Motion';
 import { NetworkStatus } from './NetworkStatus';
-import { SidebarActionIcon } from './SidebarActionIcon';
+import { TONE, type Tone } from './status-tone';
 import { Button } from './UI';
 import { useDesktopWallet } from './WalletState';
 
-type Props = ComponentProps<typeof NetworkStatus> & { onPayments(): void };
-export function SystemStatus({ state, onRetry, onPayments }: Props) {
+type StatusCheck = {
+  label: string;
+  value: string;
+  tone: Tone;
+  summary?: string;
+  action?: { label: string; run(): void };
+};
+const ISSUE: readonly Tone[] = [TONE.WARNING, TONE.DANGER];
+const GLYPH = {
+  [TONE.SUCCESS]: CheckCircle,
+  [TONE.WARNING]: Warning,
+  [TONE.DANGER]: WarningCircle,
+  [TONE.INFO]: Info,
+  [TONE.NEUTRAL]: Info,
+};
+
+function nodeTone(state: LocalNodeState): Tone {
+  if (state === LOCAL_NODE_STATE.READY) return TONE.SUCCESS;
+  if (state === LOCAL_NODE_STATE.ERROR || state === LOCAL_NODE_STATE.STOPPED)
+    return TONE.DANGER;
+  return TONE.INFO;
+}
+
+export function SystemStatus({
+  state,
+  onRetry,
+  onPayments,
+  update,
+  onUpdate,
+}: {
+  state: LocalNodeState;
+  onRetry(): void;
+  onPayments(): void;
+  update: DesktopUpdate | null;
+  onUpdate(): void;
+}) {
   const [open, setOpen] = useState(false);
   const wallet = useDesktopWallet();
-  const attention =
-    state !== LOCAL_NODE_STATE.READY ||
-    wallet.status === WALLET_STATUS.UNAVAILABLE ||
-    wallet.status === WALLET_STATUS.RECOVERY_REQUIRED ||
-    (wallet.status === WALLET_STATUS.READY && !wallet.backupVerified);
+
+  const manage = {
+    label: 'Manage',
+    run: () => {
+      setOpen(false);
+      onPayments();
+    },
+  };
+  const { checks, tone, summary } = summarizeStatus(wallet, state, manage);
+  const versionCheck = updateCheck(update, () => {
+    setOpen(false);
+    onUpdate();
+  });
   return (
     <>
       <Button
-        className="ui-nav-row ui-system-status ui-sidebar-motion-control"
-        aria-label="System status"
+        className="preview-status-trigger"
+        data-tone={tone}
+        aria-label={'System status: ' + summary}
         aria-haspopup="dialog"
         onClick={() => setOpen(true)}
       >
-        <SidebarActionIcon kind={SIDEBAR_ACTION.STATUS} />
-        <span>System status</span>
-        <span
-          className="ui-attention-dot"
-          data-attention={attention}
-          aria-hidden="true"
-        />
+        <span className="pk-dot" aria-hidden="true" />
+        <span>{summary}</span>
       </Button>
-      {open && (
-        <Modal title="System status" close={() => setOpen(false)}>
-          <div className="ui-section">
-            <section className="ui-status-item">
-              <h3>Local node</h3>
-              <NetworkStatus state={state} onRetry={onRetry} />
-            </section>
-            <section className="ui-status-item">
-              <h3>Wallet</h3>
+      <MotionPresence>
+        {open && (
+          <Modal title="System status" close={() => setOpen(false)}>
+            <div className="ui-section">
+              <section className="ui-status-item">
+                <h3>Local node</h3>
+                <NetworkStatus state={state} onRetry={onRetry} />
+              </section>
+              <ul className="preview-status-list" aria-label="Checks">
+                <StatusRows
+                  checks={[
+                    ...checks.slice(0, -1),
+                    versionCheck,
+                    ...checks.slice(-1),
+                  ]}
+                />
+              </ul>
               <p className="ui-help-text">
-                {wallet.status === WALLET_STATUS.READY
-                  ? wallet.backupVerified
-                    ? 'Protected wallet ready.'
-                    : 'Recovery backup needed.'
-                  : wallet.status === WALLET_STATUS.LOCKED
-                    ? 'Wallet locked. Free chat is available without unlocking it.'
-                    : 'Protected wallet unavailable.'}
+                Sellers are checked when you send a message.
               </p>
-              <Button
-                onClick={() => {
-                  setOpen(false);
-                  onPayments();
-                }}
-              >
-                Manage wallet
-              </Button>
-            </section>
-          </div>
-        </Modal>
-      )}
+            </div>
+          </Modal>
+        )}
+      </MotionPresence>
+    </>
+  );
+}
+
+function walletChecks(
+  wallet: ReturnType<typeof useDesktopWallet>,
+  manage: NonNullable<StatusCheck['action']>,
+) {
+  const checks: StatusCheck[] = [
+    wallet.status === WALLET_STATUS.READY
+      ? { label: 'Wallet', value: 'Ready', tone: TONE.SUCCESS }
+      : wallet.status === WALLET_STATUS.LOCKED
+        ? {
+            label: 'Wallet',
+            value: 'Locked · free chat still works',
+            tone: TONE.NEUTRAL,
+            action: manage,
+          }
+        : wallet.status === WALLET_STATUS.LOADING
+          ? { label: 'Wallet', value: 'Loading', tone: TONE.INFO }
+          : wallet.status === WALLET_STATUS.RECOVERY_REQUIRED
+            ? {
+                label: 'Wallet',
+                value: 'Recovery required',
+                tone: TONE.DANGER,
+                summary: 'Wallet recovery required',
+                action: manage,
+              }
+            : {
+                label: 'Wallet',
+                value: 'Unavailable',
+                tone: TONE.DANGER,
+                summary: 'Wallet unavailable',
+                action: manage,
+              },
+  ];
+  if (wallet.status === WALLET_STATUS.READY)
+    checks.push(
+      wallet.backupVerified
+        ? { label: 'Recovery backup', value: 'Verified', tone: TONE.SUCCESS }
+        : {
+            label: 'Recovery backup',
+            value: 'Not verified yet',
+            tone: TONE.WARNING,
+            summary: 'Backup needed',
+            action: { ...manage, label: 'Back up' },
+          },
+    );
+  checks.push({
+    label: 'Payment network',
+    value: 'Testnet · test funds only',
+    tone: TONE.INFO,
+  });
+  return checks;
+}
+function summarizeStatus(
+  wallet: ReturnType<typeof useDesktopWallet>,
+  state: LocalNodeState,
+  manage: NonNullable<StatusCheck['action']>,
+) {
+  const checks = walletChecks(wallet, manage);
+  const nodeIssue = nodeTone(state) === TONE.DANGER;
+  const issues = [
+    ...(nodeIssue
+      ? [{ tone: TONE.DANGER, summary: LOCAL_NODE_LABELS[state] }]
+      : []),
+    ...checks.filter((check) => ISSUE.includes(check.tone)),
+  ];
+  const tone = issues.some((issue) => issue.tone === TONE.DANGER)
+    ? TONE.DANGER
+    : issues.length
+      ? TONE.WARNING
+      : state === LOCAL_NODE_STATE.READY &&
+          wallet.status !== WALLET_STATUS.LOADING
+        ? TONE.SUCCESS
+        : TONE.INFO;
+  const summary =
+    issues.length > 1
+      ? issues.length + ' items need attention'
+      : (issues[0]?.summary ??
+        (state !== LOCAL_NODE_STATE.READY
+          ? LOCAL_NODE_LABELS[state]
+          : wallet.status === WALLET_STATUS.LOADING
+            ? 'Loading wallet'
+            : 'All systems ready'));
+  return { checks, tone, summary };
+}
+
+function updateCheck(
+  update: DesktopUpdate | null,
+  open: () => void,
+): StatusCheck {
+  return {
+    label: 'Desktop app',
+    value: update?.available
+      ? 'Gyblos ' + update.available + ' is available'
+      : 'Installed version ' + (update?.current ?? 'unavailable'),
+    tone: update?.available ? TONE.INFO : TONE.NEUTRAL,
+    ...(update?.available && {
+      action: {
+        label: 'View update',
+        run: open,
+      },
+    }),
+  };
+}
+
+function StatusRows({ checks }: { checks: StatusCheck[] }) {
+  return (
+    <>
+      {checks.map((check) => {
+        const Glyph = GLYPH[check.tone];
+        return (
+          <li
+            key={check.label}
+            className="preview-status-row"
+            data-tone={check.tone}
+          >
+            <Glyph size={18} weight="fill" aria-hidden="true" />
+            <span className="preview-status-copy">
+              <strong>{check.label}</strong>
+              <small>{check.value}</small>
+            </span>
+            {check.action && (
+              <Button onClick={check.action.run}>{check.action.label}</Button>
+            )}
+          </li>
+        );
+      })}
     </>
   );
 }

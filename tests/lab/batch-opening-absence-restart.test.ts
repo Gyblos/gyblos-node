@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { syncBuiltinESMExports } from 'node:module';
 import test from 'node:test';
 
-import { batchPoolChannelPaths } from '@gyblos/config/home';
+import { batchPoolChannelPaths } from '@gyblos/config/home-payments';
 import {
   openBatchBuyerPool,
   recoverBatchBuyer,

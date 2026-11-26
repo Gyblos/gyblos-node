@@ -83,16 +83,24 @@ function hash(value: string): number {
   return state;
 }
 
-export function identicon(nodeId: string): boolean[][] {
+const FACE = {
+  fold: 16,
+  paletteMask: 3,
+  mouthShift: 2,
+  mouthMask: 3,
+  wink: 16,
+  antenna: 32,
+} as const;
+
+export function sellerFace(nodeId: string) {
   const bits = hash(nodeId);
-  const half = Math.ceil(IDENTITY.gridSize / 2);
-  return Array.from({ length: IDENTITY.gridSize }, (_, row) => {
-    const left = Array.from(
-      { length: half },
-      (_, column) => ((bits >>> (row * half + column)) & 1) === 1,
-    );
-    return [...left, ...left.slice(0, IDENTITY.gridSize - half).reverse()];
-  });
+  const seed = bits ^ (bits >>> FACE.fold);
+  return {
+    color: seed & FACE.paletteMask,
+    mouth: (seed >>> FACE.mouthShift) & FACE.mouthMask,
+    wink: Boolean(seed & FACE.wink),
+    antenna: Boolean(seed & FACE.antenna),
+  };
 }
 
 export const SELLERS_EMPTY = {

@@ -2,7 +2,6 @@
 // Execution, clipboard state and session transitions remain with the caller.
 import { ArrowClockwise, Check, Copy, Info } from '@phosphor-icons/react';
 
-import { PAYMENT_METHOD } from '../paypal-model';
 import {
   CHAT_PHASE,
   MESSAGE_STATE,
@@ -13,13 +12,8 @@ import { AssistantProgress } from './ChatMessageParts';
 import { MessageText } from './MessageText';
 import { SIGNAL_STATE } from './Signal';
 import { SignalFace } from './SignalFace';
+import { TurnActivity } from './TurnActivity';
 import { IconButton } from './UI';
-
-const PHASE_LABEL = {
-  [CHAT_PHASE.CONNECTING]: 'Thinking…',
-  [CHAT_PHASE.TOOLS]: 'Using tools…',
-  [CHAT_PHASE.RESPONDING]: 'Writing…',
-} as const;
 
 type Props = {
   message: ChatMessage;
@@ -84,8 +78,21 @@ function AnswerActions({
 export function ChatAnswer(props: Props) {
   const { message, run } = props;
   return (
-    <article className="chat-answer" aria-label="Assistant">
-      {message.state === MESSAGE_STATE.PENDING && (
+    <article
+      className="chat-answer"
+      aria-label="Assistant"
+      data-streaming={
+        (message.state === MESSAGE_STATE.PENDING && !!message.text) || undefined
+      }
+    >
+      {message.activity && (
+        <TurnActivity
+          timing={message.activity}
+          state={message.state}
+          hasText={!!message.text}
+        />
+      )}
+      {!message.activity && message.state === MESSAGE_STATE.PENDING && (
         <AssistantProgress
           mark={
             <SignalFace
@@ -99,15 +106,13 @@ export function ChatAnswer(props: Props) {
             />
           }
         >
-          <span>
-            {message.paymentMethod === PAYMENT_METHOD.PAYPAL
-              ? 'Generating response…'
-              : run
-                ? PHASE_LABEL[run.phase]
-                : message.text
-                  ? 'Writing…'
-                  : 'Preparing response'}
-          </span>
+          {run?.phase === CHAT_PHASE.TOOLS
+            ? 'Using tools…'
+            : run?.phase === CHAT_PHASE.CONNECTING
+              ? 'Connecting…'
+              : message.text || run?.phase === CHAT_PHASE.RESPONDING
+                ? 'Writing…'
+                : 'Preparing response'}
         </AssistantProgress>
       )}
       {message.text ? (

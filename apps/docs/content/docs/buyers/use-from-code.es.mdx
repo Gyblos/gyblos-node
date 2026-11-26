@@ -13,17 +13,23 @@ prompt. No envíes contraseñas, llaves ni otros secretos. Consulta
 
 ## Selección automática de vendedor
 
-Si tu comprador usa descubrimiento abierto, canales y un máximo positivo por respuesta, activa Auto con los precios máximos de entrada y salida que aceptas en USDC por millón de tokens. Por ejemplo:
+Auto deja que tu comprador elija un vendedor por ti. Por defecto usa solo ofertas gratis. Para que use ofertas
+pagadas, abre **Usage & payments → Limits** en la app de escritorio y elige **Manage chat budget**. En
+**Automatic seller selection**, marca **Allow paid offers in Auto** y escribe:
 
-En escritorio, abre **Payments → Automatic seller selection**. Activa las ofertas pagadas y guarda el máximo por respuesta y las dos tarifas en USDC por millón de tokens. En el chat, abre el modelo y elige **Auto**. El CLI y OpenCode que usan ese mismo comprador respetan los mismos límites. Desactiva las ofertas pagadas para que Auto vuelva a buscar solo ofertas gratis.
+- el máximo por respuesta, en USDC;
+- el precio máximo de entrada y el precio máximo de salida, en USDC por millón de tokens.
 
-Desde el repositorio, usa el mismo `GYBLOS_HOME` que el comprador al que se conecta OpenCode.
+Luego elige **Save Auto settings**. La sección aparece cuando tu comprador busca vendedores por su cuenta
+(descubrimiento abierto), y solo se puede guardar para el comprador que maneja la app: para un comprador que conectaste por separado, la app rechaza el cambio. En el chat, abre el modelo y elige **Auto**. Por ahora, Auto pagado
+en el chat cubre solo `qwen3-0.6b`; para los demás modelos Auto sigue usando solo ofertas gratis, aunque igual puedes elegir un vendedor pagado específico en el menú del modelo.
 
-```sh
-pnpm buyer:auto 0.052 0.208
-```
-
-Reinicia el comprador y selecciona el modelo en OpenCode. Auto pide ofertas firmadas a vendedores verificados. Se respetan el máximo por respuesta y el saldo de la clave API. Una clave con límite cero solo puede usar ofertas gratuitas. Auto puede liquidar el canal anterior antes de abrir otro con el depósito autorizado restante. Para volver al descubrimiento de ofertas gratuitas, ejecuta `pnpm buyer:auto off` y reinicia el comprador.
+Estos límites se aplican al chat y a todas las claves API de este comprador, así que tus herramientas de código
+también los respetan. El máximo por respuesta es el límite del comprador para toda respuesta pagada, no solo
+para Auto, y se mantiene cuando desactivas las ofertas pagadas. Auto pide ofertas firmadas a vendedores
+verificados. Se sigue respetando el saldo de cada clave API, y una clave con límite `0` solo puede usar ofertas
+gratis. Auto puede liquidar el canal anterior antes de abrir otro con el depósito autorizado restante. Para que
+Auto vuelva a usar solo ofertas gratis, desmarca **Allow paid offers in Auto** y elige **Save Auto settings**.
 
 ## Requisitos previos [#antes-de-empezar]
 
@@ -34,9 +40,9 @@ Reinicia el comprador y selecciona el modelo en OpenCode. Auto pide ofertas firm
 
 ## Crea una API key [#crear-una-api-key]
 
-1. En la app, abre **Connections**. Si te pide conectar tu comprador, elige **Go to Payments** y
+1. En la app, abre **Connections**. Si te pide conectar tu comprador, elige **Open Usage & payments** y
    arráncalo ahí.
-2. En **Create an API key**, escribe un **Name** y un **Spend limit**, y elige **Create API key**. El
+2. Elige **Create your first API key** o **New API key**, escribe un **Name** y un **Limit for this key**, y elige **Create API key**. El
    límite es el total que puede gastar esta key, en USDC de devnet. Nunca se reinicia y no se puede
    subir después. Un límite de `0` permite solo modelos gratis.
 3. Elige **Copy API key** y **Copy Base URL**. La app mantiene la key oculta en pantalla; pégala
@@ -47,15 +53,15 @@ ya tiene la key sigue funcionando, pero la app no puede volver a copiarla. La ke
 aparece en la configuración guardada del agente ni en el historial del chat. **Revoke key** detiene las
 solicitudes nuevas con esa key; lo que ya gastó queda registrado.
 
-La Base URL puede cambiar cuando reinicias la app. Después de reiniciar, elige otra vez **Copy Base URL**
+El comprador gestionado por la app conserva su Base URL al reiniciar. Un comprador conectado por separado puede usar otra URL. Después de reiniciar, elige otra vez **Copy Base URL**
 y, si cambió, actualiza tu herramienta o elige otra vez **Write configuration**.
 
 ## Conecta un agente de código [#conectar-un-agente-de-codigo]
 
 La app configura OpenCode, pi, Codex CLI y Claude Code por ti, con todos los modelos que puede usar:
 
-1. En **Connections**, selecciona una key activa y elige **Connect agent**.
-2. Elige el **Agent** y revisa la configuración que muestra la app.
+1. En **Connections**, abre **Details** de una key activa y elige **Connect a tool**.
+2. Elige la **Tool** y revisa la configuración que muestra la app.
 3. Elige **Write configuration**. La app cambia solo el proveedor `gyblos` y guarda una copia del archivo
    anterior. Para Claude Code, copia las variables en tu shell.
 4. La configuración lee la key desde `GYBLOS_API_KEY`. Defínela en la shell que arranca el agente:

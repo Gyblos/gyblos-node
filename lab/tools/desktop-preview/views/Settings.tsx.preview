@@ -1,8 +1,9 @@
 // Appearance, account-wide buyer preferences (seller mode, free-model fallback, Testnet) with the
 // proposed buyer config.toml, and product information, built from the shared compact primitives.
-import { Check, Code, FileText, Info, Palette, Storefront, Wallet } from '@phosphor-icons/react';
+import { Check, Code, FileText, Gauge, Info, Palette, Storefront, Wallet } from '@phosphor-icons/react';
 import { useState } from 'react';
 
+import { ActionButton } from './ActionButton';
 import { Appearance } from './Appearance';
 import { BUTTON_VARIANT } from './constants';
 import { Dropdown } from './Dropdown';
@@ -215,6 +216,10 @@ export function Settings({
                   <IconButton label="Information example">
                     <Info size={16} />
                   </IconButton>
+                </div>
+                <div>
+                  <span>Collapsible action</span>
+                  <ActionButton icon={<Gauge size={16} />} label="Spending limits" />
                 </div>
                 <div>
                   <span>Disabled</span>

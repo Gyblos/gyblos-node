@@ -2,24 +2,22 @@ import assert from 'node:assert/strict';
 import { readdir, readFile } from 'node:fs/promises';
 import test from 'node:test';
 
+import { previewStyles } from '../support/desktop-preview-styles';
+
 const preview = new URL('../../lab/tools/desktop-preview/', import.meta.url);
 const views = new URL('views/', preview);
 const view = (name: string) => readFile(new URL(name, views), 'utf8');
 
 void test('every preview dialog opens and closes with one shared motion and an origin option', async () => {
-  const build = await readFile(new URL('brand-build.ts', preview), 'utf8');
+  const constants = await readFile('apps/desktop/src/ui/constants.ts', 'utf8');
+  const modal = await readFile('apps/desktop/src/ui/Modal.tsx', 'utf8');
   assert.match(
-    build,
-    /const MODAL_ORIGIN = \{\\n  CENTER: 'center',\\n  TOP: 'top',\\n  BOTTOM: 'bottom',\\n  LEFT: 'left',\\n  RIGHT: 'right',\\n\} as const;/,
-  );
-  assert.match(
-    build,
+    constants,
     /export type ModalOrigin = \(typeof MODAL_ORIGIN\)\[keyof typeof MODAL_ORIGIN\];/,
   );
-  assert.match(build, /origin\?: ModalOrigin;/);
-  assert.match(build, /data-origin=\{origin \?\? MODAL_ORIGIN\.CENTER\}/);
-  assert.equal(build.match(/'center'/g)?.length, 1);
-  const css = await readFile(new URL('preview.css', preview), 'utf8');
+  assert.match(modal, /origin\?: ModalOrigin;/);
+  assert.match(modal, /data-origin=\{origin \?\? MODAL_ORIGIN\.CENTER\}/);
+  const css = await previewStyles();
   for (const origin of ['top', 'bottom', 'left', 'right'])
     assert.match(
       css,

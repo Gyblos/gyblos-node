@@ -1,0 +1,1058 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "32b35740-e854-4f3d-acdc-86f9022e5e83",
+  "prevId": "1ecf96ef-fb6f-4625-9cd6-c3af467227dd",
+  "tables": {
+    "discovery_catalog_periods": {
+      "name": "discovery_catalog_periods",
+      "columns": {
+        "node_id": {
+          "name": "node_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "first_sequence": {
+          "name": "first_sequence",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "content_hash": {
+          "name": "content_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner": {
+          "name": "owner",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "last_sequence": {
+          "name": "last_sequence",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "last_published_at": {
+          "name": "last_published_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "ended_at": {
+          "name": "ended_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "end_reason": {
+          "name": "end_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "discovery_catalog_periods_open": {
+          "name": "discovery_catalog_periods_open",
+          "columns": [
+            "node_id",
+            "ended_at"
+          ],
+          "isUnique": false
+        },
+        "discovery_catalog_periods_by_content": {
+          "name": "discovery_catalog_periods_by_content",
+          "columns": [
+            "content_hash"
+          ],
+          "isUnique": false
+        },
+        "discovery_catalog_periods_by_end": {
+          "name": "discovery_catalog_periods_by_end",
+          "columns": [
+            "ended_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "discovery_catalog_periods_node_id_first_sequence_pk": {
+          "columns": [
+            "node_id",
+            "first_sequence"
+          ],
+          "name": "discovery_catalog_periods_node_id_first_sequence_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "discovery_catalogs": {
+      "name": "discovery_catalogs",
+      "columns": {
+        "node_id": {
+          "name": "node_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner": {
+          "name": "owner",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sequence": {
+          "name": "sequence",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "issued_at": {
+          "name": "issued_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "digest": {
+          "name": "digest",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "signed_json": {
+          "name": "signed_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "discovery_catalogs_by_expiry": {
+          "name": "discovery_catalogs_by_expiry",
+          "columns": [
+            "expires_at"
+          ],
+          "isUnique": false
+        },
+        "discovery_catalogs_listing": {
+          "name": "discovery_catalogs_listing",
+          "columns": [
+            "node_id",
+            "digest",
+            "issued_at",
+            "expires_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "discovery_github_claims": {
+      "name": "discovery_github_claims",
+      "columns": {
+        "node_id": {
+          "name": "node_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "account": {
+          "name": "account",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "gist": {
+          "name": "gist",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "issued_at": {
+          "name": "issued_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "state": {
+          "name": "state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "checked_at": {
+          "name": "checked_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "verdict_at": {
+          "name": "verdict_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "verified_at": {
+          "name": "verified_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "last_fetch_at": {
+          "name": "last_fetch_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "next_check_at": {
+          "name": "next_check_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "signature": {
+          "name": "signature",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "discovery_github_claims_by_next_check": {
+          "name": "discovery_github_claims_by_next_check",
+          "columns": [
+            "next_check_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "discovery_github_claims_node_id": {
+          "name": "discovery_github_claims_node_id",
+          "value": "length(\"discovery_github_claims\".\"node_id\") = 64"
+        },
+        "discovery_github_claims_state": {
+          "name": "discovery_github_claims_state",
+          "value": "(\"discovery_github_claims\".\"state\" is null or \"discovery_github_claims\".\"state\" in ('pending', 'verified', 'lost'))"
+        }
+      }
+    },
+    "discovery_index_heartbeat": {
+      "name": "discovery_index_heartbeat",
+      "columns": {
+        "hour": {
+          "name": "hour",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "slots": {
+          "name": "slots",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "discovery_index_heartbeat_slots": {
+          "name": "discovery_index_heartbeat_slots",
+          "value": "\"discovery_index_heartbeat\".\"slots\" between 1 and 4095"
+        }
+      }
+    },
+    "discovery_invites": {
+      "name": "discovery_invites",
+      "columns": {
+        "invite_hash": {
+          "name": "invite_hash",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "contact": {
+          "name": "contact",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "used_at": {
+          "name": "used_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "node_id": {
+          "name": "node_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "discovery_invites_hash": {
+          "name": "discovery_invites_hash",
+          "value": "length(\"discovery_invites\".\"invite_hash\") = 64"
+        },
+        "discovery_invites_contact": {
+          "name": "discovery_invites_contact",
+          "value": "length(\"discovery_invites\".\"contact\") between 1 and 128"
+        },
+        "discovery_invites_node_id": {
+          "name": "discovery_invites_node_id",
+          "value": "(\"discovery_invites\".\"node_id\" is null or length(\"discovery_invites\".\"node_id\") = 64)"
+        }
+      }
+    },
+    "discovery_catalog_models": {
+      "name": "discovery_catalog_models",
+      "columns": {
+        "node_id": {
+          "name": "node_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "model_id": {
+          "name": "model_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "discovery_catalog_models_by_model": {
+          "name": "discovery_catalog_models_by_model",
+          "columns": [
+            "model_id",
+            "node_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "discovery_catalog_models_node_id_model_id_pk": {
+          "columns": [
+            "node_id",
+            "model_id"
+          ],
+          "name": "discovery_catalog_models_node_id_model_id_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "discovery_network_days": {
+      "name": "discovery_network_days",
+      "columns": {
+        "day": {
+          "name": "day",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "node_slots": {
+          "name": "node_slots",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "peak": {
+          "name": "peak",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "covered_slots": {
+          "name": "covered_slots",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "discovery_nodes": {
+      "name": "discovery_nodes",
+      "columns": {
+        "node_id": {
+          "name": "node_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "last_sequence": {
+          "name": "last_sequence",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "last_signature": {
+          "name": "last_signature",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "retain_until": {
+          "name": "retain_until",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "publish_window": {
+          "name": "publish_window",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "publish_count": {
+          "name": "publish_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        }
+      },
+      "indexes": {
+        "discovery_nodes_by_retain": {
+          "name": "discovery_nodes_by_retain",
+          "columns": [
+            "retain_until"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "discovery_nodes_node_id": {
+          "name": "discovery_nodes_node_id",
+          "value": "length(\"discovery_nodes\".\"node_id\") = 64"
+        },
+        "discovery_nodes_sequence": {
+          "name": "discovery_nodes_sequence",
+          "value": "\"discovery_nodes\".\"last_sequence\" >= 1"
+        }
+      }
+    },
+    "discovery_offer_items": {
+      "name": "discovery_offer_items",
+      "columns": {
+        "content_hash": {
+          "name": "content_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "position": {
+          "name": "position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "model_id": {
+          "name": "model_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "variant": {
+          "name": "variant",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "quantization": {
+          "name": "quantization",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "context_tokens": {
+          "name": "context_tokens",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "reasoning": {
+          "name": "reasoning",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "input_atomic": {
+          "name": "input_atomic",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "output_atomic": {
+          "name": "output_atomic",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "unit": {
+          "name": "unit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "network": {
+          "name": "network",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "asset": {
+          "name": "asset",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "discovery_offer_items_by_model": {
+          "name": "discovery_offer_items_by_model",
+          "columns": [
+            "model_id",
+            "content_hash"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "discovery_offer_items_content_hash_position_pk": {
+          "columns": [
+            "content_hash",
+            "position"
+          ],
+          "name": "discovery_offer_items_content_hash_position_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "discovery_presence": {
+      "name": "discovery_presence",
+      "columns": {
+        "node_id": {
+          "name": "node_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sequence": {
+          "name": "sequence",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "issued_at": {
+          "name": "issued_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "catalog_digest": {
+          "name": "catalog_digest",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "signed_json": {
+          "name": "signed_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "release_version": {
+          "name": "release_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "version_sequence": {
+          "name": "version_sequence",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "discovery_presence_by_expiry": {
+          "name": "discovery_presence_by_expiry",
+          "columns": [
+            "expires_at"
+          ],
+          "isUnique": false
+        },
+        "discovery_presence_listing": {
+          "name": "discovery_presence_listing",
+          "columns": [
+            "node_id",
+            "catalog_digest",
+            "issued_at",
+            "expires_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "discovery_registrations": {
+      "name": "discovery_registrations",
+      "columns": {
+        "node_id": {
+          "name": "node_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner": {
+          "name": "owner",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "asset": {
+          "name": "asset",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "invite_hash": {
+          "name": "invite_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "country": {
+          "name": "country",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "registered_at": {
+          "name": "registered_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "discovery_registrations_node_id": {
+          "name": "discovery_registrations_node_id",
+          "value": "length(\"discovery_registrations\".\"node_id\") = 64"
+        },
+        "discovery_registrations_status": {
+          "name": "discovery_registrations_status",
+          "value": "\"discovery_registrations\".\"status\" in ('active', 'revoked')"
+        },
+        "discovery_registrations_country": {
+          "name": "discovery_registrations_country",
+          "value": "(\"discovery_registrations\".\"country\" is null or length(\"discovery_registrations\".\"country\") = 2)"
+        }
+      }
+    },
+    "discovery_seller_profiles": {
+      "name": "discovery_seller_profiles",
+      "columns": {
+        "node_id": {
+          "name": "node_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "issued_at": {
+          "name": "issued_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "signature": {
+          "name": "signature",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "held": {
+          "name": "held",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "discovery_seller_profiles_node_id": {
+          "name": "discovery_seller_profiles_node_id",
+          "value": "length(\"discovery_seller_profiles\".\"node_id\") = 64"
+        },
+        "discovery_seller_profiles_tombstone": {
+          "name": "discovery_seller_profiles_tombstone",
+          "value": "(\"discovery_seller_profiles\".\"name\" is null) = (\"discovery_seller_profiles\".\"signature\" is null)"
+        },
+        "discovery_seller_profiles_held": {
+          "name": "discovery_seller_profiles_held",
+          "value": "\"discovery_seller_profiles\".\"held\" in (0, 1)"
+        },
+        "discovery_seller_profiles_held_empty": {
+          "name": "discovery_seller_profiles_held_empty",
+          "value": "(\"discovery_seller_profiles\".\"held\" = 0 or \"discovery_seller_profiles\".\"name\" is null)"
+        }
+      }
+    },
+    "discovery_uptime_nodes": {
+      "name": "discovery_uptime_nodes",
+      "columns": {
+        "node_id": {
+          "name": "node_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "first_at": {
+          "name": "first_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "discovery_uptime_nodes_node_id": {
+          "name": "discovery_uptime_nodes_node_id",
+          "value": "length(\"discovery_uptime_nodes\".\"node_id\") = 64"
+        }
+      }
+    },
+    "discovery_uptime": {
+      "name": "discovery_uptime",
+      "columns": {
+        "node_id": {
+          "name": "node_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "hour": {
+          "name": "hour",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "slots": {
+          "name": "slots",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "first_at": {
+          "name": "first_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "last_at": {
+          "name": "last_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "discovery_uptime_by_hour": {
+          "name": "discovery_uptime_by_hour",
+          "columns": [
+            "hour"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "discovery_uptime_node_id_hour_pk": {
+          "columns": [
+            "node_id",
+            "hour"
+          ],
+          "name": "discovery_uptime_node_id_hour_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "discovery_uptime_node_id": {
+          "name": "discovery_uptime_node_id",
+          "value": "length(\"discovery_uptime\".\"node_id\") = 64"
+        },
+        "discovery_uptime_slots": {
+          "name": "discovery_uptime_slots",
+          "value": "\"discovery_uptime\".\"slots\" between 1 and 4095"
+        }
+      }
+    },
+    "discovery_withdrawals": {
+      "name": "discovery_withdrawals",
+      "columns": {
+        "node_id": {
+          "name": "node_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sequence": {
+          "name": "sequence",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "issued_at": {
+          "name": "issued_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "catalog_digest": {
+          "name": "catalog_digest",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "signed_json": {
+          "name": "signed_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "discovery_withdrawals_by_expiry": {
+          "name": "discovery_withdrawals_by_expiry",
+          "columns": [
+            "expires_at"
+          ],
+          "isUnique": false
+        },
+        "discovery_withdrawals_listing": {
+          "name": "discovery_withdrawals_listing",
+          "columns": [
+            "node_id",
+            "catalog_digest"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    }
+  },
+  "views": {},
+  "enums": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "indexes": {}
+  }
+}

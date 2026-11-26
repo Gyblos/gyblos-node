@@ -24,12 +24,13 @@ the matching service (`packages/transport-iroh/src/endpoint.ts`).
 | `gyblos/session/4`     | 4       | Active when the seller has reusable sessions                                                     | `batch-channel-v4.json`, `batch-prepare-v4.json`, `batch-startup-v4.json`, `batch-stream-v4.json`, `batch-tools-v4.json` | [Active common tool-aware execution](#active-common-tool-aware-execution) |
 | `gyblos/session/5`     | 5       | Active alongside `gyblos/session/4` (response blocks)                                            | `session-blocks-v5.json`                                                                                                 | [Session block checkpoints](#reusable-session-block-checkpoints-v5)       |
 | `gyblos/receipt/1`     | 1       | Active                                                                                           | `receipt-channel-v1.json`                                                                                                | [Receipt exchange channel v1](#receipt-exchange-channel-v1)               |
-| `gyblos/http/1`        | 1       | HTTP over Iroh; endpoints register it by default, but the seller node and buyer apps turn it off | `signed-inference-offer-v1.json`                                                                                         | [Canonical JSON and signing bytes](#canonical-json-and-signing-bytes)     |
+| `gyblos/http/1`        | 1       | HTTP over Iroh; endpoints register it by default, but the seller node and buyer apps turn it off | —                                                                                                                        | [Canonical JSON and signing bytes](#canonical-json-and-signing-bytes)     |
 | `gyblos/http/2`        | —       | Reserved identifier; never registered                                                            | —                                                                                                                        | [Control contracts](#control-contracts-and-iroh-runtime)                  |
 
 Retired channels: `gyblos/session/1`, `/2` and `/3` (vectors
 `batch-*-v1.json` to `batch-*-v3.json`) and `gyblos/paid-stream/1`. Active
-parsers reject them.
+parsers reject them. The signing domain `gyblos/signed-inference-offer/v1\n` is
+retired with its payload and is never reused.
 
 Signed records and envelopes outside the Iroh channels:
 
@@ -41,6 +42,7 @@ Signed records and envelopes outside the Iroh channels:
 | Observation upload envelope | v1                               | `observation-upload-v1.json`                       | [Observation upload envelope v1](#observation-upload-envelope-v1)                                    |
 | Identity claim              | v1                               | `identity-claim-v1.json`                           | [Identity claim v1](#identity-claim-v1)                                                              |
 | Profile claim               | v1                               | `profile-claim-v1.json`                            | [Profile claim v1](#profile-claim-v1)                                                                |
+| Model verification          | v1                               | `model-verification-v1.json`                       | [Model verification v1](#model-verification-v1)                                                      |
 
 ## Contents
 
@@ -64,6 +66,7 @@ Signed records and envelopes outside the Iroh channels:
 - [Observation upload envelope v1](#observation-upload-envelope-v1)
 - [Identity claim v1](#identity-claim-v1)
 - [Profile claim v1](#profile-claim-v1)
+- [Model verification v1](#model-verification-v1)
 
 ## Canonical JSON and signing bytes
 
@@ -81,25 +84,16 @@ token bounds, context size and schema version remain safe integer JSON numbers.
 Do not convert those existing numeric fields to strings during extraction.
 
 Signing bytes are UTF-8(domain + canonicalJson(value)). Domain prefixes follow
-gyblos/&lt;kind&gt;/v&lt;n&gt; followed by one newline. The existing offer prefix is
-exactly `gyblos/signed-inference-offer/v1\n`, with a real LF byte, not the two
-characters backslash and n. Keep this kind and payload shape unchanged. Callers
-select the domain; the helpers do not introduce a new domain policy.
-
-The offer types `InferenceOffer` and `SignedInferenceOffer` are exported from
-`./offer`. `./constants` names the wire values: `OFFER_DOMAIN` (the prefix
-above), `OFFER_SCHEMA_VERSION` (`1`) and `GYBLOS_ALPN` (`gyblos/http/1`, the
-Iroh ALPN, also carried in the offer's `protocol` field).
+gyblos/&lt;kind&gt;/v&lt;n&gt; followed by one real LF byte, not the two
+characters backslash and n. Callers select the domain; the helpers do not
+introduce a new domain policy. `./constants` names `GYBLOS_ALPN`
+(`gyblos/http/1`, the Iroh ALPN).
 
 ## Signatures, contracts and compatibility
 
 `sign` invokes an injected byte signer; it must use Ed25519. `verify` uses Web
 Crypto Ed25519 with a raw 32-byte public key. Signature encoding is the caller's
-responsibility: the existing private offer stays `{ offer, signature }`, with a
-Base64 signature over the offer. Solana addresses, signing-message adaptation,
-trust checks, payment policy and expiry checks for that legacy offer stay outside
-protocol. The public discovery contracts below are separate messages: they do
-not replace, reinterpret or authorize the buyer-bound paid offer.
+responsibility.
 
 `EngineUsage` retains camelCase domain counters. `EngineWireUsage` retains the
 distinct snake_case wire counters; inferenceWireUsage performs the existing
@@ -108,20 +102,12 @@ mapping. Engine completion reasons and error-code strings retain their values.
 Payment, node and buyer code throw and compare this same constructor and
 `PROTOCOL_ERROR_CODES` catalog directly; there are no payment-package aliases.
 
-`vectors/signed-inference-offer-v1.json` contains a synthetic, unfunded offer,
-canonical JSON, complete signing bytes in hexadecimal, raw public key and
-Base64 signature captured from main 6abdb6d **before** extraction. No private key
-is retained. `pnpm test` reads the vector and verifies it independently and
-through the existing application entrypoint. Changes to these bytes or wire
-contracts require a separately reviewed protocol version, not a refactor.
-
 ## Public discovery records, version 1
 
 The package adds `parsePublicRecord`, `signPublicRecord`, `verifyPublicRecord`
 and `catalogDigest`, available from the root or `./public-records`. Types also
 have an explicit `./public-types` entry. These pure functions do not publish,
 resolve identities, connect, load a wallet, track peers or authorize payments.
-The old offer, its domain, its Base64 encoding and its vector remain unchanged.
 
 Every public envelope is exactly `{ record, signature }`. Signatures are
 Ed25519, encoded as **128 lowercase hexadecimal characters**. The signer is the
@@ -266,9 +252,7 @@ catalog reference, public key and signatures. A separate one-shot Node/OpenSSL
 oracle built and signed the records independently of the protocol helpers.
 Only synthetic public material is retained. Tests check both Web Crypto and
 OpenSSL, wrong domains, changed payloads and reordered JSON properties. These
-are public discovery signatures, not signed payment authorizations. The
-signed-offer vectors in `vectors/signed-inference-offer-v1.json` are a separate
-set.
+are public discovery signatures, not signed payment authorizations.
 
 ## Control contracts and Iroh runtime
 
@@ -333,8 +317,7 @@ delivered or the output count is zero.
 USDC-per-million configuration prices map exactly to atomic-per-million rates
 by multiplying by 1,000,000 (at most six decimal places); there is no division
 by token count during this conversion. Seller startup advertises configured v2
-rates plus the protocol fee. The legacy buyer's v1 compatibility check does not
-convert a signed v2 quote into a v1 offer. Selector weights
+rates plus the protocol fee. Selector weights
 compare the same per-million rate sums (without charge rounding); its minimum
 paid budget covers the once-rounded cost of one input and one output token.
 A quote's total budget remains a ceiling, not a promise that an unknown prompt
@@ -342,7 +325,7 @@ and the requested output fit within it.
 
 Version mapping: the `gyblos/control/1` ALPN (control version 1) carries v2
 records and offers; `gyblos/http/2` is a reserved future identifier, not a
-supported paid ALPN. The current paid v1 validator rejects v2. The pure policy
+supported paid ALPN. The pure policy
 in `@gyblos/core/control-quotes` (`createControlQuote` for sellers,
 `acceptControlQuote` for buyers) verifies caller-trusted identities, catalog and
 request terms. It does not carry v1 payment checks (payTo distinct from
@@ -475,8 +458,7 @@ The ALPN is **`gyblos/free/4`**. Reusing `gyblos/control/1` would break its
 no-prompt/no-engine invariant, mix long-running inference with short discovery
 queries and make their independent admission budgets ambiguous. A separate
 ALPN preserves that boundary and permits separate execution admission under the
-same endpoint limits. `gyblos/http/2` remains reserved and unregistered; the
-existing v1 HTTP bridge, routes and payment admission are unchanged.
+same endpoint limits. `gyblos/http/2` remains reserved and unregistered.
 
 An existing `SignedOfferV2` still signs `protocol: "gyblos/http/2"`: this is the
 unchanged quote-family marker, **not an instruction to dial or register that
@@ -745,11 +727,9 @@ zero-skew admission of its own quotes.
 Native ingress, generation and egress share endpoint request admission. A
 read, engine or writer ignoring cancellation retains its request permit until
 actual settlement. Timeout closes the connection and suppresses late output.
-The free-configured seller starts neither the facilitator nor the paid HTTP
-service, does not check the devnet payment program or load the auxiliary
-payment signers, and writes no legacy v1 offer. Paid-configured startup keeps
-the existing v1 service. The free branch advertises only control and free
-ALPNs. Transport allows one control connection and one data connection per
+The seller never registers HTTP over Iroh. The free-configured seller starts no
+facilitator, does not check the devnet payment program or load the auxiliary
+payment signers, and advertises only control and free ALPNs. Transport allows one control connection and one data connection per
 authenticated peer at a time (the global connection pool and the per-peer
 request quota stay shared). The buyer still closes its control connection
 before dialing the data channel; the separate data allowance covers the moment
@@ -807,8 +787,7 @@ facilitator, modify the v1 flow or reserve capacity during quotation.
 Seller and buyer startup exchange private usage receipts after supported free
 execution and completed paid block sessions. Free-only collector ingestion
 remains separate; paid collector ingestion and public aggregation are not
-enabled. Receipts apply to v2-and-later quotes; paid v1 does not have the
-required request identifiers and digests.
+enabled. Receipts apply to v2-and-later quotes.
 A receipt is evidence of what its signer reports, not proof of model execution,
 correctness or independently measured usage.
 
@@ -1914,3 +1893,53 @@ contract owns shape and the node signature only; freshness and replay (keeping
 the newest `issuedAt` per node) belong to the verifier, such as the discovery
 index. It is not part of any public discovery record or offer, so record and
 offer parsers are unchanged.
+
+## Model verification v1
+
+`@gyblos/protocol/model-verification` defines the signed result of the model
+verifier ([docs/model-verifier.md](../../docs/model-verifier.md)). The signed
+object is `{ result, signature }`: `signature` is hex Ed25519 by the public key
+behind the base58 address `result.verifier`, over the prefix
+`gyblos/model-verification/v1\n` (real LF). Vectors are
+`vectors/model-verification-v1.json`.
+
+`result` has exactly these fields; any other value is `INVALID`, and a
+`schemaVersion` other than `1` is `VERSION`:
+
+| Field           | Value                                                                                     |
+| --------------- | ----------------------------------------------------------------------------------------- |
+| `schemaVersion` | `1`                                                                                       |
+| `verifier`      | The verifier's base58 address                                                             |
+| `seller`        | `{ owner, nodeId }`: the seller's owner address and 64-hex NodeId                         |
+| `selection`     | The declared model selection, as in control quotes                                        |
+| `challengeSet`  | `{ id, version, digest }`: identifier, positive version, SHA-256 hex of the canonical set |
+| `reference`     | `{ model, digest }`: the reference model's identifier and 64-hex digest                   |
+| `evidence`      | The counts, rule, nonce and answer digests described below                                |
+| `verdict`       | `pass`, `fail` or `inconclusive`                                                          |
+| `issuedAt`      | A non-negative safe integer, milliseconds                                                 |
+
+`evidence` has exactly `prompts` (1 to 64), `answers` (at most `prompts`),
+`checks` (at most 16,384, and at least `answers`, since every scored answer has a
+check), `deviations` (at most `checks`), `deviantAnswers`
+(answers with at least one deviation: at most `answers` and `deviations`, and at
+least 1 when `deviations` is positive; every answer that is not deviant needs a
+clean check, so `checks - deviations ≥ answers - deviantAnswers`), `minimumChecks` (positive),
+`honestRatePpm` (1 to 500,000 parts per million), `falsePositivePpm` (1 to
+999,999), `failAt`, `nonce` (64 hex) and `answerDigests` (one SHA-256 hex digest
+per answer, so its length is `answers`).
+
+The unit of the test is the answer: checks of one answer read the same text and
+are not independent. `failAt` must equal `modelVerificationFailAt(answers,
+honestRatePpm, falsePositivePpm)`: the smallest count k ≥ 1 whose probability of
+k or more deviant answers under a binomial distribution with the honest rate is
+at most the false positive bound. The verdict must equal
+`modelVerificationVerdict`: `fail` when `deviantAnswers ≥ failAt`, else
+`inconclusive` when `answers < prompts` or `checks < minimumChecks`, else
+`pass`. A result that disagrees with either is `INVALID`. `failAt` is computed
+exactly with integers: the tail numerator over the shared denominator
+1,000,000^answers, compared with the bound without rounding.
+
+The parser checks only that the rule values are in range. A consumer must
+compare `minimumChecks`, `honestRatePpm` and `falsePositivePpm` with the rule of
+the challenge set named by `challengeSet.id`, `version` and `digest` before it
+trusts a verdict.

@@ -1,5 +1,6 @@
 // Owns the shape of the metrics collector's public stats answers (gyblos-node docs/metrics-collector.md,
 // Public stats API) and their checks at the boundary. Pure, no I/O.
+import { COVERAGE_STATES, type CoverageState } from './constants';
 import type { Latency } from './latency';
 import {
   flag,
@@ -8,6 +9,7 @@ import {
   nullable,
   num,
   record,
+  SourceShapeError,
   text,
   type JsonRecord,
 } from './validate';
@@ -38,7 +40,7 @@ export type NetworkSide = Totals & {
   buyers: number | null;
   withheld: boolean;
 };
-export type SellerSide = Totals & Pick<NetworkSide, 'buyers' | 'withheld'>;
+export type SellerSide = Totals & BuyerCount;
 export interface SellerDay {
   day: string;
   free: SellerSide | null;
@@ -46,6 +48,7 @@ export interface SellerDay {
 }
 export interface NetworkDay {
   day: string;
+  coverage: CoverageState | null;
   free: NetworkSide | null;
   paid: NetworkSide | null;
   observed: {
@@ -76,10 +79,20 @@ export interface ModelStat {
   free: ModelSide | null;
   paid: ModelSide | null;
 }
+export type BuyerCount = Pick<NetworkSide, 'buyers' | 'withheld'>;
+export interface BuyerTotals {
+  allTime: BuyerCount;
+  newInRange: BuyerCount;
+}
+export interface NetworkBuyers {
+  free: BuyerTotals;
+  paid: BuyerTotals;
+}
 export interface CollectorSnapshot {
   aggregatedAt: number | null;
   days: NetworkDay[];
   models: ModelStat[];
+  buyerTotals: NetworkBuyers | null;
   error: string | null;
 }
 
@@ -156,6 +169,39 @@ function sellerSide(value: unknown, where: string): SellerSide {
     withheld: flag(source.withheld, `${where}.withheld`),
   };
 }
+function buyerCount(value: unknown, where: string): BuyerCount {
+  const source = record(value, where);
+  const withheld = flag(source.withheld, `${where}.withheld`);
+  const buyers = nullable(source.buyers, (present) =>
+    num(present, `${where}.buyers`),
+  );
+  if (withheld !== (buyers === null)) throw new SourceShapeError(where);
+  return { buyers, withheld };
+}
+function buyerTotals(value: unknown, where: string): BuyerTotals {
+  const source = record(value, where);
+  return {
+    allTime: buyerCount(source.allTime, `${where}.allTime`),
+    newInRange: buyerCount(source.newInRange, `${where}.newInRange`),
+  };
+}
+export function parseNetworkBuyers(value: unknown): NetworkBuyers | null {
+  return nullable(value, (present) => {
+    const source = record(present, 'buyerTotals');
+    return {
+      free: buyerTotals(source.free, 'buyerTotals.free'),
+      paid: buyerTotals(source.paid, 'buyerTotals.paid'),
+    };
+  });
+}
+export function optionalNetworkBuyers(value: unknown): NetworkBuyers | null {
+  try {
+    return parseNetworkBuyers(value);
+  } catch (error) {
+    if (error instanceof SourceShapeError) return null;
+    throw error;
+  }
+}
 function networkSide(value: unknown, where: string): NetworkSide {
   const source = record(value, where);
   return {
@@ -164,6 +210,13 @@ function networkSide(value: unknown, where: string): NetworkSide {
     modelsServed: num(source.modelsServed, `${where}.modelsServed`),
   };
 }
+function coverageState(value: unknown): CoverageState | null {
+  if (value === undefined) return null;
+  const state = text(record(value, 'coverage').state, 'coverage.state');
+  return (
+    Object.values(COVERAGE_STATES).find((option) => option === state) ?? null
+  );
+}
 export function parseNetworkDay(value: unknown): NetworkDay {
   const source = record(value, 'day');
   const observed = nullable(source.observed, (present) =>
@@ -171,6 +224,7 @@ export function parseNetworkDay(value: unknown): NetworkDay {
   );
   return {
     day: text(source.day, 'day.day'),
+    coverage: coverageState(source.coverage),
     free: nullable(source.free, (present) => networkSide(present, 'free')),
     paid: nullable(source.paid, (present) => networkSide(present, 'paid')),
     observed: observed

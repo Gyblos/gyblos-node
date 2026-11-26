@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { buyerInitMessage } from '@gyblos/buyer/init';
+import { buyerInitMessage } from '@gyblos/buyer-app/init';
 import { BuyerInitError } from '@gyblos/node/buyer-init';
 import { BUYER_INIT_CODES } from '@gyblos/node/buyer-init-constants';
 

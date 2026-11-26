@@ -21,6 +21,7 @@ export default [
       'lab/evidence/**',
       '**/dist/**',
       'coverage/**',
+      'design/boardui/preview/.next/**',
       'apps/docs/.next/**',
       'apps/docs/out/**',
       'apps/docs/.source/**',

@@ -1,12 +1,23 @@
 // Displays public wallet metadata; funding and signing remain disabled.
-import { Archive, ArrowCounterClockwise, Plus } from '@phosphor-icons/react';
+import {
+  Archive,
+  ArrowCounterClockwise,
+  CheckCircle,
+  Plus,
+  Warning,
+} from '@phosphor-icons/react';
 import { useEffect, useState } from 'react';
 
+import { BUYER_SESSION_DEFAULT_POLICY } from '@gyblos/config/batch-session';
+
+import { depositShortfall } from '../funding/model';
 import { WALLET_STATUS, type WalletSummary } from '../wallet/model';
+import { BuyerFundingAddress, fundingAmount } from './BuyerFunding';
 import { BUTTON_VARIANT } from './constants';
 import { CopyButton } from './CopyButton';
 import { MotionPresence } from './Motion';
 import { Badge, Button, List, ListRow, Note, RowCopy } from './UI';
+import type { useBuyerFunding } from './useBuyerFunding';
 import { WalletRestore } from './WalletRestore';
 import { WalletSelector } from './WalletSelector';
 import {
@@ -24,7 +35,7 @@ function WalletFacts({ address }: Pick<WalletSummary, 'address'>) {
   return (
     <dl className="wallet-facts">
       <div className="wallet-fact-address">
-        <dt>Solana address</dt>
+        <dt>Wallet address</dt>
         <dd className="wallet-address">
           <code>{address ?? 'Not available'}</code>
           {address && (
@@ -37,14 +48,6 @@ function WalletFacts({ address }: Pick<WalletSummary, 'address'>) {
           )}
         </dd>
       </div>
-      <div>
-        <dt>Private key</dt>
-        <dd>Protected on this device</dd>
-      </div>
-      <div>
-        <dt>Network</dt>
-        <dd>Solana</dd>
-      </div>
     </dl>
   );
 }
@@ -52,11 +55,20 @@ function WalletFacts({ address }: Pick<WalletSummary, 'address'>) {
 export function WalletDetails({
   onBackup,
   onAddFunds,
+  observation,
+  depositAtomic = BUYER_SESSION_DEFAULT_POLICY.depositAtomic,
 }: {
+  observation: ReturnType<typeof useBuyerFunding>;
+  depositAtomic?: string;
   onBackup: () => void;
   onAddFunds: () => void;
 }) {
   const wallet = useDesktopWallet();
+  const { funding, loading, refresh: refreshFunding } = observation;
+  const shortfall =
+    funding?.balanceAtomic == null
+      ? null
+      : depositShortfall(funding.balanceAtomic, depositAtomic);
   const refresh = useRefreshDesktopWallet();
   useEffect(() => {
     void refresh();
@@ -66,49 +78,45 @@ export function WalletDetails({
   const locked = wallet.status === WALLET_STATUS.LOCKED;
   return (
     <section className="wallet-details" aria-label="Wallet details">
-      <div className="connection-location">
-        <strong>On this device</strong>
-        <Badge warm={ready && !wallet.backupVerified}>
-          {ready
-            ? wallet.backupVerified
-              ? 'Backup verified'
-              : 'Backup needed'
-            : locked
-              ? 'Locked'
-              : 'Not available'}
-        </Badge>
-      </div>
-      <div className="settings-restriction wallet-balance">
-        <div>
-          <span>Available balance</span>
-          <strong>
-            — <small>USDC</small>
-          </strong>
+      <BuyerWallet
+        {...{ funding, shortfall, busy, loading, refreshFunding, onAddFunds }}
+      />
+      <section className="ui-section" aria-label="Protected desktop wallet">
+        <h3>Protected desktop wallet</h3>
+        <div className="connection-location">
+          <Badge warm={ready && !wallet.backupVerified}>
+            {ready
+              ? wallet.backupVerified
+                ? 'Backup verified'
+                : 'Backup needed'
+              : locked
+                ? 'Locked'
+                : 'Not available'}
+          </Badge>
         </div>
-        <Button
-          variant={BUTTON_VARIANT.PRIMARY}
-          disabled={!wallet.fundingEnabled || busy}
-          onClick={onAddFunds}
-        >
-          <Plus size={16} aria-hidden="true" /> Add funds
-        </Button>
-      </div>
-      {locked ? (
-        <WalletAccess />
-      ) : ready ? (
-        <WalletFacts address={wallet.address} />
-      ) : (
-        <Note>
-          {wallet.status === WALLET_STATUS.LOADING
-            ? 'Preparing protected wallet…'
-            : wallet.status === WALLET_STATUS.RECOVERY_REQUIRED
-              ? 'Wallet needs recovery. Existing data was preserved; no replacement was created.'
-              : 'Protected wallet storage is unavailable. On Linux, enable GNOME Keyring or KWallet and restart. You can still use free models.'}
-        </Note>
-      )}
-      {wallet.status === WALLET_STATUS.UNAVAILABLE && <WalletAccess />}
-      <WalletSelector />
-      <WalletRecovery ready={ready} onBackup={onBackup} />
+        {wallet.address && funding && wallet.address !== funding.payer && (
+          <p className="ui-help-text">
+            The buyer uses a different address. This backup covers the protected
+            desktop wallet.
+          </p>
+        )}
+        {locked ? (
+          <WalletAccess />
+        ) : ready ? (
+          <WalletFacts address={wallet.address} />
+        ) : (
+          <Note>
+            {wallet.status === WALLET_STATUS.LOADING
+              ? 'Preparing protected wallet…'
+              : wallet.status === WALLET_STATUS.RECOVERY_REQUIRED
+                ? 'Wallet needs recovery. Existing data was preserved; no replacement was created.'
+                : 'Protected wallet storage is unavailable. On Linux, enable GNOME Keyring or KWallet and restart. You can still use free models.'}
+          </Note>
+        )}
+        {wallet.status === WALLET_STATUS.UNAVAILABLE && <WalletAccess />}
+        <WalletSelector />
+        <WalletRecovery ready={ready} onBackup={onBackup} />
+      </section>
     </section>
   );
 }
@@ -147,7 +155,23 @@ function WalletRecovery({
     <>
       <List label="Wallet recovery">
         <ListRow
-          leading={null}
+          leading={
+            ready && wallet.backupVerified ? (
+              <CheckCircle
+                size={20}
+                weight="fill"
+                className="backup-verified-icon"
+                aria-hidden="true"
+              />
+            ) : ready ? (
+              <Warning
+                size={20}
+                weight="fill"
+                className="backup-needed-icon"
+                aria-hidden="true"
+              />
+            ) : null
+          }
           trailing={
             <Button
               variant={BUTTON_VARIANT.TONAL}
@@ -166,7 +190,7 @@ function WalletRecovery({
                 ? 'Available when your wallet is ready.'
                 : wallet.backupVerified
                   ? 'A recovery file has been verified for this wallet.'
-                  : 'Create a recovery file and verify it.'
+                  : 'No verified backup yet. Back up this wallet to recover it later.'
             }
           />
         </ListRow>
@@ -193,5 +217,51 @@ function WalletRecovery({
         {restoring && <WalletRestore close={() => setRestoring(false)} />}
       </MotionPresence>
     </>
+  );
+}
+
+function BuyerWallet({
+  funding,
+  shortfall,
+  busy,
+  loading,
+  refreshFunding,
+  onAddFunds,
+}: {
+  funding: ReturnType<typeof useBuyerFunding>['funding'];
+  shortfall: string | null;
+  busy: boolean;
+  loading: boolean;
+  refreshFunding(): void;
+  onAddFunds(): void;
+}) {
+  return (
+    <section className="ui-section" aria-label="Buyer wallet">
+      <h3>Buyer wallet</h3>
+      <div className="settings-restriction wallet-balance">
+        <div>
+          <span>Available balance</span>
+          <strong>
+            {funding?.balanceAtomic == null
+              ? 'Unavailable'
+              : fundingAmount(funding.balanceAtomic)}
+          </strong>
+        </div>
+        <Button
+          variant={BUTTON_VARIANT.PRIMARY}
+          disabled={!funding || busy}
+          onClick={onAddFunds}
+        >
+          <Plus size={16} aria-hidden="true" /> Add funds
+        </Button>
+      </div>
+      {shortfall && shortfall !== '0' && (
+        <p>Add {fundingAmount(shortfall)} to open a new channel.</p>
+      )}
+      {funding && <BuyerFundingAddress funding={funding} />}
+      <Button disabled={loading} onClick={refreshFunding}>
+        Refresh balance
+      </Button>
+    </section>
   );
 }

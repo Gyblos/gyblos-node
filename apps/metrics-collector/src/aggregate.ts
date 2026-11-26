@@ -20,6 +20,7 @@ import {
   runChainAggregation,
   type ChainAggregationResult,
 } from './aggregate-chain-run';
+import { calendarMarks, coverageUpsert } from './aggregate-coverage';
 import { firstSeenUpserts } from './aggregate-first-seen';
 import { modelObservedRollup } from './aggregate-model-observed';
 import {
@@ -167,6 +168,7 @@ async function scan(database: CollectorDatabase, now: number) {
       )
       .onConflictDoNothing(),
     ...(changed ? staleVersionMarks(database, day) : []),
+    ...(await calendarMarks(database, now)),
   ];
   await database.batch(batch);
 }
@@ -320,6 +322,7 @@ export function dayBatch(
     ...modelObservedRollup(database, bounds, now),
     ...firstSeenUpserts(database, bounds),
     ...breakdownRollups(database, bounds, now),
+    coverageUpsert(database, bounds, now),
   ];
 }
 

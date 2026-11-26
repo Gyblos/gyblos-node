@@ -16,7 +16,7 @@ import {
   parseAgentSetupPreview,
   type AgentSetupPreview,
 } from './agent-setup-model';
-import { x402Amount } from './x402-model';
+import { x402ShortAmount } from './x402-model';
 
 export {
   USDC_API,
@@ -112,7 +112,8 @@ export function parseUsdcApiState(input: unknown): UsdcApiState {
 }
 
 export function usdcApiAmount(atomic: string, scope: BuyerKeyScope) {
-  return `${x402Amount(atomic, scope)} ${scope.mint === DEVNET_USDC ? 'USDC' : 'atomic units'}`;
+  if (scope.mint !== DEVNET_USDC) return atomic + ' atomic units';
+  return x402ShortAmount(atomic, scope) + ' USDC';
 }
 export function usdcApiKeyBadge(state: UsdcApiState, key: BuyerApiKeySummary) {
   return key.revoked

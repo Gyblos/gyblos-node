@@ -9,14 +9,17 @@ export function previewModels(source: string): string {
     'const [network, setNetwork] = useState(false)',
     "const [network, setNetwork] = useState(() => new URLSearchParams(location.search).get('review') === 'network')",
   );
-  const listStart = models.indexOf('      <List label="Model catalog">');
-  const listEnd = models.indexOf('      </List>', listStart);
+  const listStart = models.indexOf('      {canSelect ? (');
+  const listEnd = models.indexOf(
+    '      {!canSelect && (\n        <p',
+    listStart,
+  );
   if (listStart < 0 || listEnd < 0)
     throw new Error('Missing model catalog review hook');
   const catalog =
     models.slice(0, listStart) +
     '      <PreviewCatalog query={query} filter={filter} selected={selected} canSelect={canSelect} onSelect={onSelect} />\n' +
-    models.slice(listEnd + '      </List>\n'.length);
+    models.slice(listEnd);
   const row = catalog.indexOf('function PreviewRows(');
   if (row < 0) throw new Error('Missing model rows review hook');
   return (

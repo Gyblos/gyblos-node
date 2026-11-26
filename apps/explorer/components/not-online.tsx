@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 import { DISPLAY, PAGING } from '../lib/constants';
 import { short, utc } from '../lib/format';
 import {
@@ -11,7 +13,14 @@ import { SELLER_STATUS_LABELS } from '../lib/seller-profile';
 import { Chip } from './board/chip';
 import { pagedRows, Pager } from './pager';
 import { SellerCell } from './seller-cell';
-import { SectionTitle, Table, td, timeCell } from './ui';
+import {
+  EmptyRow,
+  prefixedColumn,
+  SectionTitle,
+  Table,
+  td,
+  timeCell,
+} from './ui';
 
 export function NotOnline({
   query,
@@ -60,7 +69,6 @@ function NotOnlineTable({
     lastSeen: (node) => node.lastSeenAt,
     firstSeen: (node) => node.firstSeenAt,
   });
-  if (!nodes.length) return null;
   return (
     <>
       <SectionTitle
@@ -72,8 +80,8 @@ function NotOnlineTable({
         minWidth={DISPLAY.defaultTable}
         sorting={{ query, table: 'offline' }}
         head={[
-          { label: 'Node' },
-          { label: 'Status' },
+          prefixedColumn('Node', 'seller'),
+          prefixedColumn('Status', 'chip'),
           { label: 'Last seen', sort: 'lastSeen' },
           { label: 'First seen', sort: 'firstSeen' },
         ]}
@@ -81,6 +89,11 @@ function NotOnlineTable({
           <Pager label="Not online" view={tablePager(query, 'offline', page)} />
         }
       >
+        {!nodes.length && (
+          <EmptyRow columns={4}>
+            No offline or unpublished sellers in this list.
+          </EmptyRow>
+        )}
         {page.rows.map((node) => (
           <tr key={node.nodeId} className="border-t border-line">
             <td className={`${td} font-mono`} title={`Node ${node.nodeId}`}>
@@ -90,7 +103,14 @@ function NotOnlineTable({
                 name={node.name}
                 href={sellerHref(node.nodeId, query)}
               >
-                {node.github ? short(node.nodeId) : null}
+                {node.github ? (
+                  <Link
+                    href={sellerHref(node.nodeId, query)}
+                    title={node.nodeId}
+                  >
+                    {short(node.nodeId)}
+                  </Link>
+                ) : null}
               </SellerCell>
             </td>
             <td className={td}>

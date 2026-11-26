@@ -89,14 +89,14 @@ void test('the registry theme has the CSS tokens colors, light and dark, and the
 
 void test('llms.txt states the range presets, the buyer threshold, the longest range and the sources', () => {
   const llms = read('public/llms.txt');
-  assert.ok(
-    llms.includes(
-      `own ${RANGE.presets.join(', ').replace(/, (\d+)$/, ' or $1')} day control`,
-    ),
-  );
+  for (const option of RANGE.presets)
+    assert.ok(
+      llms.includes(`\`${option === 1 ? RANGE.dayParam : option}\``),
+      String(option),
+    );
   for (const { param } of Object.values(RANGE.sections))
     assert.ok(llms.includes(`\`${param}\``), param);
-  assert.ok(llms.includes(`; ${RANGE.defaultDays} is the default`));
+  assert.ok(llms.includes(`defaults to \`${RANGE.defaultDays}\``));
   assert.ok(llms.includes(`An older \`${RANGE.param}\` link`));
   assert.ok(llms.includes(` below ${DISPLAY.minPublicBuyers} `));
   assert.ok(llms.includes(`"< ${DISPLAY.minPublicBuyers}"`));

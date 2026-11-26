@@ -21,12 +21,12 @@ export {
   CHAT_STORAGE_STATE,
   type ChatArchiveState,
 } from './constants';
-export type ArchivedMessage = Omit<ChatMessage, 'model'> & {
+export type ArchivedMessage = Omit<ChatMessage, 'model' | 'activity'> & {
   model: Omit<ChatModel, 'image'>;
 };
 export type ArchivedConversation = Pick<
   ChatSession,
-  'id' | 'title' | 'draft'
+  'id' | 'title' | 'draft' | 'pinned'
 > & { messages: ArchivedMessage[] };
 export type ChatArchive = {
   version: typeof CHAT_STORAGE.VERSION;
@@ -34,6 +34,7 @@ export type ChatArchive = {
   sessions: ArchivedConversation[];
 };
 export type ChatArchiveStatus = {
+  pinsUnavailable?: boolean;
   available: boolean;
   generation: number;
   savedSequence: number;
@@ -151,10 +152,13 @@ function parseMessage(value: unknown): ArchivedMessage | null {
   };
 }
 function parseConversation(value: unknown): ArchivedConversation | null {
-  const item = object(value, 'draft,id,messages,title');
+  const item =
+    object(value, 'draft,id,messages,title') ??
+    object(value, 'draft,id,messages,pinned,title');
   if (
     !item ||
     !id(item.id) ||
+    (Object.hasOwn(item, 'pinned') && item.pinned !== true) ||
     !text(item.title, CHAT_STORAGE.MAX_TITLE_CHARACTERS) ||
     !text(item.draft) ||
     !Array.isArray(item.messages) ||
@@ -168,7 +172,13 @@ function parseConversation(value: unknown): ArchivedConversation | null {
       return null;
     messages.push(message);
   }
-  return { id: item.id, title: item.title, draft: item.draft, messages };
+  return {
+    id: item.id,
+    title: item.title,
+    draft: item.draft,
+    messages,
+    ...(item.pinned === true && { pinned: true }),
+  };
 }
 export function parseChatArchive(value: unknown): ChatArchive | null {
   const item = object(value, 'activeId,sessions,version');
@@ -221,8 +231,9 @@ export function projectChatArchive(snapshot: ChatSnapshot): ChatArchive | null {
     sessions: snapshot.sessions.map((session) => ({
       id: session.id,
       title: session.title,
+      ...(session.pinned && { pinned: true }),
       draft: session.draft,
-      messages: session.messages.map((message) => ({
+      messages: session.messages.map(({ activity: _activity, ...message }) => ({
         ...message,
         model: {
           id: message.model.id,
@@ -273,8 +284,11 @@ export function parseChatArchiveSave(value: unknown): ChatArchiveSave | null {
     : null;
 }
 export function parseChatArchiveStatus(value: unknown): ChatArchiveStatus {
-  const item = object(value, 'available,generation,savedSequence');
+  const item =
+    object(value, 'available,generation,savedSequence') ??
+    object(value, 'available,generation,pinsUnavailable,savedSequence');
   return item &&
+    (item.pinsUnavailable === undefined || item.pinsUnavailable === true) &&
     typeof item.available === 'boolean' &&
     (!item.available || (integer(item.generation) && item.generation > 0)) &&
     integer(item.generation) &&
@@ -283,16 +297,22 @@ export function parseChatArchiveStatus(value: unknown): ChatArchiveStatus {
         available: item.available,
         generation: item.generation,
         savedSequence: item.savedSequence,
+        ...(item.pinsUnavailable === true && { pinsUnavailable: true }),
       }
     : unavailableChatArchive();
 }
 export function parseChatArchiveLoad(value: unknown): ChatArchiveLoad {
-  const item = object(value, 'archive,available,generation,savedSequence');
+  const item =
+    object(value, 'archive,available,generation,savedSequence') ??
+    object(value, 'archive,available,generation,pinsUnavailable,savedSequence');
   if (!item) return { ...unavailableChatArchive(), archive: null };
   const status = parseChatArchiveStatus({
     available: item.available,
     generation: item.generation,
     savedSequence: item.savedSequence,
+    ...(Object.hasOwn(item, 'pinsUnavailable') && {
+      pinsUnavailable: item.pinsUnavailable,
+    }),
   });
   const archive = item.archive === null ? null : parseChatArchive(item.archive);
   if (item.archive !== null && !archive)

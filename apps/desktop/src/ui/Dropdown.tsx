@@ -9,11 +9,15 @@ import {
 } from 'react';
 
 import { MENU_GEOMETRY } from './constants';
+import { moveMenuFocus } from './menu-keyboard';
 import { Button, SearchField } from './UI';
 
 export function Dropdown({
   label,
   trigger,
+  triggerId,
+  onOpen,
+  disabled,
   className = '',
   iconOnly = false,
   searchLabel,
@@ -23,6 +27,9 @@ export function Dropdown({
 }: {
   label: string;
   trigger: ReactNode;
+  triggerId?: string;
+  onOpen?(): void;
+  disabled?: boolean;
   className?: string;
   iconOnly?: boolean;
   searchLabel?: string;
@@ -37,6 +44,7 @@ export function Dropdown({
   const [query, setQuery] = useState('');
   const content = useRef<HTMLDivElement>(null);
   function show() {
+    if (!open) onOpen?.();
     setQuery('');
     setOpen(true);
   }
@@ -47,6 +55,10 @@ export function Dropdown({
   }
   useLayoutEffect(() => {
     if (!open || !panel.current || !button.current) return;
+    if (disabled) {
+      panel.current.hidePopover();
+      return;
+    }
     const menu = panel.current;
     const anchor = button.current;
     function position() {
@@ -55,18 +67,30 @@ export function Dropdown({
       const gap = Number.parseFloat(
         getComputedStyle(menu).getPropertyValue('--overlay-gap'),
       );
-      menu.style.width = `min(var(--seller-menu-width, ${MENU_GEOMETRY.WIDTH}px), ${window.innerWidth - gutter * 2}px)`;
+      const split = menu.dataset.split === 'true';
+      const widthLimit = window.innerWidth - 2 * gutter;
+      menu.style.width = split
+        ? Math.min(
+            MENU_GEOMETRY.WIDTH,
+            (widthLimit - MENU_GEOMETRY.FLYOUT_GAP) / 2,
+          ) + 'px'
+        : `min(var(--seller-menu-width, ${MENU_GEOMETRY.WIDTH}px), ${widthLimit}px)`;
       const width = menu.getBoundingClientRect().width;
       menu.style.maxHeight = 'none';
       const below = window.innerHeight - bounds.bottom - gutter - gap;
       const above = bounds.top - gutter - gap;
-      const up =
-        below < Math.min(menu.scrollHeight, MENU_GEOMETRY.WIDTH) &&
-        above > below;
+      const up = anchor.closest('.composer')
+        ? above >= Math.min(menu.scrollHeight, MENU_GEOMETRY.WIDTH) ||
+          above > below
+        : below < Math.min(menu.scrollHeight, MENU_GEOMETRY.WIDTH) &&
+          above > below;
       const available = up ? above : below;
       menu.style.maxHeight = `${Math.max(MENU_GEOMETRY.MIN_TOP, available)}px`;
-      menu.style.left = `${Math.max(gutter, Math.min(bounds.left, window.innerWidth - width - gutter))}px`;
-      menu.style.top = `${up ? bounds.top - gap - Math.min(menu.scrollHeight, available) : bounds.bottom + gap}px`;
+      menu.style.left = `${Math.max(gutter, Math.min(bounds.left, window.innerWidth - width - gutter - (split ? width + MENU_GEOMETRY.FLYOUT_GAP : 0)))}px`;
+      menu.style.top = up ? 'auto' : `${bounds.bottom + gap}px`;
+      menu.style.bottom = up
+        ? `${window.innerHeight - bounds.top + gap}px`
+        : 'auto';
       menu.dataset.direction = up ? 'up' : 'down';
     }
     menu.showPopover();
@@ -79,17 +103,25 @@ export function Dropdown({
         menu.querySelector<HTMLElement>("[role^='menuitem']"))
     )?.focus();
     window.addEventListener('resize', position);
-    window.addEventListener('scroll', position, true);
+    const outside = (event: Event) => {
+      if (!(event.target instanceof Node && menu.contains(event.target)))
+        position();
+    };
+    window.addEventListener('scroll', outside, true);
+    menu.addEventListener(MENU_GEOMETRY.REPOSITION, position);
     return () => {
       observer.disconnect();
       window.removeEventListener('resize', position);
-      window.removeEventListener('scroll', position, true);
+      window.removeEventListener('scroll', outside, true);
+      menu.removeEventListener(MENU_GEOMETRY.REPOSITION, position);
     };
-  }, [open]);
+  }, [open, disabled, searchLabel]);
   return (
     <>
       <Button
         ref={button}
+        id={triggerId}
+        disabled={disabled}
         className={`ui-menu-trigger${iconOnly ? ' ui-icon-button' : ''} ${className}`}
         aria-label={label}
         aria-haspopup="menu"
@@ -121,33 +153,7 @@ export function Dropdown({
             close();
             return;
           }
-          const typing = event.target instanceof HTMLInputElement;
-          if (typing && event.key === 'Enter') {
-            event.preventDefault();
-            return;
-          }
-          if (typing && !['ArrowDown', 'ArrowUp'].includes(event.key)) return;
-          const items = Array.from(
-            panel.current?.querySelectorAll<HTMLElement>(
-              "[role^='menuitem']:not(:disabled)",
-            ) ?? [],
-          );
-          const index = items.indexOf(document.activeElement as HTMLElement);
-          if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key))
-            return;
-          if (!items.length) return;
-          event.preventDefault();
-          const next =
-            event.key === 'Home'
-              ? 0
-              : event.key === 'End'
-                ? items.length - 1
-                : event.key === 'ArrowDown'
-                  ? (index + 1) % items.length
-                  : index < 0
-                    ? items.length - 1
-                    : (index - 1 + items.length) % items.length;
-          items[next]?.focus();
+          moveMenuFocus(event);
         }}
       >
         {searchLabel && (

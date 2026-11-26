@@ -41,6 +41,8 @@ export interface ChainSnapshot {
   aggregatedAt: number | null;
   // Whether the program's history is fully read; null before the index ever ran.
   backfillDone: boolean | null;
+  indexedAt?: number | null;
+  historyFloorMs?: number | null;
   days: ChainDay[];
   error: string | null;
 }
@@ -79,6 +81,17 @@ export function parseChainStats(value: unknown): Omit<ChainSnapshot, 'error'> {
     aggregatedAt: nullable(body.aggregatedAt, (present) =>
       num(present, 'chain.aggregatedAt'),
     ),
+    historyFloorMs:
+      typeof index?.historyFloorMs === 'number' &&
+      Number.isSafeInteger(index.historyFloorMs) &&
+      index.historyFloorMs >= 0
+        ? index.historyFloorMs
+        : null,
+    indexedAt: index
+      ? nullable(index.updatedAt, (value) =>
+          num(value, 'chain.index.updatedAt'),
+        )
+      : null,
     backfillDone: index
       ? flag(index.backfillDone, 'chain.index.backfillDone')
       : null,
@@ -173,12 +186,32 @@ export function summarizeChain(snapshot: ChainSnapshot): ChainSummary {
 
 // One point per day of the range, oldest first: what Gyblos channels settled that day (0 without
 // activity), for the daily chart.
-export function dailySettled(snapshot: ChainSnapshot) {
-  return snapshot.days.map((day) => ({
-    day: day.day,
-    settled: day.gyblos?.settled ?? 0n,
-    settles: day.gyblos?.settles ?? 0,
-  }));
+function indexedDay(chain: ChainSnapshot, date: string) {
+  const start = Date.parse(date);
+  return (
+    !chain.error &&
+    chain.backfillDone === true &&
+    chain.historyFloorMs != null &&
+    start >= chain.historyFloorMs &&
+    chain.indexedAt != null &&
+    chain.indexedAt >= start + UNITS.msPerDay
+  );
+}
+
+export function dailySettled(
+  snapshot: ChainSnapshot,
+  dates = snapshot.days.map((row) => row.day),
+) {
+  const rows = new Map(snapshot.days.map((row) => [row.day, row]));
+  return dates.map((day) => {
+    const row = rows.get(day);
+    const covered = !!row && indexedDay(snapshot, day);
+    return {
+      day,
+      settled: row?.gyblos?.settled ?? (covered ? 0n : null),
+      settles: row?.gyblos?.settles ?? (covered ? 0 : null),
+    };
+  });
 }
 
 export const chainHistoryNote = (backfillDone: boolean | null) =>
@@ -187,3 +220,22 @@ export const chainHistoryNote = (backfillDone: boolean | null) =>
     : backfillDone
       ? null
       : 'reading chain history';
+
+export function dailyPayouts(dates: string[], chain: ChainSnapshot) {
+  const rows = new Map(chain.days.map((day) => [day.day, day]));
+  const covered = (date: string) => indexedDay(chain, date);
+  const points = dates.map((date) => {
+    const row = rows.get(date);
+    if (!row || chain.error) return null;
+    return row.gyblos?.paidOut ?? (covered(date) ? 0n : null);
+  });
+  const observed = points.filter((amount) => amount !== null);
+  const complete = dates.every(covered) && observed.length === dates.length;
+  return {
+    points,
+    total: observed.length
+      ? observed.reduce((sum, amount) => sum + amount, 0n)
+      : null,
+    complete,
+  };
+}

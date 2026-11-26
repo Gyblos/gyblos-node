@@ -36,7 +36,7 @@ const styles = sortCx({
   variant: {
     bold: 'py-0.5 text-body-medium',
     subtle: 'py-1 text-body-medium',
-    caption: 'py-1 text-caption-1-medium',
+    caption: 'gap-1 py-px text-caption-1-medium',
   },
   color: CHIP_COLORS,
 });

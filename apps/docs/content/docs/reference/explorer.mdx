@@ -9,15 +9,25 @@ explorer shows a short version of it.
 
 ## Pages [#pages]
 
-| Page            | What it shows                                                                       |
-| --------------- | ----------------------------------------------------------------------------------- |
-| Network (`/`)   | An overview of the range, the first sellers and the latest channel transactions.    |
-| `/sellers`      | Every seller online now, and the ones offline or not published.                     |
-| `/models`       | Each model offered now, its lowest paid prices, and what was served over the range. |
-| `/transactions` | Every Gyblos channel transaction, newest first.                                     |
-| `/stats`        | Usage and payments over the range, with their daily tables and unserved demand.     |
+| Page            | What it shows                                                                            |
+| --------------- | ---------------------------------------------------------------------------------------- |
+| Network (`/`)   | Recorded tokens and requests, payments to sellers, current offers and recent operations. |
+| `/sellers`      | Every seller online now, and the ones offline or not published.                          |
+| `/models`       | Each model offered now, its lowest paid prices, and what was served over the range.      |
+| `/transactions` | Every Gyblos channel transaction, newest first.                                          |
+| `/stats`        | Usage and payments over the range, with their daily tables and unserved demand.          |
 
-A seller counts as online when the discovery index lists it, so the overview count and the tables agree. Each section that covers a span of days (Overview, Models, Usage, Payments and a seller's Activity) has its own 7, 30 or 90 day control, kept in the page address. Columns with arrows sort the table: highest first, then lowest first, then the default order. The day columns and Unserved demand already show newest or most requests first, so their first click shows oldest or fewest first.
+All historical periods end at the last completed UTC calendar day. **All** opens the available history. **24h** opens the last completed UTC day, and **7d** and **30d** open that many completed days. Each chart date represents one UTC day. An observed zero and a day without observations have different marks. Daily payouts and settlements show a recorded amount whenever one is available. An empty day shows zero only when the chain index reports coverage for that entire UTC day.
+
+On Network, select tokens, requests or seller payouts. The chart follows the page period unless you change its own selector. **Daily breakdown** opens that metric and period in Stats. The daily tokens table divides the total into input and output, the requests table into free and paid. Payments shows the amount received by sellers separately from settlements. Usage and Payments share the period selector. All-time totals compare the latest two closed seven-day windows when a baseline is available. Receipt comparisons show the number of observed days on each side.
+
+Current offers have their own update time. Open the model, seller or wallet address from an offer row, or the individual operation from its transaction row. Tables keep their headers and pagination; on narrow screens the daily tables let you choose a column group or all columns.
+
+Model and seller pages show published input and output prices in USDC per million tokens. Each bar is one indexed offer period. The selector switches between sellers or model variants and context sizes. Fixed ranges follow the selected UTC days. All covers up to 92 days of retained index history. A partial-history notice means that older matching periods may be missing.
+
+A seller counts as online when the discovery index lists it. Column headers with arrows cycle through descending, ascending and default order. Dates and demand start with the newest days and highest demand respectively. For a fixed period, the comparison uses the immediately preceding period of equal length.
+
+In the requests-per-day charts on Stats, hovering a day shows how complete it is: "so far" for today, "pending" for a day the collector has not counted yet (today too, for up to 10 minutes after new requests; its bar may still show the earlier count), and "not captured" for a day before the collector started, which is not a zero. A day without a note is final, so an empty one is a real zero, unless the collector reported no state for it (an older collector), which also shows no note.
 
 ## Check mark and names [#verified]
 
@@ -29,7 +39,17 @@ with [Verify your GitHub account](/en/sellers/identity#verify-github).
 A name in smaller type below an account or NodeId is a name the seller chose. Nobody verifies it, and
 another seller can use the same name. The ✓ always belongs to the GitHub account, never to the name.
 
+## Buyers [#buyers]
+
+The Buyers card in Usage on Stats counts distinct buyers of all time: free buyers
+by NodeId and paid buyers by wallet (or by NodeId when the receipt names no wallet), never added
+together. For a 24h, 7-day or 30-day window, the card also shows newly seen buyers. A buyer counts from its first receipt reported by the seller and not disputed by the buyer, and stays counted even if that receipt is disputed later. Both are counted up to the end of yesterday (UTC), so today's new buyers appear
+tomorrow. A count below 5, zero included, is shown as "< 5". See
+[Data and privacy](/en/reference/data-and-privacy#receipts) for what these counts can and cannot hide.
+
 ## Channel transactions [#channel-transactions]
+
+The page numbers let you jump directly to a page of operations and show how many pages match the current recipient filter.
 
 Each row is one change to a Gyblos payment channel. The amount depends on the type:
 

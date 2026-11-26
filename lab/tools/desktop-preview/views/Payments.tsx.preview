@@ -1,6 +1,7 @@
 // Composes wallet metadata and the guarded shared PayPal session. Navigation never starts a payment.
-import { ArrowUpRight, Gauge, PaypalLogo, Receipt, Wallet } from '@phosphor-icons/react';
+import { ArrowUpRight, Gauge, Key, PaypalLogo, Receipt, Wallet } from '@phosphor-icons/react';
 import { useState, type KeyboardEvent } from 'react';
+import { ActionButton } from './ActionButton';
 import { ActivitySessions } from './ActivitySessions';
 import { useUsdcApiKeys } from './useUsdcApiKeys';
 import { usdcApiAmount } from '../usdc-api-model';
@@ -25,6 +26,7 @@ import { Badge, Button, IconButton, PagePanel, StatCard, StatGrid } from './UI';
 import type { ActivityView } from './useActivity';
 import type { PaypalSessionView } from './usePaypalSession';
 import type { X402View } from './useX402';
+import { useBuyerFunding } from './useBuyerFunding';
 import { WalletDetails } from './WalletDetails';
 import { useDesktopWallet } from './WalletState';
 import { X402Payments } from './X402Payments';
@@ -81,6 +83,7 @@ function TabBar({ tab, onTab }: { tab: Tab; onTab(tab: Tab): void }) {
   );
 }
 export function Payments(props: Props) {
+  const observation = useBuyerFunding(props.x402?.state.policy?.payer);
   const requested = new URLSearchParams(location.search).get('tab');
   const [tab, setTab] = useState<Tab>(props.initialTab ?? (isTab(requested) ? requested : 'overview'));
   const [budgetOpen, setBudgetOpen] = useState(false);
@@ -149,7 +152,7 @@ export function Payments(props: Props) {
       <PreviewFundsDialog host={FUNDS_HOST.PAYMENTS} />
       <MotionPresence>{walletOpen && (
         <Modal title="Wallet details" size="lg" close={() => setWalletOpen(false)}>
-          <WalletDetails
+          <WalletDetails observation={observation}
             onBackup={() => {
               setWalletOpen(false);
               props.onBackup();
@@ -174,7 +177,7 @@ function SpendingSummary({ onLimits }: { onLimits(): void }) {
     <section className="ui-section preview-spending" aria-label="Spending">
       <div className="ui-section-title">
         <h2>Spending</h2>
-        <Button onClick={onLimits}><Gauge size={16} />Spending limits</Button>
+        <ActionButton icon={<Gauge size={16} />} label="Spending limits" onClick={onLimits} />
       </div>
       <StatGrid>
         <StatCard label="Spent · USDC" help="USDC paid for chat replies and API key requests. Free models cost nothing." value={accountAmount(String(spent))} detail="Chat and API keys" icon={Receipt} />
@@ -233,7 +236,7 @@ function Limits({ buyer, onBudget, onConnections }: {
       <section className="ui-section" aria-label="API key limits">
         <div className="ui-section-title">
           <h2>API keys</h2>
-          <Button onClick={onConnections}>Manage keys</Button>
+          <ActionButton icon={<Key size={16} />} label="Manage keys" onClick={onConnections} />
         </div>
         <p className="ui-help-text">Each key can have its own limit inside the spending limit.</p>
         <div className="preview-simple-table-region">

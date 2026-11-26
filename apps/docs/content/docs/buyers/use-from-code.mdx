@@ -12,17 +12,23 @@ prompt. Don't send passwords, keys or other secrets. See [Data and privacy](/en/
 
 ## Automatic seller selection
 
-For an existing open-discovery buyer with a channel policy and a positive per-response limit, enable Auto with the maximum input and output prices you accept in USDC per million tokens. For example:
+Auto lets your buyer pick a seller for you. By default it uses free offers only. To let it use paid offers, open
+**Usage & payments → Limits** in the desktop app and choose **Manage chat budget**. Under **Automatic seller
+selection**, check **Allow paid offers in Auto**, then enter:
 
-In desktop, open **Payments → Automatic seller selection**. Enable paid offers and save the maximum per response and both prices in USDC per million tokens. In chat, open the model and select **Auto**. The CLI and OpenCode share these limits when connected to this buyer. Turn off paid offers to return Auto to free-only discovery.
+- the maximum per response, in USDC;
+- the maximum input price and the maximum output price, in USDC per million tokens.
 
-From the source checkout, use the same `GYBLOS_HOME` as the buyer serving OpenCode.
+Then choose **Save Auto settings**. The section appears when your buyer finds sellers on its own (open
+discovery), and you can save it only for the buyer the app manages: for a buyer you connected separately, the app refuses the change. In chat, open the model and select **Auto**. For now, paid Auto in chat covers `qwen3-0.6b` only;
+for other models Auto still uses free offers only, though you can still pick a specific paid seller from the model menu.
 
-```sh
-pnpm buyer:auto 0.052 0.208
-```
-
-Restart the buyer, then select the model in OpenCode. Auto asks verified sellers for signed offers. Your per-response limit and the remaining API key budget still apply. A zero-budget key can only use free offers. Auto may settle the previous channel before opening a replacement within the remaining deposit authority. To return to free-only open discovery, run `pnpm buyer:auto off` and restart the buyer.
+These limits apply to chat and to every API key on this buyer, so your coding tools follow them too. The maximum
+per response is the buyer's limit for every paid answer, not only Auto's, and it stays when you turn paid offers
+off. Auto asks verified sellers for signed offers. The remaining budget of each API key still applies, and a key
+with a limit of `0` can only use free offers. Auto may settle the previous channel before opening a replacement
+within the remaining deposit authority. To return Auto to free offers only, clear **Allow paid offers in Auto**
+and choose **Save Auto settings**.
 
 ## Prerequisites [#before-you-start]
 
@@ -32,9 +38,9 @@ Restart the buyer, then select the model in OpenCode. Auto asks verified sellers
 
 ## Create an API key [#create-an-api-key]
 
-1. In the app, open **Connections**. If it asks you to connect your buyer, choose **Go to Payments** and
+1. In the app, open **Connections**. If it asks you to connect your buyer, choose **Open Usage & payments** and
    start it there.
-2. Under **Create an API key**, enter a **Name** and a **Spend limit**, then choose **Create API key**.
+2. Choose **Create your first API key** or **New API key**, enter a **Name** and a **Limit for this key**, then choose **Create API key**.
    The limit is the total this key may spend, in devnet USDC. It never resets and can't be raised later.
    A limit of `0` allows free models only.
 3. Choose **Copy API key** and **Copy Base URL**. The app keeps the key hidden on screen; paste it
@@ -45,15 +51,15 @@ key keeps working, but the app can't copy the key again. The key never appears i
 configuration or in chat history. **Revoke key** stops new requests with that key; what it already spent
 stays recorded.
 
-The Base URL can change when you restart the app. After a restart, choose **Copy Base URL** again and, if
+The app-managed buyer keeps its Base URL across restarts. A separately connected buyer may use a different URL. After a restart, choose **Copy Base URL** again and, if
 it changed, update your tool or choose **Write configuration** again.
 
 ## Connect a coding agent [#connect-a-coding-agent]
 
 The app sets up OpenCode, pi, Codex CLI and Claude Code for you, with every model it can use:
 
-1. In **Connections**, select an active key and choose **Connect agent**.
-2. Pick the **Agent** and review the configuration the app shows.
+1. In **Connections**, open **Details** for an active key and choose **Connect a tool**.
+2. Pick the **Tool** and review the configuration the app shows.
 3. Choose **Write configuration**. The app changes only the `gyblos` provider and keeps a copy of the
    previous file. For Claude Code, copy the variables into your shell instead.
 4. The configuration reads the key from `GYBLOS_API_KEY`. Set it in the shell that starts the agent:

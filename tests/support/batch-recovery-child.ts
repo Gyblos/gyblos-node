@@ -7,7 +7,10 @@ import {
   type MessagePartialSigner,
 } from '@solana/kit';
 
-import { batchPoolPathsIn, batchSessionPathsIn } from '@gyblos/config/home';
+import {
+  batchPoolPathsIn,
+  batchSessionPathsIn,
+} from '@gyblos/config/home-payments';
 import { buyerPaymentsUnresolved } from '@gyblos/node/buyer-chain';
 import { WITHDRAW_STEPS } from '@gyblos/payments-upto';
 import {

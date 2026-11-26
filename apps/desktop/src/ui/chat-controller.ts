@@ -3,6 +3,7 @@
 import type { ReasoningLevel } from '@gyblos/protocol/constants';
 
 import { restoreChatArchive, type ChatArchive } from '../chat-archive-model';
+import { CHAT_STORAGE } from '../constants';
 import { PAYMENT_METHOD, type PaymentMethod } from '../paypal-model';
 import { parseResponseMetrics } from '../response-metrics';
 import {
@@ -11,6 +12,7 @@ import {
   startRun,
   stopRun,
   type ChatSession,
+  type ChatSnapshot,
 } from './chat-state';
 import {
   CHAT_PHASE,
@@ -29,14 +31,10 @@ import type { ToolId } from './tools';
 export type ChatScheduler = {
   schedule: (callback: () => void, delay: number) => () => void;
 };
-type Snapshot = { sessions: ChatSession[]; activeId: string };
-type ScheduledRun = {
-  run: NonNullable<ChatSession['run']>;
-  cancel: () => void;
-};
+type ScheduledRun = { run: NonNullable<ChatSession['run']>; cancel(): void };
 
 export class ChatController {
-  private snapshot: Snapshot;
+  private snapshot: ChatSnapshot;
   private online = true;
   private restoring = false;
   private scheduler: ChatScheduler | null = null;
@@ -46,6 +44,7 @@ export class ChatController {
   constructor(
     firstId: string,
     private readonly now: () => number = Date.now,
+    private readonly activityClock: () => number = () => performance.now(),
   ) {
     this.snapshot = { sessions: [createSession(firstId)], activeId: firstId };
   }
@@ -87,6 +86,40 @@ export class ChatController {
     this.publish({
       activeId: id,
       sessions: [...this.snapshot.sessions, { ...createSession(id), draft }],
+    });
+  }
+  renameChat(id: string, title: string) {
+    const name = title.trim();
+    if (
+      !this.restoring &&
+      id === this.snapshot.activeId &&
+      name &&
+      name.length <= CHAT_STORAGE.MAX_TITLE_CHARACTERS
+    )
+      this.updateActive((session) => ({ ...session, title: name }));
+  }
+  pinChat(id: string, pinned: boolean) {
+    if (this.restoring || id !== this.snapshot.activeId) return;
+    this.updateActive((session) => {
+      const next = { ...session };
+      if (pinned) next.pinned = true;
+      else delete next.pinned;
+      return next;
+    });
+  }
+  deleteChat(id: string, replacement: string) {
+    const current = this.snapshot.sessions.find((session) => session.id === id);
+    if (this.restoring || !current || current.run || current.paypalRun) return;
+    const sessions = this.snapshot.sessions.filter(
+      (session) => session.id !== id,
+    );
+    if (!sessions.length) sessions.push(createSession(replacement));
+    this.publish({
+      sessions,
+      activeId:
+        this.snapshot.activeId === id
+          ? sessions[sessions.length - 1]!.id
+          : this.snapshot.activeId,
     });
   }
   openChat(id: string) {
@@ -208,6 +241,7 @@ export class ChatController {
           paymentMethod: method,
           ...(paymentSessionId ? { paymentSessionId } : {}),
           sentAt: null,
+          activity: { started: this.activityClock() },
         },
       ],
     }));
@@ -231,6 +265,7 @@ export class ChatController {
               text,
               model: { ...model },
               state: MESSAGE_STATE.COMPLETE,
+              ...this.endActivity(message),
               ...(metrics ? { metrics } : {}),
             }
           : message,
@@ -238,12 +273,23 @@ export class ChatController {
     }));
   }
   appendBuyer(sessionId: string, id: string, text: string) {
+    if (!text) return;
     this.updatePaypal(sessionId, id, (session) => ({
       ...session,
       messages: session.messages.map((message) =>
         message.id === `${id}-assistant` &&
         message.paymentMethod === PAYMENT_METHOD.USDC
-          ? { ...message, text: message.text + text }
+          ? {
+              ...message,
+              text: message.text + text,
+              ...(message.activity &&
+                message.activity.first === undefined && {
+                  activity: {
+                    ...message.activity,
+                    first: this.activityClock(),
+                  },
+                }),
+            }
           : message,
       ),
     }));
@@ -257,7 +303,11 @@ export class ChatController {
             paypalRun: null,
             messages: session.messages.map((message) =>
               message.id === `${id}-assistant`
-                ? { ...message, state: MESSAGE_STATE.STOPPED }
+                ? {
+                    ...message,
+                    state: MESSAGE_STATE.STOPPED,
+                    ...this.endActivity(message),
+                  }
                 : message,
             ),
           },
@@ -274,10 +324,18 @@ export class ChatController {
       notice,
       messages: session.messages.map((message) =>
         message.id === `${id}-assistant`
-          ? { ...message, state: MESSAGE_STATE.FAILED }
+          ? {
+              ...message,
+              state: MESSAGE_STATE.FAILED,
+              ...this.endActivity(message),
+            }
           : message,
       ),
     }));
+  }
+  private endActivity({ activity }: ChatSession['messages'][number]) {
+    if (!activity) return {};
+    return { activity: { ...activity, ended: this.activityClock() } };
   }
   private updatePaypal(
     sessionId: string,
@@ -301,7 +359,7 @@ export class ChatController {
       ),
     });
   }
-  private publish(snapshot: Snapshot) {
+  private publish(snapshot: ChatSnapshot) {
     this.snapshot = snapshot;
     this.syncTimers();
     for (const listener of this.listeners) listener();

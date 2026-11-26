@@ -24,12 +24,14 @@ they disagree, `AGENTS.md` and `tooling/boundaries/config.ts` win.
    core, config, runtime and its SDK; never another adapter, `node` or apps.
 4. Composes adapters into a running local node for either role (lifecycle,
    roles/keys, seller free channels, control startup)? -> `packages/node`.
+   Buyer orchestration (selection, discovery, routing, payment sessions, the
+   buyer endpoint, buyer API keys)? -> `packages/buyer`.
 5. A process the user starts or deploys (CLI flags, proxy, reconcile, Electron,
-   a Worker)? -> `apps/node`, `apps/buyer`, `apps/desktop` or
+   a Worker)? -> `apps/node`, `apps/buyer` (arguments and process lifecycle only), `apps/desktop` or
    `apps/discovery-index`. Apps never import each other; shared logic moves down
    to `packages/node` or core.
 6. Operator-changeable value (port, limit, timeout, relay, index URL) or a local
-   path? -> `packages/config` (`src/home.ts` for paths). Fixed operational
+   path? -> `packages/config` (`src/home*.ts` for paths). Fixed operational
    values stay in the owning package's `constants.ts`.
 7. Platform helper with no product meaning (atomic JSON, private logs,
    processes, memory, loopback guard)? -> `packages/runtime` (config only).
@@ -42,7 +44,7 @@ they disagree, `AGENTS.md` and `tooling/boundaries/config.ts` win.
 Splitting by concern inside a package uses a filename prefix, as in
 `packages/protocol/src/control-*.ts`, `packages/core/src/seller-selection-*.ts`,
 `packages/transport-iroh/src/control-{client,server,io}.ts` and
-`apps/buyer/src/selection-*.ts`.
+`packages/buyer/src/selection-*.ts`.
 
 ## 2. Worked examples from the tree
 
@@ -56,10 +58,10 @@ Splitting by concern inside a package uses a filename prefix, as in
 | seller control startup/readiness            | `packages/node/src/control-*.ts`                                | composes transport + core                                  |
 | seller engine plugin (refuse, create)       | `packages/node/src/engine-registry-<kind>.ts`                   | implements `engine-factory`; register in `engine-registry` |
 | seller daemon composition                   | `packages/node/src/seller.ts`                                   | free offer only; paid selling off until phase 2            |
-| buyer selection proxy, offer race           | `apps/buyer/src/selection-proxy.ts`, `offer-race.ts`            | executable wiring                                          |
+| buyer selection, offer race                 | `packages/buyer/src/selection.ts`, `offer-race.ts`              | buyer orchestration; `apps/buyer` only parses arguments    |
 | discovery index client                      | `packages/discovery-http`                                       | HTTP adapter; index defaults in `config`                   |
 | discovery index server (Worker)             | `apps/discovery-index`                                          | deployable app; verification via protocol only             |
-| `GYBLOS_HOME` / `GYBLOS_LAB_HOME` layout    | `packages/config/src/home.ts`                                   | single path owner                                          |
+| `GYBLOS_HOME` / `GYBLOS_LAB_HOME` layout    | `packages/config/src/home*.ts`                                  | only path owners                                           |
 | `config.toml` validator, precedence         | `packages/node/src/node-config*.ts`, `packages/node/schemas/`   | node composes adapter URL policies                           |
 | `gyblos` CLI (`config validate`)            | `apps/node/src/bin.ts` → `entry.ts` → `cli.ts`                  | one entry; output never prints env values                  |
 | devnet wallet config, `gate:*`              | `lab/harness`                                                   | lab-only                                                   |

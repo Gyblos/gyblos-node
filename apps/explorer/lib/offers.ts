@@ -1,7 +1,6 @@
-// Owns the summary of the offers in the discovery index: free vs paid offers, the average 24 h
-// uptime, and per model the sellers, free offers, cheapest paid prices and largest context.
-import { DISPLAY } from './constants';
+import { PAGES, RANGE } from './constants';
 import type { DiscoverySnapshot, OfferedModel, Seller } from './discovery';
+import { rangeValue, type RangeDays } from './range';
 
 export interface ModelOffers {
   modelId: string;
@@ -19,6 +18,45 @@ export const modelKey = (model: {
   variant: string | null;
   quantization: string | null;
 }) => JSON.stringify([model.modelId, model.variant, model.quantization]);
+type ModelIdentity = Pick<OfferedModel, 'modelId' | 'variant' | 'quantization'>;
+
+export function modelHref(
+  model: ModelIdentity,
+  days?: RangeDays,
+  closed = false,
+) {
+  const slug = encodeURIComponent(modelKey(model))
+    .replaceAll('~', '%7E')
+    .replaceAll('%', '~');
+  const params = new URLSearchParams();
+  if (days && days !== RANGE.defaultDays)
+    params.set(RANGE.param, rangeValue(days));
+  if (closed) params.set(RANGE.closedParam, '1');
+  const search = params.toString();
+  return `${PAGES.models}/${slug}${search ? `?${search}` : ''}`;
+}
+
+const MODEL_FIELDS = 3;
+
+export function modelFromSlug(slug: string): ModelIdentity | null {
+  try {
+    const fields: unknown = JSON.parse(
+      decodeURIComponent(slug.replaceAll('~', '%')),
+    );
+    if (!Array.isArray(fields) || fields.length !== MODEL_FIELDS) return null;
+    const [modelId, variant, quantization]: unknown[] = fields;
+    if (
+      typeof modelId !== 'string' ||
+      !modelId ||
+      (variant !== null && typeof variant !== 'string') ||
+      (quantization !== null && typeof quantization !== 'string')
+    )
+      return null;
+    return { modelId, variant, quantization };
+  } catch {
+    return null;
+  }
+}
 const isFree = (model: OfferedModel) =>
   model.pricing.inputAtomicPerMtok === '0' &&
   model.pricing.outputAtomicPerMtok === '0';
@@ -30,9 +68,6 @@ export const uptimeRatio = (seller: Seller, days: number) =>
 
 export function summarizeOffers(snapshot: DiscoverySnapshot) {
   const offers = snapshot.sellers.flatMap((seller) => seller.models);
-  const day = snapshot.sellers
-    .map((seller) => uptimeRatio(seller, DISPLAY.dayWindow))
-    .filter((ratio): ratio is number => typeof ratio === 'number');
   const models = new Map<string, ModelOffers>();
   for (const offer of offers) {
     const key = modelKey(offer);
@@ -77,11 +112,6 @@ export function summarizeOffers(snapshot: DiscoverySnapshot) {
         model.minOutput === null ? low : lowest(low, model.minOutput),
       null,
     ),
-    // Listed sellers with a 24 h uptime read, over which averageDayUptime is taken.
-    sellersWithDayUptime: day.length,
-    averageDayUptime: day.length
-      ? day.reduce((sum, ratio) => sum + ratio, 0) / day.length
-      : null,
     models,
   };
 }

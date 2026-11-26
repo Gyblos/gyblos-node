@@ -14,7 +14,7 @@ desactivar lo que es opcional.
 | Tus prompts y las respuestas                                | El vendedor que atiende la solicitud y su proveedor de motor | En cada solicitud                                                                                       | No se puede: un vendedor tiene que leer el prompt para responder |
 | [Recibos firmados](#recibos)                                | El recolector de métricas, `collector.gyblos.com`            | Versiones publicadas, más o menos una vez por minuto                                                    | No se puede                                                      |
 | [Observaciones de telemetría](#observaciones)               | El recolector de métricas                                    | Versiones publicadas, junto con los recibos                                                             | Sí: `GYBLOS_OBSERVATIONS=off`                                    |
-| [Registros públicos del vendedor](#descubrimiento)          | El índice de descubrimiento, `discovery.gyblos.com`          | Mientras el vendedor está listado; la lista de la red, más tiempo                                       | En parte: pon `publish = false`                                  |
+| [Registros públicos del vendedor](#descubrimiento)          | El índice de descubrimiento, `discovery.gyblos.com`          | Mientras el vendedor está listado; la lista de la red y el historial de precios, más tiempo             | En parte: pon `publish = false`                                  |
 | [Registro](#descubrimiento)                                 | El índice de descubrimiento y Solana devnet                  | Una vez, cuando ejecutas `gyblos seller register`                                                       | Tú decides si te registras                                       |
 | [Verificación de GitHub](#github)                           | El índice de descubrimiento, que luego lee tu gist en GitHub | Solo cuando ejecutas `gyblos seller verify github`; el índice vuelve a revisar cada 6 horas más o menos | Tú decides si verificas; `--cancel` lo quita                     |
 | [Nombre del vendedor](#nombre-del-vendedor)                 | El índice de descubrimiento                                  | Solo cuando ejecutas `gyblos seller name`                                                               | Tú decides si pones uno; `--clear` lo quita                      |
@@ -83,6 +83,16 @@ descartan. La subida nunca retrasa ni bloquea una respuesta.
 de la red, por modelo y por vendedor, identificados por NodeId. Usa tu dirección IP para limitar la tasa
 de solicitudes y no la guarda.
 
+Para días UTC completos, el endpoint de actividad de la red agrupa las solicitudes, los tokens y los pagos indexados a vendedores en intervalos de media hora. Publica totales de toda la red y admite hasta siete días por consulta. Si un intervalo contiene una sola solicitud, se puede deducir cuántos tokens procesó. La respuesta omite identificadores y desgloses por modelo o vendedor.
+
+Los totales de la red también cuentan compradores distintos: los gratuitos por NodeId y los de pago por
+billetera (o por NodeId cuando un recibo de pago no nombra billetera), sin sumarlos nunca. Cada conteo
+se publica para todo el historial y para los compradores cuyo primer recibo informado por el vendedor y no disputado por el comprador cae en los días elegidos. Un comprador sigue contado aunque ese recibo se dispute después. Los compradores nuevos de hoy se cuentan solo cuando termina el
+día UTC. Un conteo menor que 5, incluido el cero, se oculta. Son solo conteos, nunca quiénes son esos
+compradores. Aun así, restar los conteos de dos rangos, o del historial y un rango, puede dar conteos
+menores que 5, hasta los compradores nuevos de un solo día, y quien cree sus propias llaves puede
+llevar un conteo por encima de 5.
+
 **En tu equipo.** El vendedor guarda los recibos pendientes hasta que el recolector los acepta, más un
 historial corto de los ya subidos (como máximo 256, durante hasta siete días). `gyblos seller status`
 muestra la cola.
@@ -98,6 +108,12 @@ Cada evento nombra el NodeId del comprador y, cuando ya se eligió uno, el NodeI
 identificador de solicitud, el modelo, los tiempos y, cuando se conocen, el número de tokens, los tamaños
 y el monto cobrado. Por eso las observaciones muestran a qué vendedores intentó llegar un comprador y
 cuándo, incluidos los intentos que no generaron recibo.
+
+El recolector publica solo totales diarios de estos eventos. Para la demanda no atendida lista hasta 20
+modelos por día, primero los más pedidos, y además el número de modelos y de solicitudes detrás de esa lista.
+Un día con 20 modelos o menos los lista todos, incluso uno pedido una sola vez; pasados los 20, el resto
+cuenta solo en los totales del día, sin su nombre. Cada día indica también si sus totales
+son finales, parciales, pendientes o no capturados, y cuándo se calcularon por última vez. El primer día con algún recibo u observación, aunque no sume a ningún total publicado, es público como el inicio de la captura: los días anteriores aparecen como "not captured".
 
 Las versiones publicadas envían las observaciones junto con los recibos. Esperan en memoria, como máximo
 5.000 eventos, así que un reinicio pierde las que aún no se enviaron.
@@ -165,6 +181,19 @@ vez que el índice lo vio, y sus modelos mientras está online. Dejar de publica
 lista: un vendedor registrado sigue en ella, y cualquier otro hasta 30 días después de su última
 presencia. No muestra la dirección del dueño, el contacto, el país ni la dirección IP. Un NodeId
 revocado aparece solo mientras está online.
+
+El índice también guarda el historial de cada catálogo que acepta (`/v1/offers/history`): el NodeId, la
+dirección del dueño, cada modelo ofrecido con su precio exacto, y cuándo ese catálogo empezó, se renovó
+por última vez y terminó (reemplazado, retirado o vencido). Cualquiera puede leerlo por NodeId o por
+modelo, hasta los últimos 92 días por consulta. Se conserva aunque dejes de publicar, unos diez años
+después de que termina cada catálogo, para que los precios pasados sigan siendo rastreables.
+
+El índice también publica cuántos vendedores estuvieron online cada día (`/v1/network/history`): el
+promedio y el máximo por día UTC, sin NodeIds, calculados con el mismo uptime que el índice ya guarda.
+
+`/v1/models/catalog` lista los modelos ofrecidos, hasta 500, cada uno con una `family` y un `lab` leídos del id del modelo,
+nunca de lo que declara el vendedor. Un id que ninguna regla reconoce muestra la familia `other` y su
+publicador, o `Unknown`, como laboratorio, con `source: "fallback"`. No agrega datos del vendedor.
 
 Los compradores y la app de escritorio leen el índice para encontrar vendedores. `gyblos seller status
 --online` además le pide el uptime del propio vendedor por su NodeId, que el vendedor ya publica ahí. El

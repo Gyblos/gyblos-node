@@ -2,7 +2,7 @@
 // No UI/IPC/automatic creation, payment APIs, balance queries or native-store replacement.
 import { mkdir } from 'node:fs/promises';
 
-import { desktopWalletLibraryPaths } from '@gyblos/config/home';
+import { desktopWalletLibraryPaths } from '@gyblos/config/home-desktop';
 
 import { createBackupFlow, type BackupDialogs } from './backup-flow';
 import { BACKUP, createBackupCodec } from './backup/index';

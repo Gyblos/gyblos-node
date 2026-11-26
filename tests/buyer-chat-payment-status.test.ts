@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { chatSession, runOwnedChat } from '@gyblos/buyer/chat-cli';
+import { chatSession, runOwnedChat } from '@gyblos/buyer-app/chat-cli';
 import { chatTurn } from '@gyblos/buyer/chat-cli-turn';
 import { PAID_VERDICTS } from '@gyblos/buyer/constants';
 import { startFreeBuyerHttp } from '@gyblos/buyer/free-http';

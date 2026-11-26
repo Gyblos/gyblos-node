@@ -12,6 +12,8 @@ export interface DayBounds {
 export interface DayRange {
   from: string;
   to: string;
+  range?: typeof AGGREGATES.allTimeRange;
+  historyAvailable?: boolean;
 }
 const DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const ISO_TIME = 'T00:00:00.000Z';

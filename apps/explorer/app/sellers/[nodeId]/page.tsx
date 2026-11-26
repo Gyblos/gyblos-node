@@ -1,19 +1,22 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 
+import { OfferPriceHistory } from '../../../components/offer-price-history';
 import { PageFrame } from '../../../components/page-frame';
+import { QueryRegion } from '../../../components/query-region';
 import { SellerActivity } from '../../../components/seller-activity';
 import { SellerProfileSection } from '../../../components/seller-profile';
 import { SellerTxs } from '../../../components/seller-txs';
 import { Loading } from '../../../components/ui';
-import { SELLER_STATUS } from '../../../lib/constants';
+import { ALL_TIME, PAGES, SELLER_STATUS } from '../../../lib/constants';
 import { getDiscovery } from '../../../lib/discovery-render';
 import { short } from '../../../lib/format';
-import { rangeOf, readQuery } from '../../../lib/paging';
-import { WIDEST_RANGE } from '../../../lib/range';
+import { getOfferPriceHistory } from '../../../lib/offer-price-history';
+import { directoryHref, rangeOf, readQuery } from '../../../lib/paging';
 import { sellerHref } from '../../../lib/seller-identity';
-import { sellerNodeId } from '../../../lib/seller-page';
+import { missingSellerHistory, sellerNodeId } from '../../../lib/seller-page';
 import { sellerProfile, unknownSeller } from '../../../lib/seller-profile';
 import { getSellerStats } from '../../../lib/seller-stats';
 import { SITE } from '../../../lib/site';
@@ -49,25 +52,43 @@ export default async function SellerPage({ params, searchParams }: Props) {
   const nodeId = sellerNodeId((await params).nodeId);
   if (!nodeId) notFound();
   const query = readQuery(await searchParams, sellerHref(nodeId));
-  const [snapshot, stats] = await Promise.all([
+  const days = rangeOf(query, 'activity');
+  const [snapshot, stats, history] = await Promise.all([
     getDiscovery(),
-    getSellerStats(nodeId, WIDEST_RANGE),
+    getSellerStats(nodeId, ALL_TIME),
+    getOfferPriceHistory({ nodeId, days, closed: query.closed }),
   ]);
-  if (unknownSeller(nodeId, snapshot, stats)) notFound();
+  if (
+    unknownSeller(nodeId, snapshot, stats) &&
+    (await missingSellerHistory(history, days, () =>
+      getOfferPriceHistory({ nodeId, days: ALL_TIME }),
+    ))
+  )
+    notFound();
   return (
     <PageFrame
-      title={`Gyblos seller ${nodeId}`}
+      title={`Seller ${short(nodeId)}`}
       crumb={`Seller ${short(nodeId)}`}
     >
       <Suspense fallback={<Loading />}>
-        <SellerProfileSection nodeId={nodeId} />
+        <SellerProfileSection
+          nodeId={nodeId}
+          directory={
+            <Link
+              className="hover:text-ink hover:underline"
+              href={directoryHref(PAGES.sellers, query, 'activity')}
+            >
+              All sellers →
+            </Link>
+          }
+        />
       </Suspense>
-      <Suspense
-        key={`activity-${rangeOf(query, 'activity')}`}
-        fallback={<Loading cards />}
-      >
-        <SellerActivity nodeId={nodeId} query={query} />
-      </Suspense>
+      <QueryRegion>
+        <Suspense fallback={<Loading cards />}>
+          <SellerActivity nodeId={nodeId} query={query} />
+        </Suspense>
+        <OfferPriceHistory history={history} />
+      </QueryRegion>
       <Suspense fallback={<Loading />}>
         <SellerTxs nodeId={nodeId} query={query} />
       </Suspense>

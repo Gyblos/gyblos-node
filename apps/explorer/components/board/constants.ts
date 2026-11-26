@@ -20,6 +20,7 @@ export const CHART = {
 // Animated figures (NumberFlow): each kind's Intl format. USDC keeps up to its 6 decimals.
 export const FLOW_FORMATS = {
   count: {},
+  compact: { notation: 'compact', maximumFractionDigits: 1 },
   percent: { style: 'percent', maximumFractionDigits: 1 },
   usdc: {
     style: 'currency',

@@ -33,7 +33,7 @@ function paginationRange(
   return [1, DOTS, current, DOTS, total];
 }
 const PAGE_CELL =
-  'flex size-6 shrink-0 items-center justify-center rounded-md text-caption-1-medium';
+  'flex size-11 sm:pointer-fine:size-6 shrink-0 items-center justify-center rounded-md text-caption-1-medium';
 
 function Step({
   href,
@@ -52,6 +52,7 @@ function Step({
       variant="secondary"
       size="xs"
       iconOnly
+      className="size-11 sm:pointer-fine:size-6"
       aria-label={label}
       leadingIcon={Icon}
     />
@@ -60,6 +61,7 @@ function Step({
       variant="secondary"
       size="xs"
       iconOnly
+      className="size-11 sm:pointer-fine:size-6"
       aria-label={label}
       disabled
       leadingIcon={Icon}
@@ -77,11 +79,11 @@ export function Pagination({
   nextLabel = 'Next',
   'aria-label': ariaLabel = 'Pagination',
 }: PaginationProps) {
-  if (totalPages <= 1) return null;
+  if (totalPages < 1) return null;
   return (
     <nav
       aria-label={ariaLabel}
-      className={cx('inline-flex items-center gap-1', className)}
+      className={cx('inline-flex max-w-full items-center gap-1', className)}
     >
       <Step
         href={page > 1 ? hrefs[page - 1] : undefined}
@@ -89,13 +91,16 @@ export function Pagination({
         next={false}
       />
       {showPages ? (
-        <ul className="flex min-w-0 items-center gap-0.5">
+        <ul className="flex min-w-0 flex-wrap items-center justify-center gap-0.5">
           {paginationRange(page, totalPages).map((item, i) =>
             item === DOTS ? (
               <li
                 key={`dots-${i}`}
                 aria-hidden
-                className={cx(PAGE_CELL, 'text-text-tertiary')}
+                className={cx(
+                  PAGE_CELL,
+                  'size-auto px-1 text-text-tertiary sm:pointer-fine:size-6 sm:px-0',
+                )}
               >
                 …
               </li>
