@@ -9,13 +9,13 @@ explorer shows a short version of it.
 
 ## Pages [#pages]
 
-| Page            | What it shows                                                                            |
-| --------------- | ---------------------------------------------------------------------------------------- |
-| Network (`/`)   | Recorded tokens and requests, payments to sellers, current offers and recent operations. |
-| `/sellers`      | Every seller online now, and the ones offline or not published.                          |
-| `/models`       | Each model offered now, its lowest paid prices, and what was served over the range.      |
-| `/transactions` | Every Gyblos channel transaction, newest first.                                          |
-| `/stats`        | Usage and payments over the range, with their daily tables and unserved demand.          |
+| Page            | What it shows                                                                                                    |
+| --------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Network (`/`)   | Recorded tokens and requests, sellers online per day, payments to sellers, current offers and recent operations. |
+| `/sellers`      | Every seller online now, and the ones offline or not published.                                                  |
+| `/models`       | Each model offered now, its lowest paid prices, and what was served over the range.                              |
+| `/transactions` | Every Gyblos channel transaction, newest first.                                                                  |
+| `/stats`        | Usage and payments over the range, with their daily tables and unserved demand.                                  |
 
 All historical periods end at the last completed UTC calendar day. **All** opens the available history. **24h** opens the last completed UTC day, and **7d** and **30d** open that many completed days. Each chart date represents one UTC day. An observed zero and a day without observations have different marks. Daily payouts and settlements show a recorded amount whenever one is available. An empty day shows zero only when the chain index reports coverage for that entire UTC day.
 
@@ -26,6 +26,8 @@ Current offers have their own update time. Open the model, seller or wallet addr
 Model and seller pages show published input and output prices in USDC per million tokens. Each bar is one indexed offer period. The selector switches between sellers or model variants and context sizes. Fixed ranges follow the selected UTC days. All covers up to 92 days of retained index history. A partial-history notice means that older matching periods may be missing.
 
 A seller counts as online when the discovery index lists it. Column headers with arrows cycle through descending, ascending and default order. Dates and demand start with the newest days and highest demand respectively. For a fixed period, the comparison uses the immediately preceding period of equal length.
+
+**Sellers online** on Network shows, for each UTC day, the average number of NodeIds with an accepted presence in each 5-minute slot. It has its own **7d**, **30d** and **90d** selector (30d by default) and does not follow the page period; its last bar is today, marked "so far". It is close to, but not the same as, the count of sellers online now, which also needs a current catalog. Hovering a day shows its peak and how many slots the index watched. "no index heartbeat" marks a day before the index recorded that it was running (or today, before its first heartbeat): its average counts slots with no recorded presence as zero, so it can read low, and such a day with no sellers at all is a gap, not a zero. A past day not summarized yet shows "pending". The headline averages the full days shown, without today.
 
 In the requests-per-day charts on Stats, hovering a day shows how complete it is: "so far" for today, "pending" for a day the collector has not counted yet (today too, for up to 10 minutes after new requests; its bar may still show the earlier count), and "not captured" for a day before the collector started, which is not a zero. A day without a note is final, so an empty one is a real zero, unless the collector reported no state for it (an older collector), which also shows no note.
 

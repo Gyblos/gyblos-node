@@ -1,8 +1,6 @@
-import { Server } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
-import { Chip as CountChip } from '../boardui/components/base/badges/chip';
 import { HELP_TEXT } from '../lib/config';
 import { DISPLAY, PAGES, PAGING } from '../lib/constants';
 import type { DiscoverySnapshot, Seller } from '../lib/discovery';
@@ -20,9 +18,7 @@ import {
   sellerHref,
   verifiedOnly,
 } from '../lib/seller-identity';
-import { Flow } from './board/animated-number';
 import { Chip } from './board/chip';
-import { StatCard } from './board/stat-card';
 import { StatusDot } from './board/status-dot';
 import { NotOnline } from './not-online';
 import { pagedRows, Pager } from './pager';
@@ -94,47 +90,6 @@ export async function NetworkSection({
         />
       )}
     </>
-  );
-}
-
-// Online sellers out of every registered or recently seen one; without the index's network status,
-// only the online count is known.
-export function SellersOnline({
-  snapshot,
-  variant,
-}: {
-  snapshot: DiscoverySnapshot;
-  variant?: 'footer' | 'plain';
-}) {
-  const counts = snapshot.network?.counts;
-  return (
-    <StatCard
-      variant={variant}
-      icon={Server}
-      label="Sellers online"
-      value={
-        <Flow value={counts?.online ?? snapshot.sellers.length} kind="count" />
-      }
-      caption={
-        counts ? (
-          <span className="flex flex-wrap gap-1.5">
-            <CountChip variant="caption" color="soft">
-              {count(counts.total)} registered
-            </CountChip>
-            {counts.offline ? (
-              <CountChip variant="caption" color="soft">
-                {count(counts.offline)} offline
-              </CountChip>
-            ) : null}
-            {counts.unpublished ? (
-              <CountChip variant="caption" color="soft">
-                {count(counts.unpublished)} not published
-              </CountChip>
-            ) : null}
-          </span>
-        ) : undefined
-      }
-    />
   );
 }
 
