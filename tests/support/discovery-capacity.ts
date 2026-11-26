@@ -16,10 +16,24 @@ import { CONTROL_RECORD_VERSION } from '@gyblos/protocol/constants';
 
 import { discoveryHome, discoveryRun } from './buyer-discovery';
 
-export const capacityNode = (n: number) => n.toString(16).padStart(64, '0');
+export const capacityNode = (n: number) =>
+  n < 0
+    ? 'f'.repeat(48) + (-n).toString(16).padStart(16, '0')
+    : n.toString(16).padStart(64, '0');
+const BASE58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+export function capacityOwner(n: number) {
+  let value = (0xffn << 248n) + BigInt(n);
+  let text = '';
+  while (value > 0n) {
+    text = BASE58[Number(value % 58n)] + text;
+    value /= 58n;
+  }
+  return text;
+}
 export async function discoveryCapacityFixture(
   t: TestContext,
   count: number = BUYER_DISCOVERY.openSellers,
+  owner: (n: number) => string = capacityOwner,
 ) {
   const home = await discoveryHome();
   home.environment.GYBLOS_HOME = await realpath(home.directory);
@@ -35,8 +49,12 @@ export async function discoveryCapacityFixture(
   );
   const seller = (n: number): KnownSeller => ({
     ...run.known,
-    catalog: { ...run.known.catalog, nodeId: capacityNode(n) },
-    presence: { ...run.known.presence!, nodeId: capacityNode(n) },
+    catalog: { ...run.known.catalog, owner: owner(n), nodeId: capacityNode(n) },
+    presence: {
+      ...run.known.presence!,
+      owner: owner(n),
+      nodeId: capacityNode(n),
+    },
   });
   const rows: DiscoveryRow[] = [];
   for (let n = 1; n <= count; n++)
@@ -52,7 +70,14 @@ export async function discoveryCapacityFixture(
       { mode: FILE_MODES.privateFile },
     );
   await write(rows);
-  const policy = { configuredNodeIds: [] as string[], now: () => now };
+  const policy = {
+    configuredNodeIds: [] as string[],
+    now: () => now,
+    rank: ((nodeId: string) => nodeId) as (
+      nodeId: string,
+      window: number,
+    ) => string,
+  };
   return {
     home,
     run,

@@ -200,8 +200,7 @@ Open discovery has its own bounds:
   `declared-usage` badge, live records). It looks up the seller that served the
   conversation before and the one still holding it warm first, then the rest in
   a random order, so which sellers get a lookup never depends on the index's
-  order. With more than 64 such sellers, lookups can reach sellers the
-  64-candidate bound below then refuses until earlier ones expire.
+  order.
 - Each selection makes at most 16 identity lookups of index-only sellers.
   Configured sellers are checked on every selection besides. A failed check of
   an index-only seller (a registry refusal, an RPC failure, or a full identity
@@ -211,9 +210,14 @@ Open discovery has its own bounds:
   the discovery lock from signed expiry and withdrawal or conflict state.
   Expiry, withdrawal or conflict frees a slot without deleting any replay floor.
   Registry refusals take no slot.
-- Configured sellers never count toward the 64. If the state already holds more
-  than 64 live unconfigured rows, eligibility is limited by NodeId order until
-  rows expire.
+- Which live sellers fill the 64 slots is drawn again every 10 minutes. Each
+  buyer process ranks them with a random seed that never leaves memory, so a low
+  NodeId, an early arrival or a ground key wins nothing, and over time every
+  live seller gets a similar share of the slots. One owner fills at most 4
+  slots. When the slots are full, a newly seen seller enters only if it outranks
+  an admitted one; the one it displaces keeps its replay floors and can return
+  in a later window.
+- Configured sellers never count toward the 64.
 - Identity and discovery histories each keep at most 1,024 rows, with room for
   configured sellers. A full history refuses new identities without affecting
   known ones.
