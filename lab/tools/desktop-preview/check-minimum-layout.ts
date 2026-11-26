@@ -33,9 +33,7 @@ export async function checkMinimumLayout() {
   const read = funding.balance;
   const settled = await read();
   if (!settled) throw new Error('Missing funding observation');
-  let release:
-    | ((value: Awaited<ReturnType<typeof read>>) => void)
-    | undefined;
+  let release: ((value: Awaited<ReturnType<typeof read>>) => void) | undefined;
   const pending = new Promise<Awaited<ReturnType<typeof read>>>((resolve) => {
     release = resolve;
   });
@@ -62,9 +60,7 @@ export async function checkMinimumLayout() {
   );
   if (labels.join('|') !== 'Add funds|View all models')
     throw new Error('Missing compact funds actions');
-  for (const action of Array.from(
-    actions.querySelectorAll('.dropdown-footer'),
-  ))
+  for (const action of Array.from(actions.querySelectorAll('.dropdown-footer')))
     fits(action, menu);
   if (!release) throw new Error('Missing balance release');
   release({ ...settled, balanceAtomic: '1234567890123456789' });

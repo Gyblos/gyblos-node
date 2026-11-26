@@ -542,32 +542,3 @@ html .app.desktop-frame .pk-toast svg {
     animation: none;
   }
 }
-html .app.desktop-frame .pk-inline-spinner {
-  width: 12px;
-  height: 12px;
-  flex: none;
-  border: 2px solid color-mix(in srgb, var(--ink) 20%, transparent);
-  border-top-color: var(--ink);
-  border-radius: var(--radius-circle);
-  animation: pk-spin 800ms linear infinite;
-}
-html .app.desktop-frame .preview-menu-actions {
-  display: flex;
-  gap: 4px;
-  margin-top: 4px;
-  border-top: 1px solid var(--line);
-}
-html .app.desktop-frame .preview-menu-actions .dropdown-footer {
-  flex: 1;
-  justify-content: center;
-  margin-top: 0;
-  border-top: 0;
-}
-html .app.desktop-frame .preview-menu-actions .dropdown-footer span {
-  flex: none;
-}
-@media (prefers-reduced-motion: reduce) {
-  html .app.desktop-frame .pk-inline-spinner {
-    animation: none;
-  }
-}

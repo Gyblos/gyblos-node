@@ -140,10 +140,7 @@ void test('the native Limits view fits the approved narrow window and identifies
 
 void test('composer balance uses a live inline spinner only while the payer balance is read', async () => {
   const chat = await readFile('apps/desktop/src/ui/Chat.tsx', 'utf8');
-  assert.match(
-    chat,
-    /checking=\{active && usingX402 && !!payer && loading\}/,
-  );
+  assert.match(chat, /checking=\{active && usingX402 && !!payer && loading\}/);
   const composer = await readFile(
     'apps/desktop/src/ui/ComposerFunding.tsx',
     'utf8',
@@ -185,10 +182,7 @@ void test('chat model picker keeps funds actions compact and leaves balance in t
   assert.match(picker, /setAddingFunds\(true\)/);
   const files = await readdir('apps/desktop/src/ui');
   assert.equal(files.includes('ModelMenuBalance.tsx'), false);
-  const css = await readFile(
-    'apps/desktop/src/ui/buyer-controls.css',
-    'utf8',
-  );
+  const css = await readFile('apps/desktop/src/ui/buyer-controls.css', 'utf8');
   assert.match(css, /\.preview-menu-actions\s*\{[^}]*display: flex/);
   assert.match(css, /\.preview-menu-actions \.dropdown-footer\s*\{/);
   assert.doesNotMatch(css, /\.pk-balance-line/);

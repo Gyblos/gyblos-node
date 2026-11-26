@@ -146,6 +146,20 @@
   flex-wrap: wrap;
   gap: var(--space-2);
 }
+.desktop-frame .ui-inline-spinner {
+  width: var(--space-3);
+  height: var(--space-3);
+  flex: none;
+  border: 2px solid color-mix(in srgb, var(--ink) 20%, transparent);
+  border-top-color: var(--ink);
+  border-radius: var(--radius-circle);
+  animation: pk-spin 800ms linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .desktop-frame .ui-inline-spinner {
+    animation: none;
+  }
+}
 .desktop-frame .ui-swatch {
   display: inline-flex;
   align-items: end;

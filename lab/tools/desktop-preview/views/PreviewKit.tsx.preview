@@ -40,7 +40,7 @@ export function Tag({ tone = TONE.NEUTRAL, dot = false, pill = false, children }
 }
 
 export function PreviewInlineSpinner() {
-  return <span className="pk-inline-spinner" aria-hidden="true" />;
+  return <span className="ui-inline-spinner" aria-hidden="true" />;
 }
 
 /** One-line notice with a tone: replacement, fallback or limit messages that must stay visible. */

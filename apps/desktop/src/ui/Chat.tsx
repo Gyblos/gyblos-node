@@ -738,6 +738,7 @@ export function Chat({
               buyer={x402}
               funding={funding}
               balanceStatus={balanceStatus}
+              checking={active && usingX402 && !!payer && loading}
             />
           )}
           <ChatComposer
@@ -781,7 +782,6 @@ export function Chat({
                 }
                 networkOnly={usingX402}
                 funding={funding}
-                balanceStatus={balanceStatus}
                 refreshFunding={usingX402 && payer ? refresh : undefined}
                 showBrowse={!usingPaypal}
                 contextLabel={
