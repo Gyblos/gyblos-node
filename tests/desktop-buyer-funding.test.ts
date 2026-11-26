@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test, type TestContext } from 'node:test';
 
-import { batchPoolPathsIn } from '@gyblos/config/home';
+import { batchPoolPathsIn } from '@gyblos/config/home-payments';
 import {
   DEVNET,
   DEVNET_GENESIS,

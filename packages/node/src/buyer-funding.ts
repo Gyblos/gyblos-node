@@ -1,11 +1,11 @@
 // Read-only desktop funding observations use the active buyer role, never the wallet selector.
 import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
+import { type HomeEnvironment } from '@gyblos/config/home';
 import {
   batchPoolChannelPaths,
   batchPoolPathsIn,
   batchSessionPathsIn,
-  type HomeEnvironment,
-} from '@gyblos/config/home';
+} from '@gyblos/config/home-payments';
 import { DEVNET, DEVNET_USDC } from '@gyblos/config/network';
 import {
   finalizedRequestCharge,

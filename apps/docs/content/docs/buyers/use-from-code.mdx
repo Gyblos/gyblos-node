@@ -12,17 +12,23 @@ prompt. Don't send passwords, keys or other secrets. See [Data and privacy](/en/
 
 ## Automatic seller selection
 
-For an existing open-discovery buyer with a channel policy and a positive per-response limit, enable Auto with the maximum input and output prices you accept in USDC per million tokens. For example:
+Auto lets your buyer pick a seller for you. By default it uses free offers only. To let it use paid offers, open
+**Usage & payments → Limits** in the desktop app and choose **Manage chat budget**. Under **Automatic seller
+selection**, check **Allow paid offers in Auto**, then enter:
 
-In desktop, open **Payments → Automatic seller selection**. Enable paid offers and save the maximum per response and both prices in USDC per million tokens. In chat, open the model and select **Auto**. The CLI and OpenCode share these limits when connected to this buyer. Turn off paid offers to return Auto to free-only discovery.
+- the maximum per response, in USDC;
+- the maximum input price and the maximum output price, in USDC per million tokens.
 
-From the source checkout, use the same `GYBLOS_HOME` as the buyer serving OpenCode.
+Then choose **Save Auto settings**. The section appears when your buyer finds sellers on its own (open
+discovery), and you can save it only for the buyer the app manages: for a buyer you connected separately, the app refuses the change. In chat, open the model and select **Auto**. For now, paid Auto in chat covers `qwen3-0.6b` only;
+for other models Auto still uses free offers only, though you can still pick a specific paid seller from the model menu.
 
-```sh
-pnpm buyer:auto 0.052 0.208
-```
-
-Restart the buyer, then select the model in OpenCode. Auto asks verified sellers for signed offers. Your per-response limit and the remaining API key budget still apply. A zero-budget key can only use free offers. Auto may settle the previous channel before opening a replacement within the remaining deposit authority. To return to free-only open discovery, run `pnpm buyer:auto off` and restart the buyer.
+These limits apply to chat and to every API key on this buyer, so your coding tools follow them too. The maximum
+per response is the buyer's limit for every paid answer, not only Auto's, and it stays when you turn paid offers
+off. Auto asks verified sellers for signed offers. The remaining budget of each API key still applies, and a key
+with a limit of `0` can only use free offers. Auto may settle the previous channel before opening a replacement
+within the remaining deposit authority. To return Auto to free offers only, clear **Allow paid offers in Auto**
+and choose **Save Auto settings**.
 
 ## Prerequisites [#before-you-start]
 

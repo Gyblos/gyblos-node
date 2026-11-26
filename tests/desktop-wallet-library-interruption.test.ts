@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { DESKTOP_WALLET_LIBRARY } from '@gyblos/config/home';
+import { DESKTOP_WALLET_LIBRARY } from '@gyblos/config/home-desktop';
 import { createWalletService } from '@gyblos/desktop/wallet';
 import { createBackupCodec } from '@gyblos/desktop/wallet-backup';
 import {

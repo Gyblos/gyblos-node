@@ -215,12 +215,35 @@ A run takes a few minutes on this machine, mostly the seller's generation.
 
 ## Run it
 
-With the `apps/model-verifier` app in the checkout,
-`pnpm model-verifier verify --seller seller.json --model qwen3-1.7b` runs the
-challenge set against one seller and writes `result.json` and `evidence.json` to
-a new result directory; `pnpm model-verifier check RESULT_DIRECTORY/result.json`
-verifies a result's signature and that its rule matches the published challenge
-set. The seller file and the full steps are on the docs site:
+From a checkout of the repository set up as in
+[CONTRIBUTING.md](../CONTRIBUTING.md#set-up-nodejs-and-pnpm), with
+[Ollama](https://ollama.com) running and the declared model pulled
+(`ollama pull qwen3:1.7b`), write the seller's public details to `seller.json`:
+
+```json
+{
+  "owner": "SELLER_OWNER_ADDRESS",
+  "nodeId": "SELLER_NODE_ID",
+  "relayUrl": "https://na1.relay.gyblos.com/",
+  "directAddresses": []
+}
+```
+
+Then run:
+
+```sh
+pnpm model-verifier verify --seller seller.json --model qwen3-1.7b
+pnpm model-verifier check RESULT_DIRECTORY/result.json
+```
+
+`verify` runs the challenge set against one seller, prints the verdict and
+writes `result.json` (the signed result) and `evidence.json` (the prompts, the
+answers and every check, plus any reply that could not be scored and why) to a
+new result directory. `check` verifies a result's signature and that its rule
+matches the published challenge set, and prints its verdict.
+`pnpm model-verifier address` prints the verifier's public address. The verifier
+key is created on first use in `model-verifier/verifier.key` inside the Gyblos
+home directory. The docs site explains the results for sellers:
 [Model verification](https://docs.gyblos.com/en/sellers/model-verification). The
 app uses public package entries only (protocol, core, the Iroh transport and the
 Ollama engine's chat template) and never imports the buyer, node or desktop

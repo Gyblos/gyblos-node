@@ -23,7 +23,7 @@ Gyblos is an open market where anyone can sell, buy or give away AI inference. T
 
 ## Public data sources
 
-- [Discovery index](https://discovery.gyblos.com/v1/models): models offered now; `/v1/sellers?model=<id>` lists live sellers, `/v1/uptime?node=<NodeId>` a seller's uptime, and `/v1/network` every registered seller's online, offline or not-published state.
+- [Discovery index](https://discovery.gyblos.com/v1/models): models offered now; `/v1/models/catalog` adds each model's `family`, `lab` and `source`, never null; `/v1/sellers?model=<id>` lists live sellers, `/v1/uptime?node=<NodeId>` a seller's uptime, and `/v1/network` every registered seller's online, offline or not-published state.
 - [Metrics collector](https://collector.gyblos.com/v1/stats/network): daily network totals, each day's `coverage` (`final`, `partial`, `pending` or `unknown`, so a real zero reads apart from a day not counted yet), `completeThrough`, each day's `demandModels` and `demandTotal` before the 20-model cut, and `buyerTotals` (distinct buyers, all time and new in the range); `/v1/stats/models` per model and `/v1/stats/chain` on-chain settlements. A bounded query takes `from` and `to` as `YYYY-MM-DD`, at most 92 days. A `range=all` query starts at the first available day for its resource and accepts an optional `to` cutoff. `/v1/stats/sellers/<NodeId>` one seller's daily and per-model totals. `/v1/stats/chain/txs` lists Gyblos channel transactions, newest first, paged with `before` and `limit`, and `recipient=<address>` keeps only channels whose first payout recipient is that address (a payout's split then sits on the first matching row, with the whole transaction's values).
 
 ## More about Gyblos

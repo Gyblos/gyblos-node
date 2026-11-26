@@ -58,6 +58,7 @@ export const INDEX_ROUTES = {
   RECORDS: '/v1/records',
   SELLERS: '/v1/sellers',
   MODELS: '/v1/models',
+  MODEL_CATALOG: '/v1/models/catalog',
   HEALTH: '/v1/health',
   REGISTRATIONS: '/v1/registrations',
   UPTIME: '/v1/uptime',
@@ -73,6 +74,7 @@ export const INDEX_ROUTES = {
 export const PUBLIC_READ_ROUTES: ReadonlySet<string> = new Set([
   INDEX_ROUTES.SELLERS,
   INDEX_ROUTES.MODELS,
+  INDEX_ROUTES.MODEL_CATALOG,
   INDEX_ROUTES.HEALTH,
   INDEX_ROUTES.UPTIME,
   INDEX_ROUTES.VERSIONS,

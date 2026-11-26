@@ -8,7 +8,10 @@ import { test } from 'node:test';
 import { SOLANA_TESTNET_CAIP2 } from '@x402/svm';
 
 import { PROTOCOL_FEE } from '@gyblos/config';
-import { batchPoolPathsIn, batchSessionPathsIn } from '@gyblos/config/home';
+import {
+  batchPoolPathsIn,
+  batchSessionPathsIn,
+} from '@gyblos/config/home-payments';
 import { createBuyerSessionManager } from '@gyblos/node/buyer-session';
 import { startSellerSessions } from '@gyblos/node/seller-sessions';
 import {

@@ -14,10 +14,10 @@ import {
   tokensPerSecond,
   usdcDecimal,
 } from '@gyblos/explorer/format';
-import { modelFamily } from '@gyblos/explorer/model-family';
 import { notOnline, parseNetworkStatus } from '@gyblos/explorer/network-status';
 import { displayRange, parseRange, rangeQuery } from '@gyblos/explorer/range';
 import { dailyRequests, usageMeta } from '@gyblos/explorer/usage';
+import { modelFamily } from '@gyblos/protocol/model-family';
 
 const realFetch = globalThis.fetch;
 const realTimeout = AbortSignal.timeout.bind(AbortSignal);
@@ -141,6 +141,8 @@ void test('a model mark comes from the family in its id', () => {
     ['gpt-oss-20b', 'openai'],
     ['claude-sonnet', 'claude'],
     ['granite3.3', 'ibm'],
+    ['unsloth/Qwen3-8B-GGUF', 'qwen'],
+    ['acme/alpha-model', null],
     ['alpha-model', null],
     ['', null],
   ];
