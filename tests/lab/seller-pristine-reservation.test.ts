@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { test } from 'node:test';
 
-import { batchSessionPathsIn } from '@gyblos/config/home';
+import { batchSessionPathsIn } from '@gyblos/config/home-payments';
 import { startSellerSessionHost } from '@gyblos/node/seller-session-directory';
 import { createBatchBuyer } from '@gyblos/payments-upto/batch-session';
 import {

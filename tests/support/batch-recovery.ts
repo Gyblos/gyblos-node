@@ -2,7 +2,7 @@
 import { readFile } from 'node:fs/promises';
 import type { TestContext } from 'node:test';
 
-import { batchSessionPathsIn } from '@gyblos/config/home';
+import { batchSessionPathsIn } from '@gyblos/config/home-payments';
 import { recoverBatchBuyer } from '@gyblos/payments-upto/batch-session';
 
 import { batchNativeFinancial } from './batch-native';

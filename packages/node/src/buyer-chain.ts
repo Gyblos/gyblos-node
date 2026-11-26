@@ -1,5 +1,8 @@
 // Free-only profiles still honor unfinished reusable payment channels.
-import { batchPoolPathsIn, batchSessionPathsIn } from '@gyblos/config/home';
+import {
+  batchPoolPathsIn,
+  batchSessionPathsIn,
+} from '@gyblos/config/home-payments';
 import {
   batchSessionTerminal,
   inspectBatchPool,

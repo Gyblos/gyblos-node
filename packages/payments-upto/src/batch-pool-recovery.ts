@@ -1,5 +1,5 @@
 // Holds buyer-wide authority while recovering existing child sessions; credit requires verified transfers.
-import type { BatchPoolPaths } from '@gyblos/config/home';
+import type { BatchPoolPaths } from '@gyblos/config/home-payments';
 import {
   PaymentSessionError,
   SESSION_CODES,

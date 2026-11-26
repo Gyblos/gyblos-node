@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import {
   paypalSandboxPaths,
   paypalSandboxReviewPaths,
-} from '@gyblos/config/home';
+} from '@gyblos/config/home-paypal';
 import { parsePaypalResult } from '@gyblos/desktop/paypal-model';
 import {
   PAYPAL_SESSION_PHASE,

@@ -31,7 +31,7 @@ they disagree, `AGENTS.md` and `tooling/boundaries/config.ts` win.
    `apps/discovery-index`. Apps never import each other; shared logic moves down
    to `packages/node` or core.
 6. Operator-changeable value (port, limit, timeout, relay, index URL) or a local
-   path? -> `packages/config` (`src/home.ts` for paths). Fixed operational
+   path? -> `packages/config` (`src/home*.ts` for paths). Fixed operational
    values stay in the owning package's `constants.ts`.
 7. Platform helper with no product meaning (atomic JSON, private logs,
    processes, memory, loopback guard)? -> `packages/runtime` (config only).
@@ -61,7 +61,7 @@ Splitting by concern inside a package uses a filename prefix, as in
 | buyer selection, offer race                 | `packages/buyer/src/selection.ts`, `offer-race.ts`              | buyer orchestration; `apps/buyer` only parses arguments    |
 | discovery index client                      | `packages/discovery-http`                                       | HTTP adapter; index defaults in `config`                   |
 | discovery index server (Worker)             | `apps/discovery-index`                                          | deployable app; verification via protocol only             |
-| `GYBLOS_HOME` / `GYBLOS_LAB_HOME` layout    | `packages/config/src/home.ts`                                   | single path owner                                          |
+| `GYBLOS_HOME` / `GYBLOS_LAB_HOME` layout    | `packages/config/src/home*.ts`                                  | only path owners                                           |
 | `config.toml` validator, precedence         | `packages/node/src/node-config*.ts`, `packages/node/schemas/`   | node composes adapter URL policies                           |
 | `gyblos` CLI (`config validate`)            | `apps/node/src/bin.ts` → `entry.ts` → `cli.ts`                  | one entry; output never prints env values                  |
 | devnet wallet config, `gate:*`              | `lab/harness`                                                   | lab-only                                                   |

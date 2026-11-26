@@ -1,6 +1,6 @@
 // Recovers reusable devnet channels under the buyer runtime lock.
 import { DEVNET, DEVNET_GENESIS } from '@gyblos/config';
-import { batchPoolPathsIn } from '@gyblos/config/home';
+import { batchPoolPathsIn } from '@gyblos/config/home-payments';
 import {
   WITHDRAW_STEPS,
   type UptoBuyerWithdrawStep,

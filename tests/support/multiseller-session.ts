@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { join } from 'node:path';
 
 import { PROTOCOL_FEE } from '@gyblos/config';
-import { batchPoolPathsIn } from '@gyblos/config/home';
+import { batchPoolPathsIn } from '@gyblos/config/home-payments';
 import { createSellerBatchSession } from '@gyblos/node/batch-seller';
 import {
   createBatchBuyer,

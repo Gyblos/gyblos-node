@@ -1,7 +1,3 @@
-// Owns which maker's mark a published model id shows: the family is read from the id's own name, never
-// from a seller's claim of provenance. Unknown ids show no mark. Pure, no I/O.
-
-// Each family's mark is `public/models/<family>.svg` (monochrome, from LobeHub icons, MIT).
 const FAMILIES = [
   ['qwen', /^(?:qwen|qwq)(?=[^a-z]|$)/],
   ['meta', /^(?:llama|meta-llama)(?=[^a-z]|$)/],
@@ -52,10 +48,8 @@ export function modelFamily(modelId: string): ModelFamily | null {
   if (name === undefined) return familyByName(publisher);
   if (!name) return null;
   if (publisher === 'google' && familyByName(name) === 'gemma') return 'gemma';
-  return PUBLISHERS.get(publisher) ?? null;
+  return PUBLISHERS.get(publisher) ?? familyByName(name);
 }
-
-export const modelMarkUrl = (family: ModelFamily) => `/models/${family}.svg`;
 
 const LABS: Record<ModelFamily, string> = {
   qwen: 'Alibaba · Qwen',
@@ -74,7 +68,35 @@ const LABS: Record<ModelFamily, string> = {
   zhipu: 'Zhipu AI',
   yi: '01.AI',
 };
-export function modelLab(modelId: string) {
+export const UNKNOWN_LAB = 'Unknown';
+export const OTHER_FAMILY = 'other';
+export const MODEL_IDENTITY_SOURCE = {
+  RULES: 'rules',
+  FALLBACK: 'fallback',
+} as const;
+export type ModelIdentity =
+  | {
+      family: ModelFamily;
+      lab: string;
+      source: typeof MODEL_IDENTITY_SOURCE.RULES;
+    }
+  | {
+      family: typeof OTHER_FAMILY;
+      lab: string;
+      source: typeof MODEL_IDENTITY_SOURCE.FALLBACK;
+    };
+
+export function modelIdentity(modelId: string): ModelIdentity {
   const family = modelFamily(modelId);
-  return family ? LABS[family] : null;
+  if (family)
+    return { family, lab: LABS[family], source: MODEL_IDENTITY_SOURCE.RULES };
+  const [publisher, name] = modelId.split('/');
+  const lab = name && publisher ? publisher : UNKNOWN_LAB;
+  return {
+    family: OTHER_FAMILY,
+    lab,
+    source: MODEL_IDENTITY_SOURCE.FALLBACK,
+  };
 }
+
+export const modelLab = (modelId: string) => modelIdentity(modelId).lab;

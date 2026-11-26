@@ -1,6 +1,6 @@
 ---
 title: Verificación de modelo
-description: Cómo Gyblos comprueba que un vendedor sirve el modelo que declara, qué significan pass, fail e inconclusive, y cómo reproducir un resultado.
+description: Cómo Gyblos comprueba que un vendedor sirve el modelo que declara, qué significan pass, fail e inconclusive, y cómo cualquiera puede repetir una verificación.
 ---
 
 Un vendedor declara el modelo que sirve, por ejemplo `qwen3-1.7b`. El verificador de modelo comprueba esa
@@ -43,29 +43,13 @@ respuestas: si se puntúan las 30 y sus otras respuestas no tienen desviaciones,
 quedan bajo el umbral de 12. El umbral se mantiene en 12 entre 26 y 30 respuestas puntuadas y baja por debajo de eso (11 entre 22 y
 25), y las desviaciones en respuestas genuinas también cuentan.
 
-## Reproducir un resultado [#reproducir]
+## Repetir una verificación [#reproducir]
 
-Desde una copia del repositorio, con [Ollama](https://ollama.com) corriendo y el modelo declarado descargado
-(`ollama pull qwen3:1.7b`), escribe los datos públicos del vendedor en un archivo:
+El verificador es de código abierto, así que cualquiera con [Ollama](https://ollama.com) y el modelo declarado
+puede correr la misma verificación contra un vendedor y obtener un resultado comparable. Los pasos para correrlo
+están en la [nota de diseño del verificador](https://github.com/Gyblos/gyblos-node/blob/develop/docs/model-verifier.md#run-it) del repositorio.
 
-```json title="seller.json"
-{
-  "owner": "SELLER_OWNER_ADDRESS",
-  "nodeId": "SELLER_NODE_ID",
-  "relayUrl": "https://na1.relay.gyblos.com/",
-  "directAddresses": []
-}
-```
-
-Luego ejecuta:
-
-```sh
-pnpm model-verifier verify --seller seller.json --model qwen3-1.7b
-pnpm model-verifier check RESULT_DIRECTORY/result.json
-```
-
-`verify` muestra el veredicto y escribe `result.json` (el resultado firmado) y `evidence.json` (las preguntas,
-las respuestas y cada comprobación, más cada respuesta que no se pudo puntuar y por qué) en un directorio nuevo.
-`check` verifica la firma y que la regla y los recuentos de evidencia se ajusten al conjunto de pruebas publicado antes de mostrar el veredicto.
-`pnpm model-verifier address` muestra la dirección pública del verificador. La llave del
-verificador se crea la primera vez en `model-verifier/verifier.key`, dentro del directorio de datos de Gyblos.
+Cada corrida escribe el resultado firmado y, a su lado, un archivo de evidencia. La evidencia guarda las
+preguntas, las respuestas y cada comprobación, más cada respuesta que no se pudo puntuar y por qué, para que otra
+persona pueda revisar cómo se llegó al veredicto. `check` también rechaza un resultado cuyos recuentos de evidencia
+no pueden ajustarse al conjunto de pruebas publicado antes de mostrar el veredicto.

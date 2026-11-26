@@ -24,6 +24,7 @@ Routes sit at the root of the index host. The client base URL is
 | `POST /v1/records`                 | Publish one signed public v2 catalog, presence or withdrawal.                                   |
 | `GET /v1/sellers`                  | List live sellers of one model, paged by an opaque cursor.                                      |
 | `GET /v1/models`                   | List models from live sellers, ordered by seller count; no query parameters.                    |
+| `GET /v1/models/catalog`           | The same list with each model's `family`, `lab` and `source` ([Model catalog](#model-catalog)). |
 | `GET /v1/uptime?node=`             | Public uptime of one NodeId over the last day, week and month ([Uptime](#uptime)).              |
 | `GET /v1/versions[?node=<NodeId>]` | Active seller counts by release, or one active seller’s declared release.                       |
 | `GET /v1/network`                  | Every known seller, online, offline or unpublished, with counts ([Network](#network)).          |
@@ -46,14 +47,15 @@ Common behavior:
 - **Unknown routes** answer `404 {"error":"NOT_FOUND"}`.
 - **Headers.** Every response carries `X-Robots-Tag: noindex` and
   `X-Content-Type-Options: nosniff`. `GET` and `HEAD` on `/v1/sellers`,
-  `/v1/models`, `/v1/uptime`, `/v1/versions`, `/v1/network`,
-  `/v1/network/history`, `/v1/offers/history`, `/v1/health`,
+  `/v1/models`, `/v1/models/catalog`, `/v1/uptime`, `/v1/versions`,
+  `/v1/network`, `/v1/network/history`, `/v1/offers/history`, `/v1/health`,
   `/v1/identity/github/<NodeId>` and `/v1/profile/<NodeId>` carry
   `Access-Control-Allow-Origin: *` on every status, errors included. A `200`
-  from `/v1/sellers`, `/v1/models`, `/v1/uptime`, `/v1/versions`, `/v1/network`,
-  `/v1/network/history`, `/v1/offers/history`, `/v1/identity/github/<NodeId>` or
-  `/v1/profile/<NodeId>` carries `Cache-Control: public, max-age=10`; everything
-  else carries `Cache-Control: no-store`.
+  from `/v1/sellers`, `/v1/models`, `/v1/models/catalog`, `/v1/uptime`,
+  `/v1/versions`, `/v1/network`, `/v1/network/history`, `/v1/offers/history`,
+  `/v1/identity/github/<NodeId>` or `/v1/profile/<NodeId>` carries
+  `Cache-Control: public, max-age=10`; everything else carries
+  `Cache-Control: no-store`.
 
 ## Publish modes
 
@@ -208,12 +210,12 @@ signed a record; clients re-verify everything.
 
 Rate limits:
 
-| Limit                               | Key                                     | Budget                                   | Consumed by                                                                                                                                                                    |
-| ----------------------------------- | --------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `DISCOVERY_IP_LIMITER`              | client IPv4 address, or IPv6 /64 prefix | set in `wrangler.jsonc`                  | every request                                                                                                                                                                  |
-| `DISCOVERY_PUBLISH_LIMITER`         | client IPv4 address, or IPv6 /64 prefix | set in `wrangler.jsonc`                  | publishes and registrations                                                                                                                                                    |
-| `DISCOVERY_READ_LIMITER`            | constant key `global`                   | set in `wrangler.jsonc`                  | storage reads only: a `/v1/sellers`, `/v1/models`, `/v1/uptime`, `/v1/versions`, `/v1/network`, `/v1/network/history` or `/v1/offers/history` cache miss, a stale health count |
-| NodeId publish quota (stored in D1) | NodeId                                  | 10 accepted records per fixed UTC minute | accepted records only                                                                                                                                                          |
+| Limit                               | Key                                     | Budget                                   | Consumed by                                                                                                                                                                                          |
+| ----------------------------------- | --------------------------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DISCOVERY_IP_LIMITER`              | client IPv4 address, or IPv6 /64 prefix | set in `wrangler.jsonc`                  | every request                                                                                                                                                                                        |
+| `DISCOVERY_PUBLISH_LIMITER`         | client IPv4 address, or IPv6 /64 prefix | set in `wrangler.jsonc`                  | publishes and registrations                                                                                                                                                                          |
+| `DISCOVERY_READ_LIMITER`            | constant key `global`                   | set in `wrangler.jsonc`                  | storage reads only: a `/v1/sellers`, `/v1/models`, `/v1/models/catalog`, `/v1/uptime`, `/v1/versions`, `/v1/network`, `/v1/network/history` or `/v1/offers/history` cache miss, a stale health count |
+| NodeId publish quota (stored in D1) | NodeId                                  | 10 accepted records per fixed UTC minute | accepted records only                                                                                                                                                                                |
 
 - A Cloudflare limiter that refuses or fails gives `429 RATE_LIMITED` with
   `Retry-After: 60`. That `429` is `no-store` and never cached.
@@ -229,14 +231,15 @@ Rate limits:
 
 ## Caching
 
-- **Public reads.** `/v1/sellers`, `/v1/models`, `/v1/uptime`, `/v1/versions`,
-  `/v1/network`, `/v1/network/history`, `/v1/offers/history`,
-  `/v1/identity/github/<NodeId>` and `/v1/profile/<NodeId>` keep `200` answers
-  in the Workers Cache API (`caches.default`, per Cloudflare location) for 10
-  seconds, matching their `max-age`. Keys are normalized:
+- **Public reads.** `/v1/sellers`, `/v1/models`, `/v1/models/catalog`,
+  `/v1/uptime`, `/v1/versions`, `/v1/network`, `/v1/network/history`,
+  `/v1/offers/history`, `/v1/identity/github/<NodeId>` and
+  `/v1/profile/<NodeId>` keep `200` answers in the Workers Cache API
+  (`caches.default`, per Cloudflare location) for 10 seconds, matching their
+  `max-age`. Keys are normalized:
   - sellers: `cursor`, the effective `limit` (so `limit=5000` and `limit=200`
     share an entry) and `model`, in that order;
-  - models and network: the route alone;
+  - models, model catalog and network: the route alone;
   - uptime: `?node=<NodeId>`, however the query was spelled;
   - network history: the effective `days`;
   - offer history: `?node=<NodeId>` or `?model=<model>`, then the effective
@@ -407,6 +410,36 @@ is `400 INVALID_QUERY`):
 - In open mode (`DISCOVERY_PUBLISH_ALLOWLIST="*"`) anyone can add entries by
   publishing from new NodeIds, as with uptime; the caps bound them, but the
   public counts are not Sybil resistant.
+
+## Model catalog
+
+`GET /v1/models/catalog` takes no parameters and returns the `/v1/models` list
+(at most 500 models) with three more fields per model:
+
+```json
+{
+  "models": [
+    {
+      "id": "qwen3-0.6b",
+      "sellers": 2,
+      "family": "qwen",
+      "lab": "Alibaba · Qwen",
+      "source": "rules"
+    }
+  ],
+  "generatedAt": 1764028800000
+}
+```
+
+`family`, `lab` and `source` are read from the model id itself
+(`@gyblos/protocol/model-family`), never from a seller's claim; rules ignore
+case, and are never `null`. A known publisher (`meta-llama/Llama-3.1-8B`)
+decides the family (`google/gemma-…` is `gemma`); otherwise the name does, with
+or without a publisher (`unsloth/Qwen3-8B` and `qwen3-0.6b` are `qwen`). Those
+carry `source: "rules"`. An id no rule knows has `family: "other"`, its
+publisher as written as `lab` (`acme/foo-7b` gives `acme`, a bare id `Unknown`)
+and `source: "fallback"`. `/v1/models` keeps its two fields, because released
+buyers reject extra keys there.
 
 ## Network history
 

@@ -13,17 +13,23 @@ prompt. No envíes contraseñas, llaves ni otros secretos. Consulta
 
 ## Selección automática de vendedor
 
-Si tu comprador usa descubrimiento abierto, canales y un máximo positivo por respuesta, activa Auto con los precios máximos de entrada y salida que aceptas en USDC por millón de tokens. Por ejemplo:
+Auto deja que tu comprador elija un vendedor por ti. Por defecto usa solo ofertas gratis. Para que use ofertas
+pagadas, abre **Usage & payments → Limits** en la app de escritorio y elige **Manage chat budget**. En
+**Automatic seller selection**, marca **Allow paid offers in Auto** y escribe:
 
-En escritorio, abre **Payments → Automatic seller selection**. Activa las ofertas pagadas y guarda el máximo por respuesta y las dos tarifas en USDC por millón de tokens. En el chat, abre el modelo y elige **Auto**. El CLI y OpenCode que usan ese mismo comprador respetan los mismos límites. Desactiva las ofertas pagadas para que Auto vuelva a buscar solo ofertas gratis.
+- el máximo por respuesta, en USDC;
+- el precio máximo de entrada y el precio máximo de salida, en USDC por millón de tokens.
 
-Desde el repositorio, usa el mismo `GYBLOS_HOME` que el comprador al que se conecta OpenCode.
+Luego elige **Save Auto settings**. La sección aparece cuando tu comprador busca vendedores por su cuenta
+(descubrimiento abierto), y solo se puede guardar para el comprador que maneja la app: para un comprador que conectaste por separado, la app rechaza el cambio. En el chat, abre el modelo y elige **Auto**. Por ahora, Auto pagado
+en el chat cubre solo `qwen3-0.6b`; para los demás modelos Auto sigue usando solo ofertas gratis, aunque igual puedes elegir un vendedor pagado específico en el menú del modelo.
 
-```sh
-pnpm buyer:auto 0.052 0.208
-```
-
-Reinicia el comprador y selecciona el modelo en OpenCode. Auto pide ofertas firmadas a vendedores verificados. Se respetan el máximo por respuesta y el saldo de la clave API. Una clave con límite cero solo puede usar ofertas gratuitas. Auto puede liquidar el canal anterior antes de abrir otro con el depósito autorizado restante. Para volver al descubrimiento de ofertas gratuitas, ejecuta `pnpm buyer:auto off` y reinicia el comprador.
+Estos límites se aplican al chat y a todas las claves API de este comprador, así que tus herramientas de código
+también los respetan. El máximo por respuesta es el límite del comprador para toda respuesta pagada, no solo
+para Auto, y se mantiene cuando desactivas las ofertas pagadas. Auto pide ofertas firmadas a vendedores
+verificados. Se sigue respetando el saldo de cada clave API, y una clave con límite `0` solo puede usar ofertas
+gratis. Auto puede liquidar el canal anterior antes de abrir otro con el depósito autorizado restante. Para que
+Auto vuelva a usar solo ofertas gratis, desmarca **Allow paid offers in Auto** y elige **Save Auto settings**.
 
 ## Requisitos previos [#antes-de-empezar]
 

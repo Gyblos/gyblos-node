@@ -21,11 +21,11 @@ import { DISPLAY, RANGE, SEARCH_TERM_LIMIT } from '../../lib/constants';
 import { getDiscovery } from '../../lib/discovery-render';
 import {
   addressLookup,
+  modelMatches,
   searchPageHref,
   sellerMatches,
 } from '../../lib/entity-search';
 import { short } from '../../lib/format';
-import { modelLab } from '../../lib/model-family';
 import { modelRows } from '../../lib/model-table';
 import { modelKey, summarizeOffers } from '../../lib/offers';
 import { numberedPager, pageOf, parsePage } from '../../lib/paging';
@@ -162,17 +162,9 @@ function catalogResults(
   discovery: Awaited<ReturnType<typeof getDiscovery>>,
   collector: Awaited<ReturnType<typeof getCollector>>,
 ) {
-  const lower = term.toLowerCase();
   const models = modelRows(summarizeOffers(discovery).models, collector.models);
   const results = models
-    .filter((model) =>
-      [
-        model.modelId,
-        modelLab(model.modelId),
-        model.variant,
-        model.quantization,
-      ].some((value) => value?.toLowerCase().includes(lower)),
-    )
+    .filter((model) => modelMatches(model, term))
     .map((model) => (
       <tr key={modelKey(model)} className="border-t border-line">
         <td className={td}>Model</td>
