@@ -75,6 +75,14 @@ export async function checkMinimumLayout() {
   fits(balance, balance.closest('.pk-composer-tab'));
   picker.click();
 
+  let releaseReturn:
+    | ((value: Awaited<ReturnType<typeof read>>) => void)
+    | undefined;
+  const returning = new Promise<Awaited<ReturnType<typeof read>>>((resolve) => {
+    releaseReturn = resolve;
+  });
+  funding.balance = () => returning;
+
   (await visible('button[aria-label="Usage & payments"]')).click();
   (await visible('#preview-tab-limits')).click();
   const track = await visible('.pk-segmented-track');
@@ -175,6 +183,24 @@ export async function checkMinimumLayout() {
   if (document.documentElement.scrollWidth > innerWidth)
     throw new Error('Models overflow');
   (await visible('button[aria-label="Chat"]')).click();
+  const rechecking = await visible('.pk-composer-tab .ui-inline-spinner');
+  const recheckLive = rechecking.closest('.pk-tab-item');
+  if (
+    recheckLive?.getAttribute('aria-busy') !== 'true' ||
+    !recheckLive.textContent?.includes('Checking balance…')
+  )
+    throw new Error('Missing revalidation checking state');
+  if (!releaseReturn) throw new Error('Missing revalidation release');
+  releaseReturn({ ...settled, balanceAtomic: '3000000' });
+  funding.balance = read;
+  const refreshed = await visible(
+    '.pk-composer-tab .pk-tab-item[aria-busy="false"]',
+  );
+  if (
+    !refreshed.textContent?.includes('Balance · last checked ·') ||
+    !refreshed.textContent.includes('3 USDC')
+  )
+    throw new Error('Missing accessible refreshed balance');
   const expand = document.querySelector<HTMLButtonElement>(
     'button[aria-label="Expand sidebar"]',
   );

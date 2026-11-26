@@ -16,6 +16,10 @@ void test('preview composer shows an inline spinner while the buyer balance is c
   assert.match(kit, /<PreviewInlineSpinner \/>/);
   assert.match(kit, /aria-busy=\{checking\}/);
   assert.match(kit, /Checking balance…/);
+  assert.match(
+    kit,
+    /<span className="sr-only">Balance · last checked · <\/span>/,
+  );
   const { CHAT_FUNDS_REWRITES } =
     await import('../../lab/tools/desktop-preview/funds-build');
   assert.ok(
@@ -23,11 +27,21 @@ void test('preview composer shows an inline spinner while the buyer balance is c
       to.includes('checking={active && usingX402 && !!payer && loading}'),
     ),
   );
+  const constants = await readFile(new URL('constants.ts', preview), 'utf8');
+  assert.match(
+    constants,
+    /PREVIEW_FUNDING = \{[\s\S]*READY: 'ready'[\s\S]*CHECKING: 'checking'[\s\S]*READY_ATOMIC: 2_000_000[\s\S]*ATOMIC_PER_USDC: 1_000_000/,
+  );
   const funding = await readFile(new URL('funding.ts', preview), 'utf8');
-  assert.match(funding, /funding'\) === 'checking'/);
+  assert.match(funding, /PREVIEW_FUNDING\.CHECKING/);
+  assert.match(funding, /PREVIEW_FUNDING\.READY/);
+  assert.match(kit, /PREVIEW_FUNDING\.READY/);
+  assert.match(kit, /PREVIEW_FUNDING\.READY_ATOMIC/);
   const css = await readFile('apps/desktop/src/ui/ui.css', 'utf8');
   assert.match(css, /\.ui-inline-spinner\s*\{/);
+  assert.match(css, /display: inline-flex;/);
   assert.match(css, /animation: pk-spin 800ms linear infinite;/);
+  assert.match(css, /@keyframes pk-spin/);
   assert.match(
     css,
     /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.ui-inline-spinner[\s\S]*animation: none;/,

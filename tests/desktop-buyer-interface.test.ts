@@ -151,14 +151,24 @@ void test('composer balance uses a live inline spinner only while the payer bala
   assert.match(composer, /<InlineSpinner \/>/);
   assert.match(composer, /Checking balance…/);
   assert.match(composer, /fundingAmount\(funding\.balanceAtomic\)/);
+  assert.match(
+    composer,
+    /<span className="sr-only">Balance · last checked · <\/span>/,
+  );
   assert.doesNotMatch(composer, /Last checked ·/);
+  const observation = await readFile(
+    'apps/desktop/src/ui/useBuyerFunding.ts',
+    'utf8',
+  );
+  assert.match(observation, /setSnapshot\(undefined\)/);
   const ui = await readFile('apps/desktop/src/ui/UI.tsx', 'utf8');
   assert.match(ui, /export function InlineSpinner\(/);
   const css = await readFile('apps/desktop/src/ui/ui.css', 'utf8');
   assert.match(
     css,
-    /\.ui-inline-spinner\s*\{[^}]*animation: pk-spin 800ms linear infinite;/,
+    /\.ui-inline-spinner\s*\{[^}]*display: inline-flex;[^}]*animation: pk-spin 800ms linear infinite;/,
   );
+  assert.match(css, /@keyframes pk-spin/);
   assert.match(
     css,
     /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.desktop-frame \.ui-inline-spinner\s*\{\s*animation: none;/,
@@ -186,6 +196,14 @@ void test('chat model picker keeps funds actions compact and leaves balance in t
   assert.match(css, /\.preview-menu-actions\s*\{[^}]*display: flex/);
   assert.match(css, /\.preview-menu-actions \.dropdown-footer\s*\{/);
   assert.doesNotMatch(css, /\.pk-balance-line/);
+  const design = await readFile(
+    'apps/desktop/src/ui/desktop-design.css',
+    'utf8',
+  );
+  assert.match(
+    design,
+    /\.preview-model-menu\[data-split\]\s+\.preview-menu-actions[^{]*\{[^}]*margin-top: auto;/,
+  );
 });
 
 void test('the chat picker refreshes its balance on open and distinguishes a missing payer from a pending read', async () => {
