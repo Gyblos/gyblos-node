@@ -106,12 +106,12 @@
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "@phosphor-icons/react": "2.1.10",
-    "@solana/kit": "5.1.0",
+    "@solana/kit": "5.5.1",
     "@gyblos/discovery-http": "workspace:*",
     "@gyblos/runtime": "workspace:*"
   },
   "devDependencies": {
-    "electron": "45.3.2",
+    "electron": "45.4.1",
     "@electron/packager": "20.3.0",
     "esbuild": "0.28.2",
     "vite": "8.3.8",
