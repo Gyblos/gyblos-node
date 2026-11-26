@@ -24,9 +24,7 @@ export interface SellersOnlinePoint {
 const UNWATCHED = 'no index heartbeat';
 
 function observed(day: SellersOnlineDay) {
-  return day.state === COVERAGE_STATES.FINAL &&
-    day.averageOnline === 0 &&
-    day.coveredSlots === 0
+  return day.averageOnline === 0 && day.coveredSlots === 0
     ? null
     : day.averageOnline;
 }
@@ -34,7 +32,8 @@ function observed(day: SellersOnlineDay) {
 function detail(day: SellersOnlineDay) {
   const note = COVERAGE_NOTES[day.state];
   if (day.averageOnline === null) return note ?? COVERAGE_STATES.PENDING;
-  if (observed(day) === null) return UNWATCHED;
+  if (observed(day) === null)
+    return note ? `${note} · ${UNWATCHED}` : UNWATCHED;
   const watched = day.coveredSlots
     ? `${day.coveredSlots} of ${day.expectedSlots} slots watched`
     : UNWATCHED;

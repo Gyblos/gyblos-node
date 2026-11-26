@@ -187,6 +187,6 @@ void test('today stays marked so far before its first heartbeat', async () => {
   const [point] = sellersOnlinePoints(await parsed([early]));
   assert.deepEqual(
     [point?.value, point?.detail],
-    [0, 'so far · peak 0 · no index heartbeat'],
+    [null, 'so far · no index heartbeat'],
   );
 });
