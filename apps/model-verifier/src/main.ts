@@ -72,17 +72,28 @@ function summary(signed: SignedModelVerification) {
   };
 }
 
+function withoutTrailingCurrentDirectory(path: string) {
+  let result = path;
+  while (basename(result) === '.') {
+    const parent = dirname(result);
+    if (parent === result) return result;
+    result = parent;
+  }
+  return result;
+}
+
 async function publishOutput(
   out: string,
   { signed, answers, unscored }: VerificationOutput,
 ) {
-  const parentPath = dirname(out);
+  const output = withoutTrailingCurrentDirectory(out);
+  const parentPath = dirname(output);
   await mkdir(parentPath, {
     recursive: true,
     mode: MODEL_VERIFIER.directoryMode,
   });
   const parent = await realpath(parentPath);
-  const destination = join(parent, basename(out));
+  const destination = join(parent, basename(output));
   const staging = await mkdtemp(join(parent, MODEL_VERIFIER.stagingPrefix));
   const diagnostics = createDiagnostics({
     ...MODEL_VERIFIER_OUTPUT_DIAGNOSTICS,
