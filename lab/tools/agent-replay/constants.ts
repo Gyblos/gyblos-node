@@ -7,6 +7,8 @@ export const AGENT_REPLAY = {
   turnChars: 600,
   runMs: 15 * 60_000,
   percentiles: [50, 95],
+  percentScale: 100,
+  okStatus: 200,
   tagPrefix: 'replay-request-',
   outFile: 'agent-replay.jsonl',
   prompts: {

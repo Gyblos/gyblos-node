@@ -15,7 +15,10 @@ function percentile(values: number[], rank: number) {
   const sorted = [...values].sort((left, right) => left - right);
   return round(
     sorted[
-      Math.min(sorted.length - 1, Math.ceil((rank / 100) * sorted.length) - 1)
+      Math.min(
+        sorted.length - 1,
+        Math.ceil((rank / AGENT_REPLAY.percentScale) * sorted.length) - 1,
+      )
     ]!,
   );
 }
@@ -47,11 +50,15 @@ export function joinTraces(
 
 export function summarize(records: ReplayRecord[]) {
   const served = records.filter(
-    (record) => record.status === 200 && record.firstTokenMs !== null,
+    (record) =>
+      record.status === AGENT_REPLAY.okStatus && record.firstTokenMs !== null,
   );
   const failures: Record<string, number> = {};
   for (const record of records)
-    if (record.status !== 200 || record.firstTokenMs === null) {
+    if (
+      record.status !== AGENT_REPLAY.okStatus ||
+      record.firstTokenMs === null
+    ) {
       const key = `${record.status}:${record.code ?? 'none'}`;
       failures[key] = (failures[key] ?? 0) + 1;
     }

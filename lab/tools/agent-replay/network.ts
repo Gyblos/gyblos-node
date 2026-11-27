@@ -6,7 +6,6 @@ import {
 } from '@gyblos/buyer/free-execution';
 import { startFreeBuyerHttp } from '@gyblos/buyer/free-http';
 import { freeBuyerDependencies } from '@gyblos/buyer/free-selection';
-import type { FreeChatStreamExecutor } from '@gyblos/buyer/free-sse';
 import { selectionStats } from '@gyblos/buyer/selection-stats';
 import { SELLER_READINESS, TRANSPORT_LIMITS } from '@gyblos/config';
 import { acceptanceSelection } from '@gyblos/lab-harness/acceptance/buyer';
@@ -20,6 +19,10 @@ import { createAcceptanceBuyerEndpoint } from '@gyblos/lab-harness/acceptance/na
 import type { AcceptanceSession } from '@gyblos/lab-harness/acceptance/session';
 
 import { AGENT_REPLAY } from './constants';
+
+type FreeChatStreamExecutor = NonNullable<
+  NonNullable<Parameters<typeof startFreeBuyerHttp>[2]>['stream']
+>;
 
 export interface CooldownEvent {
   atMs: number;
