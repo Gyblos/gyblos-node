@@ -43,7 +43,7 @@ export class UnsentChannelRequestError extends Error {
   }
 }
 
-export async function withChannelAuthorization<T>(
+async function withChannelAuthorization<T>(
   authorize: BuyerSessionOptions<BatchDestination>['authorizeRequest'],
   quote: SignedOfferV2,
   signal: AbortSignal,

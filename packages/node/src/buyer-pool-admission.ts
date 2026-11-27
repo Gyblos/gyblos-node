@@ -1,17 +1,10 @@
 // In-process ownership for bounded seller concurrency; durable journals remain the financial authority.
 import { TRANSPORT_LIMITS } from '@gyblos/config';
-import type {
-  BatchBuyerPool,
-  BatchPoolEntry,
-} from '@gyblos/payments-upto/batch-session';
 import {
   PaymentSessionError,
   SESSION_CODES,
   sessionFail,
-  UnsentChannelLimitError,
 } from '@gyblos/protocol/payment-session';
-
-import type { BuyerSessionPolicy } from './session-policy';
 
 export interface PoolLease {
   requestId: string;
@@ -120,19 +113,4 @@ export function createPoolAdmissions() {
       await queue;
     },
   };
-}
-
-export async function checkPoolBudget(
-  policy: BuyerSessionPolicy,
-  pool: BatchBuyerPool,
-  existing: BatchPoolEntry | undefined,
-  terms: BatchPoolEntry['terms'],
-) {
-  const { totalDepositAtomic, depositAtomic } = policy;
-  const { committedAtomic, availableAtomic } = await pool.budget();
-  if (
-    BigInt(committedAtomic) > BigInt(totalDepositAtomic ?? depositAtomic) ||
-    (!existing && BigInt(availableAtomic) < BigInt(terms.depositAtomic))
-  )
-    throw new UnsentChannelLimitError(terms.sellerNodeId);
 }
