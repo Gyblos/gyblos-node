@@ -81,11 +81,14 @@ function assertConfigurableBudget(
       'Finish the current chat budget in Payments before changing the maximum.',
     );
 }
+interface ManagedPorts {
+  service: Service;
+  client: X402Client;
+  budget: X402Budget;
+  check: () => void;
+}
 async function connectManaged(
-  service: Service,
-  client: X402Client,
-  budget: X402Budget,
-  check: () => void,
+  { service, client, budget, check }: ManagedPorts,
   maxAtomic?: string,
   autoPrices?: TokenPricesV2 | null,
 ) {
@@ -125,13 +128,10 @@ async function connectManaged(
   }
 }
 async function changeRenewal(
-  service: Service,
-  client: X402Client,
-  budget: X402Budget,
+  { service, client, budget, check }: ManagedPorts,
   owner: Awaited<ReturnType<Service['start']>> | undefined,
   policyId: string,
   amount: string | null,
-  check: () => void,
   reconnect: () => Promise<void>,
 ) {
   if (!owner || !service.stopWhenIdle || !service.setRenewalBudget)
@@ -177,19 +177,13 @@ export function automaticBuyer(
   const check = () => {
     if (closed) throw new Error('Local buyer is stopping');
   };
+  const ports = { service, client, budget, check };
   const reconnect = async (
     maxAtomic?: string,
     autoPrices?: TokenPricesV2 | null,
   ) => {
     check();
-    owned = await connectManaged(
-      service,
-      client,
-      budget,
-      check,
-      maxAtomic,
-      autoPrices,
-    );
+    owned = await connectManaged(ports, maxAtomic, autoPrices);
     ready = Promise.resolve();
   };
   const update = (operation: () => Promise<void>) => {
@@ -211,29 +205,16 @@ export function automaticBuyer(
         ready = null;
         owned = undefined;
       }
-      ready ??= connectManaged(service, client, budget, check)
-        .then((connection) => {
-          owned = connection;
-        })
-        .catch((error: unknown) => {
-          ready = null;
-          throw error;
-        });
+      ready ??= reconnect().catch((error: unknown) => {
+        ready = null;
+        throw error;
+      });
       return ready;
     },
     changing: () => change !== null,
     configureRenewal(amount: string | null, policyId: string) {
       return update(() =>
-        changeRenewal(
-          service,
-          client,
-          budget,
-          owned,
-          policyId,
-          amount,
-          check,
-          reconnect,
-        ),
+        changeRenewal(ports, owned, policyId, amount, reconnect),
       );
     },
     configure(

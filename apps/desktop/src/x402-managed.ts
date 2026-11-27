@@ -173,10 +173,7 @@ function supervise(
   });
   worker.on('message', (message) => {
     if (exited || stopping || accepted) return;
-    if (!message || typeof message !== 'object') {
-      fail();
-      return;
-    }
+    if (!message || typeof message !== 'object') return fail();
     const value = message as Record<string, unknown>;
     if (isBuyerSessionConfigFailure(value.kind))
       return fail(new BuyerSessionRequired(value.kind));
