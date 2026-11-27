@@ -14,7 +14,6 @@ import {
   PaymentSessionError,
   SESSION_CODES,
   sessionFail,
-  UnsentChannelLimitError,
 } from '@gyblos/protocol/payment-session';
 import {
   BatchClientError,
@@ -25,11 +24,16 @@ import {
   prepareNewChannel,
   UnsentChannelRequestError,
   verifyUnsentPoolQuote,
+  withChannelAuthorization,
   type PreparedChannel,
 } from './buyer-channel-prepare';
 import { UnsentOpeningError } from './buyer-opening-retry';
 import { bounded } from './buyer-operation';
-import { createPoolAdmissions, type PoolLease } from './buyer-pool-admission';
+import {
+  checkPoolBudget,
+  createPoolAdmissions,
+  type PoolLease,
+} from './buyer-pool-admission';
 import { UnsentSellerBusyError } from './buyer-routing';
 import {
   createBuyerSessionManager,
@@ -74,6 +78,7 @@ function manager<Remote extends BatchDestination>(
   if (!found) {
     found = createBuyerSessionManager({
       ...state.options,
+      authorizeRequest: undefined,
       preparation,
       transport: {
         ...state.options.transport,
@@ -151,57 +156,33 @@ async function unresolved<Remote extends BatchDestination>(
   }
   return state.admission.block(pending, revision);
 }
-async function checkExpiredOpening<Remote extends BatchDestination>(
-  state: State<Remote>,
-  existing: BatchPoolEntry | undefined,
-  signal: AbortSignal,
-) {
-  if (
-    existing?.stored?.openingPending &&
-    !existing.stored.notCreated &&
-    !existing.stored.openingReturned &&
-    state.options.now() >= existing.terms.expiresAt
-  ) {
-    await manager(state, existing).checkOpening(signal);
-  }
-}
-async function checkPoolBudget<Remote extends BatchDestination>(
-  state: State<Remote>,
-  pool: BatchBuyerPool,
-  existing: BatchPoolEntry | undefined,
-  terms: BatchPoolEntry['terms'],
-) {
-  const { totalDepositAtomic, depositAtomic } = state.options.policy;
-  const { committedAtomic, availableAtomic } = await pool.budget();
-  if (
-    BigInt(committedAtomic) > BigInt(totalDepositAtomic ?? depositAtomic) ||
-    (!existing && BigInt(availableAtomic) < BigInt(terms.depositAtomic))
-  )
-    throw new UnsentChannelLimitError(terms.sellerNodeId);
-}
-async function execute<Remote extends BatchDestination>(
+function poolTerms<Remote extends BatchDestination>(
   state: State<Remote>,
   quote: SignedOfferV2,
-  input: FreeExecutionBuildInput,
   signal: AbortSignal,
-  lease: PoolLease,
-  onDelta?: (text: string) => Promise<void>,
 ) {
-  recountSessionInput(quote, input, state.options.meter);
-  await state.options.verify(quote, signal);
-  const { terms, fresh } = await state.admission.serial(async () => {
+  return state.admission.serial(async () => {
     if (await unresolved(state)) return sessionFail(SESSION_CODES.UNVERIFIED);
     signal.throwIfAborted();
     const pool = await catalog(state);
     const existing = (await pool.list()).find(
       (entry) => entry.terms.sellerNodeId === quote.offer.nodeId,
     );
-    await checkExpiredOpening(state, existing, signal);
-    const terms =
-      (existing?.stored?.notCreated || existing?.stored?.openingReturned
-        ? undefined
-        : existing?.terms) ??
-      newSessionTerms(quote, state.options.policy, state.options.now());
+    if (
+      existing?.stored?.openingPending &&
+      !existing.stored.notCreated &&
+      !existing.stored.openingReturned &&
+      state.options.now() >= existing.terms.expiresAt
+    ) {
+      await manager(state, existing).checkOpening(signal);
+    }
+    const fresh =
+      !existing ||
+      !!existing.stored?.notCreated ||
+      !!existing.stored?.openingReturned;
+    const terms = fresh
+      ? newSessionTerms(quote, state.options.policy, state.options.now())
+      : existing.terms;
     await verifyUnsentPoolQuote(
       quote,
       terms,
@@ -218,18 +199,33 @@ async function execute<Remote extends BatchDestination>(
       const cause = new PaymentSessionError(SESSION_CODES.CLOSED);
       throw new UnsentChannelRequestError(terms.sellerNodeId, cause);
     }
-    await checkPoolBudget(state, pool, existing, terms);
-    return {
-      terms,
-      fresh:
-        !existing ||
-        !!existing.stored?.notCreated ||
-        !!existing.stored?.openingReturned,
-    };
+    await checkPoolBudget(state.options.policy, pool, existing, terms);
+    return { terms, fresh };
   });
+}
+async function execute<Remote extends BatchDestination>(
+  state: State<Remote>,
+  quote: SignedOfferV2,
+  input: FreeExecutionBuildInput,
+  signal: AbortSignal,
+  lease: PoolLease,
+  onDelta?: (text: string) => Promise<void>,
+) {
+  recountSessionInput(quote, input, state.options.meter);
+  await state.options.verify(quote, signal);
+  const { terms, fresh } = await poolTerms(state, quote, signal);
+  const authorize = <T>(start: () => Promise<T>) =>
+    withChannelAuthorization(
+      state.options.authorizeRequest,
+      quote,
+      signal,
+      start,
+    );
   const preparation =
     fresh && state.options.openingSupportsBlocks !== undefined
-      ? await prepareNewChannel(state.options, quote, terms, signal)
+      ? await authorize(() =>
+          prepareNewChannel(state.options, quote, terms, signal),
+        )
       : undefined;
   const entry = await state.admission.serial(async () => {
     if (await unresolved(state)) return sessionFail(SESSION_CODES.UNVERIFIED);
@@ -241,7 +237,9 @@ async function execute<Remote extends BatchDestination>(
       state.options.now(),
     );
     const pool = await catalog(state);
-    const entry = await pool.allocate(terms);
+    const allocate = () => pool.allocate(terms);
+    signal.throwIfAborted();
+    const entry = preparation ? await allocate() : await authorize(allocate);
     signal.throwIfAborted();
     await pool.begin(terms.sellerNodeId, quote.offer.requestId);
     lease.registered = true;

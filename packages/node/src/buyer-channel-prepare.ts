@@ -43,6 +43,23 @@ export class UnsentChannelRequestError extends Error {
   }
 }
 
+export async function withChannelAuthorization<T>(
+  authorize: BuyerSessionOptions<BatchDestination>['authorizeRequest'],
+  quote: SignedOfferV2,
+  signal: AbortSignal,
+  start: () => Promise<T>,
+): Promise<T> {
+  signal.throwIfAborted();
+  if (authorize) {
+    const release = await authorize(quote, signal);
+    if (signal.aborted) {
+      await release?.().catch(() => undefined);
+      signal.throwIfAborted();
+    }
+  }
+  return start();
+}
+
 export async function verifyUnsentPoolQuote(
   quote: SignedOfferV2,
   terms: PaymentSessionTerms,

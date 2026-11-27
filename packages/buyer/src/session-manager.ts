@@ -5,7 +5,10 @@ import {
   batchPoolPathsIn,
   batchSessionPathsIn,
 } from '@gyblos/config/home-payments';
-import type { ConfirmUnchargedKey } from '@gyblos/node/buyer-api-keys';
+import type {
+  BuyerApiKeyOperation,
+  ConfirmUnchargedKey,
+} from '@gyblos/node/buyer-api-keys';
 import {
   createBuyerSessionManager,
   type BuyerSessionOptions,
@@ -29,6 +32,7 @@ import type { ChatTokenizer } from '@gyblos/protocol/engine';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import { SESSION_CODES, sessionFail } from '@gyblos/protocol/payment-session';
 
+import { reserveApiKey } from './api-key-execution';
 import { PAID_BUYER_HTTP_MS } from './constants';
 import {
   permitsWinner,
@@ -51,7 +55,7 @@ type Options = BuyerStartupOptions;
 type Winner = Awaited<ReturnType<typeof selectWinner>>;
 export interface SessionState {
   openingIntent?: AsyncLocalStorage<string | undefined>;
-  selections: Map<string, Winner>;
+  selections: Map<string, Winner & { permission?: BuyerApiKeyOperation }>;
   sending: Map<string, () => void>;
   meter?: ChatTokenizer;
 }
@@ -196,6 +200,15 @@ function singleKeyProof(
       () => reconcile(AbortSignal.timeout(PAID_BUYER_HTTP_MS)),
     );
 }
+function sessionAuthorization(
+  state: SessionState,
+): BuyerSessionOptions<ReturnType<typeof sellerAddress>>['authorizeRequest'] {
+  return async (quote, signal) => {
+    const permission = state.selections.get(quote.offer.requestId)?.permission;
+    await reserveApiKey(permission, quote, signal);
+    return permission?.releaseUnsent;
+  };
+}
 export function makeManager(
   context: Context,
   options: Options,
@@ -241,6 +254,7 @@ export function makeManager(
           !batchSessionTerminal(entry.stored),
       );
     },
+    authorizeRequest: sessionAuthorization(state),
     verify: trustedQuote(context, state),
     receipt: sessionReceipts(context, state),
   };

@@ -34,6 +34,7 @@ export async function reserveApiKey(
 ) {
   if (!operation) return;
   operation.signal.throwIfAborted();
+  signal?.throwIfAborted();
   await operation.reserve({
     maxAtomic: quote.offer.maxAtomic,
     requestId: quote.offer.requestId,

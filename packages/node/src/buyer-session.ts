@@ -26,6 +26,7 @@ import type { BuyerBatchSessionOptions } from './batch-buyer-types';
 import {
   prepareNewChannel,
   UnsentChannelRequestError,
+  withChannelAuthorization,
   type PreparedChannel,
 } from './buyer-channel-prepare';
 import { UnsentOpeningError } from './buyer-opening-retry';
@@ -48,6 +49,10 @@ export { UnsentChannelRequestError } from './buyer-channel-prepare';
 export interface BuyerSessionOptions<Remote extends BatchDestination> {
   // Known capability of the financial adapter. Unspecified adapters negotiate after construction.
   financialPermission?: BuyerBatchSessionOptions<Remote>['financialPermission'];
+  authorizeRequest?: (
+    quote: SignedOfferV2,
+    signal: AbortSignal,
+  ) => Promise<(() => Promise<void>) | undefined>;
   onDeclined?: BuyerBatchSessionOptions<Remote>['onDeclined'];
   beforeInference?: BuyerBatchSessionOptions<Remote>['beforeInference'];
   switchingAllowed?(): Promise<boolean>;
@@ -195,7 +200,12 @@ async function run<Remote extends BatchDestination>(
   await bounded(state.options.verify(quote, signal), signal);
   if (await bounded(state.options.unresolved(), signal))
     return sessionFail(SESSION_CODES.UNVERIFIED);
-  const opened = await current(state, quote, signal);
+  const opened = await withChannelAuthorization(
+    state.options.authorizeRequest,
+    quote,
+    signal,
+    () => current(state, quote, signal),
+  );
   if (
     BigInt(opened.priorSpentAtomic) + BigInt(opened.terms.depositAtomic) >
       BigInt(state.options.policy.depositAtomic) ||
