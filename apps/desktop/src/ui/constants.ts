@@ -5,14 +5,6 @@ import { AGENT_CLIENT } from '../constants';
 import { LOCAL_NODE_STATE } from '../node-status';
 import type { CatalogModel } from './model-types';
 
-export const TOP_UP_STATUS = {
-  INVALID_AMOUNT: 'invalid-amount',
-  WALLET_UNAVAILABLE: 'wallet-unavailable',
-  BACKUP_REQUIRED: 'backup-required',
-  PAYMENT_UNAVAILABLE: 'payment-unavailable',
-} as const;
-export const TOP_UP_AMOUNTS = ['10', '25', '50'] as const;
-
 export const COPY_RESULT = {
   COPIED: 'copied',
   UNAVAILABLE: 'unavailable',
@@ -274,10 +266,8 @@ export const DEMO_AUTH = {
 export const DEMO_ACCOUNT = {
   REQUEST_COST: 0.001,
   UNITS_PER_CREDIT: 1000,
-  TOP_UP: 10,
   DEFAULT_BUDGET: 2,
   TOAST_MS: 3000,
-  SAMPLE_REQUESTS: 4,
 } as const;
 export const NAVIGATION_WIDTH = { MIN: 224, DEFAULT: 224, MAX: 360 } as const;
 export const HISTORY_KEY = {

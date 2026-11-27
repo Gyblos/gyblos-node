@@ -1,6 +1,6 @@
 import { DEVNET } from '@gyblos/config/network';
 
-import { PREVIEW, PREVIEW_FUNDING } from './constants';
+import { PREVIEW, PREVIEW_FUNDING, PREVIEW_QUERY } from './constants';
 
 declare global {
   interface Window {
@@ -21,7 +21,8 @@ export function previewFunding(payer: string) {
       const funded =
         mode === PREVIEW_FUNDING.READY || mode === PREVIEW_FUNDING.CHECKING;
       const mainnet =
-        query.get('network') === 'mainnet' || query.get('testnet') === 'hidden';
+        query.get(PREVIEW_QUERY.NETWORK) === PREVIEW_QUERY.NETWORK_MAINNET ||
+        query.get(PREVIEW_QUERY.TESTNET) === PREVIEW_QUERY.TESTNET_HIDDEN;
       return mainnet
         ? null
         : {

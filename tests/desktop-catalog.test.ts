@@ -86,13 +86,13 @@ void test('desktop demo account refuses over-limit and offline requests without 
 });
 void test('desktop demo request increments illustrative usage by its fixed simulation cost', () => {
   const result = authorizeDemo(
-    { credits: DEMO_ACCOUNT.TOP_UP, spent: 0, budget: 2 },
+    { credits: 10, spent: 0, budget: 2 },
     false,
     true,
   );
   assert.equal(result.status, DEMO_AUTH.APPROVED);
   assert.equal(result.spent, DEMO_ACCOUNT.REQUEST_COST);
-  assert.equal(result.credits, DEMO_ACCOUNT.TOP_UP - DEMO_ACCOUNT.REQUEST_COST);
+  assert.equal(result.credits, 10 - DEMO_ACCOUNT.REQUEST_COST);
 });
 
 void test('desktop free demo requests bypass a limit reduced below prior spending', () => {

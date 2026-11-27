@@ -3,6 +3,13 @@ export const PREVIEW_DENSITY = {
   COMPACT: 'compact',
   COMFORTABLE: 'comfortable',
 } as const;
+export const PREVIEW_QUERY = {
+  NETWORK: 'network',
+  NETWORK_MAINNET: 'mainnet',
+  TESTNET: 'testnet',
+  TESTNET_HIDDEN: 'hidden',
+} as const;
+
 export const PREVIEW_FUNDING = {
   READY: 'ready',
   CHECKING: 'checking',
