@@ -19,6 +19,7 @@ import { CHALLENGE_SET } from '@gyblos/model-verifier/challenge-set';
 import {
   MODEL_VERIFIER,
   MODEL_VERIFIER_CODES,
+  MODEL_VERIFIER_PHASES,
 } from '@gyblos/model-verifier/constants';
 import { verifyModelVerification } from '@gyblos/protocol/model-verification';
 import {
@@ -348,13 +349,16 @@ void test('verify publishes both artifacts from the same run', async (t) => {
       challengeSet: CHALLENGE_SET,
       answers: [
         {
+          challenge: 1,
           prompt: CHALLENGE_SET.prompts[0],
           text: scoredAnswer,
           digest,
           checks: [{ at: scoredAnswer.indexOf(' '), deviation: false }],
         },
       ],
-      unscored: CHALLENGE_SET.prompts.slice(1).map((prompt) => ({
+      unscored: CHALLENGE_SET.prompts.slice(1).map((prompt, index) => ({
+        challenge: index + 2,
+        phase: MODEL_VERIFIER_PHASES.SCORING,
         prompt,
         text: '',
         digest: unscoredDigest,

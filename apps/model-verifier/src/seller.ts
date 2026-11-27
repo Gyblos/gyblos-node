@@ -15,7 +15,11 @@ import { createControlTransport } from '@gyblos/transport-iroh/control-client';
 import { assertConfiguredRelay } from '@gyblos/transport-iroh/endpoint';
 import { createFreeExecutionClient } from '@gyblos/transport-iroh/free-client';
 
-import { MAX_DIRECT_ADDRESSES, MODEL_VERIFIER } from './constants';
+import {
+  MAX_DIRECT_ADDRESSES,
+  MODEL_VERIFIER,
+  SellerQuoteError,
+} from './constants';
 import { ephemeralAddress } from './key';
 import { createFreeQuoter, invalidSeller, type QuoteExchange } from './quotes';
 
@@ -83,7 +87,9 @@ export async function openSeller(
     return {
       selection,
       async ask(prompt: string, maxTokens: number) {
-        const quote = await quoter.quote(maxTokens);
+        const quote = await quoter.quote(maxTokens).catch((error: unknown) => {
+          throw new SellerQuoteError(error);
+        });
         const request = buildFreeExecutionRequest(quote, {
           messages: [{ role: FREE_CHAT_ROLES.USER, content: prompt }],
           maxTokens,

@@ -1,6 +1,12 @@
 import { createHash, randomBytes } from 'node:crypto';
 
 import { renderChat } from '@gyblos/engine-ollama/model';
+import {
+  CONTROL_CODES,
+  FREE_EXECUTION_CODES,
+  type ControlCode,
+  type FreeExecutionCode,
+} from '@gyblos/protocol/constants';
 import type { ModelSelection } from '@gyblos/protocol/control-types';
 import {
   MODEL_VERIFICATION,
@@ -13,7 +19,9 @@ import {
 import { challengeSetDigest, type ChallengeSet } from './challenge-set';
 import {
   MODEL_VERIFIER_CODES,
+  MODEL_VERIFIER_PHASES,
   SECRET_BYTES,
+  SellerQuoteError,
   TEMPLATE_MARKER,
   type ModelVerifierCode,
 } from './constants';
@@ -23,17 +31,27 @@ import { cutPoints, isDeviation, minimumLogprob } from './scoring';
 import type { SellerTarget } from './seller';
 
 export interface AnswerEvidence {
+  challenge: number;
   prompt: string;
   text: string;
   digest: string;
   checks: { at: number; deviation: boolean }[];
 }
-export interface UnscoredEvidence {
+interface UnscoredAnswerEvidence {
+  challenge: number;
+  phase: typeof MODEL_VERIFIER_PHASES.SCORING;
   prompt: string;
   text: string;
   digest: string;
   code: ModelVerifierCode;
 }
+interface SellerFailureEvidence {
+  challenge: number;
+  phase: (typeof MODEL_VERIFIER_PHASES)['QUOTE' | 'EXECUTION'];
+  code: ModelVerifierCode | ControlCode | FreeExecutionCode;
+}
+export type UnscoredEvidence = UnscoredAnswerEvidence | SellerFailureEvidence;
+
 export interface VerifiedSeller {
   selection: ModelSelection;
   ask(prompt: string, maxTokens: number): Promise<string>;
@@ -45,7 +63,7 @@ export interface VerificationInput {
   set: ChallengeSet;
   key: VerifierKey;
   now: () => number;
-  onAnswer?: (index: number, failure?: string) => void;
+  onAnswer?: (index: number, failure?: UnscoredEvidence['code']) => void;
 }
 export interface VerificationOutput {
   signed: SignedModelVerification;
@@ -53,12 +71,41 @@ export interface VerificationOutput {
   unscored: UnscoredEvidence[];
 }
 
-function failureCode(error: unknown) {
-  const code =
-    error && typeof error === 'object' ? Reflect.get(error, 'code') : undefined;
-  return typeof code === 'string' && /^[A-Z_]{1,64}$/.test(code)
-    ? code
-    : MODEL_VERIFIER_CODES.UNKNOWN;
+const QUOTE_CODES = [
+  ...Object.values(CONTROL_CODES),
+  ...Object.values(MODEL_VERIFIER_CODES),
+];
+const EXECUTION_CODES = Object.values(FREE_EXECUTION_CODES);
+
+function failureCode<T extends UnscoredEvidence['code']>(
+  error: unknown,
+  allowed: readonly T[],
+) {
+  const code: unknown =
+    error && typeof error === 'object'
+      ? Object.getOwnPropertyDescriptor(error, 'code')?.value
+      : undefined;
+  return (
+    allowed.find((candidate) => candidate === code) ??
+    MODEL_VERIFIER_CODES.UNKNOWN
+  );
+}
+
+function sellerFailure(
+  challenge: number,
+  error: unknown,
+): SellerFailureEvidence {
+  return error instanceof SellerQuoteError
+    ? {
+        challenge,
+        phase: MODEL_VERIFIER_PHASES.QUOTE,
+        code: failureCode(error.cause, QUOTE_CODES),
+      }
+    : {
+        challenge,
+        phase: MODEL_VERIFIER_PHASES.EXECUTION,
+        code: failureCode(error, EXECUTION_CODES),
+      };
 }
 
 const sha256 = (text: string) =>
@@ -67,6 +114,7 @@ const sha256 = (text: string) =>
 async function scoreAnswer(
   input: VerificationInput,
   seed: string,
+  challenge: number,
   prompt: string,
   text: string,
 ): Promise<AnswerEvidence> {
@@ -86,7 +134,7 @@ async function scoreAnswer(
         deviation: isDeviation(text.slice(at), candidates, floor),
       });
   }
-  return { prompt, text, digest, checks };
+  return { challenge, prompt, text, digest, checks };
 }
 
 function evidenceOf(
@@ -136,7 +184,14 @@ export async function runVerification(
     text: string,
     code: ModelVerifierCode,
   ) => {
-    unscored.push({ prompt, text, digest: sha256(text), code });
+    unscored.push({
+      challenge: index + 1,
+      phase: MODEL_VERIFIER_PHASES.SCORING,
+      prompt,
+      text,
+      digest: sha256(text),
+      code,
+    });
     input.onAnswer?.(index, code);
   };
   for (const [index, prompt] of set.prompts.entries()) {
@@ -144,7 +199,9 @@ export async function runVerification(
     try {
       text = await input.seller.ask(prompt, set.rule.maxTokens);
     } catch (error) {
-      input.onAnswer?.(index, failureCode(error));
+      const failure = sellerFailure(index + 1, error);
+      unscored.push(failure);
+      input.onAnswer?.(index, failure.code);
       continue;
     }
     if (TEMPLATE_MARKER.test(text)) {
@@ -154,6 +211,7 @@ export async function runVerification(
     const scored = await scoreAnswer(
       input,
       `${setDigest}:${nonce}`,
+      index + 1,
       prompt,
       text,
     );
