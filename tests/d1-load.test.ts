@@ -30,8 +30,8 @@ const CAPS: Record<D1LoadLabel, D1LoadCap> = {
   [D1_LOAD_LABELS.READ_OFFER_HISTORY]: cap(2, 2, 0, 4, 1),
   [D1_LOAD_LABELS.READ_NETWORK_HISTORY]: cap(3, 3, 0, 14, 0),
   [D1_LOAD_LABELS.CRON_ROLLUP]: cap(13, 13, 0, 14, 0),
-  [D1_LOAD_LABELS.AGG_DAY_1]: cap(39, 9, 3, 6, 5),
-  [D1_LOAD_LABELS.AGG_DAYS_31]: cap(759, 39, 33, 6, 65),
+  [D1_LOAD_LABELS.AGG_DAY_1]: cap(40, 9, 3, 6, 6),
+  [D1_LOAD_LABELS.AGG_DAYS_31]: cap(760, 39, 33, 6, 66),
 };
 
 let measured: Promise<D1LoadRow[] | null> | undefined;

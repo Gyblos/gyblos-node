@@ -1041,8 +1041,8 @@ test harness:
 ```text
 operation            statements  round trips  batches  max params  full scans
 -------------------  ----------  -----------  -------  ----------  ----------
-agg.day1             39          9            3        6           5
-agg.days31           759         39           33       6           65
+agg.day1             40          9            3        6           6
+agg.days31           760         39           33       6           66
 ```
 
 Each pending day is one batch of 24 statements; the run adds its scan batch, the
