@@ -122,3 +122,10 @@ void test('a forward page entry below the history floor is not counted as a fabr
     true,
   );
 });
+
+void test('an accounts answer shorter than the request is refused', async () => {
+  const rpc = createChainRpc('https://rpc.test', () =>
+    reply({ context: { slot: 1 }, value: [null] }),
+  );
+  await assert.rejects(rpc.accounts(['a'.repeat(44), 'b'.repeat(44)]), SHAPE);
+});

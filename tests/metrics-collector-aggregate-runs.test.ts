@@ -48,6 +48,7 @@ void test('a day that fails stays dirty and never blocks the other days', async 
     days: ['2026-11-15'],
     failed: [DAY],
     more: false,
+    scanFailed: false,
     chain: { days: [], failed: [], more: false, scanFailed: false },
   });
   assert.deepEqual(
@@ -72,6 +73,7 @@ void test('raw values past year 9999 or beyond 64-bit sums never stop aggregatio
     days: [DAY],
     failed: [],
     more: false,
+    scanFailed: false,
     chain: { days: [], failed: [], more: false, scanFailed: false },
   });
   assert.equal(
@@ -147,4 +149,24 @@ void test('a latency on a bucket bound falls in the next bucket', async () => {
   assert.equal(row!.first_token_hist, buckets(100));
   assert.equal(JSON.parse(String(row!.first_token_hist))[1], 1);
   assert.equal(JSON.parse(String(row!.total_hist)).at(-1), 1);
+});
+
+void test('a receipt scan failure still runs the chain aggregation and retries next run', async () => {
+  const database = createCollectorD1();
+  insertReceipt(database, { receivedAt: DAY_START + HOUR });
+  const batch = database.batch.bind(database);
+  let batches = 0;
+  database.batch = (statements) =>
+    ++batches === 1
+      ? Promise.reject(new Error('D1 unavailable'))
+      : batch(statements);
+  const run = await runAggregation(database, NOW);
+  assert.deepEqual(run, {
+    days: [],
+    failed: [],
+    more: false,
+    scanFailed: true,
+    chain: { days: [], failed: [], more: false, scanFailed: false },
+  });
+  assert.deepEqual((await runAggregation(database, NOW + 1)).days, [DAY]);
 });

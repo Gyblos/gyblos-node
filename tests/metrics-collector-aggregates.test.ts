@@ -75,6 +75,7 @@ void test('network and seller totals follow the metric definitions', async () =>
     days: [DAY],
     failed: [],
     more: false,
+    scanFailed: false,
     chain: { days: [], failed: [], more: false, scanFailed: false },
   });
 
@@ -308,6 +309,7 @@ void test('a run recomputes at most maxDaysPerRun days, newest first, and leaves
     days: [oldest],
     failed: [],
     more: false,
+    scanFailed: false,
     chain: { days: [], failed: [], more: false, scanFailed: false },
   });
 });
