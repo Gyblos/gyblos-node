@@ -8,13 +8,31 @@ import {
   type PaypalResult,
 } from './paypal-model';
 import type { DesktopPaypalStatus } from './paypal-session';
+import type { CHAT_ROLE } from './ui/constants';
+
+type Message = {
+  role: (typeof CHAT_ROLE)[keyof typeof CHAT_ROLE];
+  text: string;
+};
+export type PaypalChatSnapshot = {
+  sessionId?: string | null;
+  status: DesktopPaypalStatus | null;
+  statusFresh: boolean;
+  model: string | null;
+  messages: Message[];
+  draft: string;
+  pendingPrompt: string | null;
+  busy: boolean;
+  notice: string;
+  noticeIsTurnFailure?: boolean;
+  pendingMessageId: string | null;
+};
 
 export function paypalCommandNotice(
   request: PaypalRequest,
   result: PaypalResult,
   previous: DesktopPaypalStatus | null,
   pendingMessageId: string | null,
-  currentNotice: string,
 ) {
   if (request.action === PAYPAL_ACTION.CHECK_VOID) {
     return !result.error &&
@@ -35,7 +53,7 @@ export function paypalCommandNotice(
     return 'A prior response awaits confirmation. Review the session.';
   return request.action === PAYPAL_ACTION.STATUS &&
     result.status?.phase === previous?.phase
-    ? currentNotice
+    ? undefined
     : '';
 }
 

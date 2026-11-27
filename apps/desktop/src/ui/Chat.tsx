@@ -42,7 +42,11 @@ import type { ChatController } from './chat-controller';
 import { conversationSummary } from './chat-history';
 import { canSendPaypal, sendPaypalMessage } from './chat-paypal';
 import { chatReasoningChoice, type ReasoningSelection } from './chat-reasoning';
-import { toggleToolSelection, type ChatMessage } from './chat-state';
+import {
+  MESSAGE_STATE,
+  toggleToolSelection,
+  type ChatMessage,
+} from './chat-state';
 import { ChatAnswer } from './ChatAnswer';
 import { ChatComposer } from './ChatComposer';
 import { ToolsDropdown } from './ChatTools';
@@ -56,6 +60,7 @@ import {
   MODEL_SOURCE,
 } from './constants';
 import type { DemoAuthorizationStatus } from './demo-account';
+import { FailedTurn } from './FailedTurn';
 import { Modal } from './Modal';
 import { ModelDropdown, type ModelOption } from './ModelDropdown';
 import { MotionPresence } from './Motion';
@@ -220,9 +225,10 @@ export function Chat({
     (freeOnly ||
       !x402.state.summary.active ||
       x402.state.summary.policy?.policyId === x402.state.policy.policyId);
-  const notice = usingPaypal
-    ? paypal.state.notice || session.notice
-    : session.notice;
+  const notice = session.noticeIsTurnFailure ? '' : session.notice;
+  const paypalNotice = paypal.state.noticeIsTurnFailure
+    ? ''
+    : paypal.state.notice;
   const [nearBottom, setNearBottom] = useState(true);
   const [modelPulse, setModelPulse] = useState(false);
   const input = useRef<HTMLTextAreaElement>(null);
@@ -363,6 +369,12 @@ export function Chat({
     follow.current = true;
     setNearBottom(true);
   }
+  function editFailedQuestion(text: string) {
+    if (session.draft && session.draft !== text) reset(text);
+    else setDraft(text);
+    input.current?.focus();
+  }
+
   useImperativeHandle(ref, () => ({
     newChat: () => reset(),
     prefill: (text) => reset(text),
@@ -529,6 +541,7 @@ export function Chat({
               id,
               result?.error ??
                 'Response unavailable. Review the chat budget in Payments before trying again.',
+              result?.failureReason,
             );
         });
       return;
@@ -581,9 +594,9 @@ export function Chat({
         storageState === CHAT_STORAGE_STATE.PINS_UNAVAILABLE) && (
         <Note>{chatArchiveLabel(storageState)}</Note>
       )}
-      {usingPaypal && notice && (
+      {usingPaypal && paypalNotice && (
         <div className="paypal-chat-alert" role="status">
-          <p>{notice}</p>
+          <p>{paypalNotice}</p>
           <Button onClick={onReviewPaypal}>Review in Payments</Button>
         </div>
       )}
@@ -656,9 +669,7 @@ export function Chat({
                                 : 'Copy message'
                             }
                             title="Copy message"
-                            onClick={() => {
-                              void copy(user.text, user.id);
-                            }}
+                            onClick={() => void copy(user.text, user.id)}
                           >
                             {copied === user.id ? (
                               <Check size={14} />
@@ -683,15 +694,34 @@ export function Chat({
                   {answer && (
                     <ChatAnswer
                       message={answer}
+                      recovery={
+                        (answer.failureReason ||
+                          answer.state === MESSAGE_STATE.FAILED) && (
+                          <FailedTurn
+                            message={answer}
+                            onConnections={onConnections}
+                            buyer={x402}
+                            separateDraft={
+                              !!user &&
+                              !!session.draft &&
+                              session.draft !== user.text
+                            }
+                            onReview={
+                              answer.paymentMethod === PAYMENT_METHOD.PAYPAL
+                                ? onReviewPaypal
+                                : onReviewX402
+                            }
+                            onEdit={() => user && editFailedQuestion(user.text)}
+                          />
+                        )
+                      }
                       run={session.run}
                       copied={copied === answer.id}
                       canReuse={
                         answer === session.messages.at(-1) && !!lastUser
                       }
                       reuseDisabled={busy || !online}
-                      onCopy={() => {
-                        void copy(answer.text, answer.id);
-                      }}
+                      onCopy={() => void copy(answer.text, answer.id)}
                       onReuse={() => {
                         if (!lastUser) return;
                         setDraft(lastUser.text);
@@ -875,7 +905,7 @@ export function Chat({
           )}
           <p className="composer-note" role="status">
             {limitNotice ||
-              (!usingPaypal && notice) ||
+              notice ||
               (busy && session.draft.trim()
                 ? run
                   ? 'Draft kept · stop or wait to send'

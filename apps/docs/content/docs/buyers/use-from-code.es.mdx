@@ -273,15 +273,19 @@ secuencia, con finish reason `stop` (Anthropic: `stop_reason: "stop_sequence"`).
 trae llamadas a herramientas. El vendedor no recibe las secuencias y sigue generando, así que un stream
 se cierra solo cuando el vendedor termina, y `usage` cuenta todo lo que generó.
 
-| Respuesta                     | Significado                                                                                       |
-| ----------------------------- | ------------------------------------------------------------------------------------------------- |
-| 400                           | La solicitud usa algo que Gyblos no admite; el mensaje y `param` lo nombran                       |
-| 400 `BUYER_KEY_LIMIT_REACHED` | Lo que queda del límite de la key no cubre esta solicitud; no se envió nada. Crea una key nueva   |
-| 403 `BUYER_KEY_REVOKED`       | La key fue revocada; no se envió nada                                                             |
-| 404                           | La app no puede usar ese modelo; el mensaje lista los que sí puede                                |
-| 503                           | No hay vendedores disponibles. `Retry-After` sugiere cuándo reintentar; reintentar es tu decisión |
-| 503 `BUYER_KEY_NEEDS_REVIEW`  | Una solicitud pagada anterior con esta key tiene un resultado incierto. Revísala en **Payments**  |
-| 504                           | El vendedor no respondió a tiempo                                                                 |
+| Respuesta                                                                            | Significado                                                                                       |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| 400                                                                                  | La solicitud usa algo que Gyblos no admite; el mensaje y `param` lo nombran                       |
+| 400 `BUYER_KEY_LIMIT_REACHED`                                                        | Lo que queda del límite de la key no cubre esta solicitud; no se envió nada. Crea una key nueva   |
+| 403 `BUYER_KEY_REVOKED`                                                              | La key fue revocada; no se envió nada                                                             |
+| 404                                                                                  | La app no puede usar ese modelo; el mensaje lista los que sí puede                                |
+| 503                                                                                  | No hay vendedores disponibles. `Retry-After` sugiere cuándo reintentar; reintentar es tu decisión |
+| 503 (Chat Completions, Anthropic Messages), 400 (Responses) `BUYER_KEY_NEEDS_REVIEW` | El registro de API keys requiere revisión. Consulta su estado en **Connections**.                 |
+| 504                                                                                  | El vendedor no respondió a tiempo                                                                 |
+
+La tabla indica el estado HTTP antes de enviar las cabeceras de respuesta. Cuando el registro requiere revisión, el comprador envía `x-should-retry: false`. Configura el cliente para detener los reintentos automáticos mientras dure la revisión. En el cuerpo JSON de un rechazo por revisión de claves en Responses, el código de Gyblos aparece en `error.code` si se verificó que la solicitud no se envió, o en `error.gyblos_code` si pudo haberse enviado.
+
+Una vez iniciado el stream, el estado HTTP sigue siendo 200. Chat Completions envía un último evento de datos con `error.code`. Anthropic Messages envía un evento `error` con `error.code`. Responses envía un evento `response.failed` con `response.error.gyblos_code`.
 
 Los errores usan la forma de cada API, así que los SDK lanzan sus excepciones habituales. Para otros
 problemas, consulta [Solución de problemas](/es/help/troubleshooting#escritorio-y-comprador-local).

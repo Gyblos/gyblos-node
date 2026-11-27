@@ -3,12 +3,17 @@
 import type { ReasoningLevel } from '@gyblos/protocol/constants';
 
 import { restoreChatArchive, type ChatArchive } from '../chat-archive-model';
-import { CHAT_STORAGE } from '../constants';
+import {
+  CHAT_FAILURE,
+  CHAT_STORAGE,
+  type ChatFailureReason,
+} from '../constants';
 import { PAYMENT_METHOD, type PaymentMethod } from '../paypal-model';
 import { parseResponseMetrics } from '../response-metrics';
 import {
   advanceRun,
   createSession,
+  failPaidRun,
   startRun,
   stopRun,
   type ChatSession,
@@ -144,7 +149,7 @@ export class ChatController {
       ...this.snapshot,
       sessions: this.snapshot.sessions.map((session) =>
         session.id === sessionId
-          ? { ...session, notice, blocked: null }
+          ? { ...session, notice, noticeIsTurnFailure: false, blocked: null }
           : session,
       ),
     });
@@ -185,6 +190,7 @@ export class ChatController {
       this.updateActive((item) => ({
         ...item,
         notice: chatAuthorizationNotice(status),
+        noticeIsTurnFailure: false,
         blocked: status,
       }));
       return false;
@@ -306,6 +312,7 @@ export class ChatController {
                 ? {
                     ...message,
                     state: MESSAGE_STATE.STOPPED,
+                    failureReason: CHAT_FAILURE.INTERRUPTED,
                     ...this.endActivity(message),
                   }
                 : message,
@@ -313,25 +320,15 @@ export class ChatController {
           },
     );
   }
-  failPaypal(sessionId: string, id: string, notice: string) {
-    this.updatePaypal(sessionId, id, (session) => ({
-      ...session,
-      draft:
-        session.draftRevision === session.paypalRun?.draftRevision
-          ? session.paypalRun.prompt
-          : session.draft,
-      paypalRun: null,
-      notice,
-      messages: session.messages.map((message) =>
-        message.id === `${id}-assistant`
-          ? {
-              ...message,
-              state: MESSAGE_STATE.FAILED,
-              ...this.endActivity(message),
-            }
-          : message,
-      ),
-    }));
+  failPaypal(
+    sessionId: string,
+    id: string,
+    notice: string,
+    failureReason?: ChatFailureReason,
+  ) {
+    this.updatePaypal(sessionId, id, (session) =>
+      failPaidRun(session, id, notice, failureReason, this.activityClock),
+    );
   }
   private endActivity({ activity }: ChatSession['messages'][number]) {
     if (!activity) return {};

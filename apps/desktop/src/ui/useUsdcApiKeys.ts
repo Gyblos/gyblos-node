@@ -19,6 +19,26 @@ declare global {
     };
   }
 }
+export async function keyReviewStatus(policyId: string | undefined) {
+  try {
+    const state = parseUsdcApiState(
+      await window.desktopUsdcApiKeys?.run({ action: USDC_API_ACTION.STATUS }),
+    );
+    if (
+      policyId &&
+      state.policyId === policyId &&
+      state.snapshot &&
+      !state.error
+    )
+      return state.snapshot.blocked
+        ? 'The API key ledger still requires review.'
+        : 'The API key ledger currently allows new requests.';
+  } catch {
+    return 'Could not confirm the API key ledger status.';
+  }
+  return 'Could not confirm the API key ledger status.';
+}
+
 function useKeyReveal(
   running: { current: boolean },
   mounted: { current: boolean },

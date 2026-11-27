@@ -5,6 +5,7 @@ import type { ServerResponse } from 'node:http';
 
 import { HTTP_STATUS, UNITS } from '@gyblos/config';
 import { BUYER_API } from '@gyblos/protocol/buyer-api';
+import { BUYER_KEY_CODES } from '@gyblos/protocol/buyer-api-keys';
 import { FREE_EXECUTION_CODES } from '@gyblos/protocol/constants';
 import {
   FreeExecutionError,
@@ -121,17 +122,15 @@ export function replyError(
   const headers: Record<string, string> = {
     'content-type': 'application/json',
   };
-  const status = api.errorStatus?.(view.status, view.neverSent) ?? view.status;
+  const retryAllowed = view.neverSent && code !== BUYER_KEY_CODES.REVIEW;
+  const status = api.errorStatus?.(view.status, retryAllowed) ?? view.status;
   // OpenAI and Anthropic SDKs retry 408/409/429/5xx by default; a resend after a possible send would
   // repeat the prompt, possibly to another seller. Only local BUSY and unsent unavailability stay retryable.
   const callerFault = status < HTTP_STATUS.internalServerError;
-  if (
-    status !== HTTP_STATUS.tooManyRequests &&
-    (callerFault || !view.neverSent)
-  )
+  if (status !== HTTP_STATUS.tooManyRequests && (callerFault || !retryAllowed))
     headers[FREE_BUYER.noRetryHeader] = 'false';
   const retry =
-    view.neverSent && view.cooldownUntil !== undefined
+    retryAllowed && view.cooldownUntil !== undefined
       ? secondsUntil(view.cooldownUntil)
       : undefined;
   if (retry !== undefined) headers[FREE_BUYER.retryAfterHeader] = String(retry);
