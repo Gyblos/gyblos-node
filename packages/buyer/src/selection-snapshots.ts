@@ -87,10 +87,11 @@ export function recordQuote(
   const cooldownUntil = success
     ? null
     : now + (backoff?.failed(nodeId) ?? BUYER_SELECTION.cooldownMs);
+  const measured = Math.max(0, Math.round(latencyMs));
   stats.set(nodeId, {
     successes: (prior?.successes ?? 0) + Number(success),
     failures: (prior?.failures ?? 0) + Number(!success),
-    latencyMs: Math.max(0, Math.round(latencyMs)),
+    latencyMs: success ? measured : (prior?.latencyMs ?? null),
     waitAccuracy: prior?.waitAccuracy ?? null,
     cooldownUntil,
     // v2 has no predicted wait and control latency is not inference waiting time.

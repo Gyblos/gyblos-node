@@ -49,17 +49,20 @@ Stop a Docker seller with Compose and a native seller through its service (see
 `gyblos start` runs the seller node in the foreground. It reads `GYBLOS_CONFIG`; without it, the packaged
 release reads `config.toml` in its home and every other run reads `./config.toml`. The Docker image and
 the background service run it for you. Don't start a second seller on the same home.
+It accepts no arguments; extra ones are rejected with a usage error.
 
 ### setup and tokenizer [#setup-and-tokenizer]
 
 `gyblos setup --role seller --mint MINT` creates the seller's owner, node and payment keys and prints its
 public role. It keeps keys that already exist, and adds payment keys to a seller that lacks them. It
 contacts no RPC and funds nothing. `gyblos tokenizer` downloads and verifies the pinned public tokenizer
-and prints `Pinned tokenizer verified.` The installer runs both for you.
+and prints `Pinned tokenizer verified.` The installer runs both for you. `gyblos tokenizer` accepts no
+arguments; extra ones are rejected with a usage error.
 
 ### --version [#version]
 
-`gyblos --version` prints the release version. A source checkout prints `source`.
+`gyblos --version` prints the release version. A source checkout prints `source`. It accepts no
+arguments; extra ones are rejected with a usage error.
 
 ## Check the configuration [#validate-the-mounted-configuration]
 

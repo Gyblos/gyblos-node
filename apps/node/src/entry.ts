@@ -14,6 +14,10 @@ export const ENTRY_COMMANDS = {
   SERVICE_RUN: 'service-run',
 } as const;
 
+async function usage(args: readonly string[]) {
+  return (await import('./cli')).main([...args]);
+}
+
 export async function run(
   args: readonly string[],
   environment: Readonly<Record<string, string | undefined>> = process.env,
@@ -22,19 +26,22 @@ export async function run(
   switch (command) {
     // Each command loads only its own modules, so the long-running daemon never loads the CLI.
     case ENTRY_COMMANDS.START:
+      if (rest.length) return usage(args);
       return (await import('./daemon')).start();
     case ENTRY_COMMANDS.SETUP:
       return (await import('./setup')).main(rest);
     case ENTRY_COMMANDS.TOKENIZER:
+      if (rest.length) return usage(args);
       return (await import('./tokenizer')).main();
     case ENTRY_COMMANDS.SERVICE_RUN:
       process.exitCode = await (await import('./service-run')).serviceRun(rest);
       return;
     case ENTRY_COMMANDS.VERSION:
+      if (rest.length) return usage(args);
       // Releases carry their version; a checkout has none.
       process.stdout.write(`${environment[UPDATE.versionEnv] || 'source'}\n`);
       return;
     default:
-      return (await import('./cli')).main([...args]);
+      return usage(args);
   }
 }

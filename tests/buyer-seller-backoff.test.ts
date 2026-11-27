@@ -62,6 +62,17 @@ void test('without a backoff every failure cools for 30 s, as before', () => {
     assert.equal(recordQuote(stats, NODE, false, 0, 1000), 31_000);
 });
 
+void test('a failed quote keeps prior latency, and a new failure has none', () => {
+  const stats = new Map<string, LocalSellerStats>();
+  recordQuote(stats, NODE, true, 25, 0);
+  assert.equal(stats.get(NODE)?.latencyMs, 25);
+  recordQuote(stats, NODE, false, 0, 1000);
+  assert.equal(stats.get(NODE)?.latencyMs, 25);
+  const fresh = 'b'.repeat(64);
+  recordQuote(stats, fresh, false, 0, 1000);
+  assert.equal(stats.get(fresh)?.latencyMs, null);
+});
+
 void test('the failure line says when the seller is tried again', () => {
   const failure: Parameters<typeof sellerFailureLine>[0] = {
     nodeId: NODE,
