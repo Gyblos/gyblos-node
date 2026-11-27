@@ -520,7 +520,6 @@ export function DesktopApp() {
           </div>
           {view === UI_VIEW.MODELS && (
             <Models
-              policy={x402.state.policy}
               selected={model.id}
               canSelect={canSelectPreviewModel(paymentMethod)}
               onSelect={choose}
@@ -528,6 +527,7 @@ export function DesktopApp() {
               networkModels={networkModels}
               auto={
                 x402.state.policy && {
+                  policy: x402.state.policy,
                   buyerModels: autoModels,
                   paid: !!x402.state.policy.paidAuto,
                   selected: !!model.automatic,

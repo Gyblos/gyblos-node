@@ -7,6 +7,7 @@ import { atomicToUsdc } from '@gyblos/node/node-config-price';
 import type { BuyerFunding } from '../funding/model';
 import { BUTTON_VARIANT } from './constants';
 import { CopyField } from './Form';
+import { Modal } from './Modal';
 import { Button } from './UI';
 import { useBuyerFunding } from './useBuyerFunding';
 
@@ -83,4 +84,29 @@ export function AddBuyerFunds({ payer }: { payer?: string }) {
 
 export function fundingAmount(atomic: string) {
   return atomicToUsdc(BigInt(atomic)) + ' USDC';
+}
+
+export function WalletBalanceNotice({
+  close,
+  loading,
+  refresh,
+}: {
+  close(): void;
+  loading: boolean;
+  refresh(): void;
+}) {
+  return (
+    <Modal title="Buyer wallet balance" close={close}>
+      <div className="ui-form">
+        <p role="status">
+          {loading
+            ? 'Checking available USDC…'
+            : 'Could not check the buyer wallet balance.'}
+        </p>
+        <Button disabled={loading} onClick={refresh}>
+          Refresh balance
+        </Button>
+      </div>
+    </Modal>
+  );
 }

@@ -12,7 +12,7 @@ import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 import { depositShortfall, sellerResponseLimit } from '../funding/model';
 import { paidSellerLimitNotice, X402_ACTION } from '../x402-model';
 import { AmountField } from './AmountField';
-import { fundingAmount } from './BuyerFunding';
+import { fundingAmount, WalletBalanceNotice } from './BuyerFunding';
 import { BUTTON_VARIANT } from './constants';
 import { FormActions } from './Form';
 import { Facts, Pair } from './Management';
@@ -149,18 +149,11 @@ export function PaidSellerDialog(
   const balance = funding?.balanceAtomic;
   if (!hasEscrow && (loading || balance == null))
     return (
-      <Modal title="Buyer wallet balance" close={props.close}>
-        <div className="ui-form">
-          <p role="status">
-            {loading
-              ? 'Checking available USDC…'
-              : 'Could not check the buyer wallet balance.'}
-          </p>
-          <Button disabled={loading} onClick={refresh}>
-            Refresh balance
-          </Button>
-        </div>
-      </Modal>
+      <WalletBalanceNotice
+        close={props.close}
+        loading={loading}
+        refresh={refresh}
+      />
     );
   const deposit =
     funding?.replacementAtomic ??

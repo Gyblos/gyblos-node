@@ -61,6 +61,63 @@ export function ChannelReviewDetails({
   const status = sellerChannelStatus(funding);
   const ready = !checking && status.label === 'Ready';
   const Icon = ready ? Info : Warning;
+  return (
+    <Modal title="Payment channel" close={close}>
+      <div className="ui-form">
+        <DetailSummary
+          status={{
+            label: checking ? 'Checking' : status.label,
+            tone: ready ? TONE.SUCCESS : TONE.WARNING,
+          }}
+          meta={[model.name, model.family].filter(Boolean).join(' · ')}
+          totals={[
+            {
+              label: 'Per-response limit',
+              value: policy ? fundingAmount(policy.maxAtomic) : 'Unavailable',
+            },
+            {
+              label: 'Wallet balance',
+              value:
+                funding?.balanceAtomic != null
+                  ? fundingAmount(funding.balanceAtomic)
+                  : 'Unavailable',
+            },
+          ]}
+          rows={channelEvidence(model, funding)}
+        />
+        <p
+          className="pk-notice"
+          data-tone={ready ? TONE.NEUTRAL : TONE.WARNING}
+          role="status"
+        >
+          <Icon size={15} weight="fill" aria-hidden="true" />
+          <span>
+            {checking
+              ? 'Checking finalized channel status…'
+              : status.description}
+          </span>
+        </p>
+        <FormActions>
+          {!checking && funding?.balanceAtomic == null && (
+            <Button disabled={!policy} onClick={refresh}>
+              Refresh wallet
+            </Button>
+          )}
+          <Button onClick={close}>{backLabel}</Button>
+          <Button
+            variant={BUTTON_VARIANT.PRIMARY}
+            disabled={!policy || checking}
+            onClick={refresh}
+          >
+            Check status
+          </Button>
+        </FormActions>
+      </div>
+    </Modal>
+  );
+}
+
+function channelEvidence(model: ModelOption, funding: BuyerFunding | null) {
   const rows: DetailItem[] = [
     {
       label: 'Current channel',
@@ -96,58 +153,5 @@ export function ChannelReviewDetails({
       { label: 'Usage approval', value: 'Unconfirmed' },
       { label: 'Final settlement', value: 'Unconfirmed' },
     );
-  return (
-    <Modal title="Payment channel" close={close}>
-      <div className="ui-form">
-        <DetailSummary
-          status={{
-            label: checking ? 'Checking' : status.label,
-            tone: ready ? TONE.SUCCESS : TONE.WARNING,
-          }}
-          meta={[model.name, model.family].filter(Boolean).join(' · ')}
-          totals={[
-            {
-              label: 'Per-response limit',
-              value: policy ? fundingAmount(policy.maxAtomic) : 'Unavailable',
-            },
-            {
-              label: 'Wallet balance',
-              value:
-                funding?.balanceAtomic != null
-                  ? fundingAmount(funding.balanceAtomic)
-                  : 'Unavailable',
-            },
-          ]}
-          rows={rows}
-        />
-        <p
-          className="pk-notice"
-          data-tone={ready ? TONE.NEUTRAL : TONE.WARNING}
-          role="status"
-        >
-          <Icon size={15} weight="fill" aria-hidden="true" />
-          <span>
-            {checking
-              ? 'Checking finalized channel status…'
-              : status.description}
-          </span>
-        </p>
-        <FormActions>
-          {!checking && funding?.balanceAtomic == null && (
-            <Button disabled={!policy} onClick={refresh}>
-              Refresh wallet
-            </Button>
-          )}
-          <Button onClick={close}>{backLabel}</Button>
-          <Button
-            variant={BUTTON_VARIANT.PRIMARY}
-            disabled={!policy || checking}
-            onClick={refresh}
-          >
-            Check status
-          </Button>
-        </FormActions>
-      </div>
-    </Modal>
-  );
+  return rows;
 }

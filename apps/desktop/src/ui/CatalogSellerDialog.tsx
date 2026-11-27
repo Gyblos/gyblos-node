@@ -58,30 +58,15 @@ export function CatalogSellerDialog({
   return (
     <Modal title={name} size="lg" close={close}>
       <div className="preview-seller-drawer">
-        <div className="preview-model-head-line">
-          {offers.some((offer) => !offer.free && offer.offerId) && (
-            <Button
-              disabled={!target?.offerId || target.free || expired}
-              onClick={() => setReviewId(target?.offerId)}
-            >
-              Check payment channel
-            </Button>
-          )}
-          <span className="ui-help-text">
-            {offers.length} offers · advertised input / output per million
-            tokens
-          </span>
-          <Button
-            variant={BUTTON_VARIANT.PRIMARY}
-            disabled={expired || (!choice && !auto)}
-            onClick={() => {
-              if (choice) choose(choice.id);
-              else auto?.();
-            }}
-          >
-            Use this model
-          </Button>
-        </div>
+        <CatalogSellerActions
+          offers={offers}
+          target={target}
+          choice={choice}
+          expired={expired}
+          auto={auto}
+          choose={choose}
+          review={setReviewId}
+        />
         <StrategyControls
           manual={manual}
           expired={expired}
@@ -116,6 +101,44 @@ export function CatalogSellerDialog({
         />
       </div>
     </Modal>
+  );
+}
+
+function CatalogSellerActions(
+  props: Pick<Props, 'offers' | 'auto' | 'choose'> & {
+    target?: ModelOption;
+    choice?: ModelOption;
+    expired: boolean;
+    review(id?: string): void;
+  },
+) {
+  return (
+    <div className="preview-model-head-line">
+      {props.offers.some((offer) => !offer.free && offer.offerId) && (
+        <Button
+          disabled={
+            !props.target?.offerId || props.target.free || props.expired
+          }
+          onClick={() => props.review(props.target?.offerId)}
+        >
+          Check payment channel
+        </Button>
+      )}
+      <span className="ui-help-text">
+        {props.offers.length} offers · advertised input / output per million
+        tokens
+      </span>
+      <Button
+        variant={BUTTON_VARIANT.PRIMARY}
+        disabled={props.expired || (!props.choice && !props.auto)}
+        onClick={() => {
+          if (props.choice) props.choose(props.choice.id);
+          else props.auto?.();
+        }}
+      >
+        Use this model
+      </Button>
+    </div>
   );
 }
 
