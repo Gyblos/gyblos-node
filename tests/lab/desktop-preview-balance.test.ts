@@ -114,3 +114,24 @@ void test('preview chat model picker keeps funds actions compact and leaves the 
   assert.match(css, /\.preview-menu-actions\s*\{[^}]*display: flex/);
   assert.match(css, /\.preview-menu-actions \.dropdown-footer\s*\{/);
 });
+
+void test('preview refreshes the observed balance after a simulated top-up and when the picker opens', async () => {
+  const { CHAT_FUNDS_REWRITES } =
+    await import('../../lab/tools/desktop-preview/funds-build');
+  assert.ok(
+    CHAT_FUNDS_REWRITES.some(([, to]) =>
+      to.includes('refreshFunding={refresh}'),
+    ),
+  );
+  const kit = await view('PreviewKit.tsx.preview');
+  assert.match(kit, /refreshFunding\?\(\): void/);
+  const dialog = kit.slice(kit.indexOf('export function PreviewFundsDialog'));
+  assert.match(dialog, /refreshFunding\?\.\(\)/);
+  assert.ok(
+    dialog.indexOf('refreshFunding?.()') <
+      dialog.indexOf('Preview: simulate 2 USDC arriving'),
+  );
+  const dropdown = await view('ModelDropdown.tsx.preview');
+  assert.match(dropdown, /refreshFunding\?\(\): void/);
+  assert.match(dropdown, /onOpen=\{refreshFunding\}/);
+});
