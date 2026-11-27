@@ -128,3 +128,55 @@ void test('buyer startup composes open admission: a full history refuses softly'
     false,
   );
 });
+
+void test('a full history evicts open rows dead for over an hour, oldest first, to admit a new seller', async (t) => {
+  const f = await discoveryCapacityFixture(t, BUYER_DISCOVERY.maxStateRows);
+  const dead = f.now() - BUYER_DISCOVERY.evictAfterMs - 1;
+  await f.write(
+    f.rows.map((row, n) => ({
+      ...row,
+      catalogExpiresAt: dead - n,
+      presenceExpiresAt: dead - n,
+    })),
+  );
+  const a = await f.open();
+  const b = await f.open();
+  assert.equal(await a.observe(f.run.known), true);
+  const saved = (await f.saved()).rows as {
+    nodeId: string;
+    catalogDigest: string;
+  }[];
+  assert.equal(saved.length, BUYER_DISCOVERY.maxStateRows);
+  const oldest = f.rows.at(-1)!.nodeId;
+  assert.equal(
+    saved.some((row) => row.nodeId === oldest),
+    false,
+  );
+  const known = { owner: f.run.catalog.owner, nodeId: f.run.catalog.nodeId };
+  assert.equal(
+    await b.permits(
+      known.owner,
+      known.nodeId,
+      saved.find((row) => row.nodeId === known.nodeId)!.catalogDigest,
+      f.now(),
+    ),
+    true,
+  );
+});
+
+void test('a full history keeps rows that expired within the hour and configured rows', async (t) => {
+  const f = await discoveryCapacityFixture(t, BUYER_DISCOVERY.maxStateRows);
+  const recent = f.now() - 1;
+  const old = f.now() - BUYER_DISCOVERY.evictAfterMs - 1;
+  await f.write(
+    f.rows.map((row, n) => ({
+      ...row,
+      catalogExpiresAt: n === 0 ? old : recent,
+      presenceExpiresAt: n === 0 ? old : recent,
+    })),
+  );
+  f.policy.configuredNodeIds.push(f.rows[0]!.nodeId);
+  const state = await f.open();
+  assert.equal(await state.observe(f.run.known), false);
+  assert.equal((await f.saved()).rows.length, BUYER_DISCOVERY.maxStateRows);
+});

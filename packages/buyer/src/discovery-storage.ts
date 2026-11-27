@@ -89,10 +89,12 @@ async function readRows(path: string) {
 async function readMonotonicRows(
   path: string,
   held: ReadonlyMap<string, DiscoveryRow>,
+  evicted?: (row: DiscoveryRow) => boolean,
 ) {
   const next = await readRows(path);
   for (const [nodeId, row] of held) {
     const current = next.get(nodeId);
+    if (!current && evicted?.(row)) continue;
     if (
       !current ||
       (current.owner !== row.owner &&
@@ -141,7 +143,7 @@ async function writeRows(
 }
 // Capacity refusals preserve the observed snapshot without becoming permanent storage failures.
 function admittedObservation(
-  current: ReadonlyMap<string, DiscoveryRow>,
+  current: Map<string, DiscoveryRow>,
   incoming: DiscoveryRow,
   allowOwnerChange: boolean | undefined,
   admission: ReturnType<typeof discoveryAdmission>,
@@ -151,7 +153,8 @@ function admittedObservation(
     incoming,
     allowOwnerChange,
   );
-  if (admission && !admission(current, incoming.nodeId)) return undefined;
+  if (admission && !admission.admit(current, incoming.nodeId, admission.now()))
+    return undefined;
   if (
     !current.has(incoming.nodeId) &&
     current.size >= BUYER_DISCOVERY.maxStateRows
@@ -165,6 +168,9 @@ export async function buyerDiscoveryState(
   policy?: DiscoveryAdmission,
 ) {
   const admission = discoveryAdmission(policy);
+  const evicted = admission
+    ? (row: DiscoveryRow) => admission.evictable(row, admission.now())
+    : undefined;
   await assertRoleHome(P2P_ROLES.BUYER, environment);
   const { directory, path, lock } = await discoveryPaths(environment);
   let rows = await readRows(path);
@@ -183,7 +189,7 @@ export async function buyerDiscoveryState(
     async permits(owner: string, nodeId: string, digest: string, now: number) {
       if (failed) unavailable();
       await privateDirectory(directory);
-      rows = await readMonotonicRows(path, rows);
+      rows = await readMonotonicRows(path, rows, evicted);
       return (
         rows.get(nodeId)?.catalogDigest === digest &&
         matchesDiscovery(rows, { owner, nodeId }, now)
@@ -205,7 +211,7 @@ export async function buyerDiscoveryState(
         if (failed) unavailable();
         await privateDirectory(directory);
         handle = await open(lock, 'wx', FILE_MODES.privateFile);
-        const current = await readMonotonicRows(path, rows);
+        const current = await readMonotonicRows(path, rows, evicted);
         const result = admittedObservation(
           current,
           incoming,

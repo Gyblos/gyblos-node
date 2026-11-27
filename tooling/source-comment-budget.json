@@ -861,7 +861,7 @@
   "packages/node/src/free-telemetry.ts": 2,
   "packages/node/src/home.ts": 7,
   "packages/node/src/identity-reuse.ts": 2,
-  "packages/node/src/identity-state-admission.ts": 2,
+  "packages/node/src/identity-state-admission.ts": 0,
   "packages/node/src/identity-state-file.ts": 2,
   "packages/node/src/identity-state-schema.ts": 3,
   "packages/node/src/identity-state.ts": 3,

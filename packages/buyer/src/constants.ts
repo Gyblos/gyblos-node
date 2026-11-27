@@ -111,6 +111,7 @@ export const BUYER_DISCOVERY = {
   timeoutMs: 10000,
   maxStateBytes: 1048576,
   maxStateRows: 1024,
+  evictAfterMs: 3_600_000,
   openLookups: 16,
   openRefusals: 1024,
   openRefusalMs: 300_000,

@@ -150,8 +150,8 @@ anything on its own, when:
 
 - the lock exists (the buyer never breaks it, even after a crash);
 - the state is malformed, has unsafe permissions, or cannot be persisted;
-- the state reaches 1,024 identities or 1 MiB (tombstones and high-water marks
-  are never pruned).
+- the state reaches 1,024 identities or 1 MiB outside open discovery (tombstones
+  and high-water marks are never pruned there).
 
 Repair is a deliberate operator step: stop every buyer that uses this home
 before you remove a leftover lock. Never delete the state file to clear an
@@ -218,10 +218,17 @@ Open discovery has its own bounds:
   eligibility without deleting any replay floor. Ranking among eligible sellers
   is the selection's job, not admission's.
 - Identity and discovery histories each keep at most 1,024 rows, with room for
-  configured sellers. A full history refuses new identities without affecting
-  known ones. Rows are never pruned, and every looked-up seller is stored, so an
-  operator with many registered NodeIds can fill an open-discovery buyer's
-  history; pruning is tracked in #629.
+  configured sellers. With open discovery a full history makes room instead of
+  refusing a newcomer:
+  - discovery rows of unconfigured sellers whose signed records expired more
+    than an hour ago are removed, oldest first. Signed records live at most ten
+    minutes, so no older record of that seller can still be replayed;
+  - identity rows of unconfigured sellers are removed, oldest first, only to
+    admit a newly verified identity, and never when the identity is revoked. A
+    denied lookup removes nothing. A removed identity is checked again like a
+    new one. Configured sellers are never removed. Another buyer process accepts
+    a missing row only when it met the same rule; any other disappearance or
+    rollback still stops the buyer.
 
 ## Seller duties
 

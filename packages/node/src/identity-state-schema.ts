@@ -111,9 +111,11 @@ export function encodeIdentityStates(
 export function assertIdentityMonotonic(
   held: ReadonlyMap<string, IdentityState>,
   current: ReadonlyMap<string, IdentityState>,
+  evicted?: (nodeId: string) => boolean,
 ) {
   for (const [nodeId, previous] of held) {
     const next = current.get(nodeId);
+    if (!next && evicted?.(nodeId)) continue;
     if (
       !next ||
       next.binding.sequence < previous.binding.sequence ||

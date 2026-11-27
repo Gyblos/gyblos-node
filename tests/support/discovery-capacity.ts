@@ -49,7 +49,7 @@ export async function discoveryCapacityFixture(t: TestContext, count = 4) {
       { mode: FILE_MODES.privateFile },
     );
   await write(rows);
-  const policy = { configuredNodeIds: [] as string[] };
+  const policy = { configuredNodeIds: [] as string[], now: () => now };
   return {
     home,
     run,
