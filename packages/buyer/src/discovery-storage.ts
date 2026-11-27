@@ -255,8 +255,15 @@ export async function buyerDiscoveryState(
       } finally {
         try {
           if (handle) {
+            const held = await handle.stat();
+            const onDisk = await lstat(lock).catch(() => undefined);
             await handle.close();
-            await rm(lock);
+            if (
+              onDisk !== undefined &&
+              onDisk.dev === held.dev &&
+              onDisk.ino === held.ino
+            )
+              await rm(lock);
           }
         } catch {
           failed = true;
