@@ -29,6 +29,7 @@ import {
 import { createBuyerQueue, type BuyerWaitScope } from './buyer-routing-queue';
 import {
   createRoutingReferences,
+  nextQuoteCeilings,
   type BuyerRouteScope,
   type BuyerRouteSelection,
 } from './buyer-routing-reference';
@@ -290,25 +291,14 @@ async function attempt<T>(
       request.wait = undefined;
       request.waitingFor = undefined;
     });
-    if (
-      result === undefined &&
-      request.kind === OFFER_PRICING_KINDS.FREE &&
-      request.ports.takeFreeResend?.()
-    ) {
-      request.priceCeilings = prices;
-      return undefined;
-    }
-    if (
-      result === undefined &&
-      state.options.policy.onBusy === BUYER_BUSY_POLICIES.WAIT
-    )
-      throw new PaidBuyerError(PAID_BUYER_CODES.UNAVAILABLE);
     if (result === undefined)
-      request.priceCeilings = fallbackPriceCeilings(
+      request.priceCeilings = nextQuoteCeilings(
         state.options.policy,
         prices,
         request.priceCeilings,
-      )!;
+        request.kind === OFFER_PRICING_KINDS.FREE &&
+          request.ports.takeFreeResend?.() === true,
+      );
     return result;
   } catch (error) {
     if (
