@@ -269,11 +269,13 @@ change) and 24 statements per day, whatever the day's row count (the chain part
 follows with its own reads and batches); no statement binds more than a few
 values, except the calendar's, one per open day (at most 92). Sums use SQLite
 `total()`, which cannot overflow: they are exact while a day's total stays below
-2^53 (about 9 billion USDC in atomic units) and approximate above. A run whose
-days fail logs `COLLECTOR_AGGREGATION_FAILED` with the day names only. Every
-aggregate row stores `formula_version` (`AGGREGATES.formulaVersion`) and
-`aggregated_at`; `collector_agg_days` (migration `0008_day_coverage.sql`) stores
-its `cutoff` and `revision` instead.
+2^53 (about 9 billion USDC in atomic units) and approximate above. A failed
+receipt scan (logged `COLLECTOR_AGGREGATION_FAILED scan`) leaves its marks for
+the next run and never holds back the chain step; a run whose days fail logs
+`COLLECTOR_AGGREGATION_FAILED` with the day names only. Every aggregate row
+stores `formula_version` (`AGGREGATES.formulaVersion`) and `aggregated_at`;
+`collector_agg_days` (migration `0008_day_coverage.sql`) stores its `cutoff` and
+`revision` instead.
 
 | Table                                | One row per                             | Notes                                                         |
 | ------------------------------------ | --------------------------------------- | ------------------------------------------------------------- |
@@ -798,10 +800,12 @@ is `gap_until` (one more call); otherwise it is a lagging RPC, retried next run.
 A transaction the RPC lists but cannot return (`null`), an empty page for a
 range known to hold signatures, a spent call budget or any RPC error stops the
 run there. A failure logs `COLLECTOR_CHAIN_INDEX_FAILED` with the phase (`gap`,
-`forward`, `backfill`, `follow`, `accounts`, or `start`), the error class, a
-static reason (an HTTP status, an RPC error code, a shape location) and the
-calls per endpoint, never a URL, which may carry a provider key. A secret that
-is set but rejected logs `COLLECTOR_CHAIN_INDEX_FAILED config`.
+`forward`, `backfill`, `follow`, `accounts`, `release` or `start`), the error
+class, a static reason (an HTTP status, an RPC error code, a shape location) and
+the calls per endpoint, never a URL, which may carry a provider key. The lease
+release only clears the row while the run still owns it; a failed release is
+logged separately as `release`, after the run's own failure if there was one. A
+secret that is set but rejected logs `COLLECTOR_CHAIN_INDEX_FAILED config`.
 
 **How a transaction is read** (`src/chain/decode.ts`, @x402/svm 2.28): every
 top-level program instruction by its one-byte discriminator — open (1), settle

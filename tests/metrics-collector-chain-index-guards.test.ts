@@ -312,3 +312,34 @@ void test('a failing lease release never masks the run failure', async () => {
     },
   );
 });
+
+void test('a failing lease release after a clean run reports the release phase', async () => {
+  const database = createCollectorD1();
+  const history = lifecycle();
+  const { rpc } = fakeChainRpc(history, { [CHANNEL]: null });
+  await runChainIndex(database, endpoints(rpc), 1000);
+  const prepare = database.prepare.bind(database);
+  let updates = 0;
+  database.prepare = (sql) => {
+    if (sql.startsWith('update') && sql.includes('lease_until')) {
+      updates += 1;
+      if (updates === 2) {
+        const failing = {
+          bind: () => failing,
+          all: () => Promise.reject(new Error('D1 unavailable')),
+          run: () => Promise.reject(new Error('D1 unavailable')),
+        };
+        return failing as ReturnType<typeof prepare>;
+      }
+    }
+    return prepare(sql);
+  };
+  await assert.rejects(
+    runChainIndex(database, endpoints(rpc), 2000),
+    (error) => {
+      assert.equal((error as { phase?: string }).phase, 'release');
+      assert.equal((error as { cleanupFailed?: boolean }).cleanupFailed, false);
+      return true;
+    },
+  );
+});

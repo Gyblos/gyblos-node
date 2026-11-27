@@ -129,3 +129,10 @@ void test('an accounts answer shorter than the request is refused', async () => 
   );
   await assert.rejects(rpc.accounts(['a'.repeat(44), 'b'.repeat(44)]), SHAPE);
 });
+
+void test('an accounts answer longer than the request is refused', async () => {
+  const rpc = createChainRpc('https://rpc.test', () =>
+    reply({ context: { slot: 1 }, value: [null, null, null] }),
+  );
+  await assert.rejects(rpc.accounts(['a'.repeat(44), 'b'.repeat(44)]), SHAPE);
+});
