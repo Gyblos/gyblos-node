@@ -154,12 +154,13 @@ export function insertReport(
   envelopeId: string,
   receiptKey: string,
   role: 'seller' | 'buyer',
+  insertedAt = 0,
 ) {
   database.raw
     .prepare(
       `INSERT INTO collector_reports (envelope_id, receipt_key, role, fingerprint, seller_digest,
         buyer_digest, merge, stored_at, started_at, offer_json, inserted_at)
-       VALUES (?, ?, ?, ?, ?, NULL, 'new', NULL, NULL, NULL, 0)`,
+       VALUES (?, ?, ?, ?, ?, NULL, 'new', NULL, NULL, NULL, ?)`,
     )
     .run(
       envelopeId,
@@ -167,5 +168,6 @@ export function insertReport(
       role,
       hex(`rf-${++sequence}`),
       hex(`rs-${sequence}`),
+      insertedAt,
     );
 }
