@@ -10,6 +10,7 @@ import {
   type D1LoadLabel,
   type D1LoadRow,
 } from './support/d1-load';
+import { completedAggregation } from './support/d1-load-collector';
 
 type D1LoadCap = Omit<D1LoadRow, 'label'>;
 
@@ -69,4 +70,22 @@ void test('a catalog publish with the most models a record allows writes in one 
   assert.equal(PUBLIC_RECORD_LIMITS.maxModels, 64);
   assert.equal(wide.batches, 1);
   assert.ok(wide.maxParams <= D1_MAX_BOUND_PARAMETERS);
+});
+
+void test('an aggregation run that left a day failed, pending or unscanned is not measured', () => {
+  const complete = {
+    days: ['2026-11-16'],
+    failed: [],
+    more: false,
+    chain: { days: [], failed: [], more: false, scanFailed: false },
+  };
+  assert.doesNotThrow(() => completedAggregation(complete, 1));
+  for (const incomplete of [
+    { ...complete, days: [] },
+    { ...complete, failed: ['2026-11-16'] },
+    { ...complete, more: true },
+    { ...complete, chain: { ...complete.chain, failed: ['2026-11-16'] } },
+    { ...complete, chain: { ...complete.chain, scanFailed: true } },
+  ])
+    assert.throws(() => completedAggregation(incomplete, 1));
 });
