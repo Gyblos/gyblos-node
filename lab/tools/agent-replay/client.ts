@@ -1,11 +1,13 @@
 import { performance } from 'node:perf_hooks';
 
-import { MODEL_IDS } from '@gyblos/protocol/constants';
+import { FREE_BUYER } from '@gyblos/buyer/constants';
+import { HTTP_STATUS } from '@gyblos/config';
+import { MODEL_IDS, type FreeChatRole } from '@gyblos/protocol/constants';
 
 import { AGENT_REPLAY, type ReplayRole } from './constants';
 
 export interface ReplayMessage {
-  role: 'system' | 'user' | 'assistant';
+  role: FreeChatRole;
   content: string;
 }
 
@@ -22,12 +24,19 @@ export interface ReplayTiming {
   text: string;
 }
 
-function contentOf(line: string) {
-  if (!line.startsWith('data: ') || line === 'data: [DONE]') return '';
-  const chunk = JSON.parse(line.slice('data: '.length)) as {
+const DATA = 'data: ';
+
+function frameOf(line: string) {
+  if (!line.startsWith(DATA) || line === `${DATA}${FREE_BUYER.streamDone}`)
+    return {};
+  const chunk = JSON.parse(line.slice(DATA.length)) as {
     choices?: { delta?: { content?: string } }[];
+    error?: { code?: string };
   };
-  return chunk.choices?.[0]?.delta?.content ?? '';
+  return {
+    text: chunk.choices?.[0]?.delta?.content ?? '',
+    error: chunk.error ? (chunk.error.code ?? FREE_BUYER.errorType) : undefined,
+  };
 }
 
 async function readStream(
@@ -42,10 +51,11 @@ async function readStream(
     const lines = buffer.split('\n');
     buffer = lines.pop() ?? '';
     for (const line of lines) {
-      const text = contentOf(line.trim());
+      const { text, error } = frameOf(line.trim());
+      if (error) timing.code = error;
       if (text && timing.firstTokenMs === null)
         timing.firstTokenMs = performance.now() - began;
-      timing.text += text;
+      timing.text += text ?? '';
     }
   }
 }

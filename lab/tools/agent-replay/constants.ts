@@ -4,19 +4,19 @@ export const AGENT_REPLAY = {
   pace: { firstTokenMs: 400, tokenMs: 15, tokens: 60 },
   caps: { dailyTokenCap: 10_000_000, perBuyerCap: 1_000_000 },
   maxTokens: 256,
-  turnChars: 600,
+  turnChars: 250,
   runMs: 15 * 60_000,
   percentiles: [50, 95],
   percentScale: 100,
-  okStatus: 200,
   tagPrefix: 'replay-request-',
-  outFile: 'agent-replay.jsonl',
+  outPrefix: 'agent-replay-',
   prompts: {
     main: 'You are a coding agent. Use tools when needed.',
     title: 'Generate a short title for this conversation.',
     summary: 'Summarize this conversation in one paragraph.',
     task: 'Fix the failing test in the parser module.',
     tool: 'Tool result: 3 files changed, tests pass.',
+    call: 'Calling a tool.',
   },
 } as const;
 

@@ -1,5 +1,7 @@
 import { performance } from 'node:perf_hooks';
 
+import { FREE_CHAT_ROLES } from '@gyblos/protocol/constants';
+
 import { replayRequest, type ReplayMessage, type ReplayTiming } from './client';
 import { AGENT_REPLAY, REPLAY_ROLES, type ReplayRole } from './constants';
 
@@ -20,14 +22,14 @@ export async function replayAgentSession(url: string, signal: AbortSignal) {
   const timings: ReplayTiming[] = [];
   let sequence = 0;
   const history: ReplayMessage[] = [
-    { role: 'user', content: AGENT_REPLAY.prompts.task },
+    { role: FREE_CHAT_ROLES.USER, content: AGENT_REPLAY.prompts.task },
   ];
   const send = (role: ReplayRole, turn: number) => {
     const tag = `${AGENT_REPLAY.tagPrefix}${++sequence}`;
     const messages: ReplayMessage[] = [
-      { role: 'system', content: SYSTEMS[role] },
-      ...history.slice(0, -1),
-      { ...history.at(-1)!, content: `${history.at(-1)!.content} ${tag}` },
+      { role: FREE_CHAT_ROLES.SYSTEM, content: SYSTEMS[role] },
+      ...history,
+      { role: FREE_CHAT_ROLES.USER, content: tag },
     ];
     return replayRequest(url, { tag, role, turn, messages }, origin, signal);
   };
@@ -40,8 +42,14 @@ export async function replayAgentSession(url: string, signal: AbortSignal) {
   for (let turn = 1; turn <= AGENT_REPLAY.loopTurns; turn++) {
     const previous = timings.at(-1)!;
     history.push(
-      { role: 'assistant', content: previous.text || 'calling a tool' },
-      { role: 'user', content: `${AGENT_REPLAY.prompts.tool}${padding(turn)}` },
+      {
+        role: FREE_CHAT_ROLES.ASSISTANT,
+        content: previous.text || AGENT_REPLAY.prompts.call,
+      },
+      {
+        role: FREE_CHAT_ROLES.USER,
+        content: `${AGENT_REPLAY.prompts.tool}${padding(turn)}`,
+      },
     );
     timings.push(await send(REPLAY_ROLES.MAIN, turn));
   }

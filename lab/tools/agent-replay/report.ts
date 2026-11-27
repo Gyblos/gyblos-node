@@ -1,3 +1,5 @@
+import { HTTP_STATUS } from '@gyblos/config';
+
 import type { ReplayTiming } from './client';
 import { AGENT_REPLAY } from './constants';
 import type { SellerTrace } from './network';
@@ -51,14 +53,11 @@ export function joinTraces(
 export function summarize(records: ReplayRecord[]) {
   const served = records.filter(
     (record) =>
-      record.status === AGENT_REPLAY.okStatus && record.firstTokenMs !== null,
+      record.status === HTTP_STATUS.ok && record.firstTokenMs !== null,
   );
   const failures: Record<string, number> = {};
   for (const record of records)
-    if (
-      record.status !== AGENT_REPLAY.okStatus ||
-      record.firstTokenMs === null
-    ) {
+    if (record.status !== HTTP_STATUS.ok || record.firstTokenMs === null) {
       const key = `${record.status}:${record.code ?? 'none'}`;
       failures[key] = (failures[key] ?? 0) + 1;
     }
@@ -72,7 +71,7 @@ export function summarize(records: ReplayRecord[]) {
     requests: records.length,
     served: served.length,
     failures,
-    resent: records.filter((record) => record.sellers.length > 1).length,
+    reselected: records.filter((record) => record.sellers.length > 1).length,
     bySeller,
     headersMs: spread(served.map((record) => record.headersMs ?? 0)),
     firstTokenMs: spread(served.map((record) => record.firstTokenMs!)),

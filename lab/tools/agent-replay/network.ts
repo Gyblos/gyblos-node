@@ -113,6 +113,7 @@ function traced(
             trace.waitsMs.push(performance.now() - began);
             return winner;
           } catch (error) {
+            trace.waitsMs.push(performance.now() - began);
             trace.selectError = error instanceof Error ? error.name : 'unknown';
             throw error;
           }
@@ -133,8 +134,11 @@ export async function startReplayNetwork(
   const sellers = await startSellers(count, signal, mode);
   const stopRenewal = renewLikeProduction(sellers);
   const [first] = sellers;
-  const endpoint = await createAcceptanceBuyerEndpoint();
+  let endpoint:
+    Awaited<ReturnType<typeof createAcceptanceBuyerEndpoint>> | undefined;
   try {
+    endpoint = await createAcceptanceBuyerEndpoint();
+    const bound = endpoint;
     const config = acceptanceSelection(first!);
     config.request.maxTokens = AGENT_REPLAY.maxTokens;
     config.request.maxAtomic = '0';
@@ -156,7 +160,7 @@ export async function startReplayNetwork(
         discovery: first!.state(),
       },
       {
-        endpoint,
+        endpoint: bound,
         buyer: first!.identity.buyer.address,
         relayOnly: false,
         fetch: first!.index.fetch,
@@ -189,13 +193,13 @@ export async function startReplayNetwork(
       async close() {
         stopRenewal();
         await host.close();
-        await endpoint.close();
+        await bound.close();
         await Promise.allSettled(sellers.map((seller) => seller.close()));
       },
     };
   } catch (error) {
     stopRenewal();
-    await endpoint.close();
+    await endpoint?.close();
     await Promise.allSettled(sellers.map((seller) => seller.close()));
     throw error;
   }

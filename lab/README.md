@@ -34,7 +34,7 @@ loop.
 For each request it writes a JSONL line with time to headers, time to first
 token, total time, HTTP status and code, and the seller that served it. It
 prints a summary with percentiles, failures and seller cooldowns. `--out <dir>`
-keeps the file; `--ollama` uses the gate Ollama engine. Results are in #640.
+keeps the file; `--ollama` uses the gate Ollama engine.
 
 ## Batch-settlement channel check
 
