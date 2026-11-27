@@ -1,13 +1,12 @@
-import { Server } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
-import { Chip as CountChip } from '../boardui/components/base/badges/chip';
 import { HELP_TEXT } from '../lib/config';
 import { DISPLAY, PAGES, PAGING } from '../lib/constants';
 import type { DiscoverySnapshot, Seller } from '../lib/discovery';
 import { getDiscovery } from '../lib/discovery-render';
 import { count, percent, pricePerMtok, utc } from '../lib/format';
+import type { CatalogModels } from '../lib/model-catalog';
 import type { GithubAccount } from '../lib/network-status';
 import { uptimeRatio } from '../lib/offers';
 import { queryHref, tablePager, type ExplorerQuery } from '../lib/paging';
@@ -20,9 +19,7 @@ import {
   sellerHref,
   verifiedOnly,
 } from '../lib/seller-identity';
-import { Flow } from './board/animated-number';
 import { Chip } from './board/chip';
-import { StatCard } from './board/stat-card';
 import { StatusDot } from './board/status-dot';
 import { NotOnline } from './not-online';
 import { pagedRows, Pager } from './pager';
@@ -83,6 +80,7 @@ export async function NetworkSection({
         accounts={accounts}
         names={names}
         accountsKnown={!!snapshot.network && !snapshot.network.truncated}
+        models={snapshot.models}
       />
       {preview ? (
         <MoreLink href={PAGES.sellers} label="All sellers" />
@@ -97,59 +95,20 @@ export async function NetworkSection({
   );
 }
 
-// Online sellers out of every registered or recently seen one; without the index's network status,
-// only the online count is known.
-export function SellersOnline({
-  snapshot,
-  variant,
-}: {
-  snapshot: DiscoverySnapshot;
-  variant?: 'footer' | 'plain';
-}) {
-  const counts = snapshot.network?.counts;
-  return (
-    <StatCard
-      variant={variant}
-      icon={Server}
-      label="Sellers online"
-      value={
-        <Flow value={counts?.online ?? snapshot.sellers.length} kind="count" />
-      }
-      caption={
-        counts ? (
-          <span className="flex flex-wrap gap-1.5">
-            <CountChip variant="caption" color="soft">
-              {count(counts.total)} registered
-            </CountChip>
-            {counts.offline ? (
-              <CountChip variant="caption" color="soft">
-                {count(counts.offline)} offline
-              </CountChip>
-            ) : null}
-            {counts.unpublished ? (
-              <CountChip variant="caption" color="soft">
-                {count(counts.unpublished)} not published
-              </CountChip>
-            ) : null}
-          </span>
-        ) : undefined
-      }
-    />
-  );
-}
-
 function SellersBlock({
   query,
   sellers,
   accounts,
   names,
   accountsKnown,
+  models,
 }: {
   query: ExplorerQuery;
   sellers: Seller[];
   accounts: Map<string, GithubAccount>;
   names: Map<string, string>;
   accountsKnown: boolean;
+  models: CatalogModels;
 }) {
   return (
     <>
@@ -165,6 +124,7 @@ function SellersBlock({
         accounts={accounts}
         names={names}
         accountsKnown={accountsKnown}
+        models={models}
       />
     </>
   );
@@ -228,12 +188,14 @@ function OfferRow({
   seller,
   model,
   cell,
+  models,
 }: {
   seller: Seller;
   model: Seller['models'][number];
   cell: ReactNode;
   days: ExplorerQuery['days'];
   closed?: boolean;
+  models: CatalogModels;
 }) {
   return (
     <tr className="border-t border-line">
@@ -253,6 +215,7 @@ function OfferRow({
           modelId={model.modelId}
           variant={model.variant}
           quantization={model.quantization}
+          models={models}
         />
       </td>
       <td className={numberCell}>{count(model.contextTokens)}</td>
@@ -279,12 +242,14 @@ function SellersTable({
   accounts,
   names,
   accountsKnown,
+  models,
 }: {
   query: ExplorerQuery;
   sellers: Seller[];
   accounts: Map<string, GithubAccount>;
   names: Map<string, string>;
   accountsKnown: boolean;
+  models: CatalogModels;
 }) {
   const empty = emptySellersMessage(sellers, query.verified, accountsKnown);
   const offers = sellerOffers(sellers);
@@ -315,6 +280,7 @@ function SellersTable({
             key={`${seller.nodeId}:${model.modelId}:${model.variant}:${model.quantization}`}
             seller={seller}
             model={model}
+            models={models}
             cell={
               <SellerCell
                 nodeId={seller.nodeId}

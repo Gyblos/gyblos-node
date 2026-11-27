@@ -232,6 +232,8 @@ function publishedRule({ result }: SignedModelVerification) {
     challengeSet.version === CHALLENGE_SET.version &&
     challengeSet.digest === challengeSetDigest(CHALLENGE_SET) &&
     evidence.prompts === prompts.length &&
+    evidence.checks <= evidence.answers * rule.checksPerAnswer &&
+    evidence.deviations <= evidence.deviantAnswers * rule.checksPerAnswer &&
     evidence.minimumChecks === rule.minimumChecks &&
     evidence.honestRatePpm === rule.honestRatePpm &&
     evidence.falsePositivePpm === rule.falsePositivePpm

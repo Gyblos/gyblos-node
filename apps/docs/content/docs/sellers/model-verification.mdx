@@ -51,4 +51,5 @@ A run writes the signed result and an evidence file together in a new directory.
 readers, but it does not fsync the files or directories, so an operating-system crash or power loss can still
 lose the new directory or leave incomplete artifacts. If you pass `--out`, choose a path that does not already
 exist. The evidence keeps the prompts, the answers and every check, plus any reply that could not be scored and
-why, so someone else can review how the verdict was reached.
+why, so someone else can review how the verdict was reached. `check` also rejects a result whose evidence counts
+cannot fit the published challenge set before printing its verdict.

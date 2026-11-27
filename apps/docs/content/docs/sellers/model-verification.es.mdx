@@ -54,4 +54,5 @@ publicación es atómica para quien lee, pero no hace fsync de los archivos ni d
 del sistema operativo o un corte de energía todavía puede perder el directorio nuevo o dejar artefactos
 incompletos. Si usas `--out`, elige una ruta que todavía no exista. La evidencia guarda las preguntas, las
 respuestas y cada comprobación, más cada respuesta que no se pudo puntuar y por qué, para que otra persona pueda
-revisar cómo se llegó al veredicto.
+revisar cómo se llegó al veredicto. `check` también rechaza un resultado cuyos recuentos de evidencia no pueden
+ajustarse al conjunto de pruebas publicado antes de mostrar el veredicto.

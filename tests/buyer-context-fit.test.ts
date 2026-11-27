@@ -1,0 +1,321 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import { FREE_BUYER_CODES } from '@gyblos/buyer/constants';
+import { FreeBuyerError } from '@gyblos/buyer/free-chat';
+import {
+  executeBuyerFree,
+  executeSelectedBuyerFree,
+  FreeSelectionFailure,
+  unfitOutcome,
+} from '@gyblos/buyer/free-execution';
+import { BYTES_PER_TOKEN, MIN_FITTED_ANSWER } from '@gyblos/buyer/input-size';
+import { fittingSelect } from '@gyblos/buyer/session-free';
+import { parseBuyerRoutingPolicy } from '@gyblos/core/buyer-routing';
+import { SELLER_SELECTION_CODES } from '@gyblos/core/constants';
+import { DECLARED_METER } from '@gyblos/node/free-meter';
+import {
+  CONTROL_METERING_MODES,
+  ENGINE_DONE_REASONS,
+  FREE_EXECUTION_CODES,
+} from '@gyblos/protocol/constants';
+import type { FreeExecutionRequest } from '@gyblos/protocol/free-execution';
+import { FreeClientError } from '@gyblos/transport-iroh/free-client';
+
+import { CODEX, host } from './support/buyer-responses';
+import { freeSellerFixture } from './support/free-seller';
+
+const QUOTE = (await (await freeSellerFixture()).request()).quote;
+const withContext = (contextTokens: number) => ({
+  ...QUOTE,
+  offer: {
+    ...QUOTE.offer,
+    maxTokens: 4096,
+    model: { ...QUOTE.offer.model, contextTokens },
+  },
+});
+const ANSWER = {
+  text: 'ok',
+  usage: { inputTokens: 1, outputTokens: 1 },
+  finishReason: ENGINE_DONE_REASONS.STOP,
+};
+const input = (bytes: number, maxTokens: number) => ({
+  messages: [{ role: 'user' as const, content: 'x'.repeat(bytes) }],
+  maxTokens,
+});
+
+const used = (bytes: number) =>
+  Math.ceil(
+    Buffer.byteLength(JSON.stringify([input(bytes, 1).messages, null])) /
+      BYTES_PER_TOKEN,
+  );
+
+function rig(contexts: Record<string, number>, cooling = false) {
+  const asked: { nodeId: string; maxTokens: number }[] = [];
+  return {
+    asked,
+    dependencies: {
+      select: async (excluded: ReadonlySet<string>) => {
+        const next = Object.keys(contexts).find((id) => !excluded.has(id));
+        if (!next && cooling)
+          throw new FreeSelectionFailure(
+            { ok: false, code: SELLER_SELECTION_CODES.NO_CANDIDATES },
+            Date.now() + 30_000,
+          );
+        if (!next) throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE);
+        return { nodeId: next, quote: withContext(contexts[next]!) };
+      },
+      execute: async (
+        winner: { nodeId: string },
+        request: FreeExecutionRequest,
+      ) => {
+        asked.push({
+          nodeId: winner.nodeId,
+          maxTokens: request.input.maxTokens,
+        });
+        return ANSWER;
+      },
+    },
+  };
+}
+
+void test('the answer limit is lowered to what fits in the chosen seller context', async () => {
+  const { dependencies, asked } = rig({ a: 4096 });
+  await executeBuyerFree(input(3000, 4096), dependencies);
+  assert.deepEqual(asked, [{ nodeId: 'a', maxTokens: 4096 - used(3000) }]);
+});
+
+void test('an answer limit that already fits is left as asked', async () => {
+  const { dependencies, asked } = rig({ a: 32768 });
+  await executeBuyerFree(input(30, 256), dependencies);
+  assert.equal(asked[0]!.maxTokens, 256);
+});
+
+void test('a seller whose context cannot hold the conversation is skipped before the prompt is sent', async () => {
+  const { dependencies, asked } = rig({ small: 1000, large: 32768 });
+  await executeBuyerFree(input(8000, 4096), dependencies);
+  assert.deepEqual(
+    asked.map(({ nodeId }) => nodeId),
+    ['large'],
+  );
+});
+
+void test('when no seller can hold the conversation the client is told its context is full', async () => {
+  const { dependencies, asked } = rig({ a: 1000, b: 2000 });
+  await assert.rejects(
+    executeBuyerFree(input(12000, 4096), dependencies),
+    (error: unknown) =>
+      error instanceof FreeClientError &&
+      error.code === FREE_EXECUTION_CODES.LIMIT &&
+      !error.sent &&
+      !error.remote,
+  );
+  assert.equal(asked.length, 0);
+});
+
+void test('a seller that would leave less than the minimum answer is skipped', async () => {
+  const context = used(2000) + MIN_FITTED_ANSWER - 1;
+  const { dependencies, asked } = rig({ tight: context, large: 32768 });
+  await executeBuyerFree(input(2000, 4096), dependencies);
+  assert.deepEqual(
+    asked.map(({ nodeId }) => nodeId),
+    ['large'],
+  );
+});
+
+void test('a small seller does not turn a cooling-down network into a full context', async () => {
+  const { dependencies } = rig({ small: 100 }, true);
+  await assert.rejects(
+    executeBuyerFree(input(2000, 4096), dependencies),
+    (error: unknown) => error instanceof FreeSelectionFailure,
+  );
+});
+
+void test('a session or API-key seller that cannot hold the conversation is passed over unsent', async () => {
+  const { dependencies, asked } = rig({ a: 100 });
+  let unfit = false;
+  const result = await executeSelectedBuyerFree(
+    input(2000, 4096),
+    dependencies,
+    { nodeId: 'a', quote: withContext(100) },
+    AbortSignal.timeout(5000),
+    undefined,
+    undefined,
+    () => {
+      unfit = true;
+    },
+  );
+  assert.equal(result, undefined);
+  assert.equal(unfit, true);
+  assert.equal(asked.length, 0);
+});
+
+void test('after passing over unfit sellers, an exhausted route reports a full context and a cooling one does not', () => {
+  const full = unfitOutcome(new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE));
+  assert.ok(
+    full instanceof FreeClientError &&
+      full.code === FREE_EXECUTION_CODES.LIMIT &&
+      !full.sent,
+  );
+  const cooling = new FreeSelectionFailure(
+    { ok: false, code: SELLER_SELECTION_CODES.NO_CANDIDATES },
+    Date.now() + 30_000,
+  );
+  assert.equal(unfitOutcome(cooling), cooling);
+});
+
+void test('a declared-usage offer is fitted with the count its seller admits by', async () => {
+  const declared = {
+    ...withContext(8192),
+    offer: {
+      ...withContext(8192).offer,
+      meteringMode: CONTROL_METERING_MODES.DECLARED,
+    },
+  };
+  const request = input(6000, 4096);
+  const asked: number[] = [];
+  await executeBuyerFree(request, {
+    select: async (excluded) => {
+      if (excluded.size) throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE);
+      return { nodeId: 'd', quote: declared };
+    },
+    execute: async (_winner, sent) => {
+      asked.push(sent.input.maxTokens);
+      return ANSWER;
+    },
+  });
+  assert.deepEqual(asked, [8192 - DECLARED_METER.chat(request.messages)]);
+});
+
+const sellerRefusal = new FreeClientError(
+  FREE_EXECUTION_CODES.LIMIT,
+  true,
+  true,
+);
+const nobodyFits = new FreeClientError(FREE_EXECUTION_CODES.LIMIT, false);
+const messagesUrl = (url: string) =>
+  url.replace(/\/v1\/chat\/completions$/, '/v1/messages');
+
+void test('a full context is reported with the OpenAI code coding agents compact on', async () => {
+  const server = await host(async () => {
+    throw sellerRefusal;
+  }, []);
+  try {
+    const response = await fetch(server.url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: CODEX.model,
+        messages: [{ role: 'user', content: 'a long conversation' }],
+      }),
+    });
+    const body = await response.json();
+    assert.equal(response.status, 400);
+    assert.equal(body.error.code, 'context_length_exceeded');
+    assert.equal(body.error.type, 'invalid_request_error');
+    assert.match(body.error.message, /maximum context length/);
+    assert.equal(body.error.gyblos_code, FREE_EXECUTION_CODES.LIMIT);
+  } finally {
+    await server.close();
+  }
+});
+
+void test('a full context is reported in the words Anthropic clients compact on', async () => {
+  const server = await host(async () => {
+    throw sellerRefusal;
+  }, []);
+  try {
+    const response = await fetch(messagesUrl(server.url), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: CODEX.model,
+        max_tokens: 64,
+        messages: [{ role: 'user', content: 'a long conversation' }],
+      }),
+    });
+    const body = await response.json();
+    assert.equal(response.status, 400);
+    assert.equal(body.error.type, 'invalid_request_error');
+    assert.match(body.error.message, /^prompt is too long/);
+    assert.equal(body.error.code, FREE_EXECUTION_CODES.LIMIT);
+  } finally {
+    await server.close();
+  }
+});
+
+void test('no seller fitting the conversation reaches the client as a full context', async () => {
+  const server = await host(async () => {
+    throw nobodyFits;
+  }, []);
+  try {
+    const response = await fetch(server.url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: CODEX.model,
+        messages: [{ role: 'user', content: 'a long conversation' }],
+      }),
+    });
+    const body = await response.json();
+    assert.equal(response.status, 400);
+    assert.equal(body.error.code, 'context_length_exceeded');
+  } finally {
+    await server.close();
+  }
+});
+
+void test('session selection passes over free sellers that cannot hold the conversation, in every busy policy', async () => {
+  const offers: Record<string, ReturnType<typeof withContext>> = {
+    small: withContext(100),
+    large: withContext(32768),
+  };
+  const asked: string[] = [];
+  let unfit = 0;
+  const select = fittingSelect(
+    async (excluded) => {
+      const nodeId = ['small', 'large'].find((id) => !excluded.has(id))!;
+      asked.push(nodeId);
+      return { nodeId, quote: offers[nodeId]! };
+    },
+    input(2000, 4096),
+    () => {
+      unfit++;
+    },
+    parseBuyerRoutingPolicy(),
+  );
+  const winner = await select(new Set(), AbortSignal.timeout(5000), {
+    priceCeilings: { inputAtomicPerMtok: '0', outputAtomicPerMtok: '0' },
+  });
+  assert.equal(winner.nodeId, 'large');
+  assert.deepEqual(asked, ['small', 'large']);
+  assert.equal(unfit, 1);
+});
+
+void test('a paid replacement for an unfit free seller respects the replacement price cap', async () => {
+  const paid = {
+    ...withContext(32768),
+    offer: {
+      ...withContext(32768).offer,
+      prices: { inputAtomicPerMtok: '5', outputAtomicPerMtok: '5' },
+      maxAtomic: '1000',
+    },
+  };
+  const pick = (allowHigherPriceFallback: boolean) =>
+    fittingSelect(
+      async (excluded, _signal, route) => {
+        if (!excluded.has('small'))
+          return { nodeId: 'small', quote: withContext(100) };
+        if (BigInt(route.priceCeilings.inputAtomicPerMtok) < 5n)
+          throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE);
+        return { nodeId: 'paid', quote: paid };
+      },
+      input(2000, 4096),
+      () => {},
+      { ...parseBuyerRoutingPolicy(), allowHigherPriceFallback },
+    )(new Set(), AbortSignal.timeout(5000), {
+      priceCeilings: { inputAtomicPerMtok: '9', outputAtomicPerMtok: '9' },
+    });
+  await assert.rejects(pick(false), FreeBuyerError);
+  assert.equal((await pick(true)).nodeId, 'paid');
+});

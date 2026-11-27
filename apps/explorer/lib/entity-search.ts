@@ -1,9 +1,6 @@
 import { controlAddress } from '@gyblos/protocol/control-validation';
-import {
-  MODEL_IDENTITY_SOURCE,
-  modelIdentity,
-} from '@gyblos/protocol/model-family';
 
+import { modelView, type CatalogModels } from './model-catalog';
 import type { GithubAccount } from './network-status';
 
 export function addressLookup(value: string): string | null {
@@ -48,12 +45,17 @@ export function modelMatches(
     quantization?: string | null;
   },
   term: string,
+  models?: Readonly<CatalogModels>,
 ) {
   const lower = term.toLowerCase();
-  const identity = modelIdentity(model.modelId);
-  const lab =
-    identity.source === MODEL_IDENTITY_SOURCE.RULES ? identity.lab : undefined;
-  return [model.modelId, lab, model.variant, model.quantization].some((value) =>
-    value?.toLowerCase().includes(lower),
-  );
+  const view = modelView(models, model.modelId);
+  const named = view.family !== null || view.classified;
+  return [
+    model.modelId,
+    named ? view.lab : undefined,
+    view.familyName ?? undefined,
+    ...view.categories,
+    model.variant,
+    model.quantization,
+  ].some((value) => value?.toLowerCase().includes(lower));
 }

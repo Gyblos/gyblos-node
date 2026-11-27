@@ -1047,6 +1047,22 @@ details matter when you change or debug the endpoint:
   is `response.failed` with code `invalid_prompt` and the Gyblos code in
   `gyblos_code`. A conversation larger than the network carries, or one a seller
   refuses as too long, gets `context_length_exceeded`, so Codex compacts it.
+- **Context fit.** Before sending, the buyer lowers `max_tokens` to what fits in
+  the chosen seller's advertised context, estimating four bytes per token of the
+  conversation and tools; the answer then ends with finish reason `length` if it
+  runs out. A seller that would leave less than 256 tokens (or less than the
+  requested limit, if smaller) for the answer does not receive the prompt, and
+  the buyer tries another seller, on the free route, through a session and with
+  an API key alike. Offers that meter declared usage are fitted with the same
+  count their seller admits by (`DECLARED_METER`). When no seller can hold the
+  conversation, when a seller refuses it as too long before answering, or when
+  it is over this endpoint's own size or message count, the error is a 400 that
+  coding agents read as a full context: in the OpenAI format `code` is
+  `context_length_exceeded` (the Gyblos code in `gyblos_code`) and the message
+  says the request exceeds the maximum context length; in the Anthropic format
+  the message starts with `prompt is too long`. OpenCode and Claude Code then
+  compact the conversation instead of stopping. A network where every fitting
+  seller is cooling down still answers 503 with `Retry-After`.
 - **Status codes.** 400 for an invalid request or one beyond the quote's limits,
   413 for an oversized body, 429 when the endpoint already runs as many requests
   as it can (safe to retry), 503 when no seller could take the request, 504 when

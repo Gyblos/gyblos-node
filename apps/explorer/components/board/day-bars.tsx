@@ -1,6 +1,11 @@
 'use client';
 
-import type { KeyboardEvent, ReactNode } from 'react';
+import {
+  useLayoutEffect,
+  useRef,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react';
 
 import type { FlowKind, FlowValue } from './animated-number';
 import { CHART, DELTA } from './constants';
@@ -76,6 +81,34 @@ function AxisLabels({
   );
 }
 
+function barLabel(row: BarPoint, label: string, kind: FlowKind) {
+  return [
+    `${row.day} UTC`,
+    label,
+    row.outside ? 'Outside selected period' : dayLabel(row.amount, kind),
+    row.outside ? null : row.detail,
+  ]
+    .filter(Boolean)
+    .join(', ');
+}
+
+function BarMark({ row, maximum }: { row: BarPoint; maximum: number }) {
+  const percentage =
+    maximum > 0 ? ((row.value ?? 0) / maximum) * DELTA.percent : 0;
+  return (
+    <span className="flex h-32 w-full items-end justify-center">
+      {row.outside ? null : row.amount === null ? (
+        <span className="mb-px h-0 w-1/2 border-t border-dashed border-dim" />
+      ) : (
+        <span
+          className="w-3/4 rounded-t-sm bg-chart"
+          style={{ height: `${percentage}%`, minHeight: 2 }}
+        />
+      )}
+    </span>
+  );
+}
+
 export function DayBars({
   points,
   kind,
@@ -84,8 +117,10 @@ export function DayBars({
   active,
   setActive,
   calendar,
+  startAtEnd = false,
 }: {
   calendar?: ReactNode;
+  startAtEnd?: boolean;
   points: BarPoint[];
   label: string;
   kind: FlowKind;
@@ -95,8 +130,17 @@ export function DayBars({
 }) {
   const minWidth =
     points.length * (points[0]?.tick ? COMPACT_WIDTH : DAY_WIDTH);
+  const scroller = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const element = scroller.current;
+    if (startAtEnd && element) element.scrollLeft = element.scrollWidth;
+  }, [startAtEnd, points.length]);
   return (
-    <div className="mt-4 overflow-x-auto" onMouseLeave={() => setActive(null)}>
+    <div
+      ref={scroller}
+      className="mt-4 overflow-x-auto"
+      onMouseLeave={() => setActive(null)}
+    >
       {calendar || <AxisLabels points={points} minWidth={minWidth} />}
       <div
         data-loading-field="plot"
@@ -104,9 +148,6 @@ export function DayBars({
         className="flex gap-px"
       >
         {points.map((row, index) => {
-          const amount = row.amount;
-          const percentage =
-            maximum > 0 ? ((row.value ?? 0) / maximum) * DELTA.percent : 0;
           return (
             <button
               type="button"
@@ -116,24 +157,19 @@ export function DayBars({
                 index === active && 'bg-raised',
                 row.outside && 'opacity-40',
               )}
-              aria-label={`${row.day} UTC, ${label}, ${row.outside ? 'Outside selected period' : dayLabel(amount, kind)}`}
-              tabIndex={index === (active ?? 0) ? 0 : -1}
+              aria-label={barLabel(row, label, kind)}
+              tabIndex={
+                index === (active ?? (startAtEnd ? points.length - 1 : 0))
+                  ? 0
+                  : -1
+              }
               onKeyDown={moveDay}
               onMouseEnter={() => setActive(index)}
               onFocus={() => setActive(index)}
               onBlur={() => setActive(null)}
               onClick={() => setActive(index)}
             >
-              <span className="flex h-32 w-full items-end justify-center">
-                {row.outside ? null : amount === null ? (
-                  <span className="mb-px h-0 w-1/2 border-t border-dashed border-dim" />
-                ) : (
-                  <span
-                    className="w-3/4 rounded-t-sm bg-chart"
-                    style={{ height: `${percentage}%`, minHeight: 2 }}
-                  />
-                )}
-              </span>
+              <BarMark row={row} maximum={maximum} />
               <span className="mt-2 h-9 font-mono text-[10px] whitespace-nowrap text-dim [writing-mode:vertical-rl]">
                 {row.tick ?? row.day.slice(CHART.monthDayStart)}
               </span>

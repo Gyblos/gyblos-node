@@ -34,11 +34,12 @@ const sources={
     export function sellerAddress(seller){return seller}
     export function relayAllowed(){return true}\`,
   './free-execution': \`export class FreeSelectionFailure extends Error {}
+    export function unfitOutcome(error){return error}
     export async function executeSelectedBuyerFree(){globalThis.probe.free++;return {text:'synthetic',usage:{inputTokens:4,outputTokens:2},finishReason:'stop'}}\`,
   '@gyblos/node/buyer-chain': 'export async function buyerPaymentsUnresolved(){return false}'
 };
 registerHooks({resolve(name,context,next){
-  const owner=[target,target.replace('quote-startup.ts','session-startup.ts'),target.replace('quote-startup.ts','session-manager.ts')].includes(context.parentURL);
+  const owner=[target,target.replace('quote-startup.ts','session-startup.ts'),target.replace('quote-startup.ts','session-manager.ts'),target.replace('quote-startup.ts','session-free.ts')].includes(context.parentURL);
   const source=owner?sources[name]:undefined;
   return source?{url:'data:text/javascript,'+encodeURIComponent(source),shortCircuit:true}:next(name,context);
 }});

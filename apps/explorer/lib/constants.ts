@@ -228,6 +228,17 @@ export const SELLER_NAME = {
 
 export const SEARCH_TERM_LIMIT = 160;
 
+export const SELLERS_ONLINE = {
+  path: '/network/history',
+  fetchDays: 90,
+  windows: [7, 30, 90],
+  defaultWindow: 30,
+  averageScale: 1_000,
+  anchor: 'sellers-online',
+  dayOfMonthStart: 8,
+  isoDay: /^\d{4}-\d{2}-\d{2}$/,
+} as const;
+
 export const COVERAGE_STATES = {
   FINAL: 'final',
   PARTIAL: 'partial',
