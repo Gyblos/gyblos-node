@@ -1554,9 +1554,6 @@
   font-size: var(--ui-font);
   font-weight: 450;
 }
-.top-up-amounts .ui-button {
-  flex: 1;
-}
 
 /* Buyer payment choice and planned application catalog use shared tokens. */
 .desktop-frame .content[data-layout='chat'] {

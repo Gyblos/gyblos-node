@@ -61,7 +61,6 @@ function chooseShowTestnet(show: boolean) {
     params.delete(PREVIEW_QUERY.TESTNET);
   } else {
     params.set(PREVIEW_QUERY.NETWORK, PREVIEW_QUERY.NETWORK_MAINNET);
-    params.set(PREVIEW_QUERY.TESTNET, PREVIEW_QUERY.TESTNET_HIDDEN);
   }
   history.replaceState(null, '', '?' + params.toString());
   window.dispatchEvent(new Event(PREVIEW_EVENT.NETWORK));

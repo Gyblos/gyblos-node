@@ -137,7 +137,7 @@ and fresh shared-session information.
 Models uses a searchable list with laboratory artwork, a filter menu and a
 network-check dialog. Artwork does not establish availability. Applications
 shows unavailable web services as such, without pretend connection actions.
-Settings holds seller and funding preferences, Appearance, the visual-system preview and version information.
+Settings holds seller and funding preferences, Appearance, developer network preferences, the visual-system preview and version information.
 An update notice sits in the status bar when a newer release exists; it opens
 the release page and never installs anything.
 
