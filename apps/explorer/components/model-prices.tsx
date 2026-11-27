@@ -28,7 +28,7 @@ export function ModelPrices({ history }: { history: OfferPriceHistory }) {
           kind="usdc"
           countAxis={false}
           total={latest?.[side] ? usdcDecimal(latest[side].median) : null}
-          summary="Across sellers, per UTC day"
+          summary={`Across sellers · latest ${latest?.day ?? 'day'}`}
           startAtEnd
           points={days.map((day) => {
             const spread = day[side];
@@ -45,7 +45,7 @@ export function ModelPrices({ history }: { history: OfferPriceHistory }) {
         title="Sellers offering it"
         kind="count"
         total={latest?.sellers ?? null}
-        summary="With an offer, per UTC day"
+        summary={`With an offer · latest ${latest?.day ?? 'day'}`}
         startAtEnd
         points={days.map((day) => ({
           day: day.day,

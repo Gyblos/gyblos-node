@@ -116,7 +116,7 @@ function OffersTable({
   const names = namesByNode(discovery.network);
   const page = pagedRows(query, 'sellers', offers, !discovery.error, {
     context: ({ offer }) => offer.contextTokens,
-    uptimeWeek: ({ seller }) => weekUptime(seller) ?? -1,
+    uptimeWeek: ({ seller }) => weekUptime(seller),
     input: ({ offer }) => BigInt(offer.pricing.inputAtomicPerMtok),
     output: ({ offer }) => BigInt(offer.pricing.outputAtomicPerMtok),
   });
