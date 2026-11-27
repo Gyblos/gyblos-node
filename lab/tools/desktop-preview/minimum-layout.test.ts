@@ -15,11 +15,17 @@ import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
 import { buildPreview } from './build';
 
-async function render(root: string, url: URL, width: number) {
+async function render(
+  root: string,
+  url: URL,
+  width: number,
+  reduceMotion = false,
+) {
   const { stdout } = await promisify(execFile)(
     process.env.CHROME_BIN || 'google-chrome',
     [
       '--headless',
+      ...(reduceMotion ? ['--force-prefers-reduced-motion'] : []),
       '--disable-background-networking',
       '--no-first-run',
       '--allow-file-access-from-files',
@@ -40,6 +46,7 @@ async function minimumLayout(
   head = '',
   probeName = 'check-minimum-layout.ts',
   invoke = 'checkMinimumLayout()',
+  reduceMotion = false,
 ) {
   const root = await mkdtemp(join(tmpdir(), 'gyblos-minimum-layout-'));
   try {
@@ -67,7 +74,7 @@ async function minimumLayout(
     const url = pathToFileURL(entry);
     url.search =
       'screen=chat&connection-state=ready&funding=ready&seller-budget=ready';
-    const stdout = await render(root, url, DESKTOP.MIN_WIDTH);
+    const stdout = await render(root, url, DESKTOP.MIN_WIDTH, reduceMotion);
     return {
       passed: /data-layout-passed="([^"]+)"/.exec(stdout)?.[1],
       skipped: /data-inert-payment-rows="([^"]+)"/.exec(stdout)?.[1],
@@ -134,6 +141,7 @@ void test('confirmed paid Chat keeps the draft during a fresh seller check and m
     '',
     'check-pinned-seller.ts',
     'checkPinnedSeller(...' + JSON.stringify(args) + ')',
+    true,
   );
   assert.equal(result.passed, 'verified');
 });

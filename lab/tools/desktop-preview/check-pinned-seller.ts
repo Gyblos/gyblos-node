@@ -6,6 +6,8 @@ export async function checkPinnedSeller(
   reviewAction: string,
   sendAction: string,
 ) {
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+    throw new Error('Unexpected animated test environment');
   const maxAttempts = 100;
   const pollMs = 40;
   async function until<T>(observe: () => T | null | undefined | false) {
@@ -31,7 +33,10 @@ export async function checkPinnedSeller(
     ).click();
   }
   async function choosePaidSeller() {
-    await click('Models');
+    await until(() => !document.querySelector('dialog[open]'));
+    window.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }),
+    );
     (
       await until(() =>
         Array.from(
@@ -52,13 +57,16 @@ export async function checkPinnedSeller(
   if (!wallet) throw new Error('Missing fixture');
   let blocker: ChannelBlocker | undefined;
   let hold: Promise<void> | undefined;
+  let capacity: Partial<
+    NonNullable<Awaited<ReturnType<typeof funding.balance>>>
+  > = {};
   const actions: unknown[] = [];
   funding.balance = async (offer) => {
     if (offer) await hold;
     return {
       ...wallet,
       balanceAtomic: blocker === keyReview ? null : '2000000',
-      ...(offer && { channelBlocker: blocker }),
+      ...(offer && { channelBlocker: blocker, ...capacity }),
     };
   };
   const execute = buyer.run;
@@ -69,6 +77,11 @@ export async function checkPinnedSeller(
     }
     return execute(input);
   };
+  await until(() =>
+    document
+      .querySelector('.composer-note')
+      ?.textContent.includes('Choose a seller'),
+  );
   await choosePaidSeller();
   await click('Use this model');
   await click('Confirm seller');
@@ -140,6 +153,29 @@ export async function checkPinnedSeller(
   await until(() => !document.querySelector('dialog[open]'));
   await click('Chat');
   await until(() => !button.disabled);
+  for (const observation of [
+    { poolLimited: true as const },
+    { balanceAtomic: null },
+    { balanceAtomic: '999999' },
+  ]) {
+    capacity = observation;
+    form.requestSubmit();
+    await until(
+      () =>
+        button.disabled &&
+        !document
+          .querySelector('.composer-note')
+          ?.textContent.includes('Checking'),
+    );
+    if (draft.value !== 'Keep this draft' || actions.includes(sendAction))
+      throw new Error('Insufficient capacity consumed draft');
+    capacity = {};
+    const picker = form.querySelector<HTMLButtonElement>('.ui-model-trigger');
+    if (!picker) throw new Error('Missing model menu');
+    picker.click();
+    await until(() => !button.disabled);
+    picker.click();
+  }
   form.requestSubmit();
   form.requestSubmit();
   await until(() => actions.includes(sendAction));

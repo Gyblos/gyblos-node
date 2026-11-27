@@ -84,8 +84,13 @@ export function sellerResponseLimit(
     deposit
   );
 }
+type FundingPolicy = {
+  payer: string;
+  depositAtomic?: string;
+  maxAtomic: string;
+};
 export function autoFundingAvailable(
-  policy: { payer: string; depositAtomic?: string; maxAtomic: string },
+  policy: FundingPolicy,
   observations: readonly (BuyerFunding | null)[],
 ) {
   const deposit = policy.depositAtomic;
@@ -122,12 +127,13 @@ export type ReplacementTerms = Pick<
 >;
 export function pinnedFundingNotice(
   funding: BuyerFunding | null,
+  policy: FundingPolicy | null | undefined,
   consent?: ReplacementTerms,
 ) {
   const blocker = funding
     ? funding.channelBlocker
     : SESSION_CODES.STATUS_UNKNOWN;
-  if (
+  const reviewedReplacement =
     blocker === SESSION_CODES.REPLACEMENT_REQUIRED &&
     funding &&
     consent &&
@@ -135,10 +141,16 @@ export function pinnedFundingNotice(
     (consent.switchingAtomic !== undefined ||
       consent.replacementAtomic !== undefined) &&
     funding.switchingAtomic === consent.switchingAtomic &&
-    funding.replacementAtomic === consent.replacementAtomic
-  )
-    return undefined;
-  return blocker ? channelBlockerMessage(blocker) : undefined;
+    funding.replacementAtomic === consent.replacementAtomic;
+  if (blocker && !reviewedReplacement) return channelBlockerMessage(blocker);
+  const available = policy
+    ? autoFundingAvailable(policy, [
+        reviewedReplacement
+          ? { ...funding, channelBlocker: undefined }
+          : funding,
+      ])
+    : null;
+  return available === true ? undefined : autoFundingNotice(available);
 }
 export function autoFundingNotice(
   available: Exclude<ReturnType<typeof autoFundingAvailable>, true>,

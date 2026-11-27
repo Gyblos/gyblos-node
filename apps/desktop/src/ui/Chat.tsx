@@ -193,7 +193,8 @@ export function Chat({
   const [reasoning, setReasoning] = useState<ReasoningSelection | null>(null);
   const usingPaypal = paymentMethod === PAYMENT_METHOD.PAYPAL;
   const usingX402 = !usingPaypal && !!x402;
-  const payer = x402?.state.policy?.payer;
+  const policy = x402?.state.policy;
+  const payer = policy?.payer;
   const { funding, loading, refresh, verify } = useBuyerFunding(
     payer,
     model.offerId,
@@ -283,7 +284,7 @@ export function Chat({
   const channelNotice = pinnedPaid
     ? loading
       ? 'Checking finalized channel status…'
-      : pinnedFundingNotice(funding, replacement)
+      : pinnedFundingNotice(funding, policy, replacement)
     : undefined;
   const verification = useRef<symbol | null>(null);
   useLayoutEffect(
@@ -304,7 +305,7 @@ export function Chat({
       x402Ready,
       limitNotice,
       payer,
-      x402?.state.policy?.policyId,
+      policy?.policyId,
     ],
   );
   const canSend =
@@ -520,7 +521,7 @@ export function Chat({
         const observation = await verify();
         if (verification.current !== token) return;
         verification.current = null;
-        if (pinnedFundingNotice(observation, replacement)) return;
+        if (pinnedFundingNotice(observation, policy, replacement)) return;
       }
       if (!session.messages.length) captureComposer();
       follow.current = true;

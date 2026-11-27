@@ -115,6 +115,7 @@ void test('Auto and a pinned seller show the buyer reason for each verified refu
     await import('@gyblos/desktop/funding-model');
   const { channelBlockerMessage } =
     await import('@gyblos/node/buyer-channel-message');
+  const policy = { payer, maxAtomic: '10000', depositAtomic: '1000000' };
   const funded = {
     network: DEVNET,
     payer,
@@ -131,27 +132,56 @@ void test('Auto and a pinned seller show the buyer reason for each verified refu
       channelBlockerMessage(channelBlocker),
     );
     assert.equal(
-      pinnedFundingNotice({ ...funded, channelBlocker }),
+      pinnedFundingNotice({ ...funded, channelBlocker }, policy),
       channelBlockerMessage(channelBlocker),
     );
   }
   assert.equal(
-    pinnedFundingNotice(null),
+    pinnedFundingNotice(null, policy),
     channelBlockerMessage(SESSION_CODES.STATUS_UNKNOWN),
   );
-  assert.equal(pinnedFundingNotice(funded), undefined);
+  assert.equal(pinnedFundingNotice(funded, policy), undefined);
   const switching = {
     ...funded,
     channelBlocker: SESSION_CODES.REPLACEMENT_REQUIRED,
     switchingAtomic: '700000',
   };
   assert.equal(
-    pinnedFundingNotice(switching),
+    pinnedFundingNotice(switching, policy),
     channelBlockerMessage(SESSION_CODES.REPLACEMENT_REQUIRED),
   );
   assert.equal(
-    pinnedFundingNotice(switching, { switchingAtomic: '700000' }),
+    pinnedFundingNotice(switching, policy, { switchingAtomic: '700000' }),
     undefined,
   );
-  assert.ok(pinnedFundingNotice(switching, { switchingAtomic: '800000' }));
+  assert.ok(
+    pinnedFundingNotice(switching, policy, { switchingAtomic: '800000' }),
+  );
+});
+
+void test('a confirmed pinned seller requires spendable escrow or a verified and affordable new deposit', async () => {
+  const { pinnedFundingNotice } = await import('@gyblos/desktop/funding-model');
+  const policy = { payer, maxAtomic: '10000', depositAtomic: '1000000' };
+  const wallet = {
+    network: DEVNET,
+    payer,
+    channelRemainingAtomic: null,
+    faucetAvailable: true,
+    balanceAtomic: '2000000',
+  };
+  for (const funding of [
+    { ...wallet, balanceAtomic: null },
+    { ...wallet, balanceAtomic: '999999' },
+    { ...wallet, poolLimited: true as const },
+    { ...wallet, channelRemainingAtomic: '9999' },
+  ])
+    assert.ok(pinnedFundingNotice(funding, policy));
+  assert.equal(pinnedFundingNotice(wallet, policy), undefined);
+  assert.equal(
+    pinnedFundingNotice(
+      { ...wallet, balanceAtomic: null, channelRemainingAtomic: '10000' },
+      policy,
+    ),
+    undefined,
+  );
 });
