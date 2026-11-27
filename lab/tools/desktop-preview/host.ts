@@ -35,13 +35,15 @@ import {
 } from '@gyblos/desktop/x402-model';
 import { AGENT_TOOLS } from '@gyblos/node/agent-setup-constants';
 import { BUYER_API, type BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
-import {
-  BUYER_API_KEYS,
-  BUYER_KEY_CODES,
-} from '@gyblos/protocol/buyer-api-keys';
+import { BUYER_API_KEYS } from '@gyblos/protocol/buyer-api-keys';
 
 import { accountBudgetSnapshot, accountLimitError } from './account-budget';
-import { previewChatSeed } from './chat-seed';
+import {
+  previewChatSeed,
+  previewChatTitles,
+  seedFailedTurn,
+  sharedReviewFailure,
+} from './chat-seed';
 import { PREVIEW } from './constants';
 import { exampleKeys } from './example-keys';
 import { previewFunding } from './funding';
@@ -105,20 +107,7 @@ export function createPreviewHost(
     });
   }
   const tenChats = query.get('review') === 'ten-chats';
-  const titles = [
-    'Product launch plan',
-    'Explain vector search',
-    'Research assistant',
-  ];
-  if (tenChats)
-    titles.push(
-      'Review API changes',
-      'Plan the onboarding flow',
-      'Compare model outputs',
-      'Summarize meeting notes',
-      'Explore search ranking',
-      'Outline a release checklist',
-    );
+  const titles = previewChatTitles(tenChats);
   const seeded: string[] = [];
   function exampleChat(title: string, receiptId: string) {
     const conversationId = conversations.getSnapshot().activeId;
@@ -156,25 +145,7 @@ export function createPreviewHost(
     conversations.newChat(crypto.randomUUID());
   }
   Object.assign(window, { previewChatSeed: previewChatSeed(seeded) });
-  if (failedTurn) {
-    const id = 'interrupted-turn';
-    const origin = conversations.startPaypal(
-      'How do I read a file in TypeScript?',
-      { ...chatModel, free: false },
-      id,
-      sessionId,
-      PAYMENT_METHOD.USDC,
-    );
-    if (origin) {
-      conversations.appendBuyer(
-        origin,
-        id,
-        'Read the file with:\n\n```ts\nconst text =',
-      );
-      conversations.setDraft('How should I handle an empty file?');
-      conversations.failPaypal(origin, id, '', BUYER_KEY_CODES.REVIEW);
-    }
-  } else
+  if (!seedFailedTurn(conversations, chatModel, sessionId, query.get('review')))
     exampleChat(
       'How can I use Gyblos in my coding tools?',
       'preview-free-reply',
@@ -308,11 +279,7 @@ export function createPreviewHost(
       if (request.action === X402_ACTION.COPY_MINT)
         await navigator.clipboard.writeText(DEVNET_USDC);
       if (failedTurn && request.action === X402_ACTION.SEND)
-        return {
-          ...buyerState(),
-          error: 'An API key reservation needs review.',
-          failureReason: BUYER_KEY_CODES.REVIEW,
-        };
+        return { ...buyerState(), ...sharedReviewFailure };
       if (request.action === X402_ACTION.SEND) {
         await new Promise((resolve) =>
           window.setTimeout(resolve, PREVIEW.replyDelayMs),

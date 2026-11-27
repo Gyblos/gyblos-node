@@ -10,7 +10,11 @@ import {
   PAYPAL_STATUS_POLL_TIMEOUT_MS,
 } from './constants';
 import { createPaypalChatMonitor } from './paypal-chat-monitor';
-import { paypalChatFailure, paypalCommandNotice } from './paypal-chat-notice';
+import {
+  paypalChatFailure,
+  paypalCommandNotice,
+  type PaypalChatSnapshot as Snapshot,
+} from './paypal-chat-notice';
 import {
   parsePaypalResult,
   PAYPAL_ACTION,
@@ -19,27 +23,10 @@ import {
   type PaypalRequest,
   type PaypalResult,
 } from './paypal-model';
-import type { DesktopPaypalStatus } from './paypal-session';
 import { CHAT_ROLE } from './ui/constants';
 
 export { PaypalChatScroll } from './paypal-chat-scroll';
 
-type Message = {
-  role: (typeof CHAT_ROLE)[keyof typeof CHAT_ROLE];
-  text: string;
-};
-type Snapshot = {
-  sessionId?: string | null;
-  status: DesktopPaypalStatus | null;
-  statusFresh: boolean;
-  model: string | null;
-  messages: Message[];
-  draft: string;
-  pendingPrompt: string | null;
-  busy: boolean;
-  notice: string;
-  pendingMessageId: string | null;
-};
 type Run = (request: PaypalRequest) => Promise<PaypalResult>;
 
 export class PaypalChatController {
@@ -88,7 +75,11 @@ export class PaypalChatController {
     };
   }
   private update(values: Partial<Snapshot>) {
-    this.snapshot = { ...this.snapshot, ...values };
+    this.snapshot = {
+      ...this.snapshot,
+      ...(values.notice !== undefined && { noticeIsTurnFailure: false }),
+      ...values,
+    };
     this.monitor.observe(this.snapshot);
     for (const listener of this.listeners) listener();
   }
@@ -150,12 +141,11 @@ export class PaypalChatController {
       result,
       previous,
       this.snapshot.pendingMessageId,
-      this.snapshot.notice,
     );
     this.update({
       ...this.receive(result),
       statusFresh: this.monitor.isActive() && result.status !== null,
-      notice,
+      ...(notice !== undefined && { notice }),
       busy: false,
       ...(request.action === PAYPAL_ACTION.CREATE &&
       !result.error &&
@@ -327,6 +317,7 @@ export class PaypalChatController {
       new TextEncoder().encode(draft).length > PAYPAL_REQUEST_LIMITS.promptBytes
     ) {
       this.update({
+        noticeIsTurnFailure: true,
         notice: paypalChatFailure(
           paypalFailure(PAYPAL_DESKTOP_ERROR.INVALID_PROMPT),
         ),
@@ -348,6 +339,7 @@ export class PaypalChatController {
         ...this.receive(result),
         statusFresh: this.monitor.isActive() && result.status !== null,
         notice: paypalChatFailure(result),
+        noticeIsTurnFailure: true,
         draft:
           this.draftRevision === draftRevision ? draft : this.snapshot.draft,
         pendingPrompt: null,

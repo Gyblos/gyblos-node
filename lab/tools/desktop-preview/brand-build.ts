@@ -159,16 +159,21 @@ export function transformBrand(source: string, id: string, desktop: string) {
           [
             '{answer && (',
             `{answer && (answer.failureReason || answer.state === MESSAGE_STATE.FAILED) ? (
-            <FailedTurn message={answer} buyer={x402} onReview={answer.paymentMethod === PAYMENT_METHOD.PAYPAL ? onReviewPaypal : onReviewX402} onEdit={() => {
-              if (!session.draft && user) setDraft(user.text);
+            <FailedTurn message={answer} buyer={x402} separateDraft={!!user && !!session.draft && session.draft !== user.text} onReview={answer.paymentMethod === PAYMENT_METHOD.PAYPAL ? onReviewPaypal : onReviewX402} onEdit={() => {
+              if (!user) return;
+              if (session.draft && session.draft !== user.text) reset(user.text);
+              else setDraft(user.text);
               input.current?.focus();
             }} />
           ) : answer && (`,
           ],
           [
-            '(!usingPaypal && notice)',
-            '(!usingPaypal && !session.messages.at(-1)?.failureReason && notice)',
+            '  const notice = usingPaypal\n    ? paypal.state.notice || session.notice\n    : session.notice;',
+            "  const notice = session.noticeIsTurnFailure ? '' : session.notice;\n  const paypalNotice = paypal.state.noticeIsTurnFailure ? '' : paypal.state.notice;",
           ],
+          ['{usingPaypal && notice && (', '{usingPaypal && paypalNotice && ('],
+          ['<p>{notice}</p>', '<p>{paypalNotice}</p>'],
+          ['(!usingPaypal && notice)', 'notice'],
           ...funds.CHAT_FUNDS_REWRITES,
         ],
       ) +

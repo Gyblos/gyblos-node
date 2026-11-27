@@ -58,6 +58,7 @@ export type ChatSession = {
   draft: string;
   draftRevision: number;
   notice: string;
+  noticeIsTurnFailure?: boolean;
   blocked: DemoAuthorizationStatus | null;
   messages: ChatMessage[];
   run: ChatRun | null;
@@ -214,6 +215,7 @@ export function failPaidRun(
         : session.draft,
     paypalRun: null,
     notice,
+    noticeIsTurnFailure: true,
     messages: session.messages.map((message) =>
       message.id === `${id}-assistant`
         ? {

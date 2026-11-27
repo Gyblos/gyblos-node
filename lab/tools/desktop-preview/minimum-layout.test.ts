@@ -8,7 +8,9 @@ import test from 'node:test';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 
+import { PAYPAL_ACTION } from '@gyblos/desktop/paypal-model';
 import { DESKTOP } from '@gyblos/desktop/window-chrome';
+import { X402_ACTION } from '@gyblos/desktop/x402-model';
 
 import { buildPreview } from './build';
 
@@ -135,7 +137,7 @@ void test('a restored USDC failure renders one recovery explanation and preserve
       assert.ok(turn);
       assert.equal(turn.match(/role="status"/g)?.length, 1);
       assert.match(turn, /final charge is unknown/);
-      assert.match(turn, /Desktop and connected tools are paused/);
+      assert.match(turn, /paused Desktop and connected tools/);
       assert.match(turn, /<button[^>]*>Check status<\/button>/);
       assert.doesNotMatch(turn, /Response unavailable/);
       assert.match(html, /How should I handle an empty file\?/);
@@ -144,3 +146,53 @@ void test('a restored USDC failure renders one recovery explanation and preserve
     await rm(root, { recursive: true, force: true });
   }
 });
+
+for (const example of [
+  'failed-turn',
+  'paypal-turn',
+  'declined-turn',
+  'unbound-review',
+  'review-error',
+]) {
+  const proof =
+    example === 'unbound-review'
+      ? 'other-turn'
+      : example === 'review-error'
+        ? 'error'
+        : undefined;
+  const review = proof ? 'failed-turn' : example;
+  void test(`full chat preserves independent recovery actions for ${example}`, async () => {
+    const root = await mkdtemp(join(tmpdir(), 'gyblos-failed-turn-'));
+    try {
+      const output = await buildPreview(join(root, 'dist'));
+      const probe = await readFile(
+        new URL('./check-failed-turn.ts', import.meta.url),
+        'utf8',
+      );
+      await writeFile(
+        join(output, 'probe.mjs'),
+        stripTypeScriptTypes(probe) +
+          `\ncheckFailedTurn(${JSON.stringify(X402_ACTION.REVIEW)}, ${JSON.stringify(PAYPAL_ACTION.SEND)}).catch(error => { document.documentElement.dataset.recoveryPassed = error.message; });`,
+      );
+      const entry = join(output, 'index.html');
+      const html = await readFile(entry, 'utf8');
+      await writeFile(
+        entry,
+        html.replace(
+          '<script type="module"',
+          '<script type="module" src="./probe.mjs"></script><script type="module"',
+        ),
+      );
+      const url = pathToFileURL(entry);
+      url.search = new URLSearchParams({
+        screen: 'chat',
+        review,
+        ...(proof && { 'status-proof': proof }),
+      }).toString();
+      const result = await render(root, url, DESKTOP.MIN_WIDTH);
+      assert.equal(/data-recovery-passed="([^"]+)"/.exec(result)?.[1], 'yes');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+}

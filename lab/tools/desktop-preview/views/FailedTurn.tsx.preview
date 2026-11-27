@@ -1,7 +1,8 @@
 
-function FailedTurn({ message, buyer, onReview, onEdit }: {
+function FailedTurn({ message, buyer, separateDraft, onReview, onEdit }: {
   message: ChatMessage;
   buyer?: Props['x402'];
+  separateDraft: boolean;
   onReview?: () => void;
   onEdit: () => void;
 }) {
@@ -13,12 +14,14 @@ function FailedTurn({ message, buyer, onReview, onEdit }: {
     !!message.paymentSessionId && message.paymentSessionId === buyer?.state.summary.sessionId;
   async function checkStatus() {
     const status = await buyer?.run({ action: X402_ACTION.REVIEW });
-    setObservation(!status?.summary.available ? 'Payment status is unavailable.'
-      : status.summary.blocked ? 'Status checked. Spending is still paused.'
-      : 'Status checked. See Payments for the recorded outcome of this turn.');
+    const budgetStatus = status?.error || !status?.summary.available
+      ? 'The status check was unavailable.'
+      : status.summary.blocked ? 'The desktop budget still has spending under review.'
+      : 'The desktop budget reports no pending review.';
+    setObservation(budgetStatus + ' The charge for this turn remains unconfirmed.');
   }
   const explanation = shared
-    ? 'An API key reservation needs review. Its final charge is unknown. Desktop and connected tools are paused.'
+    ? 'An API key spending review paused Desktop and connected tools for this request. The final charge is unknown.'
     : declined ? 'The seller declined this question before charging you.'
     : free ? 'The free response was interrupted. Any text shown is incomplete.'
     : `The ${message.paymentMethod === PAYMENT_METHOD.PAYPAL ? 'PayPal' : 'USDC'} response was interrupted. The final charge is unknown.`;
@@ -28,7 +31,7 @@ function FailedTurn({ message, buyer, onReview, onEdit }: {
       <Notice>{explanation}{observation && ' ' + observation}</Notice>
       <div className="answer-actions">
         {declined || (free && !shared) ? (
-          <Button variant={BUTTON_VARIANT.SECONDARY} onClick={onEdit}>Edit question</Button>
+          <Button variant={BUTTON_VARIANT.SECONDARY} onClick={onEdit}>{separateDraft ? 'Edit in new chat' : 'Edit question'}</Button>
         ) : sameSession ? (
           <Button variant={BUTTON_VARIANT.SECONDARY} disabled={buyer.busy} onClick={() => void checkStatus()}>Check status</Button>
         ) : (

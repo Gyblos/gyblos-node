@@ -251,11 +251,13 @@ export function restoreChatArchive(archive: ChatArchive): ChatSnapshot {
     sessions: archive.sessions.map((session) => ({
       ...createSession(session.id),
       ...session,
-      notice: session.messages.some(
+      ...(session.messages.some(
         (message) => message.state === MESSAGE_STATE.PENDING,
-      )
-        ? 'A response was interrupted. Review its payment status before sending again.'
-        : '',
+      ) && {
+        notice:
+          'A response was interrupted. Review its payment status before sending again.',
+        noticeIsTurnFailure: true,
+      }),
       messages: session.messages.map((message) => ({
         ...message,
         ...(message.state === MESSAGE_STATE.PENDING &&

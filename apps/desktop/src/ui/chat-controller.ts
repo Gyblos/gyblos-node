@@ -149,7 +149,7 @@ export class ChatController {
       ...this.snapshot,
       sessions: this.snapshot.sessions.map((session) =>
         session.id === sessionId
-          ? { ...session, notice, blocked: null }
+          ? { ...session, notice, noticeIsTurnFailure: false, blocked: null }
           : session,
       ),
     });
@@ -190,6 +190,7 @@ export class ChatController {
       this.updateActive((item) => ({
         ...item,
         notice: chatAuthorizationNotice(status),
+        noticeIsTurnFailure: false,
         blocked: status,
       }));
       return false;
