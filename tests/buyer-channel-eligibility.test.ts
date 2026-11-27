@@ -317,3 +317,43 @@ void test('an earlier finalized voucher attributes only its verified share to th
   assert.equal(await confirm(2, '50'), undefined);
   assert.equal(await confirm(2, '105'), undefined);
 });
+
+void test('closing on an accepted checkpoint charges only that part of an interrupted turn', async (t) => {
+  const rig = await sessionRig();
+  t.after(rig.dispose);
+  const { blockIntent } = await import('./support/session-block-intent');
+  const { finalizedKeyCharge } =
+    await import('@gyblos/payments-upto/batch-session');
+  await rig.open();
+  await rig.serve(1, '40');
+  const request = rig.request(2);
+  await rig.buyer.beginBlocks(request);
+  await rig.seller().reserveBlocks(request, rig.terms.buyerNodeId);
+  const first = blockIntent(request, 0, '10', false, '40');
+  await rig.seller().checkpoint(first);
+  const accepted = await rig.buyer.approveBlock(first, '10');
+  await rig.seller().acceptBlock(first, accepted, rig.terms.buyerNodeId);
+  await rig.buyer.acknowledgeBlock(first);
+  const next = blockIntent(request, 1, '20', false, '40');
+  await rig.seller().checkpoint(next);
+  await rig.buyer.approveBlock(next, '20');
+  assert.equal(rig.buyer.snapshot().cumulativeAtomic, '60');
+  const settlement = await rig.seller().close();
+  assert.equal(settlement.chargedAtomic, '50');
+  const charge = await finalizedKeyCharge(
+    rig.buyerOptions.paths,
+    {
+      ...request,
+      executionDigest: request.requestDigest,
+      sellerNodeId: rig.terms.sellerNodeId,
+    },
+    {
+      payer: rig.terms.buyer,
+      mint: rig.terms.mint,
+      network: rig.terms.network,
+    },
+    rig.terms.buyerNodeId,
+    (_terms, channelId) => rig.sellerOptions.observe(channelId),
+  );
+  assert.equal(charge, '10');
+});

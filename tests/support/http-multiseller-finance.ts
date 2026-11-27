@@ -22,6 +22,7 @@ import {
   createBatchSeller,
   inspectBatchSession,
   openBatchBuyerPool,
+  renewBatchSession,
 } from '@gyblos/payments-upto/batch-session';
 import { matchBatchTerms } from '@gyblos/protocol/batch-channel';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
@@ -44,7 +45,41 @@ export function httpMultiLedger(payer: KeyPairSigner) {
   const settled = new Map<string, SessionSettlement>();
   const calls: { seller: string; type: string; channel: string }[] = [];
   const observe = async (id: string) => settled.get(id);
+  const backend = async (
+    paths: ReturnType<typeof batchSessionPathsIn>,
+  ): Promise<BuyerSessionBackend> => ({
+    inspect: () => inspectBatchSession(paths),
+    observe,
+    create: (terms) =>
+      createBatchBuyer({
+        terms,
+        paths,
+        payer,
+        now: Date.now,
+        hints: async () => ({
+          blockhash: '11111111111111111111111111111111',
+          lastValidBlockHeight: '1000',
+          slot: '1',
+        }),
+      }),
+  });
   return {
+    async single(): Promise<BuyerSessionBackend> {
+      const paths = batchSessionPathsIn(process.env, P2P_ROLES.BUYER);
+      return {
+        ...(await backend(paths)),
+        renew: (expectedChannelId, terms, totalBudgetAtomic, switchSeller) =>
+          renewBatchSession({
+            paths,
+            expectedChannelId,
+            terms,
+            totalBudgetAtomic,
+            switchSeller,
+            now: Date.now,
+            observe,
+          }),
+      };
+    },
     calls,
     settled,
     observe,
@@ -130,22 +165,7 @@ export function httpMultiLedger(payer: KeyPairSigner) {
         paths: batchPoolPathsIn(process.env),
         totalDepositAtomic,
         now: Date.now,
-        backend: async (paths): Promise<BuyerSessionBackend> => ({
-          inspect: () => inspectBatchSession(paths),
-          observe,
-          create: (terms) =>
-            createBatchBuyer({
-              terms,
-              paths,
-              payer,
-              now: Date.now,
-              hints: async () => ({
-                blockhash: '11111111111111111111111111111111',
-                lastValidBlockHeight: '1000',
-                slot: '1',
-              }),
-            }),
-        }),
+        backend,
       }),
   };
 }

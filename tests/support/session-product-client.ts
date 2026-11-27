@@ -13,7 +13,7 @@ import { P2P_ROLES } from '@gyblos/protocol/constants';
 import type { sessionProductHost } from './session-product-host';
 
 export async function buyerClient(
-  host: Awaited<ReturnType<typeof sessionProductHost>>,
+  host: Pick<Awaited<ReturnType<typeof sessionProductHost>>, 'buyer'>,
   request: typeof fetch,
   limitAtomic = '1000',
 ) {
