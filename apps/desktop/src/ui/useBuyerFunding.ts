@@ -15,6 +15,11 @@ export function useBuyerFunding(
     attempt: number;
     funding: BuyerFunding | null;
   }>();
+  const [enabledBefore, setEnabledBefore] = useState(enabled);
+  if (enabledBefore !== enabled) {
+    setEnabledBefore(enabled);
+    setSnapshot(undefined);
+  }
   useEffect(() => {
     if (!enabled) return;
     let active = true;
@@ -26,7 +31,13 @@ export function useBuyerFunding(
       } catch {
         funding = null;
       }
-      if (active) setSnapshot({ payer, offerId, attempt, funding });
+      if (active)
+        setSnapshot({
+          payer,
+          offerId,
+          attempt,
+          funding,
+        });
     }
     void read();
     return () => {

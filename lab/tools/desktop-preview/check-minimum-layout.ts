@@ -3,12 +3,18 @@ export async function checkMinimumLayout() {
   const pollMs = 50;
   const keyNameLength = 60;
 
+  function liveElement(selector: string) {
+    return Array.from(document.querySelectorAll<HTMLElement>(selector)).find(
+      (candidate) =>
+        !candidate.closest('[inert]') &&
+        candidate.getBoundingClientRect().width,
+    );
+  }
+
   async function visible(selector: string) {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      const element = Array.from(
-        document.querySelectorAll<HTMLElement>(selector),
-      ).find((match) => !match.closest('[inert]'));
-      if (element?.getBoundingClientRect().width) return element;
+      const element = liveElement(selector);
+      if (element) return element;
       await new Promise((resolve) => setTimeout(resolve, pollMs));
     }
     throw new Error('Missing ' + selector);
@@ -33,21 +39,56 @@ export async function checkMinimumLayout() {
   const funding = window.desktopFunding;
   if (!funding) throw new Error('Missing funding bridge');
   const read = funding.balance;
-  funding.balance = async (...args) => {
-    const observed = await read(...args);
-    return observed && { ...observed, balanceAtomic: '1234567890123456789' };
-  };
+  const settled = await read();
+  if (!settled) throw new Error('Missing funding observation');
+  let release: ((value: Awaited<ReturnType<typeof read>>) => void) | undefined;
+  const pending = new Promise<Awaited<ReturnType<typeof read>>>((resolve) => {
+    release = resolve;
+  });
+  funding.balance = () => pending;
   picker.click();
-  const add = await visible('.pk-balance-add');
-  const menu = add.closest('.compact-dropdown');
-  fits(add, menu);
+  const spinner = await visible('.pk-composer-tab .ui-inline-spinner');
+  const live = spinner.closest('.pk-tab-item');
+  if (!live) throw new Error('Missing live balance region');
+  if (
+    live.getAttribute('aria-live') !== 'polite' ||
+    live.getAttribute('aria-busy') !== 'true' ||
+    !live.textContent?.includes('Checking balance…')
+  )
+    throw new Error('Missing checking balance state');
+  fits(spinner, live);
+  const actions = await visible('.preview-menu-actions');
+  const menu = actions.closest('.compact-dropdown');
+  if (!menu) throw new Error('Missing model menu');
+  if (menu.querySelector('.pk-balance-line'))
+    throw new Error('Duplicated picker balance');
+  const labels = Array.from(
+    actions.querySelectorAll('.dropdown-footer'),
+    (item) => item.textContent?.trim(),
+  );
+  if (labels.join('|') !== 'Add funds|View all models')
+    throw new Error('Missing compact funds actions');
+  for (const action of Array.from(actions.querySelectorAll('.dropdown-footer')))
+    fits(action, menu);
+  if (!release) throw new Error('Missing balance release');
+  release({ ...settled, balanceAtomic: '1234567890123456789' });
+  funding.balance = read;
   const balance = await visible(
-    '.pk-balance-line strong:not([data-unavailable])',
+    '.pk-composer-tab .pk-tab-item[aria-busy="false"]',
   );
   if (!balance.textContent.includes('1234567890123.456789'))
     throw new Error('Missing long balance');
-  fits(balance, menu);
+  if (balance.querySelector('.ui-inline-spinner'))
+    throw new Error('Balance spinner did not resolve');
+  fits(balance, balance.closest('.pk-composer-tab'));
   picker.click();
+
+  let releaseReturn:
+    ((value: Awaited<ReturnType<typeof read>>) => void) | undefined;
+  const returning = new Promise<Awaited<ReturnType<typeof read>>>((resolve) => {
+    releaseReturn = resolve;
+  });
+  funding.balance = () => returning;
 
   (await visible('button[aria-label="Usage & payments"]')).click();
   (await visible('#preview-tab-limits')).click();
@@ -151,6 +192,43 @@ export async function checkMinimumLayout() {
   if (document.documentElement.scrollWidth > innerWidth)
     throw new Error('Models overflow');
   (await visible('button[aria-label="Chat"]')).click();
+  if (liveElement('.pk-composer-tab .pk-tab-item[aria-busy="false"]'))
+    throw new Error('Stale balance presented during revalidation');
+  const rechecking = await visible('.pk-composer-tab .ui-inline-spinner');
+  const recheckLive = rechecking.closest('.pk-tab-item');
+  if (
+    recheckLive?.getAttribute('aria-busy') !== 'true' ||
+    !recheckLive.textContent?.includes('Checking balance…')
+  )
+    throw new Error('Missing revalidation checking state');
+  if (!releaseReturn) throw new Error('Missing revalidation release');
+  releaseReturn({ ...settled, balanceAtomic: '3000000' });
+  funding.balance = read;
+  const refreshed = await visible(
+    '.pk-composer-tab .pk-tab-item[aria-busy="false"]',
+  );
+  if (
+    !refreshed.textContent?.includes('Balance · last checked ·') ||
+    !refreshed.textContent.includes('3 USDC')
+  )
+    throw new Error('Missing accessible refreshed balance');
+  window.previewFunds = {
+    atomic: 4_000_000,
+    open: false,
+  };
+  (await visible('.ui-model-trigger')).click();
+  let toppedUp: HTMLElement | undefined;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const settledTab = liveElement(
+      '.pk-composer-tab .pk-tab-item[aria-busy="false"]',
+    );
+    if (settledTab?.textContent?.includes('4 USDC')) {
+      toppedUp = settledTab;
+      break;
+    }
+    await new Promise((resolve) => setTimeout(resolve, pollMs));
+  }
+  if (!toppedUp) throw new Error('Missing topped-up balance');
   const expand = document.querySelector<HTMLButtonElement>(
     'button[aria-label="Expand sidebar"]',
   );

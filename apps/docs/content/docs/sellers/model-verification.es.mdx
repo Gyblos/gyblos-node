@@ -34,6 +34,16 @@ muestreo y las diferencias entre GPU y CPU, mientras que un modelo más chico ve
 Un resultado cubre un vendedor, un modelo y una versión del conjunto de preguntas. Es evidencia de un
 verificador, no una sanción: hoy no cambia nada en el descubrimiento, la selección de vendedores ni los pagos.
 
+En `evidence.json`, cada pregunta tiene un resultado numerado. Los resultados sin
+puntuación distinguen entre un fallo de cotización, un fallo de ejecución y una
+respuesta que no se pudo puntuar. Los fallos de cotización y ejecución registran
+un código, no los detalles originales del error.
+
+Si el Ollama de referencia devuelve una lista de candidatos vacía, incompleta o malformada y los reintentos no lo resuelven, el comando
+se detiene con `REFERENCE_UNAVAILABLE` y no emite un resultado firmado. Una lista completa puede contener cadenas vacías
+para alternativas improbables que no coinciden; las alternativas vacías que podrían afectar una decisión, o una lista sin
+ningún token utilizable, siguen siendo errores de la referencia. Es un error de la referencia, no un veredicto sobre el vendedor.
+
 Por ahora solo se verifican ofertas gratis de modelos Qwen3 del catálogo que tienen una etiqueta pública en
 Ollama. La cuantización no se comprueba.
 
@@ -49,6 +59,10 @@ El verificador es de código abierto, así que cualquiera con [Ollama](https://o
 puede correr la misma verificación contra un vendedor y obtener un resultado comparable. Los pasos para correrlo
 están en la [nota de diseño del verificador](https://github.com/Gyblos/gyblos-node/blob/develop/docs/model-verifier.md#run-it) del repositorio.
 
-Cada corrida escribe el resultado firmado y, a su lado, un archivo de evidencia. La evidencia guarda las
-preguntas, las respuestas y cada comprobación, más cada respuesta que no se pudo puntuar y por qué, para que otra
-persona pueda revisar cómo se llegó al veredicto.
+Cada corrida escribe el resultado firmado y el archivo de evidencia juntos en un directorio nuevo. La
+publicación es atómica para quien lee, pero no hace fsync de los archivos ni de los directorios, así que un fallo
+del sistema operativo o un corte de energía todavía puede perder el directorio nuevo o dejar artefactos
+incompletos. Si usas `--out`, elige una ruta que todavía no exista. La evidencia guarda las preguntas, las
+respuestas y cada comprobación, más cada respuesta que no se pudo puntuar y por qué, para que otra persona pueda
+revisar cómo se llegó al veredicto. `check` también rechaza un resultado cuyos recuentos de evidencia no pueden
+ajustarse al conjunto de pruebas publicado antes de mostrar el veredicto.

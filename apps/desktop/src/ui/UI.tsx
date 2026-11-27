@@ -97,6 +97,10 @@ export function IconButton({
   );
 }
 
+export function InlineSpinner() {
+  return <span className="ui-inline-spinner" aria-hidden="true" />;
+}
+
 export function ChoiceCard({
   title,
   name,

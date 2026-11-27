@@ -274,3 +274,22 @@ void test('the network answer withholds every breakdown row below the buyer mini
     },
   ]);
 });
+
+void test('a buyer report arriving after aggregation re-marks the receipt day', async () => {
+  const database = createCollectorD1();
+  const key = insertReceipt(database, { status: 'seller-only' });
+  const seller = insertEnvelope(database, 'seller', AT);
+  insertReport(database, seller, key, 'seller');
+  await runAggregation(database, NOW);
+  assert.deepEqual(
+    rows(database, 'SELECT client_kind FROM collector_agg_origin_daily'),
+    [{ client_kind: 'unknown' }],
+  );
+  const buyer = insertEnvelope(database, 'buyer', NOW + 1);
+  insertReport(database, buyer, key, 'buyer', NOW + 1);
+  await runAggregation(database, NOW + 2);
+  assert.deepEqual(
+    rows(database, 'SELECT client_kind FROM collector_agg_origin_daily'),
+    [{ client_kind: 'buyer-desktop' }],
+  );
+});

@@ -1,16 +1,15 @@
 // Quick model selection for chat; the full catalog remains a separate screen.
-import { CaretDown, Check } from '@phosphor-icons/react';
+import { CaretDown, Check, Plus } from '@phosphor-icons/react';
 import { useState } from 'react';
 
 import type { BuyerFunding } from '../funding/model';
-import { AddBuyerFunds, fundingAmount } from './BuyerFunding';
+import { AddBuyerFunds } from './BuyerFunding';
 import { MENU_GEOMETRY, MODEL_SOURCE } from './constants';
 import { Dropdown } from './Dropdown';
 import { Modal } from './Modal';
 import { priceRange, usdPerMtok } from './model-price';
 import type { ModelOption } from './model-types';
 import { ModelImage } from './ModelImage';
-import { ModelMenuBalance } from './ModelMenuBalance';
 import { NetworkSellerMenu } from './NetworkSellerMenu';
 import { OfferComparison } from './SellerStrategies';
 import { Badge, MenuItem } from './UI';
@@ -40,7 +39,6 @@ type PickerProps = {
   networkOnly?: boolean;
   contextLabel?: string;
   funding?: BuyerFunding | null;
-  balanceStatus?: string;
   refreshFunding?(): void;
   auto?: {
     buyerModels: readonly string[];
@@ -95,31 +93,16 @@ export function ModelDropdown(props: PickerProps) {
         trigger={<PickerTrigger {...props} network={network} />}
       >
         {(close, query) => (
-          <>
-            {props.networkOnly && (
-              <ModelMenuBalance
-                status={props.balanceStatus}
-                amount={
-                  funding?.balanceAtomic == null
-                    ? undefined
-                    : fundingAmount(funding.balanceAtomic)
-                }
-                onAdd={() => {
-                  close();
-                  setAddingFunds(true);
-                }}
-              />
-            )}
-            <ModelOptions
-              onCompare={setComparison}
-              {...props}
-              showBrowse={props.showBrowse ?? true}
-              close={close}
-              query={query}
-              ordered={ordered}
-              network={network}
-            />
-          </>
+          <ModelOptions
+            onCompare={setComparison}
+            onAddFunds={() => setAddingFunds(true)}
+            {...props}
+            showBrowse={props.showBrowse ?? true}
+            close={close}
+            query={query}
+            ordered={ordered}
+            network={network}
+          />
         )}
       </Dropdown>
     </>
@@ -128,10 +111,17 @@ export function ModelDropdown(props: PickerProps) {
 
 type ModelOptionsProps = Pick<
   PickerProps,
-  'model' | 'auto' | 'onSelect' | 'onBrowse' | 'contextLabel' | 'showBrowse'
+  | 'model'
+  | 'auto'
+  | 'onSelect'
+  | 'onBrowse'
+  | 'contextLabel'
+  | 'showBrowse'
+  | 'networkOnly'
 > & {
   close(): void;
   onCompare(name: string): void;
+  onAddFunds(): void;
   query: string;
   ordered: readonly ModelOption[];
   network: boolean;
@@ -141,6 +131,7 @@ function ModelOptions({
   query,
   ordered,
   onCompare,
+  onAddFunds,
   network,
   model,
   auto,
@@ -148,6 +139,7 @@ function ModelOptions({
   onBrowse,
   contextLabel,
   showBrowse,
+  networkOnly,
 }: ModelOptionsProps) {
   const options = matchingModels(ordered, query, network);
   return (
@@ -195,6 +187,50 @@ function ModelOptions({
           No models found
         </p>
       )}
+      <ModelMenuActions
+        close={close}
+        onAddFunds={onAddFunds}
+        onBrowse={onBrowse}
+        contextLabel={contextLabel}
+        showBrowse={showBrowse}
+        networkOnly={networkOnly}
+      />
+    </>
+  );
+}
+
+type ModelMenuActionsProps = Pick<
+  ModelOptionsProps,
+  | 'close'
+  | 'onAddFunds'
+  | 'onBrowse'
+  | 'contextLabel'
+  | 'showBrowse'
+  | 'networkOnly'
+>;
+function ModelMenuActions({
+  close,
+  onAddFunds,
+  onBrowse,
+  contextLabel,
+  showBrowse,
+  networkOnly,
+}: ModelMenuActionsProps) {
+  const funds = networkOnly && !contextLabel;
+  if (!showBrowse && !funds) return null;
+  return (
+    <div className="preview-menu-actions">
+      {funds && (
+        <MenuItem
+          footer
+          label="Add funds"
+          leading={<Plus size={13} weight="bold" aria-hidden="true" />}
+          onClick={() => {
+            close();
+            onAddFunds();
+          }}
+        />
+      )}
       {showBrowse && (
         <MenuItem
           footer
@@ -205,7 +241,7 @@ function ModelOptions({
           }}
         />
       )}
-    </>
+    </div>
   );
 }
 

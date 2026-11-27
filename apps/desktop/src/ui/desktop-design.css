@@ -1991,10 +1991,8 @@ html .app.desktop-frame .preview-model-menu[data-split] .dropdown-content {
 html .app.desktop-frame .preview-model-menu[data-split] .dropdown-content {
   flex: 1;
 }
-html
-  .app.desktop-frame
-  :is(.preview-model-menu[data-split], .preview-seller-flyout)
-  .dropdown-footer {
+html .app.desktop-frame .preview-model-menu[data-split] .preview-menu-actions,
+html .app.desktop-frame .preview-seller-flyout .dropdown-footer {
   margin-top: auto;
 }
 html .app.desktop-frame .compact-dropdown.preview-seller-flyout:popover-open {
@@ -2687,11 +2685,6 @@ html .app.desktop-frame .preview-chat-pin[aria-pressed='true'] {
 @media (prefers-reduced-motion: reduce) {
   .desktop-frame .preview-chat-state[data-state='running'] {
     animation: none;
-  }
-}
-@keyframes pk-spin {
-  to {
-    rotate: 360deg;
   }
 }
 .desktop-frame .content[data-layout='chat']:has(> .preview-chat-details) {

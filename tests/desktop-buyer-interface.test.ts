@@ -138,6 +138,74 @@ void test('the native Limits view fits the approved narrow window and identifies
   );
 });
 
+void test('composer balance uses a live inline spinner only while the payer balance is read', async () => {
+  const chat = await readFile('apps/desktop/src/ui/Chat.tsx', 'utf8');
+  assert.match(chat, /checking=\{active && usingX402 && !!payer && loading\}/);
+  const composer = await readFile(
+    'apps/desktop/src/ui/ComposerFunding.tsx',
+    'utf8',
+  );
+  assert.match(composer, /checking: boolean;/);
+  assert.match(composer, /aria-live="polite"/);
+  assert.match(composer, /aria-busy=\{checking\}/);
+  assert.match(composer, /<InlineSpinner \/>/);
+  assert.match(composer, /Checking balance…/);
+  assert.match(composer, /fundingAmount\(funding\.balanceAtomic\)/);
+  assert.match(
+    composer,
+    /<span className="sr-only">Balance · last checked · <\/span>/,
+  );
+  assert.doesNotMatch(composer, /Last checked ·/);
+  const observation = await readFile(
+    'apps/desktop/src/ui/useBuyerFunding.ts',
+    'utf8',
+  );
+  assert.match(observation, /setSnapshot\(undefined\)/);
+  const ui = await readFile('apps/desktop/src/ui/UI.tsx', 'utf8');
+  assert.match(ui, /export function InlineSpinner\(/);
+  const css = await readFile('apps/desktop/src/ui/ui.css', 'utf8');
+  assert.match(
+    css,
+    /\.ui-inline-spinner\s*\{[^}]*display: inline-flex;[^}]*animation: pk-spin 800ms linear infinite;/,
+  );
+  assert.match(css, /@keyframes pk-spin/);
+  assert.match(
+    css,
+    /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.desktop-frame \.ui-inline-spinner\s*\{\s*animation: none;/,
+  );
+});
+
+void test('chat model picker keeps funds actions compact and leaves balance in the composer tab', async () => {
+  const picker = await readFile(
+    'apps/desktop/src/ui/ModelDropdown.tsx',
+    'utf8',
+  );
+  assert.doesNotMatch(picker, /ModelMenuBalance/);
+  assert.doesNotMatch(picker, /balanceStatus/);
+  assert.match(picker, /className="preview-menu-actions"/);
+  assert.match(picker, /label="Add funds"/);
+  assert.match(picker, /label="View all models"/);
+  assert.ok(
+    picker.indexOf('label="Add funds"') <
+      picker.indexOf('label="View all models"'),
+  );
+  assert.match(picker, /setAddingFunds\(true\)/);
+  const files = await readdir('apps/desktop/src/ui');
+  assert.equal(files.includes('ModelMenuBalance.tsx'), false);
+  const css = await readFile('apps/desktop/src/ui/buyer-controls.css', 'utf8');
+  assert.match(css, /\.preview-menu-actions\s*\{[^}]*display: flex/);
+  assert.match(css, /\.preview-menu-actions \.dropdown-footer\s*\{/);
+  assert.doesNotMatch(css, /\.pk-balance-line/);
+  const design = await readFile(
+    'apps/desktop/src/ui/desktop-design.css',
+    'utf8',
+  );
+  assert.match(
+    design,
+    /\.preview-model-menu\[data-split\]\s+\.preview-menu-actions[^{]*\{[^}]*margin-top: auto;/,
+  );
+});
+
 void test('the chat picker refreshes its balance on open and distinguishes a missing payer from a pending read', async () => {
   const { buyerBalanceStatus, emptyX402 } =
     await import('@gyblos/desktop/x402-model');

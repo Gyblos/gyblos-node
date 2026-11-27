@@ -3,6 +3,12 @@ export const PREVIEW_DENSITY = {
   COMPACT: 'compact',
   COMFORTABLE: 'comfortable',
 } as const;
+export const PREVIEW_FUNDING = {
+  READY: 'ready',
+  CHECKING: 'checking',
+  READY_ATOMIC: 2_000_000,
+  ATOMIC_PER_USDC: 1_000_000,
+} as const;
 export const CHAT_FILTER = {
   ALL: 'All chats',
   UNREAD: 'Unread',
@@ -25,6 +31,7 @@ export const PREVIEW = {
   minuteMs: 60000,
   halfHourMs: 1800000,
   replyDelayMs: 1400,
+  balanceCheckDelayMs: 10000,
   priceScale: 1_000_000,
   medianMinOffers: 3,
   replyCents: 10,

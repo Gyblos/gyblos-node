@@ -61,6 +61,16 @@ reference. A point where the declared model's most likely next token ends the
 answer is not counted: Ollama returns no probabilities there, so the point says
 nothing either way.
 
+An empty, incomplete or malformed candidate list is an invalid reference
+response, not a deviation by the seller. A complete list can contain empty
+display strings for non-matching low-probability alternatives, such as control
+or incomplete UTF-8 tokens; those entries are ignored. An empty alternative at
+or above the deviation probability floor is ambiguous, and a list with no usable
+non-empty token is invalid. If retries do not recover, the run stops with
+`REFERENCE_UNAVAILABLE` and does not issue a signed result. Ollama's display
+strings do not always preserve raw token bytes, so byte-level token fidelity
+remains a reference-runtime limitation.
+
 This approach needs no log probabilities from the seller and no protocol change,
 it tolerates sampling, and it works for any engine that serves an open-weight
 catalog model. An honest seller sampling from the declared model almost never
@@ -233,13 +243,17 @@ pnpm model-verifier check RESULT_DIRECTORY/result.json
 ```
 
 `verify` runs the challenge set against one seller, prints the verdict and
-writes `result.json` (the signed result) and `evidence.json` (the prompts, the
-answers and every check, plus any reply that could not be scored and why) to a
-new result directory. `check` verifies a result's signature and that its rule
-matches the published challenge set, and prints its verdict.
-`pnpm model-verifier address` prints the verifier's public address. The verifier
-key is created on first use in `model-verifier/verifier.key` inside the Gyblos
-home directory. The docs site explains the results for sellers:
+publishes `result.json` (the signed result) and `evidence.json` (the prompts,
+the answers and every check, plus any reply that could not be scored and why)
+together in a new result directory. Publication is atomic for readers, but it
+does not fsync the files or directories, so an operating-system crash or power
+loss can still lose the new directory or leave incomplete artifacts. If you pass
+`--out`, choose a path that does not already exist. `check` verifies a result's
+signature and that its rule and evidence counts fit the published challenge set,
+and prints its verdict. `pnpm model-verifier address` prints the verifier's
+public address. The verifier key is created on first use in
+`model-verifier/verifier.key` inside the Gyblos home directory. The docs site
+explains the results for sellers:
 [Model verification](https://docs.gyblos.com/en/sellers/model-verification). The
 app uses public package entries only (protocol, core, the Iroh transport and the
 Ollama engine's chat template) and never imports the buyer, node or desktop
@@ -256,8 +270,14 @@ honest rate and false positive bound, `failAt`, the nonce and one SHA-256 digest
 per answer) and the verdict, signed with the verifier's Ed25519 key. The parser
 recomputes `failAt` and the verdict from the evidence and refuses any result
 that does not match; a consumer still compares the signed rule with the
-challenge set's. The evidence file next to it keeps the prompts, answers and
-every check, and each reply that could not be scored with its reason.
+challenge set's. For a completed run, `evidence.json` has one outcome per
+prompt, with a one-based `challenge` number in either `answers` or `unscored`.
+Unscored entries include a normalized `code` and `phase`: `quote` when the
+verifier could not obtain a usable quote, `execution` for a request that failed
+after quoting, or `scoring` for a reply that could not be scored. An
+unrecognized error code is recorded as `UNKNOWN`. Of the unscored entries, only
+scoring entries retain reply text; quote and execution failures never include
+exception details.
 
 ## Limits
 

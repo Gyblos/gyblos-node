@@ -1,25 +1,35 @@
 import { DEVNET } from '@gyblos/config/network';
 
+import { PREVIEW, PREVIEW_FUNDING } from './constants';
+
 declare global {
   interface Window {
     previewFunds?: { atomic: number; open: boolean };
   }
 }
 
-const READY_ATOMIC = 2_000_000;
-
 export function previewFunding(payer: string) {
   return {
     balance: async () => {
       const query = new URLSearchParams(location.search);
-      return query.get('network') && query.get('network') !== 'devnet'
+      const mode = query.get('funding');
+      if (mode === PREVIEW_FUNDING.CHECKING) {
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, PREVIEW.balanceCheckDelayMs);
+        });
+      }
+      const funded =
+        mode === PREVIEW_FUNDING.READY || mode === PREVIEW_FUNDING.CHECKING;
+      const mainnet =
+        query.get('network') === 'mainnet' || query.get('testnet') === 'hidden';
+      return mainnet
         ? null
         : {
             network: DEVNET,
             payer,
             balanceAtomic: String(
               window.previewFunds?.atomic ??
-                (query.get('funding') === 'ready' ? READY_ATOMIC : 0),
+                (funded ? PREVIEW_FUNDING.READY_ATOMIC : 0),
             ),
             faucetAvailable: true,
             channelRemainingAtomic: null,
