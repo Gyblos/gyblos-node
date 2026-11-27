@@ -486,7 +486,7 @@
   "apps/metrics-collector/src/chain/rpc.ts": 29,
   "apps/metrics-collector/src/chain/run.ts": 3,
   "apps/metrics-collector/src/chain/writes.ts": 19,
-  "apps/metrics-collector/src/constants.ts": 80,
+  "apps/metrics-collector/src/constants.ts": 79,
   "apps/metrics-collector/src/d1-client.ts": 3,
   "apps/metrics-collector/src/days.ts": 9,
   "apps/metrics-collector/src/errors.ts": 3,

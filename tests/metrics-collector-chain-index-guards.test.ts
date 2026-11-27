@@ -8,13 +8,19 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-import { runChainIndex } from '@gyblos/metrics-collector/chain/indexer';
+import {
+  CHAIN_PHASES,
+  runChainIndex,
+} from '@gyblos/metrics-collector/chain/indexer';
 import {
   ChainRpcError,
   WRONG_NETWORK,
   type ChainRpc,
 } from '@gyblos/metrics-collector/chain/rpc';
-import { CHAIN_INDEX } from '@gyblos/metrics-collector/constants';
+import {
+  CHAIN_CURSOR_ID,
+  CHAIN_INDEX,
+} from '@gyblos/metrics-collector/constants';
 
 import {
   endpoints,
@@ -24,8 +30,10 @@ import {
   withSignature,
 } from './support/metrics-collector-chain';
 import {
+  CHANNEL,
   counted,
   gyblosOpens,
+  lifecycle,
   liveAccounts,
   plain,
   readCount,
@@ -247,4 +255,94 @@ void test('an endpoint of another network hands the run on and is never counted 
   });
   assert.equal(usage.onFallback, true);
   assert.equal(usage.fallback.calls, 1);
+});
+
+void test('a run that lost its lease mid-flight never clears the new holder', async () => {
+  const database = createCollectorD1();
+  const history = lifecycle();
+  const { rpc } = fakeChainRpc(history, { [CHANNEL]: null });
+  await runChainIndex(database, endpoints(rpc), 1000);
+  const foreignLease = 9_999_999;
+  const takeover: ChainRpc = {
+    ...rpc,
+    signatures(address, range) {
+      database.raw
+        .prepare(
+          'UPDATE collector_chain_cursor SET lease_until = ? WHERE id = ?',
+        )
+        .run(foreignLease, CHAIN_CURSOR_ID);
+      return rpc.signatures(address, range);
+    },
+  };
+  await runChainIndex(database, endpoints(takeover), 2000);
+  assert.deepEqual(
+    rows(database, 'SELECT lease_until FROM collector_chain_cursor'),
+    [{ lease_until: foreignLease }],
+  );
+});
+
+void test('a failing lease release never masks the run failure', async () => {
+  const database = createCollectorD1();
+  const history = lifecycle();
+  const { rpc } = fakeChainRpc(history, { [CHANNEL]: null });
+  await runChainIndex(database, endpoints(rpc), 1000);
+  const prepare = database.prepare.bind(database);
+  let updates = 0;
+  database.prepare = (sql) => {
+    if (sql.startsWith('update') && sql.includes('lease_until')) {
+      updates += 1;
+      if (updates === 2) {
+        const failing = {
+          bind: () => failing,
+          all: () => Promise.reject(new Error('D1 unavailable')),
+          run: () => Promise.reject(new Error('D1 unavailable')),
+        };
+        return failing as ReturnType<typeof prepare>;
+      }
+    }
+    return prepare(sql);
+  };
+  const failingRpc: ChainRpc = {
+    ...rpc,
+    signatures: () => Promise.reject(new ChainRpcError('refused')),
+  };
+  await assert.rejects(
+    runChainIndex(database, endpoints(failingRpc), 2000),
+    (error) => {
+      assert.equal((error as { phase?: string }).phase, CHAIN_PHASES.FORWARD);
+      assert.equal((error as { cleanupFailed?: boolean }).cleanupFailed, true);
+      return true;
+    },
+  );
+});
+
+void test('a failing lease release after a clean run reports the release phase', async () => {
+  const database = createCollectorD1();
+  const history = lifecycle();
+  const { rpc } = fakeChainRpc(history, { [CHANNEL]: null });
+  await runChainIndex(database, endpoints(rpc), 1000);
+  const prepare = database.prepare.bind(database);
+  let updates = 0;
+  database.prepare = (sql) => {
+    if (sql.startsWith('update') && sql.includes('lease_until')) {
+      updates += 1;
+      if (updates === 2) {
+        const failing = {
+          bind: () => failing,
+          all: () => Promise.reject(new Error('D1 unavailable')),
+          run: () => Promise.reject(new Error('D1 unavailable')),
+        };
+        return failing as ReturnType<typeof prepare>;
+      }
+    }
+    return prepare(sql);
+  };
+  await assert.rejects(
+    runChainIndex(database, endpoints(rpc), 2000),
+    (error) => {
+      assert.equal((error as { phase?: string }).phase, CHAIN_PHASES.RELEASE);
+      assert.equal((error as { cleanupFailed?: boolean }).cleanupFailed, false);
+      return true;
+    },
+  );
 });

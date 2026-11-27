@@ -77,6 +77,7 @@ void test('an aggregation run that left a day failed, pending or unscanned is no
     days: ['2026-11-16'],
     failed: [],
     more: false,
+    scanFailed: false,
     chain: { days: [], failed: [], more: false, scanFailed: false },
   };
   assert.doesNotThrow(() => completedAggregation(complete, 1));
@@ -84,6 +85,7 @@ void test('an aggregation run that left a day failed, pending or unscanned is no
     { ...complete, days: [] },
     { ...complete, failed: ['2026-11-16'] },
     { ...complete, more: true },
+    { ...complete, scanFailed: true },
     { ...complete, chain: { ...complete.chain, failed: ['2026-11-16'] } },
     { ...complete, chain: { ...complete.chain, more: true } },
     { ...complete, chain: { ...complete.chain, scanFailed: true } },

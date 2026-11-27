@@ -212,15 +212,17 @@ export function createChainRpc(
         addresses,
         { encoding: 'base64', commitment: FINALIZED },
       ]);
-      return list(record(result, 'accounts').value, 'accounts.value').map(
-        (entry) =>
-          nullable(entry, (present) => {
-            const account = record(present, 'account');
-            return {
-              owner: text(account.owner, 'account.owner'),
-              data: text(list(account.data, 'account.data')[0], 'data'),
-            };
-          }),
+      const value = list(record(result, 'accounts').value, 'accounts.value');
+      if (value.length !== addresses.length)
+        throw new ChainShapeError('accounts.value');
+      return value.map((entry) =>
+        nullable(entry, (present) => {
+          const account = record(present, 'account');
+          return {
+            owner: text(account.owner, 'account.owner'),
+            data: text(list(account.data, 'account.data')[0], 'data'),
+          };
+        }),
       );
     },
   };

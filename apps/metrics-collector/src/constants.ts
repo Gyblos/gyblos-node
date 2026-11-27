@@ -63,7 +63,6 @@ export const ENVELOPE_KINDS = {
 export type EnvelopeKind = (typeof ENVELOPE_KINDS)[keyof typeof ENVELOPE_KINDS];
 // Static code for unexpected failures; nothing else is reported.
 export const COLLECTOR_INTERNAL_ERROR = 'COLLECTOR_INTERNAL_ERROR';
-// Log code of a scheduled run whose days failed; followed by the UTC day names only.
 export const COLLECTOR_AGGREGATION_FAILED = 'COLLECTOR_AGGREGATION_FAILED';
 
 export const COLLECTOR_HEADERS = {
