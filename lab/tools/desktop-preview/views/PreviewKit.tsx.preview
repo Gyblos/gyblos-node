@@ -7,7 +7,8 @@ import { AGENT_TOOLS, type AgentTool } from '@gyblos/node/agent-setup-constants'
 import { CHAT_FILTER, CHAT_STATE, PREVIEW_DENSITY, PREVIEW_FUNDING } from '../../../../lab/tools/desktop-preview/constants';
 import { DESKTOP_UPDATE } from '../constants';
 import { observeDesktopUpdates } from '../update-session';
-import { AddBuyerFunds } from './BuyerFunding';
+import type { BuyerFunding } from '../funding/model';
+import { AddBuyerFunds, fundingAmount } from './BuyerFunding';
 import type { ChatController } from './chat-controller';
 import { Dropdown } from './Dropdown';
 import { CopyField, FormActions, FormField, FormInput } from './Form';
@@ -606,11 +607,13 @@ export function useSpending() {
 /** Context tab attached above the composer: network, balance and limit, or the funds-needed notice. */
 export function PreviewComposerTab({
   funds,
+  funding,
   models,
   onSelectModel,
   checking = false,
 }: {
   funds: ReturnType<typeof usePreviewFunds>;
+  funding: BuyerFunding | null;
   models: readonly { id: string; name: string; free: boolean }[];
   onSelectModel: (id: string) => void;
   checking?: boolean;
@@ -662,7 +665,9 @@ export function PreviewComposerTab({
               ) : (
                 <>
                   <span className="sr-only">Balance · last checked · </span>
-                  {previewUsdc(atomic)}
+                  {funding?.balanceAtomic == null
+                    ? previewUsdc(atomic)
+                    : fundingAmount(funding.balanceAtomic)}
                 </>
               )}
             </span>
