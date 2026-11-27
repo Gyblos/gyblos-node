@@ -75,6 +75,8 @@ void test('GraphQL errors or a malformed group are refused with a static code', 
     response([{ ...group(DISCOVERY, 1), sum: { readQueries: '1' } }]),
     response([{ ...group(DISCOVERY, 1), dimensions: {} }]),
     { data: { viewer: { accounts: [] } } },
+    response([{ ...group(DISCOVERY, 1), quantiles: null }]),
+    { errors: [] },
     'not json',
   ])
     assert.throws(
