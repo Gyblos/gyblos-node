@@ -1022,10 +1022,11 @@ Cloudflare counts it per location, so it is approximate.
 
 ## Cost
 
-D1 bills read and write queries and rows read and written. `pnpm d1:analytics`
-reads seven complete UTC days of account-level D1 analytics and the size of both
-databases; the discovery index's [Cost](discovery-index.md#cost) section
-explains its inputs. Baseline for `gyblos-collector`, 2026-11-20 to 2026-11-26:
+D1 bills rows read, rows written and storage; statements and round trips set
+latency. `pnpm d1:analytics` reads seven complete UTC days of account-level D1
+analytics and the size of both databases; the discovery index's
+[Cost](discovery-index.md#cost) section explains its inputs. Baseline for
+`gyblos-collector`, 2026-11-20 to 2026-11-26:
 
 ```text
 database          size MB  read queries  write queries  rows read  rows written  p50 ms  p95 ms
