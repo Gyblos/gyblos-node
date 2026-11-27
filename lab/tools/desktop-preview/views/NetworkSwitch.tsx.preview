@@ -15,7 +15,7 @@ function PreviewNetwork() {
       <div className="preview-network" role="group" aria-label="Network">
         <span className="preview-network-single" data-network="mainnet">
           <span className="preview-network-dot" aria-hidden="true" />
-          Mainnet
+          {PREVIEW_NETWORK.MAINNET}
         </span>
       </div>
     );
