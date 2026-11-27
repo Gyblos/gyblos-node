@@ -347,3 +347,10 @@ void test('spending limit actions share the compact action button', async () => 
     /<ActionButton\s+icon=\{<\w+ size=\{16\} \/>\}\s+label="Manage chat budget"/,
   );
 });
+
+void test('disabled funding reads report no pending load and wallet details show checking while revalidating', async () => {
+  const hook = await readFile('apps/desktop/src/ui/useBuyerFunding.ts', 'utf8');
+  assert.match(hook, /loading: enabled && !current/);
+  const details = await readFile('apps/desktop/src/ui/WalletDetails.tsx', 'utf8');
+  assert.match(details, /loading[\s\S]{0,120}'Checking balance…'/);
+});
