@@ -21,6 +21,7 @@ export function completedAggregation(result: AggregationResult, days: number) {
     result.days.length !== days ||
     result.failed.length ||
     result.more ||
+    result.scanFailed ||
     result.chain.failed.length ||
     result.chain.more ||
     result.chain.scanFailed
