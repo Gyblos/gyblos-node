@@ -1,7 +1,3 @@
-// Owns which maker's mark a published model id shows: the family is read from the id's own name, never
-// from a seller's claim of provenance. Unknown ids show no mark. Pure, no I/O.
-
-// Each family's mark is `public/models/<family>.svg` (monochrome, from LobeHub icons, MIT).
 const FAMILIES = [
   ['qwen', /^(?:qwen|qwq)(?=[^a-z]|$)/],
   ['meta', /^(?:llama|meta-llama)(?=[^a-z]|$)/],
@@ -24,6 +20,9 @@ const FAMILIES = [
 ] as const;
 
 export type ModelFamily = (typeof FAMILIES)[number][0];
+export const MODEL_FAMILIES: readonly ModelFamily[] = FAMILIES.map(
+  ([family]) => family,
+);
 
 const PUBLISHERS = new Map<string, ModelFamily>([
   ['qwen', 'qwen'],
@@ -52,10 +51,14 @@ export function modelFamily(modelId: string): ModelFamily | null {
   if (name === undefined) return familyByName(publisher);
   if (!name) return null;
   if (publisher === 'google' && familyByName(name) === 'gemma') return 'gemma';
-  return PUBLISHERS.get(publisher) ?? null;
+  return PUBLISHERS.get(publisher) ?? familyByName(name);
 }
 
-export const modelMarkUrl = (family: ModelFamily) => `/models/${family}.svg`;
+export function namedFamily(modelId: string): ModelFamily | null {
+  const [publisher, name] = modelId.toLowerCase().split('/');
+  const named = name ?? publisher;
+  return named ? familyByName(named) : null;
+}
 
 const LABS: Record<ModelFamily, string> = {
   qwen: 'Alibaba · Qwen',
@@ -74,7 +77,56 @@ const LABS: Record<ModelFamily, string> = {
   zhipu: 'Zhipu AI',
   yi: '01.AI',
 };
-export function modelLab(modelId: string) {
+export const FAMILY_NAMES: Record<ModelFamily, string> = {
+  qwen: 'Qwen',
+  meta: 'Llama',
+  mistral: 'Mistral',
+  gemma: 'Gemma',
+  google: 'Gemini',
+  deepseek: 'DeepSeek',
+  microsoft: 'Phi',
+  openai: 'GPT',
+  claude: 'Claude',
+  nvidia: 'Nemotron',
+  ibm: 'Granite',
+  huggingface: 'SmolLM',
+  kimi: 'Kimi',
+  zhipu: 'GLM',
+  yi: 'Yi',
+};
+export const UNKNOWN_LAB = 'Unknown';
+export const OTHER_FAMILY = 'other';
+export const MODEL_IDENTITY_SOURCE = {
+  RULES: 'rules',
+  FALLBACK: 'fallback',
+  REGISTRY: 'registry',
+} as const;
+export type ModelIdentity =
+  | {
+      family: ModelFamily;
+      lab: string;
+      source: typeof MODEL_IDENTITY_SOURCE.RULES;
+    }
+  | {
+      family: typeof OTHER_FAMILY;
+      lab: string;
+      source: typeof MODEL_IDENTITY_SOURCE.FALLBACK;
+    }
+  | {
+      family: ModelFamily | typeof OTHER_FAMILY;
+      lab: string;
+      source: typeof MODEL_IDENTITY_SOURCE.REGISTRY;
+    };
+
+export function modelIdentity(modelId: string): ModelIdentity {
   const family = modelFamily(modelId);
-  return family ? LABS[family] : null;
+  if (family)
+    return { family, lab: LABS[family], source: MODEL_IDENTITY_SOURCE.RULES };
+  const [publisher, name] = modelId.split('/');
+  const lab = name && publisher ? publisher : UNKNOWN_LAB;
+  return {
+    family: OTHER_FAMILY,
+    lab,
+    source: MODEL_IDENTITY_SOURCE.FALLBACK,
+  };
 }

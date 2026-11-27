@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-import { batchSessionPathsIn } from '@gyblos/config/home';
+import { batchSessionPathsIn } from '@gyblos/config/home-payments';
 
 import { batchRecoveryCrash } from '../support/batch-recovery-crash';
 import { CRASH_ACTIONS, CRASH_CUTS } from '../support/channel-crash-constants';

@@ -1,45 +1,42 @@
-// The 64-candidate budget follows live signed availability, never the lifetime replay history.
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import { BUYER_DISCOVERY } from '@gyblos/buyer/constants';
-import { discoverBuyerSellers } from '@gyblos/buyer/discovery';
-import { buyerDiscoveryState } from '@gyblos/buyer/discovery-storage';
+import { mergeDiscoveryRow } from '@gyblos/buyer/discovery-state';
 import { prepareConfiguredBuyerSelection } from '@gyblos/buyer/selection-runtime';
-import { PUBLIC_RECORD_KINDS } from '@gyblos/protocol/constants';
-
-import { discoveryResponse } from './support/buyer-discovery';
 import {
-  capacityNode,
-  discoveryCapacityFixture,
-} from './support/discovery-capacity';
+  CONTROL_LIMITS,
+  PUBLIC_RECORD_KINDS,
+  PUBLIC_RECORD_LIMITS,
+} from '@gyblos/protocol/constants';
 
-void test('expiry releases capacity at the exact boundary without deleting replay history, including restart', async (t) => {
+import { discoveryCapacityFixture } from './support/discovery-capacity';
+
+const identities = (rows: { owner: string; nodeId: string }[]) =>
+  rows.map(({ owner, nodeId }) => ({ owner, nodeId }));
+
+void test('open discovery admits every live verified seller, well beyond 64', async (t) => {
+  const f = await discoveryCapacityFixture(t, 200);
+  const state = await f.open();
+  assert.equal(state.eligible(identities(f.rows), f.now()).length, 200);
+  assert.equal(await state.observe(f.run.known), true);
+  const known = { owner: f.run.catalog.owner, nodeId: f.run.catalog.nodeId };
+  assert.equal(state.eligible([known], f.now()).length, 1);
+  assert.equal((await f.saved()).rows.length, 201);
+});
+
+void test('expiry ends eligibility without deleting replay history', async (t) => {
   const f = await discoveryCapacityFixture(t);
   f.rows[0]!.presenceExpiresAt = f.now() + 1;
   await f.write(f.rows);
   const state = await f.open();
-  const before = await readFile(f.path, 'utf8');
-  assert.equal(await state.observe(f.run.known), false);
-  assert.equal(await readFile(f.path, 'utf8'), before);
+  assert.equal(state.eligible(identities(f.rows), f.now()).length, 4);
   f.setNow(f.now() + 1);
-  assert.equal(await state.observe(f.run.known), true);
-  assert.equal((await f.saved()).rows.length, BUYER_DISCOVERY.openSellers + 1);
-  const restarted = await f.open();
-  assert.equal(
-    await restarted.permits(
-      f.run.catalog.owner,
-      f.run.catalog.nodeId,
-      f.run.request.params.catalogDigest,
-      f.now(),
-    ),
-    true,
-  );
-  assert.equal(await restarted.observe(f.seller(100)), false);
+  assert.equal(state.eligible(identities(f.rows), f.now()).length, 3);
+  assert.equal((await f.saved()).rows.length, 4);
 });
 
-void test('withdrawal releases a slot and its tombstone survives a restart', async (t) => {
+void test('a withdrawal ends eligibility and its tombstone survives a restart', async (t) => {
   const f = await discoveryCapacityFixture(t);
   const state = await f.open();
   const old = f.seller(1);
@@ -59,20 +56,14 @@ void test('withdrawal releases a slot and its tombstone survives a restart', asy
     }),
     false,
   );
-  assert.equal(await state.observe(f.run.known), true);
   const restarted = await f.open();
   assert.equal(await restarted.observe(old), false);
-  assert.equal(
-    restarted.eligible(
-      [{ owner: old.catalog.owner, nodeId: old.catalog.nodeId }],
-      f.now(),
-    ).length,
-    0,
-  );
-  assert.equal((await f.saved()).rows.length, BUYER_DISCOVERY.openSellers + 1);
+  const withdrawn = { owner: old.catalog.owner, nodeId: old.catalog.nodeId };
+  assert.equal(restarted.eligible([withdrawn], f.now()).length, 0);
+  assert.equal((await f.saved()).rows.length, 4);
 });
 
-void test('conflict releases a slot without forgetting the conflicting sequence', async (t) => {
+void test('a conflict ends eligibility without forgetting the conflicting sequence', async (t) => {
   const f = await discoveryCapacityFixture(t);
   const state = await f.open();
   const old = f.seller(1);
@@ -83,41 +74,44 @@ void test('conflict releases a slot without forgetting the conflicting sequence'
     }),
     false,
   );
-  assert.equal(await state.observe(f.run.known), true);
-  assert.equal(await (await f.open()).observe(old), false);
+  const reopened = await f.open();
+  assert.equal(await reopened.observe(old), false);
+  const conflicted = { owner: old.catalog.owner, nodeId: old.catalog.nodeId };
+  assert.equal(reopened.eligible([conflicted], f.now()).length, 0);
 });
 
-void test('capacity refusal is not cached as a registry denial; the same candidate succeeds immediately after expiry', async (t) => {
-  const f = await discoveryCapacityFixture(t);
-  f.rows[0]!.presenceExpiresAt = f.now() + 1;
-  await f.write(f.rows);
+void test('a full history refuses new open sellers but keeps room for configured ones', async (t) => {
+  const f = await discoveryCapacityFixture(t, BUYER_DISCOVERY.maxStateRows - 1);
+  await f.write(f.rows.map((row) => ({ ...row, presenceExpiresAt: 0 })));
+  f.policy.configuredNodeIds.push(f.run.catalog.nodeId);
   const state = await f.open();
-  const config = {
-    ...f.run.config,
-    sellers: [],
-    identity: { rpcUrl: 'https://rpc.test' },
-    discovery: { ...f.run.config.discovery, open: true as const },
-  };
-  let checks = 0;
-  const discover = () =>
-    discoverBuyerSellers(config, state, {
-      fetch: async () => discoveryResponse([f.run.entry]),
-      now: f.now,
-      openRelay: 'https://relay.test',
-      verifyIdentity: async () => {
-        checks++;
-        return true;
-      },
-    });
-  assert.deepEqual((await discover()).sellers, []);
-  f.setNow(f.now() + 1);
-  assert.equal((await discover()).sellers[0]?.nodeId, f.run.catalog.nodeId);
-  assert.equal(checks, 2);
+  assert.equal(await state.observe(f.seller(2000)), false);
+  assert.equal(await state.observe(f.run.known), true);
+  assert.equal(await state.observe(f.seller(2001)), false);
+  assert.equal(await state.observe(f.seller(1)), true);
+  assert.equal((await f.saved()).rows.length, BUYER_DISCOVERY.maxStateRows);
 });
 
-void test('buyer startup applies active admission with the original configured IDs', async (t) => {
-  const f = await discoveryCapacityFixture(t);
-  // No registry network is needed to check that the actual startup composes the bounded store.
+void test('two handles cannot overfill the last history row', async (t) => {
+  const f = await discoveryCapacityFixture(t, BUYER_DISCOVERY.maxStateRows - 1);
+  const a = await f.open();
+  const b = await f.open();
+  const results = await Promise.allSettled([
+    a.observe(f.run.known),
+    b.observe(f.seller(2000)),
+  ]);
+  assert.equal(
+    results.filter((result) => result.status === 'fulfilled' && result.value)
+      .length,
+    1,
+  );
+  const restarted = await f.open();
+  assert.equal(await restarted.observe(f.seller(2001)), false);
+  assert.equal((await f.saved()).rows.length, BUYER_DISCOVERY.maxStateRows);
+});
+
+void test('buyer startup composes open admission: a full history refuses softly', async (t) => {
+  const f = await discoveryCapacityFixture(t, BUYER_DISCOVERY.maxStateRows);
   const config = {
     ...f.run.config,
     sellers: [],
@@ -129,15 +123,7 @@ void test('buyer startup applies active admission with the original configured I
     config,
   );
   assert.ok(prepared.discovery);
-  // Startup uses wall time; make all seeded metadata live at that clock too.
   const wall = Date.now();
-  await f.write(
-    f.rows.map((row) => ({
-      ...row,
-      catalogExpiresAt: wall + 60000,
-      presenceExpiresAt: wall + 30000,
-    })),
-  );
   assert.equal(
     await prepared.discovery.observe({
       ...f.run.known,
@@ -148,72 +134,97 @@ void test('buyer startup applies active admission with the original configured I
   );
 });
 
-void test('configured identities bypass only active capacity and the snapshot cannot be mutated by the caller', async (t) => {
-  const f = await discoveryCapacityFixture(t);
-  f.policy.configuredNodeIds.push(f.run.catalog.nodeId);
-  const state = await f.open();
-  f.policy.configuredNodeIds.push(capacityNode(100));
-  assert.equal(await state.observe(f.run.known), true);
-  assert.equal(await state.observe(f.seller(100)), false);
-  assert.equal((await f.saved()).rows.length, BUYER_DISCOVERY.openSellers + 1);
-});
-
-void test('two handles cannot over-admit the last live slot and expected capacity does not poison the store', async (t) => {
-  const f = await discoveryCapacityFixture(t, BUYER_DISCOVERY.openSellers - 1);
+void test('a full history evicts open rows dead for over an hour, oldest first, to admit a new seller', async (t) => {
+  const f = await discoveryCapacityFixture(t, BUYER_DISCOVERY.maxStateRows);
+  const dead = f.now() - BUYER_DISCOVERY.evictAfterMs - 1;
+  await f.write(
+    f.rows.map((row, n) => ({
+      ...row,
+      catalogExpiresAt: dead - n,
+      presenceExpiresAt: dead - n,
+    })),
+  );
   const a = await f.open();
   const b = await f.open();
-  const results = await Promise.allSettled([
-    a.observe(f.run.known),
-    b.observe(f.seller(100)),
-  ]);
+  assert.equal(await a.observe(f.run.known), true);
+  const saved = (await f.saved()).rows as {
+    nodeId: string;
+    catalogDigest: string;
+  }[];
+  assert.equal(saved.length, BUYER_DISCOVERY.maxStateRows);
+  const oldest = f.rows.at(-1)!.nodeId;
   assert.equal(
-    results.filter((result) => result.status === 'fulfilled' && result.value)
-      .length,
-    1,
+    saved.some((row) => row.nodeId === oldest),
+    false,
   );
-  const restarted = await f.open();
-  assert.equal(await restarted.observe(f.seller(101)), false);
-  assert.equal(await restarted.observe(f.seller(1)), true);
+  const known = { owner: f.run.catalog.owner, nodeId: f.run.catalog.nodeId };
+  assert.equal(
+    await b.permits(
+      known.owner,
+      known.nodeId,
+      saved.find((row) => row.nodeId === known.nodeId)!.catalogDigest,
+      f.now(),
+    ),
+    true,
+  );
 });
 
-void test('discovery history reserves configured space independently of active capacity', async (t) => {
-  const f = await discoveryCapacityFixture(t, BUYER_DISCOVERY.maxStateRows - 1);
-  await f.write(f.rows.map((row) => ({ ...row, presenceExpiresAt: 0 })));
-  f.policy.configuredNodeIds.push(f.run.catalog.nodeId);
+void test('a full history keeps rows that expired within the hour and configured rows', async (t) => {
+  const f = await discoveryCapacityFixture(t, BUYER_DISCOVERY.maxStateRows);
+  const recent = f.now() - 1;
+  const old = f.now() - BUYER_DISCOVERY.evictAfterMs - 1;
+  await f.write(
+    f.rows.map((row, n) => ({
+      ...row,
+      catalogExpiresAt: n === 0 ? old : recent,
+      presenceExpiresAt: n === 0 ? old : recent,
+    })),
+  );
+  f.policy.configuredNodeIds.push(f.rows[0]!.nodeId);
   const state = await f.open();
-  assert.equal(await state.observe(f.seller(2000)), false);
-  assert.equal(await state.observe(f.run.known), true);
-  assert.equal(await state.observe(f.seller(2001)), false);
+  assert.equal(await state.observe(f.run.known), false);
   assert.equal((await f.saved()).rows.length, BUYER_DISCOVERY.maxStateRows);
 });
 
-void test('preexisting excess live history has deterministic bounded eligibility, with floors intact', async (t) => {
-  const f = await discoveryCapacityFixture(t, BUYER_DISCOVERY.openSellers + 1);
-  const state = await f.open();
-  const candidates = f.rows
-    .map((row) => ({ nodeId: row.nodeId, owner: row.owner }))
-    .reverse();
-  const eligible = state.eligible(candidates, f.now());
-  assert.equal(eligible.length, BUYER_DISCOVERY.openSellers);
-  assert.equal(
-    eligible.some(
-      (seller) =>
-        seller.nodeId === capacityNode(BUYER_DISCOVERY.openSellers + 1),
-    ),
-    false,
+void test('a seller evicted and seen again does not stop another buyer process', async (t) => {
+  const f = await discoveryCapacityFixture(t, BUYER_DISCOVERY.maxStateRows);
+  const dead = f.now() - BUYER_DISCOVERY.evictAfterMs - 1;
+  await f.write(
+    f.rows.map((row) => ({
+      ...row,
+      catalogExpiresAt: dead,
+      presenceExpiresAt: dead,
+      conflictedThrough: row.highWater,
+    })),
   );
-  assert.equal(
-    await state.permits(
-      f.rows.at(-1)!.owner,
-      f.rows.at(-1)!.nodeId,
-      f.rows.at(-1)!.catalogDigest,
-      f.now(),
-    ),
-    false,
+  const a = await f.open();
+  const b = await f.open();
+  assert.equal(await a.observe(f.run.known), true);
+  assert.equal(await a.observe(f.seller(1)), true);
+  assert.equal(await b.observe(f.seller(2)), true);
+});
+
+void test('the eviction grace outlasts every signed record lifetime', () => {
+  assert.ok(
+    BUYER_DISCOVERY.evictAfterMs >=
+      PUBLIC_RECORD_LIMITS.catalogLifetimeMs +
+        PUBLIC_RECORD_LIMITS.withdrawalLifetimeMs +
+        CONTROL_LIMITS.clockSkewMs,
   );
-  assert.equal(
-    await state.observe(f.seller(BUYER_DISCOVERY.openSellers + 1)),
-    false,
-  );
-  assert.equal((await f.saved()).rows.length, BUYER_DISCOVERY.openSellers + 1);
+});
+
+void test('a fork keeps its row from being pruned until the forked records expire', async (t) => {
+  const f = await discoveryCapacityFixture(t, 1);
+  const held = f.rows[0]!;
+  const later = 10 * BUYER_DISCOVERY.evictAfterMs;
+  const merged = mergeDiscoveryRow(held, {
+    ...held,
+    presenceDigest: 'f'.repeat(64),
+    catalogExpiresAt: held.catalogExpiresAt + later,
+    presenceExpiresAt: held.presenceExpiresAt + later,
+  });
+  assert.equal(merged.accepted, false);
+  assert.ok(merged.row.conflictedThrough > 0);
+  assert.equal(merged.row.presenceExpiresAt, held.presenceExpiresAt + later);
+  assert.equal(merged.row.catalogExpiresAt, held.catalogExpiresAt + later);
 });

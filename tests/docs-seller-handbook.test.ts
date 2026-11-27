@@ -132,3 +132,17 @@ void test('docs handbook: English and Spanish preserve identical executable exam
     );
   }
 });
+
+void test('docs handbook: seller and buyer pages never ask the reader to run a repository script', async () => {
+  for (const slug of JOURNEY.filter((entry) =>
+    /^(?:sellers|buyers)\//.test(entry),
+  )) {
+    for (const locale of ['en', 'es']) {
+      assert.doesNotMatch(
+        await page(slug, locale),
+        /(?:^|`|&&|\|\||;|\|)\s*\$?\s*pnpm\s/m,
+        `${locale}/${slug}`,
+      );
+    }
+  }
+});

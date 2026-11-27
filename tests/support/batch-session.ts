@@ -8,7 +8,7 @@ import { SOLANA_TESTNET_CAIP2 } from '@x402/svm';
 import { signBatchVoucher } from '@x402/svm/batch-settlement/client';
 
 import { PROTOCOL_FEE } from '@gyblos/config';
-import { batchSessionPathsIn } from '@gyblos/config/home';
+import { batchSessionPathsIn } from '@gyblos/config/home-payments';
 import {
   createBatchBuyer,
   createBatchSeller,

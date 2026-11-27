@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { test, type TestContext } from 'node:test';
 
 import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
-import { batchPoolPathsIn } from '@gyblos/config/home';
+import { batchPoolPathsIn } from '@gyblos/config/home-payments';
 import {
   inspectBatchPool,
   inspectBatchSession,

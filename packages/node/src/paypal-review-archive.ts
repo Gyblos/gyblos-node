@@ -2,7 +2,7 @@
 // It never stores prompts, model responses, credentials or provider bodies.
 import { createHash } from 'node:crypto';
 
-import { paypalSandboxReviewPaths } from '@gyblos/config/home';
+import { paypalSandboxReviewPaths } from '@gyblos/config/home-paypal';
 import { canonicalJson } from '@gyblos/protocol';
 import { PAYPAL_ERROR_CODES } from '@gyblos/protocol/constants';
 import { isPaypalId, PaypalError } from '@gyblos/protocol/paypal-payment';

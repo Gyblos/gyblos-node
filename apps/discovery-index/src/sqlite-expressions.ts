@@ -28,6 +28,9 @@ export const coveringIndex = (
   name: DiscoveryListingIndex,
 ) => sql`${table} indexed by ${sql.identifier(name)}`;
 
+export const jsonArray = (column: AnySQLiteColumn) =>
+  sql<boolean>`json_valid(${column}) and json_type(${column}) = 'array'`;
+
 export const jsonTextValues = (values: readonly string[]) =>
   sql`(select value from json_each(${JSON.stringify(values)}))`;
 

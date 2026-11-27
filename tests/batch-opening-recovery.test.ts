@@ -7,7 +7,7 @@ import test from 'node:test';
 
 import { generateKeyPairSigner } from '@solana/kit';
 
-import { batchSessionPathsIn } from '@gyblos/config/home';
+import { batchSessionPathsIn } from '@gyblos/config/home-payments';
 import { createBatchBuyer } from '@gyblos/payments-upto/batch-session';
 
 import { sessionRig } from './support/batch-session';

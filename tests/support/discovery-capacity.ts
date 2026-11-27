@@ -17,10 +17,7 @@ import { CONTROL_RECORD_VERSION } from '@gyblos/protocol/constants';
 import { discoveryHome, discoveryRun } from './buyer-discovery';
 
 export const capacityNode = (n: number) => n.toString(16).padStart(64, '0');
-export async function discoveryCapacityFixture(
-  t: TestContext,
-  count: number = BUYER_DISCOVERY.openSellers,
-) {
+export async function discoveryCapacityFixture(t: TestContext, count = 4) {
   const home = await discoveryHome();
   home.environment.GYBLOS_HOME = await realpath(home.directory);
   const run = await discoveryRun();

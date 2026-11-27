@@ -2,7 +2,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { batchPoolPathsIn, batchSessionPathsIn } from '@gyblos/config/home';
+import {
+  batchPoolPathsIn,
+  batchSessionPathsIn,
+} from '@gyblos/config/home-payments';
 import { buyerPaymentsUnresolved } from '@gyblos/node/buyer-chain';
 import {
   createBatchBuyer,

@@ -1,7 +1,7 @@
 // Owns a separate metadata lock so a delayed history write cannot race another app process.
 import { isAbsolute } from 'node:path';
 
-import { desktopActivityPaths } from '@gyblos/config/home';
+import { desktopActivityPaths } from '@gyblos/config/home-desktop';
 import {
   acquireProcessLock,
   readPrivateFile,

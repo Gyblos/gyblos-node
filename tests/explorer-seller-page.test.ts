@@ -211,6 +211,7 @@ const snapshot = (
   },
   datedAt: null,
   networkDatedAt: null,
+  models: {},
   error: null,
 });
 

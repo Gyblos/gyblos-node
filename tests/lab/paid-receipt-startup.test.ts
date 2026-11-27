@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 
 import { chatSession } from '@gyblos/buyer-app/chat-cli';
-import { batchSessionPathsIn } from '@gyblos/config/home';
+import { batchSessionPathsIn } from '@gyblos/config/home-payments';
 import { OFFER_PRICING_KINDS, P2P_ROLES } from '@gyblos/protocol/constants';
 
 import { blockTestMeter } from '../support/batch-block-product';

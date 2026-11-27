@@ -1,5 +1,6 @@
 // Composes durable session admission for authenticated buyers on a priced seller.
-import { batchSellerPathsIn, type HomeEnvironment } from '@gyblos/config/home';
+import { type HomeEnvironment } from '@gyblos/config/home';
+import { batchSellerPathsIn } from '@gyblos/config/home-payments';
 import { openBatchSellerRegistry } from '@gyblos/payments-upto/batch-session';
 
 export async function sellerChainSessions(

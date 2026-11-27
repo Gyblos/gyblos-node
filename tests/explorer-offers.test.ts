@@ -32,6 +32,7 @@ const summary = (sellers: Seller[]) =>
     network: null,
     datedAt: null,
     networkDatedAt: null,
+    models: {},
     error: null,
     sellers,
   });

@@ -15,6 +15,8 @@
     "./execution-policy": "./src/execution-policy.ts",
     "./errors": "./src/errors.ts",
     "./models": "./src/models.ts",
+    "./model-categories": "./src/model-categories.ts",
+    "./model-family": "./src/model-family.ts",
     "./package.json": "./package.json",
     "./public-records": "./src/public-records.ts",
     "./public-types": "./src/public-types.ts",

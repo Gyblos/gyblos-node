@@ -3,6 +3,7 @@
 // same for everyone and cached like a sellers page.
 import { DISCOVERY_INDEX_LIMITS, INDEX_ERRORS } from './constants';
 import { indexFail } from './errors';
+import { catalogIdentity, type ModelRegistryStore } from './model-registry';
 import type { DiscoveryStorage } from './storage';
 
 export function parseModelsQuery(url: string) {
@@ -12,5 +13,25 @@ export function parseModelsQuery(url: string) {
 export async function modelsPage(storage: DiscoveryStorage, now: number) {
   const rows = await storage.models(now, DISCOVERY_INDEX_LIMITS.maxModels);
   const models = rows.map((row) => ({ id: row.modelId, sellers: row.sellers }));
+  return JSON.stringify({ models, generatedAt: now });
+}
+
+export async function modelCatalogPage(
+  storage: DiscoveryStorage,
+  {
+    now: clock,
+    modelRegistry: registry,
+  }: { now: () => number; modelRegistry: ModelRegistryStore | undefined },
+) {
+  const now = clock();
+  const rows = await storage.models(now, DISCOVERY_INDEX_LIMITS.maxModels);
+  const ids = rows.map((row) => row.modelId);
+  const entries = registry ? await registry.get(ids).catch(() => []) : [];
+  const byId = new Map(entries.map((entry) => [entry.modelId, entry]));
+  const models = rows.map((row) => ({
+    id: row.modelId,
+    sellers: row.sellers,
+    ...catalogIdentity(row.modelId, byId.get(row.modelId)),
+  }));
   return JSON.stringify({ models, generatedAt: now });
 }

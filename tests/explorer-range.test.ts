@@ -143,12 +143,18 @@ void test('a fall from 100 to 80 unserved attempts is favorable', () => {
   });
 });
 
-void test('model labels name a recognized lab and leave an unknown family unattributed', async () => {
-  const { modelLab } = await import('@gyblos/explorer/model-family');
-  assert.equal(modelLab('qwen3-0.6b'), 'Alibaba · Qwen');
-  assert.equal(modelLab('deepseek-ai/DeepSeek-R1-Distill-Qwen-7B'), 'DeepSeek');
-  assert.equal(modelLab('acme/metadata-analyzer'), null);
-  assert.equal(modelLab('custom-local-model'), null);
+void test('model labels name a recognized lab, else the id publisher or Unknown', async () => {
+  const { modelIdentity, UNKNOWN_LAB } =
+    await import('@gyblos/protocol/model-family');
+  assert.equal(modelIdentity('qwen3-0.6b').lab, 'Alibaba · Qwen');
+  assert.equal(
+    modelIdentity('deepseek-ai/DeepSeek-R1-Distill-Qwen-7B').lab,
+    'DeepSeek',
+  );
+  assert.equal(modelIdentity('acme/metadata-analyzer').lab, 'acme');
+  assert.equal(modelIdentity('custom-local-model').lab, UNKNOWN_LAB);
+  assert.equal(modelIdentity('acme/').lab, UNKNOWN_LAB);
+  assert.equal(modelIdentity('unsloth/Qwen3-8B-GGUF').lab, 'Alibaba · Qwen');
 });
 
 void test('zero payouts require a closed and indexed day', () => {

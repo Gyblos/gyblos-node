@@ -251,6 +251,7 @@ void test('offers of the same model with different variants are summarized apart
     network: null,
     datedAt: null,
     networkDatedAt: null,
+    models: {},
     error: null,
     sellers: [
       {
@@ -273,6 +274,7 @@ void test('the models table joins offers now with receipts, keeps both kinds of 
     network: null,
     datedAt: null,
     networkDatedAt: null,
+    models: {},
     error: null,
     sellers: [
       {
@@ -304,6 +306,7 @@ void test('the models table joins offers now with receipts, keeps both kinds of 
       ...base,
       outcomes: { completed, failed, cancelled },
       authorizedAtomic: null,
+      sellers: null,
       observed: null,
     };
   };
