@@ -6,7 +6,8 @@ export async function checkMinimumLayout() {
   function liveElement(selector: string) {
     return Array.from(document.querySelectorAll<HTMLElement>(selector)).find(
       (candidate) =>
-        !candidate.closest('[inert]') && candidate.getBoundingClientRect().width,
+        !candidate.closest('[inert]') &&
+        candidate.getBoundingClientRect().width,
     );
   }
 
