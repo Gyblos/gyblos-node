@@ -9,6 +9,7 @@ import { DEVNET_GYBLOS_TREASURY } from '@gyblos/config/network';
 
 import {
   CHAIN_CHANNEL_CLOSED,
+  CHAIN_CURSOR_ID,
   CHAIN_INSTRUCTIONS,
   COLLECTOR_LIMITS,
   GYBLOS_OPEN_MEMOS,
@@ -57,28 +58,32 @@ function chunksFor<T>(table: SQLiteTable, rows: readonly T[]): T[][] {
   return result;
 }
 
-export function cursorUpsert(
+const owned = (lease: number | null) =>
+  sql`exists (select 1 from ${chainCursor} where ${chainCursor.id} = ${CHAIN_CURSOR_ID} and ${chainCursor.leaseUntil} = ${lease})`;
+export function cursorUpdate(
   orm: CollectorDatabase,
   id: number,
   cursor: ChainCursorState,
   now: number,
+  lease: number | null,
 ) {
-  const values = {
-    newestSignature: cursor.newest,
-    newestSlot: cursor.newestSlot,
-    gapUntil: cursor.gapUntil,
-    gapUntilSlot: cursor.gapUntilSlot,
-    gapBefore: cursor.gapBefore,
-    gapFull: cursor.gapFull ? 1 : 0,
-    backfillBefore: cursor.backfillBefore,
-    backfillFull: cursor.backfillFull ? 1 : 0,
-    backfillDone: cursor.backfillDone ? 1 : 0,
-    updatedAt: now,
-  };
   return orm
-    .insert(chainCursor)
-    .values({ id, ...values })
-    .onConflictDoUpdate({ target: chainCursor.id, set: values });
+    .update(chainCursor)
+    .set({
+      newestSignature: cursor.newest,
+      newestSlot: cursor.newestSlot,
+      gapUntil: cursor.gapUntil,
+      gapUntilSlot: cursor.gapUntilSlot,
+      gapBefore: cursor.gapBefore,
+      gapFull: cursor.gapFull ? 1 : 0,
+      backfillBefore: cursor.backfillBefore,
+      backfillFull: cursor.backfillFull ? 1 : 0,
+      backfillDone: cursor.backfillDone ? 1 : 0,
+      updatedAt: now,
+    })
+    .where(
+      sql`${chainCursor.id} = ${id} and ${chainCursor.leaseUntil} = ${lease}`,
+    );
 }
 
 const isGyblosMemo = (memo: string) =>
@@ -292,6 +297,7 @@ export function programCounts(
   orm: CollectorDatabase,
   entries: readonly ChainSignature[],
   now: number,
+  lease: number | null,
 ): BatchItem[] {
   const days = new Map<string, { transactions: number; failed: number }>();
   for (const entry of entries) {
@@ -308,10 +314,17 @@ export function programCounts(
     updatedAt: now,
   }));
   return [
-    ...chunksFor(chainProgramDaily, rows).map((chunk) =>
-      orm
+    ...chunksFor(chainProgramDaily, rows).map((chunk) => {
+      const values = sql.join(
+        chunk.map(
+          (row) =>
+            sql`(${row.day}, ${row.transactions}, ${row.failed}, ${row.updatedAt})`,
+        ),
+        sql`, `,
+      );
+      return orm
         .insert(chainProgramDaily)
-        .values(chunk)
+        .select(sql`select * from (values ${values}) where ${owned(lease)}`)
         .onConflictDoUpdate({
           target: chainProgramDaily.day,
           set: {
@@ -319,8 +332,8 @@ export function programCounts(
             failed: sql`${chainProgramDaily.failed} + excluded.failed`,
             updatedAt: sql`excluded.updated_at`,
           },
-        }),
-    ),
+        });
+    }),
     ...chunksFor(aggChainDirtyDays, rows).map((chunk) =>
       orm
         .insert(aggChainDirtyDays)
@@ -337,6 +350,7 @@ export function followUpdate(
   channel: string,
   follow: { until: string | null; following: boolean },
   now: number,
+  lease: number | null,
 ): BatchItem {
   return orm
     .update(chainChannels)
@@ -345,5 +359,5 @@ export function followUpdate(
       following: follow.following ? 1 : 0,
       followedAt: now,
     })
-    .where(sql`${chainChannels.channel} = ${channel}`);
+    .where(sql`${chainChannels.channel} = ${channel} and ${owned(lease)}`);
 }

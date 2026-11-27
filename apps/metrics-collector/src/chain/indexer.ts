@@ -136,10 +136,12 @@ export async function runChainIndex(
   now: number,
 ): Promise<ChainIndexResult> {
   const orm = createD1Orm(database);
+  const leaseUntil = await acquireLease(orm, now);
   const run: ChainRun = {
     orm,
     rpc,
     now,
+    lease: leaseUntil,
     cursor: await readCursor(orm),
     touched: new Set(),
     listed: 0,
@@ -160,7 +162,6 @@ export async function runChainIndex(
     usage: rpc.usage(),
     cursor: run.cursor,
   });
-  const leaseUntil = await acquireLease(orm, now);
   if (leaseUntil === null) return result(true, 0);
   let failure: unknown;
   let channels = 0;

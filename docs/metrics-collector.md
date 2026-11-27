@@ -793,19 +793,24 @@ counted once and a failed run resumes where it stopped. The cursor also keeps
 the slots of `newest_signature` and `gap_until`: a page holding older signatures
 (a lagging node that ignored `until`) is refused rather than counted twice. A
 lease (`lease_until`, 15 minutes) makes a run that overlaps another skip
-(`skipped=true` in its log line). A failed list phase does not stop the follow
-and account phases; the first failure is logged after them. After a full page, a
-gap answered empty is closed only when the signature right before `gap_before`
-is `gap_until` (one more call); otherwise it is a lagging RPC, retried next run.
-A transaction the RPC lists but cannot return (`null`), an empty page for a
-range known to hold signatures, a spent call budget or any RPC error stops the
-run there. A failure logs `COLLECTOR_CHAIN_INDEX_FAILED` with the phase (`gap`,
-`forward`, `backfill`, `follow`, `accounts`, `release` or `start`), the error
-class, a static reason (an HTTP status, an RPC error code, a shape location) and
-the calls per endpoint, never a URL, which may carry a provider key. The lease
-release only clears the row while the run still owns it; a failed release is
-logged separately as `release`, after the run's own failure if there was one. A
-secret that is set but rejected logs `COLLECTOR_CHAIN_INDEX_FAILED config`.
+(`skipped=true` in its log line). The lease is taken before the cursor is read,
+and every write of the cursor, the program counts and the follow positions
+applies only while the run still owns the lease, so a run whose lease expired
+under it writes nothing: it cannot move the cursor over a newer holder's state
+nor count a stretch the cursor will never cover. A failed list phase does not
+stop the follow and account phases; the first failure is logged after them.
+After a full page, a gap answered empty is closed only when the signature right
+before `gap_before` is `gap_until` (one more call); otherwise it is a lagging
+RPC, retried next run. A transaction the RPC lists but cannot return (`null`),
+an empty page for a range known to hold signatures, a spent call budget or any
+RPC error stops the run there. A failure logs `COLLECTOR_CHAIN_INDEX_FAILED`
+with the phase (`gap`, `forward`, `backfill`, `follow`, `accounts`, `release` or
+`start`), the error class, a static reason (an HTTP status, an RPC error code, a
+shape location) and the calls per endpoint, never a URL, which may carry a
+provider key. The lease release only clears the row while the run still owns it;
+a failed release is logged separately as `release`, after the run's own failure
+if there was one. A secret that is set but rejected logs
+`COLLECTOR_CHAIN_INDEX_FAILED config`.
 
 **How a transaction is read** (`src/chain/decode.ts`, @x402/svm 2.28): every
 top-level program instruction by its one-byte discriminator — open (1), settle

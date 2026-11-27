@@ -68,7 +68,13 @@ async function followChannel(
   if (page.length >= CHAIN_INDEX.signaturesPerPage) {
     run.flooded += 1;
     await run.orm.batch([
-      followUpdate(run.orm, channel, { until, following: false }, run.now),
+      followUpdate(
+        run.orm,
+        channel,
+        { until, following: false },
+        run.now,
+        run.lease,
+      ),
     ]);
     return;
   }
@@ -91,7 +97,13 @@ async function followChannel(
     failure = error;
   }
   await run.orm.batch([
-    followUpdate(run.orm, channel, { until: newest, following: true }, run.now),
+    followUpdate(
+      run.orm,
+      channel,
+      { until: newest, following: true },
+      run.now,
+      run.lease,
+    ),
     ...transactionWrites(run.orm, read, run.now),
   ]);
   if (failure) throw failure;
