@@ -124,9 +124,9 @@ void test('latency bars name each bucket and its share of samples', () => {
   });
   assert.deepEqual(bars, [
     { label: '< 100 ms', count: 1, share: 0.25 },
-    { label: '< 500 ms', count: 2, share: 0.5 },
-    { label: '< 2 s', count: 0, share: 0 },
-    { label: '> 2 s', count: 1, share: 0.25 },
+    { label: '100–500 ms', count: 2, share: 0.5 },
+    { label: '500 ms–2 s', count: 0, share: 0 },
+    { label: '≥ 2 s', count: 1, share: 0.25 },
   ]);
   assert.deepEqual(
     latencyBars({
@@ -136,7 +136,7 @@ void test('latency bars name each bucket and its share of samples', () => {
       bucketsMs: [100, 500, 2000, 5000],
       counts: [0, 1, 0, 1, 0],
     }).map((bar) => bar.label),
-    ['< 500 ms', '< 2 s', '< 5 s'],
+    ['100–500 ms', '500 ms–2 s', '2–5 s'],
   );
   assert.deepEqual(
     latencyBars({
@@ -236,6 +236,17 @@ void test('price days count each seller once at its latest price and take the sp
     sellers: 3,
     input: { min: 20n, median: 25n, max: 30n },
     output: { min: 60n, median: 70n, max: 80n },
+  });
+  const switched = series('s', [
+    [START, START + DAY / 2, 40n, 90n],
+    [START + DAY / 2, START + DAY, 0n, 0n],
+  ]);
+  const [mixed] = priceDays([switched], START, START + DAY);
+  assert.deepEqual(mixed, {
+    day: '2026-11-20',
+    sellers: 1,
+    input: { min: 40n, median: 40n, max: 40n },
+    output: { min: 90n, median: 90n, max: 90n },
   });
   const [onlyFree] = priceDays([free], START, START + DAY);
   assert.deepEqual([onlyFree?.sellers, onlyFree?.input], [1, null]);

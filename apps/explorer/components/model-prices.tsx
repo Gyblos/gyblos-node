@@ -18,7 +18,7 @@ export function ModelPrices({ history }: { history: OfferPriceHistory }) {
     history.truncated && starts.length ? Math.min(...starts) : history.from;
   const days = priceDays(history.series, history.from, history.to, knownFrom);
   if (!days.some((day) => day.sellers)) return null;
-  const latest = [...days].reverse().find((day) => day.sellers);
+  const latest = days.at(-1);
   return (
     <div className="mb-6 grid min-w-0 gap-3 lg:grid-cols-3">
       {SIDES.map((side) => (
@@ -44,7 +44,7 @@ export function ModelPrices({ history }: { history: OfferPriceHistory }) {
       <BarChartCard
         title="Sellers offering it"
         kind="count"
-        total={latest ? latest.sellers : null}
+        total={latest?.sellers ?? null}
         summary="With an offer, per UTC day"
         startAtEnd
         points={days.map((day) => ({

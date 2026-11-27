@@ -9,7 +9,13 @@ import {
 
 import type { ModelSide, ModelStat, NetworkDay } from '../lib/collector-shape';
 import { DISPLAY } from '../lib/constants';
-import { count, latencyMs, tokensPerSecond, usdcDecimal } from '../lib/format';
+import {
+  count,
+  latencyMs,
+  percent,
+  tokensPerSecond,
+  usdcDecimal,
+} from '../lib/format';
 import { mergedLatency } from '../lib/latency';
 import { Flow } from './board/animated-number';
 import { delta, type Delta } from './board/delta';
@@ -117,7 +123,9 @@ function Kpis({
       <StatCard
         icon={CircleCheck}
         label="Success"
-        sides={shown(figures.success, 'percent')}
+        sides={sides(stat, (side) =>
+          side.successRate === null ? '—' : percent(side.successRate),
+        )}
         deltas={changes(stat, previous, figures.success)}
         hint="Completed requests out of completed and failed ones. Cancellations are not counted as failures."
       />

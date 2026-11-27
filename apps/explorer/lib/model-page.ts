@@ -7,7 +7,6 @@ import {
   UNITS,
 } from './constants';
 import type { OfferedModel, Seller } from './discovery';
-import { latencyMs } from './format';
 import type { Latency } from './latency';
 import type { OfferPriceSeries } from './offer-price-history';
 import { uptimeRatio } from './offers';
@@ -90,17 +89,28 @@ export function demandPoints(days: readonly NetworkDay[], modelId: string) {
   });
 }
 
+const seconds = (ms: number) => ms >= UNITS.msPerSecond;
+const duration = (ms: number, unit = true) => {
+  const value = seconds(ms) ? ms / UNITS.msPerSecond : ms;
+  return unit ? `${value} ${seconds(ms) ? 's' : 'ms'}` : String(value);
+};
+
+function bucketLabel(lower: number | undefined, upper: number | undefined) {
+  if (upper === undefined)
+    return lower === undefined ? '' : `≥ ${duration(lower)}`;
+  if (lower === undefined) return `< ${duration(upper)}`;
+  const sameUnit = seconds(lower) === seconds(upper);
+  return `${duration(lower, !sameUnit)}–${duration(upper)}`;
+}
+
 export function latencyBars(latency: Latency | null | undefined) {
   if (!latency?.samples) return [];
-  const last = latency.bucketsMs.at(-1);
-  const bars = latency.counts.map((count, index) => {
-    const bound = latency.bucketsMs[index];
-    const label =
-      bound === undefined
-        ? `> ${latencyMs(last ?? null).slice(2)}`
-        : latencyMs(bound);
-    return { label, count, share: count / latency.samples };
-  });
+  const bounds = latency.bucketsMs;
+  const bars = latency.counts.map((count, index) => ({
+    label: bucketLabel(bounds[index - 1], bounds[index]),
+    count,
+    share: count / latency.samples,
+  }));
   const first = bars.findIndex((bar) => bar.count > 0);
   if (first < 0) return [];
   const end =
@@ -123,16 +133,21 @@ function spread(values: bigint[]): PriceSpread | null {
   };
 }
 
+type Quote = OfferPriceSeries['points'][number];
+const isPaid = (quote: Quote) => quote.input > 0n || quote.output > 0n;
+
 function latestBySeller(
   series: readonly OfferPriceSeries[],
   day: number,
   end: number,
+  keep: (quote: Quote) => boolean = () => true,
 ) {
-  const latest = new Map<string, OfferPriceSeries['points'][number]>();
+  const latest = new Map<string, Quote>();
   for (const item of series)
     for (const point of item.points) {
       const current = latest.get(item.nodeId);
       if (
+        keep(point) &&
         point.at < end &&
         point.end > day &&
         (!current || point.at >= current.at)
@@ -161,11 +176,10 @@ export function priceDays(
       });
       continue;
     }
-    const quotes = latestBySeller(series, day, end);
-    const paid = quotes.filter((quote) => quote.input || quote.output);
+    const paid = latestBySeller(series, day, end, isPaid);
     result.push({
       day: isoDay(day),
-      sellers: quotes.length,
+      sellers: latestBySeller(series, day, end).length,
       input: spread(paid.map((quote) => quote.input)),
       output: spread(paid.map((quote) => quote.output)),
     });

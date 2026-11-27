@@ -84,7 +84,7 @@ interface Offer {
 const OFFER_HEAD = [
   prefixedColumn('Seller', 'seller'),
   { label: 'Context', right: true, sort: 'context' },
-  { label: 'Uptime 7 d', right: true, sort: 'uptime' },
+  { label: 'Uptime 7 d', right: true, sort: 'uptimeWeek' },
   {
     label: 'Input / 1M',
     right: true,
@@ -116,7 +116,7 @@ function OffersTable({
   const names = namesByNode(discovery.network);
   const page = pagedRows(query, 'sellers', offers, !discovery.error, {
     context: ({ offer }) => offer.contextTokens,
-    uptime: ({ seller }) => weekUptime(seller) ?? -1,
+    uptimeWeek: ({ seller }) => weekUptime(seller) ?? -1,
     input: ({ offer }) => BigInt(offer.pricing.inputAtomicPerMtok),
     output: ({ offer }) => BigInt(offer.pricing.outputAtomicPerMtok),
   });
