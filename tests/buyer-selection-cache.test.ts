@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { BUYER_SELECTION } from '@gyblos/buyer/constants';
-import { createBuyerControlClient } from '@gyblos/buyer/control';
+import { createBuyerControlClient, SellerRefusal } from '@gyblos/buyer/control';
 import { selectVerifiedBuyerQuote } from '@gyblos/buyer/selection';
 import { createSnapshotCache } from '@gyblos/buyer/selection-cache';
 import { CONTROL_CODES } from '@gyblos/protocol/constants';
@@ -37,7 +37,7 @@ async function rig(t: test.TestContext) {
         getCatalog: (...args: Parameters<typeof catalog>) => {
           if (staleCatalogs > 0) {
             staleCatalogs--;
-            controlFail(CONTROL_CODES.STALE);
+            throw new SellerRefusal(CONTROL_CODES.STALE);
           }
           return catalog(...args);
         },

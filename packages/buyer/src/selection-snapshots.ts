@@ -3,7 +3,7 @@
 
 import { SELLER_BADGES } from '@gyblos/core/constants';
 import type { KnownSeller } from '@gyblos/core/seller-selection';
-import { CONTROL_CODES, PUBLIC_RECORD_KINDS } from '@gyblos/protocol/constants';
+import { PUBLIC_RECORD_KINDS } from '@gyblos/protocol/constants';
 import type { SignedPublicV2 } from '@gyblos/protocol/control-types';
 import { verifyPublicV2 } from '@gyblos/protocol/public-v2';
 
@@ -14,6 +14,7 @@ import {
   SELLER_FAILURES,
   type SellerFailurePhase,
 } from './constants';
+import { staleSellerCatalog } from './control';
 import type {
   BuyerControlClient,
   VerifiedSelectionDependencies,
@@ -346,18 +347,17 @@ async function snapshotBatch(
           )
             throw error;
           const code = failureCode(error);
-          const retryAt =
-            code === CONTROL_CODES.STALE
-              ? forgetStale(dependencies, seller.nodeId)
-              : connectFailed(
-                  seller,
-                  clients,
-                  settling,
-                  dependencies,
-                  now(),
-                  pinned,
-                  signal,
-                );
+          const retryAt = staleSellerCatalog(error)
+            ? forgetStale(dependencies, seller.nodeId)
+            : connectFailed(
+                seller,
+                clients,
+                settling,
+                dependencies,
+                now(),
+                pinned,
+                signal,
+              );
           failed(SELLER_FAILURE_PHASES.CONNECT, code, retryAt);
           return undefined;
         }

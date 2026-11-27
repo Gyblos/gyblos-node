@@ -9,7 +9,7 @@ import {
   ERROR_DIAGNOSTICS,
   SELLER_FAILURE_PHASES,
 } from './constants';
-import { SellerRefusal } from './control';
+import { SellerRefusal, staleSellerCatalog } from './control';
 import { raceControlOffers } from './offer-race';
 import type {
   BuyerControlClient,
@@ -279,7 +279,7 @@ async function requestCandidate(
   } catch (error) {
     if (
       !querySignal.aborted &&
-      (sellerFailureCode(error) === CONTROL_CODES.STALE ||
+      (staleSellerCatalog(error) ||
         (remembered && CATALOG_CHANGED.has(sellerFailureCode(error))))
     ) {
       // A quote for a remembered catalog that the seller refused because it replaced the catalog or no
