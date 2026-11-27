@@ -290,6 +290,7 @@ export function x402BudgetInput(
 export interface X402Result {
   failureReason?: ChatFailureReason;
   canCheckChannels?: true;
+  canConfigureRenewal?: true;
   summary: X402Summary;
   policy: BuyerApiPolicy | null;
   reply?: { text: string; model: string; metrics?: ResponseMetrics };
@@ -315,6 +316,7 @@ export function parseX402Result(input: unknown): X402Result {
   if (!input || typeof input !== 'object') throw new Error('Buyer unavailable');
   const value = input as Record<string, unknown>;
   const result: X402Result = {
+    ...(value.canConfigureRenewal === true && { canConfigureRenewal: true }),
     ...(value.canCheckChannels === true && { canCheckChannels: true }),
     summary: parseX402Summary(value.summary),
     policy: value.policy === null ? null : x402Policy(value.policy),

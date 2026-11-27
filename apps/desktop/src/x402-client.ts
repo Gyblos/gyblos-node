@@ -62,7 +62,7 @@ export class X402Client {
   policy() {
     return this.connection ? { ...this.connection.policy } : null;
   }
-  disconnectForPolicyChange(
+  assertPolicyChange(
     owner: { url: string; token: string } | undefined,
     policyId?: string,
   ) {
@@ -83,6 +83,12 @@ export class X402Client {
       throw new PaidSellerLimitError(
         'The buyer changed. Select the seller again.',
       );
+  }
+  disconnectForPolicyChange(
+    owner: { url: string; token: string } | undefined,
+    policyId?: string,
+  ) {
+    this.assertPolicyChange(owner, policyId);
     this.disconnect();
   }
   disconnect() {

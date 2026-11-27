@@ -12,6 +12,8 @@ interface Service {
     autoPrices?: TokenPricesV2 | null,
   ): Promise<{ url: string; token: string }>;
   stop(): Promise<void>;
+  stopWhenIdle?(): Promise<boolean>;
+  setRenewalBudget?(budget: string | null): Promise<void>;
   close(): Promise<void>;
 }
 async function reconcileFreePermission(
@@ -153,6 +155,41 @@ export function automaticBuyer(
       return ready;
     },
     changing: () => change !== null,
+    configureRenewal(amount: string | null, policyId: string) {
+      check();
+      if (
+        change ||
+        !owned ||
+        !service.setRenewalBudget ||
+        !service.stopWhenIdle
+      )
+        throw new PaidSellerLimitError(
+          'Only an idle buyer managed by this app can change renewal settings.',
+        );
+      const persist = service.setRenewalBudget;
+      const stopWhenIdle = service.stopWhenIdle;
+      const update = async () => {
+        client.assertPolicyChange(owned, policyId);
+        if (!(await stopWhenIdle()))
+          throw new PaidSellerLimitError(
+            'Wait for the current buyer request to finish.',
+          );
+        ready = null;
+        owned = undefined;
+        check();
+        try {
+          await persist(amount);
+        } finally {
+          check();
+          owned = await connectManaged(service, client, budget, check);
+          ready = Promise.resolve();
+        }
+      };
+      change = update().finally(() => {
+        change = null;
+      });
+      return change;
+    },
     configure(
       maxAtomic: string,
       policyId?: string,

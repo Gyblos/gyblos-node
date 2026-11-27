@@ -10,6 +10,7 @@ interface ParentPort {
 }
 interface Host {
   url: string;
+  pauseWhenIdle?(): boolean;
   close(): Promise<void>;
 }
 export async function runBuyerSidecar(
@@ -23,13 +24,18 @@ export async function runBuyerSidecar(
   const stopped = new Promise<void>((resolve) => {
     stop = resolve;
   });
-  port.on('message', (event) => {
-    if (event.data === BUYER_SIDECAR.STOP) {
-      stopping = true;
-      stop();
-    }
-  });
   let host: Host | undefined;
+  port.on('message', (event) => {
+    if (event.data === BUYER_SIDECAR.STOP_IF_IDLE) {
+      const idle = host?.pauseWhenIdle?.();
+      port.postMessage({
+        kind: idle ? BUYER_SIDECAR.IDLE : BUYER_SIDECAR.BUSY,
+      });
+      if (!idle) return;
+    } else if (event.data !== BUYER_SIDECAR.STOP) return;
+    stopping = true;
+    stop();
+  });
   let code = 0;
   try {
     host = await start();

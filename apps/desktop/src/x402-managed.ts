@@ -86,6 +86,42 @@ interface Connection {
 interface Running {
   exit: Promise<void>;
   stop(): void;
+  stopWhenIdle(): Promise<boolean>;
+}
+function idleStop(worker: BuyerWorker, exit: Promise<void>, timeout: number) {
+  let pending: ((ok: boolean) => void) | undefined;
+  worker.on('message', (message) => {
+    if (!message || typeof message !== 'object' || !('kind' in message)) return;
+    if (
+      message.kind === BUYER_SIDECAR.IDLE ||
+      message.kind === BUYER_SIDECAR.BUSY
+    ) {
+      pending?.(message.kind === BUYER_SIDECAR.IDLE);
+      pending = undefined;
+    }
+  });
+  return async () => {
+    if (pending) return false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const answered = new Promise<boolean>((resolve, reject) => {
+      pending = resolve;
+      timer = setTimeout(() => resolve(false), timeout);
+      try {
+        worker.postMessage(BUYER_SIDECAR.STOP_IF_IDLE);
+      } catch (error) {
+        pending = undefined;
+        reject(error);
+      }
+    });
+    try {
+      if (!(await Promise.race([answered, exit.then(() => false)])))
+        return false;
+      await exit;
+      return true;
+    } finally {
+      clearTimeout(timer);
+    }
+  };
 }
 function supervise(
   worker: BuyerWorker,
@@ -157,6 +193,7 @@ function supervise(
   return {
     ready,
     exit,
+    stopWhenIdle: idleStop(worker, exit, stopMs),
     stop() {
       if (exited || stopping) return;
       stopping = true;
@@ -200,6 +237,9 @@ export class ManagedBuyer {
     );
     this.running = operation;
     return operation.ready;
+  }
+  async stopWhenIdle() {
+    return (await this.running?.stopWhenIdle()) ?? false;
   }
   async close() {
     this.closed = true;

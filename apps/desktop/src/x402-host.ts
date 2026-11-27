@@ -11,6 +11,7 @@ import {
   type BrowserWindow,
 } from 'electron';
 
+import { setBuyerRenewalBudget } from '@gyblos/buyer/auto-settings';
 import { desktopX402Paths } from '@gyblos/config/home-desktop';
 import { reviewDesktopCharge } from '@gyblos/node/buyer-funding';
 import { desktopOpening } from '@gyblos/node/desktop-opening';
@@ -67,6 +68,8 @@ function managedBuyer(
       start: (maxAtomic, autoPrices) =>
         service.start(profile, undefined, maxAtomic, autoPrices),
       stop: () => service.stop(),
+      stopWhenIdle: () => service.stopWhenIdle(),
+      setRenewalBudget: (amount) => setBuyerRenewalBudget(environment, amount),
       close: () => service.close(),
     },
     client,
