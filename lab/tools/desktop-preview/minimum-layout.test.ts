@@ -161,10 +161,12 @@ for (const example of [
         ? 'error'
         : undefined;
   const review = proof ? 'failed-turn' : example;
-  void test(`full chat preserves independent recovery actions for ${example}`, async () => {
+  void test(`shipped chat preserves independent recovery actions for ${example}`, async () => {
     const root = await mkdtemp(join(tmpdir(), 'gyblos-failed-turn-'));
     try {
-      const output = await buildPreview(join(root, 'dist'));
+      const preview = await buildPreview(join(root, 'dist'));
+      const output = join(preview, 'desktop');
+      await copyFile(join(preview, 'preview.js'), join(output, 'preview.js'));
       const probe = await readFile(
         new URL('./check-failed-turn.ts', import.meta.url),
         'utf8',
@@ -180,7 +182,7 @@ for (const example of [
         entry,
         html.replace(
           '<script type="module"',
-          '<script type="module" src="./probe.mjs"></script><script type="module"',
+          '<script src="./preview.js"></script><script type="module" src="./probe.mjs"></script><script type="module"',
         ),
       );
       const url = pathToFileURL(entry);

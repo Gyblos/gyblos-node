@@ -143,44 +143,16 @@ export function transformBrand(source: string, id: string, desktop: string) {
       'Could not open the testnet faucet.',
     );
   if (target === `${base}/src/ui/Chat.tsx`)
-    return (
-      replaceEach(
-        source.replace(
-          /\{active && usingX402 && x402 && [\s\S]*?<ComposerFunding[\s\S]*?\/>(?:\s*\))?\}/,
-          '',
-        ),
-        [
-          ["'x402 · devnet'", "'x402'"],
-          ["'Free · Gyblos network'", "''"],
-          [
-            "import { ChatAnswer } from './ChatAnswer';",
-            "import { ChatAnswer } from './ChatAnswer';\nimport { CHAT_FAILURE } from '../constants';\nimport { MESSAGE_STATE } from './chat-state';\nimport { MessageText } from './MessageText';\nimport { Notice } from './PreviewKit';",
-          ],
-          [
-            '{answer && (',
-            `{answer && (answer.failureReason || answer.state === MESSAGE_STATE.FAILED) ? (
-            <FailedTurn message={answer} buyer={x402} separateDraft={!!user && !!session.draft && session.draft !== user.text} onReview={answer.paymentMethod === PAYMENT_METHOD.PAYPAL ? onReviewPaypal : onReviewX402} onEdit={() => {
-              if (!user) return;
-              if (session.draft && session.draft !== user.text) reset(user.text);
-              else setDraft(user.text);
-              input.current?.focus();
-            }} />
-          ) : answer && (`,
-          ],
-          [
-            '  const notice = usingPaypal\n    ? paypal.state.notice || session.notice\n    : session.notice;',
-            "  const notice = session.noticeIsTurnFailure ? '' : session.notice;\n  const paypalNotice = paypal.state.noticeIsTurnFailure ? '' : paypal.state.notice;",
-          ],
-          ['{usingPaypal && notice && (', '{usingPaypal && paypalNotice && ('],
-          ['<p>{notice}</p>', '<p>{paypalNotice}</p>'],
-          ['(!usingPaypal && notice)', 'notice'],
-          ...funds.CHAT_FUNDS_REWRITES,
-        ],
-      ) +
-      readFileSync(
-        new URL('./views/FailedTurn.tsx.preview', import.meta.url),
-        'utf8',
-      )
+    return replaceEach(
+      source.replace(
+        /\{active && usingX402 && x402 && [\s\S]*?<ComposerFunding[\s\S]*?\/>(?:\s*\))?\}/,
+        '',
+      ),
+      [
+        ["'x402 · devnet'", "'x402'"],
+        ["'Free · Gyblos network'", "''"],
+        ...funds.CHAT_FUNDS_REWRITES,
+      ],
     );
   if (target === `${base}/src/theme.ts`) {
     for (const [name, value] of Object.entries(brand.themeTokens)) {

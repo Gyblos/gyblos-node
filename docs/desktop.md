@@ -127,7 +127,10 @@ payment payloads are excluded. Storage is local, not synchronized, and
 conversation content is not encrypted.
 
 - Restoring history never resumes inference, acknowledges a response or
-  authorizes spending. An incomplete response reopens as interrupted.
+  authorizes spending. An incomplete response reopens as interrupted. The turn
+  shows its recovery action. Editing a declined question preserves an existing
+  draft in its conversation. A budget status check cannot establish a charge for
+  the specific turn.
 - x402 history holds verified references and amounts, or an explicit free result
   with no hash. Uncertain values never appear as confirmed spending or available
   balance.

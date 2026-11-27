@@ -40,11 +40,7 @@ function AnswerActions({
     <div className="answer-actions">
       {message.state !== MESSAGE_STATE.COMPLETE && (
         <span className="answer-state" role="status">
-          {message.state === MESSAGE_STATE.FAILED
-            ? 'Response unavailable'
-            : message.text
-              ? 'Stopped · partial response'
-              : 'Stopped'}
+          {message.text ? 'Stopped · partial response' : 'Stopped'}
         </span>
       )}
       {message.text && (
@@ -117,8 +113,6 @@ export function ChatAnswer(props: Props) {
       )}
       {message.text ? (
         <MessageText text={message.text} />
-      ) : message.state === MESSAGE_STATE.FAILED ? (
-        <p className="stopped-note">Response unavailable.</p>
       ) : message.state === MESSAGE_STATE.STOPPED ? (
         <p className="stopped-note">Stopped before a response arrived.</p>
       ) : null}
