@@ -149,7 +149,9 @@ void test('preview re-enabling testnet clears the hidden network flags', async (
     choose.indexOf('params.delete(PREVIEW_QUERY.NETWORK)') <
       choose.indexOf('function BuyerPreferences'),
   );
-  const hideBranch = choose.slice(choose.indexOf('} else {'));
+  const functionEnd = choose.indexOf('window.dispatchEvent');
+  const toggle = choose.slice(0, functionEnd);
+  const hideBranch = toggle.slice(toggle.indexOf('} else {'));
   assert.match(
     hideBranch,
     /params\.set\(PREVIEW_QUERY\.NETWORK, PREVIEW_QUERY\.NETWORK_MAINNET\)/,
@@ -158,7 +160,7 @@ void test('preview re-enabling testnet clears the hidden network flags', async (
     hideBranch,
     /params\.set\(PREVIEW_QUERY\.TESTNET, PREVIEW_QUERY\.TESTNET_HIDDEN\)/,
   );
-  const showBranch = choose.slice(0, choose.indexOf('} else {'));
+  const showBranch = toggle.slice(0, toggle.indexOf('} else {'));
   assert.doesNotMatch(showBranch, /params\.set\(PREVIEW_QUERY/);
   assert.doesNotMatch(hideBranch, /params\.delete\(PREVIEW_QUERY/);
 });

@@ -273,7 +273,7 @@
   "apps/desktop/src/ui/startup-splash.css": 2,
   "apps/desktop/src/ui/startup-state.ts": 2,
   "apps/desktop/src/ui/tools.ts": 2,
-  "apps/desktop/src/ui/ui.css": 27,
+  "apps/desktop/src/ui/ui.css": 26,
   "apps/desktop/src/ui/useActivity.ts": 1,
   "apps/desktop/src/ui/useBuyerFunding.ts": 1,
   "apps/desktop/src/ui/useChatArchive.ts": 1,
