@@ -66,12 +66,7 @@ export function openBatchBuyerBackend(
       await verifyPaymentNetwork(rpc, terms.network);
       return paymentTokenBalance(rpc, terms.buyer, terms.mint, signal);
     },
-    async renew(
-      expectedChannelId: string,
-      terms: PaymentSessionTerms,
-      totalBudgetAtomic: string,
-      switchSeller = false,
-    ) {
+    async renew(expectedChannelId, terms, totalBudgetAtomic, switchSeller) {
       if (options.payer.address !== terms.buyer)
         return sessionFail(SESSION_CODES.BINDING);
       const existing = await inspectBatchSession(options.paths);
@@ -85,7 +80,7 @@ export function openBatchBuyerBackend(
         expectedChannelId,
         terms,
         totalBudgetAtomic,
-        switchSeller,
+        switchSeller: switchSeller ?? false,
         now: options.now ?? Date.now,
         observe: oldObserver.settlement,
       });
