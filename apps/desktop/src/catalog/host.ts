@@ -4,7 +4,7 @@ import { ipcMain, session, type BrowserWindow } from 'electron';
 import { DISCOVERY_INDEX_URL } from '@gyblos/config';
 
 import { NETWORK_CATALOG } from './constants';
-import { createCatalogHandlers } from './handlers';
+import { registerCatalogHandlers } from './handlers';
 import { createCatalogSession } from './session';
 
 export function registerNetworkCatalog(
@@ -46,23 +46,14 @@ export function registerNetworkCatalog(
     );
   const catalog = createSession();
   const search = createSession();
-  const handlers = createCatalogHandlers(
+  registerCatalogHandlers(
+    (channel, handler) => ipcMain.handle(channel, handler),
     { summary: catalog.browse, lookup: search.lookup },
     {
       contents: window.webContents,
       mainFrame: () => window.webContents.mainFrame,
       destroyed: () => window.isDestroyed(),
     },
-  );
-  ipcMain.handle(NETWORK_CATALOG.STATUS_CHANNEL, (event, ...args: unknown[]) =>
-    handlers.summary(event, args),
-  );
-  ipcMain.handle(NETWORK_CATALOG.LOOKUP_CHANNEL, (event, ...args: unknown[]) =>
-    handlers.lookup(event, args),
-  );
-  ipcMain.handle(
-    NETWORK_CATALOG.AUTO_LOOKUP_CHANNEL,
-    (event, ...args: unknown[]) => handlers.lookup(event, args, true),
   );
   const resolve = (offerId: string) =>
     catalog.resolve(offerId) ?? search.resolve(offerId);

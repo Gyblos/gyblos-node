@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import { DEVNET, DEVNET_USDC } from '@gyblos/config';
 import {
   CATALOG_STATE,
+  NETWORK_CATALOG,
   parseNetworkCatalog,
 } from '@gyblos/desktop/network-catalog';
 import {
@@ -295,7 +296,7 @@ void test('a repeated cursor cannot discard or double-count a signed listing or 
   }
 });
 
-void test('Auto model lookup retains the signed binding of a visible manual search offer for a different model', async () => {
+void test('the registered Auto IPC channel retains a visible manual search offer for a different model', async () => {
   const { createCatalogSession } =
     await import('@gyblos/desktop/network-catalog-session');
   const manual = await priced('1', '2', 'synthetic-manual-model');
@@ -314,12 +315,37 @@ void test('Auto model lookup retains the signed binding of a visible manual sear
     () => DISCOVERY_NOW,
     stop.signal,
   );
+  const { registerCatalogHandlers } =
+    await import('@gyblos/desktop/network-catalog-handlers');
+  type Handler = Parameters<Parameters<typeof registerCatalogHandlers>[0]>[1];
+  const routes = new Map<string, Handler>();
+  const event = { sender: {}, senderFrame: {} };
+  registerCatalogHandlers(
+    (channel, handler) => routes.set(channel, handler),
+    search,
+    {
+      contents: event.sender,
+      mainFrame: () => event.senderFrame,
+      destroyed: () => false,
+    },
+  );
   try {
-    const manualId = (await search.lookup(manual.modelId)).models[0]?.offerId;
+    const manualId = (
+      await routes.get(NETWORK_CATALOG.LOOKUP_CHANNEL)!(event, manual.modelId)
+    ).models[0]?.offerId;
     assert.ok(manualId);
-    const autoId = (await search.lookup(automatic.modelId, true)).models[0]
-      ?.offerId;
+    const autoId = (
+      await routes.get(NETWORK_CATALOG.AUTO_LOOKUP_CHANNEL)!(
+        event,
+        automatic.modelId,
+      )
+    ).models[0]?.offerId;
     assert.ok(autoId);
+    const rejected = await routes.get(NETWORK_CATALOG.AUTO_LOOKUP_CHANNEL)!(
+      { ...event, senderFrame: {} },
+      manual.modelId,
+    );
+    assert.equal(rejected.state, CATALOG_STATE.ERROR);
     assert.equal(
       search.resolve(manualId)?.nodeId,
       manual.signed.catalog.record.nodeId,

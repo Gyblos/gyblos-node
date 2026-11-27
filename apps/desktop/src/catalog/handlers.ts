@@ -2,6 +2,7 @@
 import {
   CATALOG_STATE,
   emptyCatalog,
+  NETWORK_CATALOG,
   validCatalogQuery,
   type NetworkCatalog,
 } from './model';
@@ -45,4 +46,27 @@ export function createCatalogHandlers(
         ? session.lookup(args[0], automatic)
         : emptyCatalog(CATALOG_STATE.ERROR),
   };
+}
+
+export function registerCatalogHandlers(
+  handle: (
+    channel: string,
+    handler: (
+      event: CatalogSender,
+      ...args: unknown[]
+    ) => NetworkCatalog | Promise<NetworkCatalog>,
+  ) => void,
+  session: CatalogSession,
+  window: CatalogWindow,
+) {
+  const handlers = createCatalogHandlers(session, window);
+  handle(NETWORK_CATALOG.STATUS_CHANNEL, (event, ...args) =>
+    handlers.summary(event, args),
+  );
+  handle(NETWORK_CATALOG.LOOKUP_CHANNEL, (event, ...args) =>
+    handlers.lookup(event, args),
+  );
+  handle(NETWORK_CATALOG.AUTO_LOOKUP_CHANNEL, (event, ...args) =>
+    handlers.lookup(event, args, true),
+  );
 }
