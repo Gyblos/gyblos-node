@@ -201,8 +201,11 @@ export async function startReplayNetwork(
         try {
           await host.close();
         } finally {
-          await bound.close().catch(() => {});
-          await Promise.allSettled(sellers.map((seller) => seller.close()));
+          try {
+            await bound.close();
+          } finally {
+            await Promise.allSettled(sellers.map((seller) => seller.close()));
+          }
         }
       },
     };

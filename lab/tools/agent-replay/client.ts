@@ -25,16 +25,25 @@ export interface ReplayTiming {
 
 const DATA = 'data: ';
 
-function frameOf(line: string) {
+const record = (value: unknown): Record<string, unknown> =>
+  typeof value === 'object' && value !== null
+    ? (value as Record<string, unknown>)
+    : {};
+
+export function frameOf(line: string): { text?: string; error?: string } {
   if (!line.startsWith(DATA) || line === `${DATA}${FREE_BUYER.streamDone}`)
     return {};
-  const chunk = JSON.parse(line.slice(DATA.length)) as {
-    choices?: { delta?: { content?: string } }[];
-    error?: { code?: string };
-  };
+  const chunk = record(JSON.parse(line.slice(DATA.length)));
+  const choices = Array.isArray(chunk.choices) ? chunk.choices : [];
+  const content = record(record(choices[0]).delta).content;
+  const error = chunk.error === undefined ? undefined : record(chunk.error);
   return {
-    text: chunk.choices?.[0]?.delta?.content ?? '',
-    error: chunk.error ? (chunk.error.code ?? FREE_BUYER.errorType) : undefined,
+    text: typeof content === 'string' ? content : '',
+    error: error
+      ? typeof error.code === 'string'
+        ? error.code
+        : FREE_BUYER.errorType
+      : undefined,
   };
 }
 
