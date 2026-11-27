@@ -74,16 +74,16 @@ Deploying a Worker or publishing a site is a maintainer action; see
 
 ## Other top-level directories
 
-| Path                                    | What it holds                                                                                                                                |
-| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `lab/`                                  | Validation outside the product: `harness`, `tools` and the historical `evidence` ([lab/README.md](../lab/README.md)).                        |
-| `tests/`                                | Product and lab test suites ([tests/README.md](../tests/README.md)). Standalone packages keep theirs in `packages/<name>/test/`.             |
-| `tooling/`                              | The boundary checker, lint rules, skills tooling, native and npm builds, and the [AI security review](../tooling/security-review/README.md). |
-| `examples/`                             | Sample seller `config.toml` files ([configuration.md](configuration.md)).                                                                    |
-| `Dockerfile`, `docker/`, `compose.yaml` | The Docker seller image and its entrypoint ([running-a-node.md](running-a-node.md#docker)).                                                  |
-| `install.sh`, `install.ps1`             | The seller install scripts ([running-a-node.md](running-a-node.md#install-script)).                                                          |
-| `scripts/`                              | Release and installer publishing scripts, run by maintainers.                                                                                |
-| `patches/`                              | Dependency patches, each justified in `pnpm-workspace.yaml`.                                                                                 |
+| Path                                    | What it holds                                                                                                                                                                                  |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lab/`                                  | Validation outside the product: `harness`, `tools` and the historical `evidence` ([lab/README.md](../lab/README.md)).                                                                          |
+| `tests/`                                | Product and lab test suites ([tests/README.md](../tests/README.md)). Standalone packages keep theirs in `packages/<name>/test/`.                                                               |
+| `tooling/`                              | The boundary checker, lint rules, skills tooling, native and npm builds, the D1 load scripts (`d1:analytics`, `d1:bench`), and the [AI security review](../tooling/security-review/README.md). |
+| `examples/`                             | Sample seller `config.toml` files ([configuration.md](configuration.md)).                                                                                                                      |
+| `Dockerfile`, `docker/`, `compose.yaml` | The Docker seller image and its entrypoint ([running-a-node.md](running-a-node.md#docker)).                                                                                                    |
+| `install.sh`, `install.ps1`             | The seller install scripts ([running-a-node.md](running-a-node.md#install-script)).                                                                                                            |
+| `scripts/`                              | Release and installer publishing scripts, run by maintainers.                                                                                                                                  |
+| `patches/`                              | Dependency patches, each justified in `pnpm-workspace.yaml`.                                                                                                                                   |
 
 `tests/` and `tooling/` may import any layer. Product code never imports `lab/`,
 `tests/` or `tooling/`. "Gate" is a lab word only.

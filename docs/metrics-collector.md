@@ -1020,6 +1020,36 @@ Cloudflare counts it per location, so it is approximate.
 | Chain index | `src/chain/`: the scheduled read (`indexer.ts`, `list.ts`, `follow.ts`), call budgets and fallback (`endpoints.ts`), the RPC client, decoding and writes; `src/schema-chain.ts` |
 | Values      | `src/constants.ts`, `src/errors.ts`                                                                                                                                             |
 
+## Cost
+
+D1 bills rows read, rows written and storage; statements and round trips set
+latency. `pnpm d1:analytics` reads seven complete UTC days of account-level D1
+analytics and the size of both databases; the discovery index's
+[Cost](discovery-index.md#cost) section explains its inputs. Baseline for
+`gyblos-collector`, 2026-11-20 to 2026-11-26:
+
+```text
+database          size MB  read queries  write queries  rows read  rows written  p50 ms  p95 ms
+----------------  -------  ------------  -------------  ---------  ------------  ------  ------
+gyblos-collector  4.23     41086         16077          1321991    29697         0.28    2.65
+```
+
+`pnpm d1:bench` runs one aggregation over three synthetic receipts per day on 1
+and on 31 pending days (the most one run takes) against the SQLite-backed D1
+test harness:
+
+```text
+operation            statements  round trips  batches  max params  full scans
+-------------------  ----------  -----------  -------  ----------  ----------
+agg.day1             40          9            3        6           6
+agg.days31           760         39           33       6           66
+```
+
+Each pending day is one batch of 24 statements; the run adds its scan batch, the
+chain scan batch and six reads. Full scans grow with the pending days because
+each day's batch has statements whose plan scans an intermediate result.
+`tests/d1-load.test.ts` caps both runs at these counts.
+
 ## Operations
 
 Deploying, applying remote migrations, setting secrets and rebuilding aggregates
