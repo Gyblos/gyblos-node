@@ -149,5 +149,12 @@ void test('preview re-enabling testnet clears the hidden network flags', async (
     choose.indexOf('params.delete(PREVIEW_QUERY.NETWORK)') <
       choose.indexOf('function BuyerPreferences'),
   );
-  assert.doesNotMatch(choose, /params\.set\(PREVIEW_QUERY\.TESTNET/);
+  assert.match(
+    choose,
+    /params\.set\(PREVIEW_QUERY\.TESTNET, PREVIEW_QUERY\.TESTNET_HIDDEN\)/,
+  );
+  assert.match(
+    choose,
+    /params\.set\(PREVIEW_QUERY\.NETWORK, PREVIEW_QUERY\.NETWORK_MAINNET\)/,
+  );
 });
