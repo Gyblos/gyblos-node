@@ -7,6 +7,7 @@ import { createChainRpc } from '@gyblos/metrics-collector/chain/rpc';
 import { CHAIN_INDEX } from '@gyblos/metrics-collector/constants';
 
 import {
+  BLOCK_TIME_S,
   endpoints,
   fakeChainRpc,
   plainTx,
@@ -30,7 +31,7 @@ const reply = (result: unknown) =>
 const signatureList = (
   entries: { slot?: number; blockTime?: number | null }[],
 ) =>
-  entries.map(({ slot = 1, blockTime = 1_794_800_000 }) => ({
+  entries.map(({ slot = 1, blockTime = BLOCK_TIME_S }) => ({
     signature: 'a'.repeat(64),
     slot,
     blockTime,

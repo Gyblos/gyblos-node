@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import {
   chmod,
+  lstat,
   open,
   readFile,
   rm,
@@ -205,6 +206,24 @@ void test('a lock left by a crashed observer is reclaimed once stale', async () 
       home.state.eligible(run.config.sellers, run.context.now()).length,
       1,
     );
+  } finally {
+    await run.wire.close();
+    await home.close();
+  }
+});
+void test('a fresh lock left in place is never removed by a failed claim', async () => {
+  const home = await discoveryHome();
+  const run = await discoveryRun();
+  const path = join(
+    homeLayout(home.environment).roles.buyer,
+    BUYER_DISCOVERY.lockFile,
+  );
+  try {
+    await writeFile(path, '', { mode: 0o600 });
+    await assert.rejects(home.state.observe(run.known), {
+      code: BUYER_SELECTION_CODES.DISCOVERY_STATE,
+    });
+    assert.equal((await lstat(path)).isFile(), true);
   } finally {
     await run.wire.close();
     await home.close();

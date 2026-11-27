@@ -2,7 +2,7 @@
 // Never stores prompts, signed offers, authorization journals or private identity material.
 import { randomUUID } from 'node:crypto';
 import { constants } from 'node:fs';
-import { lstat, mkdir, open, rename, rm } from 'node:fs/promises';
+import { link, lstat, mkdir, open, rename, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { FILE_MODES } from '@gyblos/config';
@@ -40,10 +40,19 @@ async function acquireLock(lock: string) {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST' || attempts > 0)
         throw error;
     }
-    const info = await lstat(lock).catch(() => undefined);
-    if (info === undefined) continue;
-    if (Date.now() - info.mtimeMs < BUYER_DISCOVERY.lockStaleMs) unavailable();
-    await rm(lock, { force: true });
+    const claim = `${lock}.${randomUUID()}.claim`;
+    try {
+      await rename(lock, claim);
+    } catch {
+      continue;
+    }
+    const info = await lstat(claim);
+    if (Date.now() - info.mtimeMs < BUYER_DISCOVERY.lockStaleMs) {
+      await link(claim, lock).catch(() => undefined);
+      await rm(claim, { force: true });
+      unavailable();
+    }
+    await rm(claim, { force: true });
   }
 }
 async function privateDirectory(directory: string) {

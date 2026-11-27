@@ -113,7 +113,7 @@ export async function fillGap(run: ChainRun) {
         gapUntil: complete ? null : gapUntil,
         gapBefore: complete ? null : page.at(-1)!.signature,
         gapUntilSlot: complete ? null : gapUntilSlot,
-        gapFull: false,
+        gapFull: !complete,
       });
       continue;
     }
