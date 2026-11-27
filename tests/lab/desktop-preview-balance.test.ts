@@ -143,10 +143,10 @@ void test('preview refreshes the observed balance after a simulated top-up and w
 void test('preview re-enabling testnet clears the hidden network flags', async () => {
   const settings = await view('Settings.tsx.preview');
   const choose = settings.slice(settings.indexOf('function chooseShowTestnet'));
-  assert.match(choose, /params\.delete\('network'\)/);
-  assert.match(choose, /params\.delete\('testnet'\)/);
+  assert.match(choose, /params\.delete\(PREVIEW_QUERY\.NETWORK\)/);
+  assert.match(choose, /params\.delete\(PREVIEW_QUERY\.TESTNET\)/);
   assert.ok(
-    choose.indexOf("params.delete('network')") <
+    choose.indexOf('params.delete(PREVIEW_QUERY.NETWORK)') <
       choose.indexOf('function BuyerPreferences'),
   );
 });

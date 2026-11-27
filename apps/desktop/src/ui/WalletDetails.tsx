@@ -243,7 +243,9 @@ function BuyerWallet({
           <span>Available balance</span>
           <strong>
             {funding?.balanceAtomic == null
-              ? 'Unavailable'
+              ? loading
+                ? 'Checking balance…'
+                : 'Unavailable'
               : fundingAmount(funding.balanceAtomic)}
           </strong>
         </div>
