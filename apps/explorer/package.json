@@ -26,6 +26,7 @@
     "./model-table": "./lib/model-table.ts",
     "./model-catalog": "./lib/model-catalog.ts",
     "./network-status": "./lib/network-status.ts",
+    "./model-page": "./lib/model-page.ts",
     "./network-history": "./lib/network-history.ts",
     "./offer-price-history": "./lib/offer-price-history.ts",
     "./offers": "./lib/offers.ts",

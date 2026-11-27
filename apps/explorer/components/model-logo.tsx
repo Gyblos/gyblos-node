@@ -2,19 +2,27 @@
 // follows the theme; a model of no known family shows its initial instead.
 import type { ModelView } from '../lib/model-catalog';
 
+const SIZES = {
+  sm: { tile: 'size-5 rounded-md text-[10px]', mark: 'size-3.5' },
+  lg: { tile: 'size-14 rounded-2xl text-xl', mark: 'size-9' },
+} as const;
+
 export function ModelLogo({
   modelId,
   view,
+  size = 'sm',
 }: {
   modelId: string;
   view: Pick<ModelView, 'family'>;
+  size?: keyof typeof SIZES;
 }) {
   const { family } = view;
+  const { tile, mark } = SIZES[size];
   if (!family)
     return (
       <span
         aria-hidden
-        className="inline-flex size-5 shrink-0 items-center justify-center rounded-md bg-raised font-mono text-[10px] text-muted uppercase"
+        className={`inline-flex shrink-0 items-center justify-center bg-raised font-mono text-muted uppercase ${tile}`}
       >
         {modelId.slice(0, 1)}
       </span>
@@ -23,9 +31,9 @@ export function ModelLogo({
   return (
     <span
       aria-hidden
-      className="inline-flex size-5 shrink-0 items-center justify-center rounded-md bg-raised"
+      className={`inline-flex shrink-0 items-center justify-center bg-raised ${tile}`}
     >
-      <span className="size-3.5 bg-ink" style={{ mask, WebkitMask: mask }} />
+      <span className={`bg-ink ${mark}`} style={{ mask, WebkitMask: mask }} />
     </span>
   );
 }
