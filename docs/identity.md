@@ -221,9 +221,9 @@ signatures, RPC URLs, keys or payment journals.
 - Sequences are canonical u64 decimal strings. Canonical JSON rejects duplicate
   or unknown fields and duplicate NodeIds.
 - Limits are 1,024 rows and 1 MiB. With open discovery, a full table removes the
-  oldest unconfigured, unrevoked identity to admit a newly verified one
-  ([discovery.md](discovery.md)); otherwise no expiry or eviction removes
-  security history.
+  earliest admitted unconfigured identity (revoked ones last) to record a newly
+  verified one ([discovery.md](discovery.md)); otherwise no expiry or eviction
+  removes security history.
 - Writes use an exclusive lock, a unique temporary file, file sync, atomic
   rename and parent sync where supported.
 - Contention, stale locks, malformed or unsafe files, failed writes and observed

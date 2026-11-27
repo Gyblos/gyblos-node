@@ -66,7 +66,11 @@ export async function readIndexPages<T extends Listed>(
       ...(await readPass(read, first.next, maxPages - 1)).entries,
     ];
   const start = randomStart(random);
-  const tail = await readPass(read, start, maxPages);
+  const tail = await readPass(
+    read,
+    first.next > start ? first.next : start,
+    maxPages,
+  );
   const entries = [...first.entries, ...tail.entries];
   if (tail.next === null) {
     if (first.next < start)

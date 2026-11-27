@@ -41,7 +41,10 @@ void test('an index of one page is read once', async () => {
 void test('an index within the page ceiling is covered once, without duplicates, in at most one extra read', async () => {
   const index = pagedIndex(TWELVE, 2);
   const seen = ids(await readIndexPages(index.read, 6, HALF));
-  assert.deepEqual([...new Set(seen)].sort(), TWELVE);
+  assert.deepEqual([...seen].sort(), TWELVE);
+  const early = pagedIndex(TWELVE, 2);
+  const fromStart = ids(await readIndexPages(early.read, 6, () => 0));
+  assert.deepEqual([...fromStart].sort(), TWELVE);
   assert.ok(index.cursors.length <= 7);
 });
 

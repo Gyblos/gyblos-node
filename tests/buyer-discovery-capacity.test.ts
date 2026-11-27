@@ -3,7 +3,11 @@ import test from 'node:test';
 
 import { BUYER_DISCOVERY } from '@gyblos/buyer/constants';
 import { prepareConfiguredBuyerSelection } from '@gyblos/buyer/selection-runtime';
-import { PUBLIC_RECORD_KINDS } from '@gyblos/protocol/constants';
+import {
+  CONTROL_LIMITS,
+  PUBLIC_RECORD_KINDS,
+  PUBLIC_RECORD_LIMITS,
+} from '@gyblos/protocol/constants';
 
 import { discoveryCapacityFixture } from './support/discovery-capacity';
 
@@ -179,4 +183,31 @@ void test('a full history keeps rows that expired within the hour and configured
   const state = await f.open();
   assert.equal(await state.observe(f.run.known), false);
   assert.equal((await f.saved()).rows.length, BUYER_DISCOVERY.maxStateRows);
+});
+
+void test('a seller evicted and seen again does not stop another buyer process', async (t) => {
+  const f = await discoveryCapacityFixture(t, BUYER_DISCOVERY.maxStateRows);
+  const dead = f.now() - BUYER_DISCOVERY.evictAfterMs - 1;
+  await f.write(
+    f.rows.map((row) => ({
+      ...row,
+      catalogExpiresAt: dead,
+      presenceExpiresAt: dead,
+      conflictedThrough: row.highWater,
+    })),
+  );
+  const a = await f.open();
+  const b = await f.open();
+  assert.equal(await a.observe(f.run.known), true);
+  assert.equal(await a.observe(f.seller(1)), true);
+  assert.equal(await b.observe(f.seller(2)), true);
+});
+
+void test('the eviction grace outlasts every signed record lifetime', () => {
+  assert.ok(
+    BUYER_DISCOVERY.evictAfterMs >=
+      PUBLIC_RECORD_LIMITS.catalogLifetimeMs +
+        PUBLIC_RECORD_LIMITS.withdrawalLifetimeMs +
+        CONTROL_LIMITS.clockSkewMs,
+  );
 });

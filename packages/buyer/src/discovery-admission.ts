@@ -16,13 +16,13 @@ export function discoveryAdmission(policy?: DiscoveryAdmission) {
   const configured = new Set(
     policy.configuredNodeIds.map((nodeId) => controlHex(nodeId)),
   );
-  const evictable = (row: DiscoveryRow, now: number) =>
+  const now = policy.now ?? Date.now;
+  const evictable = (row: DiscoveryRow) =>
     !configured.has(row.nodeId) &&
-    now >= lastExpiry(row) + BUYER_DISCOVERY.evictAfterMs;
+    now() >= lastExpiry(row) + BUYER_DISCOVERY.evictAfterMs;
   return {
-    now: policy.now ?? Date.now,
     evictable,
-    admit(rows: Map<string, DiscoveryRow>, nodeId: string, now: number) {
+    admit(rows: Map<string, DiscoveryRow>, nodeId: string) {
       if (rows.has(nodeId)) return true;
       const missing = [...configured].filter((id) => !rows.has(id)).length;
       const limit = configured.has(nodeId)
@@ -31,7 +31,7 @@ export function discoveryAdmission(policy?: DiscoveryAdmission) {
       const excess = rows.size + 1 - limit;
       if (excess <= 0) return true;
       const victims = [...rows.values()]
-        .filter((row) => evictable(row, now))
+        .filter(evictable)
         .sort((left, right) => lastExpiry(left) - lastExpiry(right))
         .slice(0, excess);
       if (victims.length < excess) return false;

@@ -86,13 +86,19 @@ export async function openBuyerIdentityState(
             bytes === undefined
               ? new Map<string, IdentityState>()
               : parseIdentityStates(bytes, scope);
-          assertIdentityMonotonic(held, current, admit.evictable);
+          assertIdentityMonotonic(held, current, admit.evicted);
           const decision = evaluateIdentityPolicy({
             ...input,
             scope,
             previous: current.get(input.nodeId),
           });
-          if (!admit.admit(current, input.nodeId, decision.ok)) {
+          if (
+            !admit.admit(
+              current,
+              input.nodeId,
+              decision.ok && decision.state !== undefined,
+            )
+          ) {
             // Preserve every observed floor even when this new identity is refused without writing.
             held = current;
             exists = bytes !== undefined;

@@ -150,8 +150,8 @@ anything on its own, when:
 
 - the lock exists (the buyer never breaks it, even after a crash);
 - the state is malformed, has unsafe permissions, or cannot be persisted;
-- the state reaches 1,024 identities or 1 MiB outside open discovery (tombstones
-  and high-water marks are never pruned there).
+- the state reaches 1 MiB, or 1,024 identities outside open discovery
+  (tombstones and high-water marks are never pruned there).
 
 Repair is a deliberate operator step: stop every buyer that uses this home
 before you remove a leftover lock. Never delete the state file to clear an
@@ -223,12 +223,13 @@ Open discovery has its own bounds:
   - discovery rows of unconfigured sellers whose signed records expired more
     than an hour ago are removed, oldest first. Signed records live at most ten
     minutes, so no older record of that seller can still be replayed;
-  - identity rows of unconfigured sellers are removed, oldest first, only to
-    admit a newly verified identity, and never when the identity is revoked. A
-    denied lookup removes nothing. A removed identity is checked again like a
-    new one. Configured sellers are never removed. Another buyer process accepts
-    a missing row only when it met the same rule; any other disappearance or
-    rollback still stops the buyer.
+  - identity rows of unconfigured sellers are removed, earliest admitted first
+    and revoked ones last, only to record a newly verified identity. A denied
+    lookup removes nothing. A removed identity is checked again like a new one.
+    Configured sellers are never removed. Another buyer process forgets a
+    discovery row only once it met the same rule, and accepts a missing identity
+    only when the table is full and that identity is one the rule could have
+    removed; any other disappearance or rollback still stops the buyer.
 
 ## Seller duties
 
