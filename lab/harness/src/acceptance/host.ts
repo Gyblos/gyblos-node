@@ -20,8 +20,12 @@ import { openSellerSequence } from '@gyblos/node/public-sequence';
 import { createSellerPublisher } from '@gyblos/node/publisher';
 import type { SellerCatalogOffer } from '@gyblos/node/seller-offer';
 import { SellerOfferSet } from '@gyblos/node/seller-offer-set';
-import { CONTROL_METERING_MODES } from '@gyblos/protocol/constants';
+import {
+  CONTROL_CODES,
+  CONTROL_METERING_MODES,
+} from '@gyblos/protocol/constants';
 import type { SignedPublicV2 } from '@gyblos/protocol/control-types';
+import { ControlError } from '@gyblos/protocol/control-validation';
 import type { ChatTokenizer } from '@gyblos/protocol/engine';
 import { controlDeadline } from '@gyblos/transport-iroh/control-io';
 
@@ -32,6 +36,21 @@ import type { AcceptanceIndex } from './index';
 import type { AcceptanceWire } from './native';
 import { pocPaidListing } from './paid-listing';
 import type { AcceptanceWorkspace } from './workspace';
+
+const TRANSIENT_REFRESH = new Set<string>([
+  CONTROL_CODES.STALE,
+  CONTROL_CODES.EXPIRED,
+  CONTROL_CODES.BUSY,
+  CONTROL_CODES.CANCELLED,
+]);
+
+function refreshLikeDaemon(refresh: () => Promise<unknown>) {
+  return () =>
+    refresh().catch((error: unknown) => {
+      if (!(error instanceof ControlError && TRANSIENT_REFRESH.has(error.code)))
+        throw error;
+    });
+}
 
 export interface AcceptanceIdentity {
   owner: KeyPairSigner;
@@ -189,7 +208,8 @@ export async function startAcceptanceHost(options: AcceptanceHostOptions) {
       wire,
       observation: current,
       startRenewal() {
-        offerSet?.start(() => control.records.refresh().catch(() => {}));
+        if (!offerSet) throw new Error('startRenewal needs offerSet');
+        offerSet.start(refreshLikeDaemon(() => control.records.refresh()));
         publisher.start();
       },
       publisher,
