@@ -7,12 +7,18 @@ import test from 'node:test';
 import { CHALLENGE_SET } from '@gyblos/model-verifier/challenge-set';
 import {
   MODEL_VERIFIER_CODES,
+  MODEL_VERIFIER_PHASES,
   ModelVerifierError,
 } from '@gyblos/model-verifier/constants';
 import { loadVerifierKey } from '@gyblos/model-verifier/key';
 import { main } from '@gyblos/model-verifier/main';
 import { openReference } from '@gyblos/model-verifier/reference';
-import { runVerification } from '@gyblos/model-verifier/verify';
+import {
+  runVerification,
+  type UnscoredEvidence,
+} from '@gyblos/model-verifier/verify';
+import { FREE_EXECUTION_CODES } from '@gyblos/protocol/constants';
+import { FreeExecutionError } from '@gyblos/protocol/free-execution';
 import {
   MODEL_VERIFICATION_VERDICTS,
   signModelVerification,
@@ -74,7 +80,7 @@ async function verifyWith(
   ask: (prompt: string) => Promise<string>,
 ) {
   const key = await loadVerifierKey(join(home, 'verifier.key'), true);
-  const failures: string[] = [];
+  const failures: UnscoredEvidence['code'][] = [];
   const outcome = await runVerification({
     target: TARGET,
     seller: { selection: SELECTION, ask },
@@ -130,9 +136,7 @@ void test('a seller that answers too little is inconclusive and failures keep on
   await withHome(async (home) => {
     let calls = 0;
     const outcome = await verifyWith(home, async () => {
-      calls++;
-      if (calls > 3)
-        throw Object.assign(new Error('secret seller text'), { code: 'BUSY' });
+      if (++calls > 3) throw new FreeExecutionError(FREE_EXECUTION_CODES.BUSY);
       return answer('word');
     });
     assert.equal(
@@ -140,15 +144,22 @@ void test('a seller that answers too little is inconclusive and failures keep on
       MODEL_VERIFICATION_VERDICTS.INCONCLUSIVE,
     );
     assert.equal(outcome.signed.result.evidence.answers, 3);
-    assert.deepEqual(new Set(outcome.failures), new Set(['BUSY']));
+    assert.deepEqual(
+      new Set(outcome.failures),
+      new Set([FREE_EXECUTION_CODES.BUSY]),
+    );
     const silent = await verifyWith(home, async () => {
-      throw new Error('no code');
+      throw Object.assign(new Error('secret seller text'), {
+        code: 'SECRET_CANARY',
+      });
     });
     assert.equal(silent.signed.result.evidence.checks, 0);
-    assert.deepEqual(
-      new Set(silent.failures),
-      new Set([MODEL_VERIFIER_CODES.UNKNOWN]),
-    );
+    assert.equal(silent.failures[0], MODEL_VERIFIER_CODES.UNKNOWN);
+    assert.deepEqual(silent.unscored[0], {
+      challenge: 1,
+      phase: MODEL_VERIFIER_PHASES.EXECUTION,
+      code: MODEL_VERIFIER_CODES.UNKNOWN,
+    });
   });
 });
 
@@ -167,13 +178,20 @@ void test('one unanswered prompt keeps a run from passing even with enough check
   await withHome(async (home) => {
     let calls = 0;
     const outcome = await verifyWith(home, async () => {
-      calls++;
-      if (calls === 1) throw Object.assign(new Error('x'), { code: 'BUSY' });
+      if (++calls === 1)
+        throw new FreeExecutionError(FREE_EXECUTION_CODES.BUSY);
       return answer('word');
     });
     const { evidence, verdict } = outcome.signed.result;
     assert.ok(evidence.checks >= CHALLENGE_SET.rule.minimumChecks);
     assert.equal(verdict, MODEL_VERIFICATION_VERDICTS.INCONCLUSIVE);
+    assert.deepEqual(outcome.unscored, [
+      {
+        challenge: 1,
+        phase: MODEL_VERIFIER_PHASES.EXECUTION,
+        code: FREE_EXECUTION_CODES.BUSY,
+      },
+    ]);
   });
 });
 
@@ -190,7 +208,9 @@ void test('a blank answer or one with nothing to check counts as unanswered', as
     const { evidence, verdict } = outcome.signed.result;
     assert.equal(evidence.answers, CHALLENGE_SET.prompts.length - 3);
     assert.deepEqual(
-      outcome.unscored.map(({ text, code }) => ({ text, code })),
+      outcome.unscored
+        .filter((entry) => 'text' in entry)
+        .map(({ text, code }) => ({ text, code })),
       [
         { text: '', code: MODEL_VERIFIER_CODES.EMPTY_ANSWER },
         { text: '  \n\t ', code: MODEL_VERIFIER_CODES.EMPTY_ANSWER },

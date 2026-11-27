@@ -23,6 +23,12 @@ export const MODEL_VERIFIER_COMMANDS = {
   CHECK: 'check',
 } as const;
 
+export const MODEL_VERIFIER_PHASES = {
+  QUOTE: 'quote',
+  EXECUTION: 'execution',
+  SCORING: 'scoring',
+} as const;
+
 export const MODEL_VERIFIER_OUTPUT_DIAGNOSTICS = {
   component: 'model-verifier',
   operation: 'publish-output',
@@ -53,5 +59,11 @@ export class ModelVerifierError extends Error {
   constructor(readonly code: ModelVerifierCode) {
     super(code);
     this.name = 'ModelVerifierError';
+  }
+}
+
+export class SellerQuoteError extends Error {
+  constructor(cause: unknown) {
+    super(MODEL_VERIFIER_PHASES.QUOTE, { cause });
   }
 }
