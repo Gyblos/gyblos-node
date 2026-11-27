@@ -106,7 +106,7 @@
     "@gyblos/telemetry-file": "workspace:*",
     "@gyblos/transport-iroh": "workspace:*",
     "@number0/iroh": "1.2.0",
-    "@solana/kit": "5.1.0",
+    "@solana/kit": "5.5.1",
     "smol-toml": "1.9.1",
     "@gyblos/inference": "workspace:*"
   }

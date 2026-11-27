@@ -38,6 +38,6 @@
     "@gyblos/protocol": "workspace:*",
     "@gyblos/runtime": "workspace:*",
     "drizzle-orm": "0.45.4",
-    "hono": "4.13.18"
+    "hono": "4.13.21"
   }
 }

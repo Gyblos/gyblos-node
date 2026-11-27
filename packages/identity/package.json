@@ -13,7 +13,7 @@
   "dependencies": {
     "@gyblos/config": "workspace:*",
     "@solana-program/system": "0.10.0",
-    "@solana/kit": "5.1.0",
+    "@solana/kit": "5.5.1",
     "@gyblos/core": "workspace:*",
     "@solana/rpc-spec-types": "8.6.0"
   }
