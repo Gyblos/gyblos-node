@@ -116,6 +116,40 @@ void test('registry file path cannot read outside the app root', async () => {
   }
 });
 
+void test('registry file path cannot escape the app root via symlink', async () => {
+  const outside = await mkdtemp(join(tmpdir(), 'gyblos-registry-outside-'));
+  await writeFile(join(outside, 'secret.txt'), 'SECRET-CONTENT');
+  const root = await fixture({
+    ...VALID,
+    items: [
+      {
+        name: 'widget',
+        type: 'registry:component',
+        files: [
+          {
+            path: 'linked-secret.txt',
+            type: 'registry:file',
+            target: 'components/board/widget.ts',
+          },
+        ],
+      },
+    ],
+  });
+  try {
+    await symlink(join(outside, 'secret.txt'), join(root, 'linked-secret.txt'));
+    const result = run(root);
+    assert.notEqual(result.status, 0);
+    const output = join(root, 'public/r/widget.json');
+    assert.equal(
+      existsSync(output) && readFileSync(output, 'utf8').includes('SECRET'),
+      false,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+    await rm(outside, { recursive: true, force: true });
+  }
+});
+
 void test('registry file target cannot escape the consumer project', async () => {
   const root = await fixture({
     ...VALID,

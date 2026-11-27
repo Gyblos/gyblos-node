@@ -3,8 +3,8 @@
 // `npx shadcn add https://explorer.gyblos.com/r/<name>.json`. Files install at their own path (`target`), so
 // their relative imports hold; a dependency on another item of this registry becomes its URL.
 // Generated output, not committed (public/r is ignored).
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
+import { dirname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import postcss from 'postcss';
@@ -12,6 +12,13 @@ import postcss from 'postcss';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const ITEM_SCHEMA = 'https://ui.shadcn.com/schema/registry-item.json';
 const output = resolve(root, 'public/r');
+
+async function insideRoot(realRoot: string, path: string) {
+  const resolved = await realpath(resolve(root, path));
+  if (!resolved.startsWith(realRoot + sep))
+    throw new Error(`registry path escapes the app root: ${path}`);
+  return resolved;
+}
 
 interface RegistryFile {
   path: string;
@@ -113,13 +120,17 @@ const url = (name: string) =>
 
 await rm(output, { recursive: true, force: true });
 await mkdir(output, { recursive: true });
+const realRoot = await realpath(root);
+const realOutput = await realpath(output);
+if (!realOutput.startsWith(realRoot + sep))
+  throw new Error('registry output escapes the app root');
 for (const item of registry.items) {
   const files = await Promise.all(
     (item.files ?? []).map(async (file) => ({
       path: file.path,
       type: file.type,
       target: file.target,
-      content: await readFile(resolve(root, file.path), 'utf8'),
+      content: await readFile(await insideRoot(realRoot, file.path), 'utf8'),
     })),
   );
   const built = {
