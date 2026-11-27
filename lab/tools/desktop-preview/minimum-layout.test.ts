@@ -62,23 +62,25 @@ async function minimumLayout(head = '') {
     url.search =
       'screen=chat&connection-state=ready&funding=ready&seller-budget=ready';
     const stdout = await render(root, url, DESKTOP.MIN_WIDTH);
-    return /data-layout-passed="([^"]+)"/.exec(stdout)?.[1];
+    return {
+      passed: /data-layout-passed="([^"]+)"/.exec(stdout)?.[1],
+      skipped: /data-inert-payment-rows="([^"]+)"/.exec(stdout)?.[1],
+    };
   } finally {
     await rm(root, { recursive: true, force: true });
   }
 }
 
 void test('the desktop renderer fits its model picker and Limits controls at native minimum width', async () => {
-  assert.equal(await minimumLayout(), String(DESKTOP.MIN_WIDTH));
+  assert.equal((await minimumLayout()).passed, String(DESKTOP.MIN_WIDTH));
 });
 
 void test('the minimum-width probe measures the live pane while a slide snapshot is still entering', async () => {
-  assert.equal(
-    await minimumLayout(
-      '<style>.slide-snapshot--in{animation-play-state:paused!important;animation-delay:-150ms!important}</style>',
-    ),
-    String(DESKTOP.MIN_WIDTH),
+  const { passed, skipped } = await minimumLayout(
+    '<style>.slide-snapshot--in{animation-play-state:paused!important;animation-delay:-150ms!important}.slide-snapshot button[aria-label]{scale:2!important}</style>',
   );
+  assert.equal(passed, String(DESKTOP.MIN_WIDTH));
+  assert.ok(Number(skipped) > 0);
 });
 
 void test('the design-system dialog hides the action tooltip while its label is visible', async () => {
