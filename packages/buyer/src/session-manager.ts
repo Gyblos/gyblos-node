@@ -226,6 +226,7 @@ function pickerChannel(
         network: config.request.network,
         mint: config.request.asset,
         maxAtomic: config.request.maxAtomic,
+        renewExhausted: config.session?.renewalBudgetAtomic !== undefined,
         pinnedNodeId: config.pinnedNodeId,
         activeRequest: state.activeRequest,
       },

@@ -59,7 +59,7 @@ export async function buyerUsdcBalance(
 }
 
 export async function paymentTokenBalance(
-  rpc: ReturnType<typeof createBuyerObservationRpc>,
+  rpc: Pick<ReturnType<typeof createBuyerObservationRpc>, 'getAccountInfo'>,
   payer: string,
   mint: string,
   signal?: AbortSignal,

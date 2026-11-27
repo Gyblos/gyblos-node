@@ -123,12 +123,30 @@ closing the old channel. It then verifies the final charge and refund. Missing
 or uncertain proof blocks renewal. Renewal never replays a failed inference or
 changes the seller or payment roles.
 
-`depositAtomic` is the total spending authority across renewals: earlier actual
-charges plus the next deposit can't exceed it, so a replacement deposit shrinks
-by those charges. There is no automatic top-up. A question whose ceiling exceeds
-the remaining authority is refused before any channel opens. The journal keeps
-at most 16 closed generations within its 512 KiB bound; at that limit renewal is
-refused.
+Without an explicit renewal budget, `depositAtomic` is the total spending
+authority across renewals: earlier actual charges plus the next deposit can't
+exceed it, so a replacement deposit shrinks by those charges. There is no
+automatic top-up. A question whose ceiling exceeds the remaining authority is
+refused before any channel opens. The journal keeps at most 16 closed
+generations within its 512 KiB bound; at that limit renewal is refused.
+
+For automatic replacement with the same seller, the owner can set a
+single-channel `session.renewalBudgetAtomic`. This lifetime total includes
+earlier finalized charges plus the full deposit for the next generation. Each
+deposit stays at or below `depositAtomic`. Chat and all delegated keys share the
+total across restarts. Each key's own remaining limit, price ceilings and the
+maximum per response still apply. An exhausted, open channel can renew between
+requests after verification of the seller, payment roles, wallet balance and
+settlement. An unknown balance or an uncertain payment stops the request before
+a replacement deposit.
+
+With the buyer stopped, use the following contributor command with the same
+`GYBLOS_HOME` as the endpoint. The amount is in USDC. Pass `off` to disable
+automatic replacement. Start the buyer after saving the change.
+
+```sh
+node --import tsx apps/buyer/src/bin.ts budget 3
+```
 
 ### Multiple sellers and shared authority
 

@@ -274,6 +274,23 @@ void test(
     assert.equal(first.status, 200, await first.clone().text());
     const initial = await inspectBatchSession(paths);
     assert.ok(initial?.snapshot.channelId);
+    const configPath = rolePathIn(
+      process.env,
+      P2P_ROLES.BUYER,
+      BUYER_SELECTION.configFile,
+    );
+    const config = await readFile(configPath, 'utf8');
+    const changed: BuyerSelectionConfig = JSON.parse(config);
+    assert.ok(changed.session);
+    changed.session.withdrawDelaySeconds = 1800;
+    await writeFile(configPath, JSON.stringify(changed));
+    await host.restartBuyer();
+    const mismatch = await ask(64);
+    const error = (await mismatch.json()).error;
+    assert.equal(error.code, SESSION_CODES.BINDING);
+    assert.equal(error[BUYER_API.NEVER_SENT_FIELD], true);
+    assert.deepEqual(host.finance.calls, ['deposit']);
+    await writeFile(configPath, config);
     await host.restartBuyer();
     for (const balance of [null, '0']) {
       host.finance.walletBalance(balance);

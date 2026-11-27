@@ -1,10 +1,15 @@
 // Prepares replacement terms and finishes the previous channel before replacement authority begins.
-import { verifyBatchQuote } from '@gyblos/protocol/batch-channel';
+import {
+  matchBatchTerms,
+  verifyBatchQuote,
+} from '@gyblos/protocol/batch-channel';
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
 import {
   SESSION_CODES,
   SESSION_STATES,
   sessionFail,
+  UnsentChannelLimitError,
+  type PaymentSessionTerms,
 } from '@gyblos/protocol/payment-session';
 import type { BatchDestination } from '@gyblos/transport-iroh/batch-client';
 
@@ -53,21 +58,35 @@ export async function prepareRenewal<Remote extends BatchDestination>(
   )
     return undefined;
   if (snapshot.channelId) await options.checkReusableChannel?.(quote, signal);
+  const proposed = newSessionTerms(quote, options.policy, options.now());
   if (options.policy.renewalBudgetAtomic !== undefined) {
     if (
       switching ||
       snapshot.state !== SESSION_STATES.OPEN ||
       snapshot.reservedAtomic !== '0'
     )
-      return sessionFail(SESSION_CODES.UNVERIFIED);
-    await verifyBatchQuote(
-      quote,
-      { ...opened.terms, depositAtomic: options.policy.depositAtomic },
-      options.endpoint.id().toString(),
-      options.now(),
-    );
+      throw new UnsentSellerChoiceError(
+        SESSION_CODES.STATUS_UNKNOWN,
+        quote.offer.nodeId,
+      );
+    if (options.now() >= opened.terms.expiresAt)
+      throw new UnsentSellerChoiceError(
+        SESSION_CODES.EXPIRED,
+        quote.offer.nodeId,
+      );
+    try {
+      matchBatchTerms(proposed, {
+        ...opened.terms,
+        depositAtomic: proposed.depositAtomic,
+        expiresAt: proposed.expiresAt,
+      });
+    } catch {
+      throw new UnsentSellerChoiceError(
+        SESSION_CODES.BINDING,
+        quote.offer.nodeId,
+      );
+    }
   }
-  const proposed = newSessionTerms(quote, options.policy, options.now());
   await verifyBatchQuote(
     quote,
     proposed,
@@ -84,27 +103,14 @@ export async function prepareRenewal<Remote extends BatchDestination>(
   );
   if (snapshot.state !== SESSION_STATES.CLOSED) {
     const expected = replacement(snapshot.cumulativeAtomic);
-    if (options.policy.renewalBudgetAtomic !== undefined) {
-      const backend = await state.backend;
-      const available = await bounded(
-        backend?.availableBalance?.(opened.terms, signal) ??
-          Promise.resolve(null),
+    if (options.policy.renewalBudgetAtomic !== undefined)
+      await checkWallet(
+        state,
+        opened.terms,
+        snapshot.cumulativeAtomic,
+        expected,
         signal,
-      ).catch(() => null);
-      signal.throwIfAborted();
-      if (available === null)
-        throw new UnsentSellerChoiceError(
-          SESSION_CODES.STATUS_UNKNOWN,
-          quote.offer.nodeId,
-        );
-      const refundable =
-        BigInt(opened.terms.depositAtomic) - BigInt(snapshot.cumulativeAtomic);
-      if (BigInt(available) + refundable < BigInt(expected.depositAtomic))
-        throw new UnsentSellerChoiceError(
-          SESSION_CODES.LIMIT,
-          quote.offer.nodeId,
-        );
-    }
+      );
   }
   const settlement = snapshot.channelId
     ? ((await opened.host.reconcile(signal)) ??
@@ -122,4 +128,27 @@ export async function prepareRenewal<Remote extends BatchDestination>(
   await opened.host.settled();
   await opened.financial.dispose();
   return { channelId: snapshot.channelId, terms };
+}
+
+async function checkWallet<Remote extends BatchDestination>(
+  state: State<Remote>,
+  previous: PaymentSessionTerms,
+  spent: string,
+  next: PaymentSessionTerms,
+  signal: AbortSignal,
+) {
+  const backend = await state.backend;
+  const available = await bounded(
+    backend?.availableBalance?.(previous, signal) ?? Promise.resolve(null),
+    signal,
+  ).catch(() => null);
+  signal.throwIfAborted();
+  if (available === null)
+    throw new UnsentSellerChoiceError(
+      SESSION_CODES.STATUS_UNKNOWN,
+      next.sellerNodeId,
+    );
+  const refundable = BigInt(previous.depositAtomic) - BigInt(spent);
+  if (BigInt(available) + refundable < BigInt(next.depositAtomic))
+    throw new UnsentChannelLimitError(next.sellerNodeId);
 }
