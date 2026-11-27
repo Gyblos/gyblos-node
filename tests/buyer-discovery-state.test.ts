@@ -8,6 +8,7 @@ import {
   rm,
   stat,
   symlink,
+  utimes,
   writeFile,
 } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -184,6 +185,27 @@ void test('a held discovery lock fails closed and never removes another process 
     );
   } finally {
     await lock.close();
+    await run.wire.close();
+    await home.close();
+  }
+});
+void test('a lock left by a crashed observer is reclaimed once stale', async () => {
+  const home = await discoveryHome();
+  const run = await discoveryRun();
+  const path = join(
+    homeLayout(home.environment).roles.buyer,
+    BUYER_DISCOVERY.lockFile,
+  );
+  try {
+    await writeFile(path, '', { mode: 0o600 });
+    const stale = new Date(Date.now() - BUYER_DISCOVERY.lockStaleMs - 1_000);
+    await utimes(path, stale, stale);
+    assert.equal(await home.state.observe(run.known), true);
+    assert.equal(
+      home.state.eligible(run.config.sellers, run.context.now()).length,
+      1,
+    );
+  } finally {
     await run.wire.close();
     await home.close();
   }

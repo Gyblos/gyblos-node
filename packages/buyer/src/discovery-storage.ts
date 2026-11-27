@@ -32,6 +32,20 @@ import { BuyerSelectionError } from './selection-config';
 function unavailable(): never {
   throw new BuyerSelectionError(BUYER_SELECTION_CODES.DISCOVERY_STATE);
 }
+async function acquireLock(lock: string) {
+  for (let attempts = 0; ; attempts += 1) {
+    try {
+      return await open(lock, 'wx', FILE_MODES.privateFile);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST' || attempts > 0)
+        throw error;
+    }
+    const info = await lstat(lock).catch(() => undefined);
+    if (info === undefined) continue;
+    if (Date.now() - info.mtimeMs < BUYER_DISCOVERY.lockStaleMs) unavailable();
+    await rm(lock, { force: true });
+  }
+}
 async function privateDirectory(directory: string) {
   try {
     await mkdir(directory, {
@@ -206,7 +220,7 @@ export async function buyerDiscoveryState(
       try {
         if (failed) unavailable();
         await privateDirectory(directory);
-        handle = await open(lock, 'wx', FILE_MODES.privateFile);
+        handle = await acquireLock(lock);
         const current = await readMonotonicRows(
           path,
           rows,
