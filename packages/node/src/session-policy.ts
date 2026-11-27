@@ -124,6 +124,10 @@ function positiveTotal(value: unknown) {
   return total;
 }
 
+export function spendingAuthority(policy: BuyerSessionPolicy) {
+  return policy.renewalBudgetAtomic ?? policy.depositAtomic;
+}
+
 export function replacementTerms(
   policy: BuyerSessionPolicy,
   now: () => number,
@@ -132,8 +136,7 @@ export function replacementTerms(
 ) {
   const cap = BigInt(policy.depositAtomic);
   const authority =
-    BigInt(policy.renewalBudgetAtomic ?? policy.depositAtomic) -
-    BigInt(priorSpentAtomic ?? '0');
+    BigInt(spendingAuthority(policy)) - BigInt(priorSpentAtomic ?? '0');
   return (spent: string) => {
     const available = authority - BigInt(spent);
     return newSessionTerms(

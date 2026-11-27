@@ -159,6 +159,7 @@ export async function paidChannelEligibility(
     if (
       result.blocker === SESSION_CODES.REPLACEMENT_REQUIRED &&
       selection.renewExhausted &&
+      !stored.openingPending &&
       snapshot.state === SESSION_STATES.OPEN &&
       snapshot.reservedAtomic === '0'
     )

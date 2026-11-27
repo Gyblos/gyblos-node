@@ -10,6 +10,7 @@ import {
   sessionFail,
   UnsentChannelLimitError,
   type PaymentSessionTerms,
+  type SessionSnapshot,
 } from '@gyblos/protocol/payment-session';
 import type { BatchDestination } from '@gyblos/transport-iroh/batch-client';
 
@@ -39,7 +40,7 @@ export async function prepareRenewal<Remote extends BatchDestination>(
     options.now() < opened.terms.expiresAt
   )
     return undefined;
-  if (!canRenew) {
+  if (!canRenew && options.policy.renewalBudgetAtomic === undefined) {
     if (switching) throw new UnsentSellerBusyError(quote.offer.nodeId);
     return undefined;
   }
@@ -48,51 +49,28 @@ export async function prepareRenewal<Remote extends BatchDestination>(
   const snapshot = opened.financial.snapshot();
   if (
     !switching &&
-    ((!snapshot.channelId && options.now() < opened.terms.expiresAt) ||
-      (snapshot.state === SESSION_STATES.OPEN &&
-        options.now() < opened.terms.expiresAt &&
-        BigInt(snapshot.cumulativeAtomic) +
-          BigInt(snapshot.reservedAtomic) +
-          BigInt(quote.offer.maxAtomic) <=
-          BigInt(opened.terms.depositAtomic)))
+    canUseCurrent(opened.terms, snapshot, quote.offer.maxAtomic, options.now())
   )
     return undefined;
   if (snapshot.channelId) await options.checkReusableChannel?.(quote, signal);
   const proposed = newSessionTerms(quote, options.policy, options.now());
-  if (options.policy.renewalBudgetAtomic !== undefined) {
-    if (
-      switching ||
-      snapshot.state !== SESSION_STATES.OPEN ||
-      snapshot.reservedAtomic !== '0'
-    )
-      throw new UnsentSellerChoiceError(
-        SESSION_CODES.STATUS_UNKNOWN,
-        quote.offer.nodeId,
-      );
-    if (options.now() >= opened.terms.expiresAt)
-      throw new UnsentSellerChoiceError(
-        SESSION_CODES.EXPIRED,
-        quote.offer.nodeId,
-      );
-    try {
-      matchBatchTerms(proposed, {
-        ...opened.terms,
-        depositAtomic: proposed.depositAtomic,
-        expiresAt: proposed.expiresAt,
-      });
-    } catch {
-      throw new UnsentSellerChoiceError(
-        SESSION_CODES.BINDING,
-        quote.offer.nodeId,
-      );
-    }
-  }
-  await verifyBatchQuote(
-    quote,
-    proposed,
-    options.endpoint.id().toString(),
-    options.now(),
-  );
+  if (options.policy.renewalBudgetAtomic !== undefined)
+    checkRenewalTerms(
+      opened.terms,
+      proposed,
+      snapshot,
+      options.now(),
+      switching,
+      canRenew,
+    );
+  const verify = (terms: PaymentSessionTerms) =>
+    verifyBatchQuote(
+      quote,
+      terms,
+      options.endpoint.id().toString(),
+      options.now(),
+    );
+  await verify(proposed);
   const stored = await options.inspect();
   if (!stored || stored.pending) return sessionFail(SESSION_CODES.UNVERIFIED);
   const replacement = replacementTerms(
@@ -117,17 +95,66 @@ export async function prepareRenewal<Remote extends BatchDestination>(
       (await start(() => opened.host.close(signal))))
     : undefined;
   const terms = replacement(settlement?.chargedAtomic ?? '0');
-  await verifyBatchQuote(
-    quote,
-    terms,
-    options.endpoint.id().toString(),
-    options.now(),
-  );
+  await verify(terms);
   signal.throwIfAborted();
   await opened.host.disconnect();
   await opened.host.settled();
   await opened.financial.dispose();
   return { channelId: snapshot.channelId, terms };
+}
+
+function canUseCurrent(
+  terms: PaymentSessionTerms,
+  snapshot: SessionSnapshot,
+  maximum: string,
+  now: number,
+) {
+  if (now >= terms.expiresAt) return false;
+  if (!snapshot.channelId) return true;
+  return (
+    snapshot.state === SESSION_STATES.OPEN &&
+    BigInt(snapshot.cumulativeAtomic) +
+      BigInt(snapshot.reservedAtomic) +
+      BigInt(maximum) <=
+      BigInt(terms.depositAtomic)
+  );
+}
+
+function checkRenewalTerms(
+  previous: PaymentSessionTerms,
+  proposed: PaymentSessionTerms,
+  snapshot: SessionSnapshot,
+  now: number,
+  switching: boolean,
+  canRenew: boolean,
+) {
+  if (
+    !canRenew ||
+    switching ||
+    snapshot.state !== SESSION_STATES.OPEN ||
+    snapshot.reservedAtomic !== '0'
+  )
+    throw new UnsentSellerChoiceError(
+      SESSION_CODES.STATUS_UNKNOWN,
+      proposed.sellerNodeId,
+    );
+  if (now >= previous.expiresAt)
+    throw new UnsentSellerChoiceError(
+      SESSION_CODES.EXPIRED,
+      proposed.sellerNodeId,
+    );
+  try {
+    matchBatchTerms(proposed, {
+      ...previous,
+      depositAtomic: proposed.depositAtomic,
+      expiresAt: proposed.expiresAt,
+    });
+  } catch {
+    throw new UnsentSellerChoiceError(
+      SESSION_CODES.BINDING,
+      proposed.sellerNodeId,
+    );
+  }
 }
 
 async function checkWallet<Remote extends BatchDestination>(

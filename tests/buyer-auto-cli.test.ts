@@ -6,6 +6,7 @@ import test from 'node:test';
 import { setBuyerRenewalBudget } from '@gyblos/buyer/auto-settings';
 import { buildBuyerInit, initializeBuyer } from '@gyblos/node/buyer-init';
 import { withBuyerRuntime } from '@gyblos/node/buyer-runtime';
+import { NODE_ERROR_CODES } from '@gyblos/node/constants';
 
 import { answers, home, role } from './support/buyer-init';
 
@@ -69,7 +70,7 @@ void test('operator renewal budget persists only while the home is stopped', asy
   }));
   try {
     await assert.rejects(setBuyerRenewalBudget(fixture.environment, null), {
-      code: 'BUYER_RUNTIME_UNAVAILABLE',
+      code: NODE_ERROR_CODES.BUYER_RUNTIME_UNAVAILABLE,
     });
   } finally {
     await buyer.close();

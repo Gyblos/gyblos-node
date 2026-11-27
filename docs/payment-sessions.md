@@ -135,10 +135,11 @@ single-channel `session.renewalBudgetAtomic`. This lifetime total includes
 earlier finalized charges plus the full deposit for the next generation. Each
 deposit stays at or below `depositAtomic`. Chat and all delegated keys share the
 total across restarts. Each key's own remaining limit, price ceilings and the
-maximum per response still apply. An exhausted, open channel can renew between
-requests after verification of the seller, payment roles, wallet balance and
-settlement. An unknown balance or an uncertain payment stops the request before
-a replacement deposit.
+maximum per response still apply. The signed per-token rates may change between
+turns within the approved input and output ceilings. An exhausted, open channel
+can renew between requests after verification of the seller, payment roles,
+wallet balance and settlement. An unknown balance or an uncertain payment stops
+the request before a replacement deposit.
 
 With the buyer stopped, use the following contributor command with the same
 `GYBLOS_HOME` as the endpoint. The amount is in USDC. Pass `off` to disable

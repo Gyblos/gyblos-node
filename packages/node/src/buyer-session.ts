@@ -42,6 +42,7 @@ import {
   newSessionTerms,
   parseBuyerSessionPolicy,
   replacementTerms,
+  spendingAuthority,
   UnsentChannelLimitError,
   type BuyerSessionPolicy,
 } from './session-policy';
@@ -142,7 +143,7 @@ async function openCurrent<Remote extends BatchDestination>(
       renew(
         stored.snapshot.channelId,
         replacement,
-        options.policy.renewalBudgetAtomic ?? options.policy.depositAtomic,
+        spendingAuthority(options.policy),
         switching,
       ),
     );
@@ -219,9 +220,7 @@ async function run<Remote extends BatchDestination>(
   if (
     BigInt(opened.terms.depositAtomic) > BigInt(options.policy.depositAtomic) ||
     BigInt(opened.priorSpentAtomic) + BigInt(opened.terms.depositAtomic) >
-      BigInt(
-        options.policy.renewalBudgetAtomic ?? options.policy.depositAtomic,
-      ) ||
+      BigInt(spendingAuthority(options.policy)) ||
     opened.terms.withdrawDelaySeconds > options.policy.withdrawDelaySeconds ||
     opened.terms.protocolFeeBps !== PROTOCOL_FEE.bps ||
     opened.terms.treasury !== PROTOCOL_FEE.treasury ||
@@ -263,7 +262,6 @@ async function run<Remote extends BatchDestination>(
     }),
   };
 }
-
 async function renewable<Remote extends BatchDestination>(
   state: State<Remote>,
   opened: Current<Remote>,
@@ -298,8 +296,7 @@ async function renewable<Remote extends BatchDestination>(
     backend.renew!(
       plan.channelId,
       plan.terms,
-      state.options.policy.renewalBudgetAtomic ??
-        state.options.policy.depositAtomic,
+      spendingAuthority(state.options.policy),
       switching,
     ),
   );
