@@ -165,7 +165,7 @@ void test('a spammed channel is read at most a capped number of transactions per
   history.unshift(
     ...Array.from({ length: spam }, (_, index) =>
       withSignature(`spam${index}`, undefined, {
-        slot: 1e12 - index,
+        slot: 6e8 - index,
         addresses: [PROGRAM, channel],
       }),
     ),

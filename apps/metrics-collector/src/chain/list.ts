@@ -61,6 +61,8 @@ async function storeListPage(
 const fullyCoveredFullPage = (page: unknown[], stored: unknown[]) =>
   page.length === CHAIN_INDEX.signaturesPerPage &&
   stored.length === page.length;
+const withinFloor = (entry: ChainSignature) =>
+  entry.blockTimeMs === null || entry.blockTimeMs >= CHAIN_INDEX.historyFloorMs;
 const listPage = (run: ChainRun, range: { until?: string; before?: string }) =>
   run.rpc.signatures(CHANNEL_PROGRAM, range);
 const isLastPage = (page: unknown[]) =>
@@ -103,9 +105,21 @@ export async function fillGap(run: ChainRun) {
       break;
     }
     refuseOlder(page, gapUntilSlot);
+    const counted = page.filter(withinFloor);
+    if (!counted.length) {
+      const complete = isLastPage(page);
+      await saveCursor(run, {
+        ...run.cursor,
+        gapUntil: complete ? null : gapUntil,
+        gapBefore: complete ? null : page.at(-1)!.signature,
+        gapUntilSlot: complete ? null : gapUntilSlot,
+        gapFull: false,
+      });
+      continue;
+    }
     total += await storeListPage(
       run,
-      page,
+      counted,
       isLastPage(page),
       (stored, complete) => ({
         ...run.cursor,
@@ -127,7 +141,16 @@ export async function readForward(run: ChainRun) {
   if (!page.length) return 0;
   refuseOlder(page, newestSlot);
   const top = page[0]!;
-  return storeListPage(run, page, isLastPage(page), (stored, complete) => ({
+  const counted = page.filter(withinFloor);
+  if (!counted.length) {
+    await saveCursor(run, {
+      ...run.cursor,
+      newest: top.signature,
+      newestSlot: top.slot,
+    });
+    return 0;
+  }
+  return storeListPage(run, counted, isLastPage(page), (stored, complete) => ({
     ...run.cursor,
     newest: top.signature,
     newestSlot: top.slot,
@@ -160,11 +183,7 @@ async function backfillPage(run: ChainRun) {
     if (!run.cursor.backfillFull) throw new ChainRpcError('history page empty');
   }
   // Signatures older than the floor are not read: the page ends the history there.
-  const page = listed.filter(
-    (entry) =>
-      entry.blockTimeMs === null ||
-      entry.blockTimeMs >= CHAIN_INDEX.historyFloorMs,
-  );
+  const page = listed.filter(withinFloor);
   const reachedFloor = page.length < listed.length;
   const top = listed[0];
   const start = {
