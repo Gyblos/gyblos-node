@@ -54,6 +54,7 @@ export class DesktopBuyerFailure extends Error {
   constructor(
     readonly code: BuyerCode,
     message: string,
+    readonly neverSent = false,
   ) {
     super(message);
     this.name = 'DesktopBuyerFailure';
@@ -121,7 +122,11 @@ export function desktopBuyerFailure(
       ? (value as Record<string, unknown>)
       : {};
   if (row[BUYER_API.NEVER_SENT_FIELD] === true && isChannelBlocker(row.code))
-    return new DesktopBuyerFailure(row.code, channelBlockerMessage(row.code));
+    return new DesktopBuyerFailure(
+      row.code,
+      channelBlockerMessage(row.code),
+      true,
+    );
   if (
     row.code === PAID_EXECUTION_CODES.EXPIRED &&
     row[BUYER_API.NEVER_SENT_FIELD] === true
@@ -129,6 +134,7 @@ export function desktopBuyerFailure(
     return new DesktopBuyerFailure(
       PAID_EXECUTION_CODES.EXPIRED,
       'The seller quote expired before payment. Refresh the listing and send your message again.',
+      true,
     );
   if (
     row.code === BUYER_API.TOKENIZER_UNAVAILABLE &&
@@ -137,6 +143,7 @@ export function desktopBuyerFailure(
     return new DesktopBuyerFailure(
       BUYER_API.TOKENIZER_UNAVAILABLE,
       'The app could not download or verify the files it needs to count tokens. Check your internet connection and try again. No payment was made.',
+      true,
     );
   if (
     row.code === PAID_EXECUTION_CODES.PEER &&
@@ -145,6 +152,7 @@ export function desktopBuyerFailure(
     return new DesktopBuyerFailure(
       PAID_EXECUTION_CODES.PEER,
       'The selected seller could not open a payment channel. Choose another seller.',
+      true,
     );
   const code = [
     BUYER_ROUTING_CODES.BUSY,

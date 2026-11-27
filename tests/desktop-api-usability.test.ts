@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { SELLER_SELECTION_CODES } from '@gyblos/core/constants';
-import { desktopBuyerFailure } from '@gyblos/desktop/buyer-error';
+import {
+  DesktopBuyerFailure,
+  desktopBuyerFailure,
+} from '@gyblos/desktop/buyer-error';
 import {
   emptyUsdcApi,
   parseUsdcApiSecret,
@@ -14,10 +17,13 @@ import { X402Budget } from '@gyblos/desktop/x402-budget';
 import { X402Client } from '@gyblos/desktop/x402-client';
 import { createX402Handlers } from '@gyblos/desktop/x402-handlers';
 import { X402_ACTION } from '@gyblos/desktop/x402-model';
+import { BUYER_API } from '@gyblos/protocol/buyer-api';
 import {
   FREE_EXECUTION_CODES,
   FREE_EXECUTION_STOP_REASONS,
 } from '@gyblos/protocol/constants';
+import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
+import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
 import { desktopAgentFixture } from './support/desktop-agent';
 import { frame, policy } from './support/desktop-stream';
@@ -274,4 +280,26 @@ void test('secret replies reject extra fields and a navigation during refresh pr
     return result;
   };
   await assert.rejects(fixture.host.reveal(fixture.event, [input]));
+});
+
+void test('Desktop preserves explicit delivery certainty only for bound buyer pre-dispatch failures', () => {
+  for (const code of [
+    SESSION_CODES.CLOSED,
+    PAID_EXECUTION_CODES.EXPIRED,
+    BUYER_API.TOKENIZER_UNAVAILABLE,
+    PAID_EXECUTION_CODES.PEER,
+  ]) {
+    const error = desktopBuyerFailure(
+      { code, [BUYER_API.NEVER_SENT_FIELD]: true },
+      policy,
+    );
+    assert.ok(error instanceof DesktopBuyerFailure);
+    assert.equal(error.neverSent, true);
+  }
+  const uncertain = desktopBuyerFailure(
+    { code: SESSION_CODES.BINDING },
+    policy,
+  );
+  assert.ok(uncertain instanceof DesktopBuyerFailure);
+  assert.equal(uncertain.neverSent, false);
 });
