@@ -71,12 +71,16 @@ function definitions(
   entries: { name: unknown; description: unknown; schema: unknown }[],
   positions?: readonly number[],
 ): ToolDefinition[] {
-  const tools = entries.map(({ name, description, schema }) => ({
+  const tools = entries.map(({ name, description, schema }, at) => ({
     name,
     ...(typeof description === 'string' && description
       ? { description: shortened(description) }
       : {}),
-    parameters: JSON.stringify(schema ?? EMPTY_SCHEMA),
+    parameters: checked(
+      'tools',
+      FREE_CHAT_DETAILS.toolSchema(positions?.[at] ?? at),
+      () => JSON.stringify(schema ?? EMPTY_SCHEMA),
+    ),
   }));
   const problem = toolProblem(tools, positions);
   if (problem) throw invalidChat('tools', problem);

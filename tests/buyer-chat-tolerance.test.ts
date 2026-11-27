@@ -154,3 +154,20 @@ void test('a Responses tool refusal counts the tools the client sent, skipped on
     await server.close();
   }
 });
+
+void test('a schema nested too deep for JSON is refused as that tool, not as an internal error', async () => {
+  const deep = '{"x":'.repeat(10_000) + '{}' + '}'.repeat(10_000);
+  const server = await host(TEXT, []);
+  try {
+    const response = await fetch(server.url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: `{"model":${JSON.stringify(CODEX.model)},"messages":[{"role":"user","content":"hi"}],"tools":[{"type":"function","function":{"name":"deep","parameters":${deep}}}]}`,
+    });
+    const body = await response.json();
+    assert.equal(response.status, 400);
+    assert.match(body.error.message, /^tools\[0\]: the input schema/);
+  } finally {
+    await server.close();
+  }
+});

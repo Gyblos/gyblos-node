@@ -1040,9 +1040,9 @@ details matter when you change or debug the endpoint:
   is added to the leading instructions, as the Anthropic format does, instead of
   being refused; the Responses route keeps it in place as user text.
 - **Tool limits.** At most 128 tools; a name is 1 to 64 letters, digits, `_` or
-  `-` and unique; an input schema is at most 64 KiB. A refusal names the tool by
-  its index (`tools[3]: ...`). A description longer than 8 KiB is shortened to
-  fit rather than refused.
+  `-` and unique; an input schema is at most 64 KiB. A refusal over these limits
+  names the tool by its index (`tools[3]: ...`). A description longer than 8 KiB
+  is shortened to fit rather than refused.
 - **Browser isolation.** Invalid UTF-8, requests with an `Origin` header and
   other content types get 400, and a foreign `Host` gets 421, so a web page
   cannot reach the endpoint. There is no CORS.
