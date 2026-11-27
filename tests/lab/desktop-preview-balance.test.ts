@@ -16,6 +16,7 @@ void test('preview composer shows an inline spinner while the buyer balance is c
   assert.match(kit, /<PreviewInlineSpinner \/>/);
   assert.match(kit, /aria-busy=\{checking\}/);
   assert.match(kit, /Checking balance…/);
+  assert.match(kit, /fundingAmount\(funding\.balanceAtomic\)/);
   assert.match(
     kit,
     /<span className="sr-only">Balance · last checked · <\/span>/,
@@ -26,6 +27,9 @@ void test('preview composer shows an inline spinner while the buyer balance is c
     CHAT_FUNDS_REWRITES.some(([, to]) =>
       to.includes('checking={active && usingX402 && !!payer && loading}'),
     ),
+  );
+  assert.ok(
+    CHAT_FUNDS_REWRITES.some(([, to]) => to.includes('funding={funding}')),
   );
   const constants = await readFile(new URL('constants.ts', preview), 'utf8');
   assert.match(
