@@ -141,6 +141,17 @@ async function changeRenewal(
   assertConfigurableBudget(await budget.summary());
   check();
   client.assertPolicyChange(owner, policyId);
+  if (!client.canConfigureRenewal())
+    throw new PaidSellerLimitError(
+      'Channel renewal requires a managed single-channel buyer.',
+    );
+  if (
+    amount !== null &&
+    BigInt(amount) < BigInt(client.policy()!.depositAtomic!)
+  )
+    throw new PaidSellerLimitError(
+      'The renewal budget must cover at least one channel deposit.',
+    );
   if (!(await service.stopWhenIdle()))
     throw new PaidSellerLimitError(
       'Wait for the current buyer request to finish.',

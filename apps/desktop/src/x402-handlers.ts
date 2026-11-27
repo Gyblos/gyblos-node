@@ -278,7 +278,7 @@ async function checkPayment(
 }
 async function buyerStatus(client: X402Client, budget: X402Budget) {
   return {
-    ...(client.managed() && { canConfigureRenewal: true as const }),
+    ...(client.canConfigureRenewal() && { canConfigureRenewal: true as const }),
     ...(client.canCheckChannels() && { canCheckChannels: true as const }),
     summary: await budget.summary(),
     policy: client.policy(),

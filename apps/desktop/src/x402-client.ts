@@ -59,6 +59,14 @@ export class X402Client {
   managed() {
     return this.connection?.managed === true;
   }
+  canConfigureRenewal() {
+    const policy = this.connection?.policy;
+    return (
+      this.managed() &&
+      !!policy?.depositAtomic &&
+      policy.totalDepositAtomic === undefined
+    );
+  }
   policy() {
     return this.connection ? { ...this.connection.policy } : null;
   }

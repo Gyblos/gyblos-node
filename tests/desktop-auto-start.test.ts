@@ -348,3 +348,32 @@ void test('changing renewal cannot strand an active chat budget by restarting th
   assert.equal(budgetWrites, 0);
   await buyer.close();
 });
+void test('a pooled buyer refuses single-channel renewal before stopping its listener', async () => {
+  const r = runtime();
+  Object.assign(r.checked, {
+    depositAtomic: '1000000',
+    totalDepositAtomic: '3000000',
+    lifetimeMs: 3600000,
+  });
+  let stopped = false;
+  const buyer = automaticBuyer(
+    {
+      ...r.service,
+      stopWhenIdle: async () => {
+        stopped = true;
+        return true;
+      },
+      setRenewalBudget: async () => {},
+    },
+    r.client,
+    r.budget,
+  );
+  await buyer.start();
+  await assert.rejects(
+    async () => buyer.configureRenewal('2000000', r.checked.policyId),
+    /single-channel/,
+  );
+  assert.equal(stopped, false);
+  assert.equal(r.starts(), 1);
+  await buyer.close();
+});
