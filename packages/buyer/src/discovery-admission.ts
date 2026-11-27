@@ -1,6 +1,3 @@
-// Bounds live discovery candidates using existing signed-expiry metadata, retaining every replay floor.
-import { createHash, randomBytes } from 'node:crypto';
-
 import { controlHex } from '@gyblos/protocol/control-validation';
 
 import { BUYER_DISCOVERY } from './constants';
@@ -9,119 +6,46 @@ import { discoveryRowLive, type DiscoveryRow } from './discovery-state';
 export interface DiscoveryAdmission {
   configuredNodeIds: readonly string[];
   now?: () => number;
-  rank?: (nodeId: string, window: number) => string;
 }
 
-const order = (left: string, right: string) =>
-  left < right ? -1 : left > right ? 1 : 0;
-
-function secretRank() {
-  const seed = randomBytes(BUYER_DISCOVERY.openSeedBytes);
-  return (nodeId: string, window: number) =>
-    createHash('sha256')
-      .update(seed)
-      .update(`${window}:${nodeId}`)
-      .digest('hex');
-}
+const lastExpiry = (row: DiscoveryRow) =>
+  Math.max(row.catalogExpiresAt, row.presenceExpiresAt);
 
 export function discoveryAdmission(policy?: DiscoveryAdmission) {
   if (!policy) return undefined;
   const configured = new Set(
     policy.configuredNodeIds.map((nodeId) => controlHex(nodeId)),
   );
-  const draw = policy.rank ?? secretRank();
-  let drawn = { window: -1, ranks: new Map<string, string>() };
-  const rank = (nodeId: string, window: number) => {
-    if (drawn.window !== window) drawn = { window, ranks: new Map() };
-    let value = drawn.ranks.get(nodeId);
-    if (value === undefined) {
-      if (drawn.ranks.size >= BUYER_DISCOVERY.maxStateRows) drawn.ranks.clear();
-      value = draw(nodeId, window);
-      drawn.ranks.set(nodeId, value);
-    }
-    return value;
-  };
-  const inUse = new Map<string, number>();
-  const hold = (nodeId: string, now: number) => {
-    inUse.delete(nodeId);
-    inUse.set(nodeId, now + BUYER_DISCOVERY.openWindowMs);
-    if (inUse.size > BUYER_DISCOVERY.openInUse)
-      inUse.delete(inUse.keys().next().value!);
-  };
-  const live = (rows: Iterable<DiscoveryRow>, now: number) =>
-    [...rows].filter(
-      (row) => !configured.has(row.nodeId) && discoveryRowLive(row, now),
-    );
-  const admitted = (rows: Iterable<DiscoveryRow>, now: number) => {
-    const window = Math.floor(now / BUYER_DISCOVERY.openWindowMs);
-    const ranked = live(rows, now)
-      .map((row) => ({ row, rank: rank(row.nodeId, window) }))
-      .sort(
-        (left, right) =>
-          order(left.rank, right.rank) ||
-          order(left.row.nodeId, right.row.nodeId),
-      );
-    const owners = new Map<string, number>();
-    const chosen = new Set<string>();
-    for (const { row } of ranked) {
-      if (chosen.size >= BUYER_DISCOVERY.openSellers) break;
-      const count = owners.get(row.owner) ?? 0;
-      if (count >= BUYER_DISCOVERY.openPerOwner) continue;
-      owners.set(row.owner, count + 1);
-      chosen.add(row.nodeId);
-    }
-    return chosen;
-  };
-  const permits = (
-    rows: ReadonlyMap<string, DiscoveryRow>,
-    nodeId: string,
-    now: number,
-  ) =>
-    configured.has(nodeId) ||
-    (inUse.get(nodeId) ?? 0) > now ||
-    admitted(rows.values(), now).has(nodeId);
+  const now = policy.now ?? Date.now;
+  const evictable = (row: DiscoveryRow) =>
+    !configured.has(row.nodeId) &&
+    now() >= lastExpiry(row) + BUYER_DISCOVERY.evictAfterMs;
   return {
-    now: policy.now ?? Date.now,
-    permits,
-    hold,
-    accepts(
-      rows: ReadonlyMap<string, DiscoveryRow>,
-      row: DiscoveryRow,
-      now: number,
-    ) {
-      const prior = rows.get(row.nodeId);
-      if (!prior) {
-        if (rows.size >= BUYER_DISCOVERY.maxStateRows) return false;
-        const missing = [...configured].filter(
-          (nodeId) => !rows.has(nodeId),
-        ).length;
-        if (
-          !configured.has(row.nodeId) &&
-          rows.size + missing >= BUYER_DISCOVERY.maxStateRows
-        )
-          return false;
-      }
-      // Negative observations still persist withdrawal/conflict floors and immediately release eligibility.
-      if (configured.has(row.nodeId) || !discoveryRowLive(row, now))
-        return true;
-      if (prior || (inUse.get(row.nodeId) ?? 0) > now) return true;
-      return admitted([...rows.values(), row], now).has(row.nodeId);
+    evictable,
+    admit(rows: Map<string, DiscoveryRow>, nodeId: string) {
+      if (rows.has(nodeId)) return true;
+      const missing = [...configured].filter((id) => !rows.has(id)).length;
+      const limit = configured.has(nodeId)
+        ? BUYER_DISCOVERY.maxStateRows
+        : BUYER_DISCOVERY.maxStateRows - missing;
+      const excess = rows.size + 1 - limit;
+      if (excess <= 0) return true;
+      const victims = [...rows.values()]
+        .filter(evictable)
+        .sort((left, right) => lastExpiry(left) - lastExpiry(right))
+        .slice(0, excess);
+      if (victims.length < excess) return false;
+      for (const victim of victims) rows.delete(victim.nodeId);
+      return true;
     },
   };
 }
 
-// Eligibility and final digest admission share the same live working set.
 export function matchesDiscovery(
   rows: ReadonlyMap<string, DiscoveryRow>,
   identity: Pick<DiscoveryRow, 'nodeId' | 'owner'>,
   now: number,
-  admission: ReturnType<typeof discoveryAdmission>,
 ) {
   const row = rows.get(identity.nodeId);
-  return (
-    !!row &&
-    row.owner === identity.owner &&
-    discoveryRowLive(row, now) &&
-    (admission?.permits(rows, identity.nodeId, now) ?? true)
-  );
+  return !!row && row.owner === identity.owner && discoveryRowLive(row, now);
 }

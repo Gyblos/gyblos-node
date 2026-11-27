@@ -42,7 +42,8 @@ export async function openBuyerIdentityVerifier(
   );
   const read = async (nodeId: string, signal?: AbortSignal, force = false) => {
     const kept = force ? undefined : reuse.get(nodeId);
-    if (kept) return { lookup: kept.lookup, fresh: false, at: kept.at };
+    if (kept && (await state.known(nodeId)))
+      return { lookup: kept.lookup, fresh: false, at: kept.at };
     reuse.drop(nodeId);
     const lookup = await readRegistryIdentity(source, nodeId, { signal });
     return { lookup, fresh: true, at: reuse.time() };

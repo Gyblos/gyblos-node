@@ -66,6 +66,17 @@ export async function openBuyerIdentityState(
     let failed = false;
     let pending = Promise.resolve();
     return {
+      async known(nodeId: string) {
+        if (failed) identityStateUnavailable();
+        try {
+          const bytes = await readIdentityFile(path);
+          return (
+            bytes !== undefined && parseIdentityStates(bytes, scope).has(nodeId)
+          );
+        } catch {
+          return false;
+        }
+      },
       async evaluate(
         input: BuyerIdentityInput,
       ): Promise<IdentityPolicyDecision> {
@@ -86,18 +97,24 @@ export async function openBuyerIdentityState(
             bytes === undefined
               ? new Map<string, IdentityState>()
               : parseIdentityStates(bytes, scope);
-          assertIdentityMonotonic(held, current);
-          if (!admit(current, input.nodeId)) {
-            // Preserve every observed floor even when this new identity is refused without writing.
-            held = current;
-            exists = bytes !== undefined;
-            return { ok: false, code: IDENTITY_POLICY_CODES.LIMIT };
-          }
+          assertIdentityMonotonic(held, current, admit.evicted);
           const decision = evaluateIdentityPolicy({
             ...input,
             scope,
             previous: current.get(input.nodeId),
           });
+          if (
+            !admit.admit(
+              current,
+              input.nodeId,
+              decision.ok && decision.state !== undefined,
+            )
+          ) {
+            // Preserve every observed floor even when this new identity is refused without writing.
+            held = current;
+            exists = bytes !== undefined;
+            return { ok: false, code: IDENTITY_POLICY_CODES.LIMIT };
+          }
           recordIdentityDecision(current, decision);
           await writeIdentityFile(path, encodeIdentityStates(current, scope));
           held = current;
