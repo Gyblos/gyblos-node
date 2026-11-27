@@ -48,7 +48,7 @@ export function useBuyerFunding(
     snapshot.offerId === offerId &&
     snapshot.attempt === attempt;
   return {
-    loading: !current,
+    loading: enabled && !current,
     funding: current ? snapshot.funding : null,
     verify,
     refresh: () => setAttempt((n) => n + 1),

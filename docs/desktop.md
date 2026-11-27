@@ -239,8 +239,6 @@ background polling.
 - Chat and Connections receive only the public address and status. **Copy
   address** copies only the selected wallet's public address, through a narrow
   host action.
-- **Add funds** opens a local amount form that always reports payment
-  unavailable. It cannot authorize payment, change a balance or enable funding.
 - The app queries no balance for this wallet.
 
 > **Warning:** Funding is disabled in every state, including after backup

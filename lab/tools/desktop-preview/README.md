@@ -19,10 +19,10 @@ The spending limit starts unset; use `limit=set` for a 1 USDC limit, or
 Use `funding=ready` for a settled 2 USDC balance, or `funding=checking` to
 review the balance while its synthetic check is still in progress. Account-wide
 settings start off: use `fallback=on` for the free-model fallback and
-`testnet=hidden` for the post-launch network menu without Testnet. Example
-changes last only until the page reloads. A copied API key is deliberately
-invalid. Connection examples can be copied from the setup guide on the
-Connections screen.
+`testnet=hidden` for the post-launch network menu without Testnet. The Testnet
+switch stays in the URL across reloads; other example changes last only until
+the page reloads. A copied API key is deliberately invalid. Connection examples
+can be copied from the setup guide on the Connections screen.
 
 Open `?screen=models&channel=unknown` to review paid channel status. The fixture
 also accepts `eligible`, `expired` and `settled`. **Check status** on the
