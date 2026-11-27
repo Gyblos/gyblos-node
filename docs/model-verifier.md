@@ -236,7 +236,7 @@ pnpm model-verifier check RESULT_DIRECTORY/result.json
 writes `result.json` (the signed result) and `evidence.json` (the prompts, the
 answers and every check, plus any reply that could not be scored and why) to a
 new result directory. `check` verifies a result's signature and that its rule
-matches the published challenge set, and prints its verdict.
+and evidence counts fit the published challenge set, and prints its verdict.
 `pnpm model-verifier address` prints the verifier's public address. The verifier
 key is created on first use in `model-verifier/verifier.key` inside the Gyblos
 home directory. The docs site explains the results for sellers:
