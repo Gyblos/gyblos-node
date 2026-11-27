@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
+import { DEVNET } from '@gyblos/config/network';
+
 import { previewStyles } from '../support/desktop-preview-styles';
 
 const preview = new URL('../../lab/tools/desktop-preview/', import.meta.url);
@@ -49,6 +51,54 @@ void test('preview composer shows an inline spinner while the buyer balance is c
   assert.match(
     css,
     /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.ui-inline-spinner[\s\S]*animation: none;/,
+  );
+});
+
+async function withPreviewGlobals<T>(
+  search: string,
+  atomic: number,
+  run: () => Promise<T>,
+): Promise<T> {
+  const locationBefore = Object.getOwnPropertyDescriptor(
+    globalThis,
+    'location',
+  );
+  const windowBefore = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  Object.defineProperty(globalThis, 'location', {
+    configurable: true,
+    value: { search },
+  });
+  Object.defineProperty(globalThis, 'window', {
+    configurable: true,
+    value: { previewFunds: { atomic, open: false } },
+  });
+  try {
+    return await run();
+  } finally {
+    if (locationBefore)
+      Object.defineProperty(globalThis, 'location', locationBefore);
+    else Reflect.deleteProperty(globalThis, 'location');
+    if (windowBefore) Object.defineProperty(globalThis, 'window', windowBefore);
+    else Reflect.deleteProperty(globalThis, 'window');
+  }
+}
+
+void test('preview funding follows the preview network', async () => {
+  const [{ previewFunding }, { PREVIEW_FUNDING }] = await Promise.all([
+    import('../../lab/tools/desktop-preview/funding'),
+    import('../../lab/tools/desktop-preview/constants'),
+  ]);
+  const observe = (search: string) =>
+    withPreviewGlobals(search, PREVIEW_FUNDING.READY_ATOMIC, () =>
+      previewFunding('payer').balance(),
+    );
+  assert.equal(await observe('?funding=ready&testnet=hidden'), null);
+  assert.equal(await observe('?funding=ready&network=mainnet'), null);
+  const testnet = await observe('?funding=ready&network=testnet');
+  assert.equal(testnet?.network, DEVNET);
+  assert.equal(
+    testnet?.balanceAtomic,
+    String(PREVIEW_FUNDING.READY_ATOMIC),
   );
 });
 

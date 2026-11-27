@@ -313,7 +313,7 @@ void test('preview model picker keeps one selection signal, short seller rows an
   );
   assert.match(
     css,
-    /\.preview-seller-flyout\)\s+\.dropdown-footer \{\n {2}margin-top: auto;/,
+    /\.preview-model-menu\[data-split\] \.preview-menu-actions,\nhtml \.app\.desktop-frame \.preview-seller-flyout \.dropdown-footer \{\n {2}margin-top: auto;/,
   );
   assert.match(
     css,
