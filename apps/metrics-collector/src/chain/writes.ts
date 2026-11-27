@@ -357,11 +357,13 @@ export function programCounts(
           },
         });
     }),
-    ...chunksFor(aggChainDirtyDays, rows).map((chunk) =>
-      orm
-        .insert(aggChainDirtyDays)
-        .values(chunk.map(({ day }) => ({ day })))
-        .onConflictDoNothing(),
+    ...chunksFor(aggChainDirtyDays, rows, 2).map((chunk) =>
+      ownedInsert(
+        orm,
+        aggChainDirtyDays,
+        chunk.map(({ day }) => ({ day })),
+        lease,
+      ).onConflictDoNothing(),
     ),
   ];
 }
