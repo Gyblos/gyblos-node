@@ -1,6 +1,7 @@
 import { CheckCircle, Info, Warning, WarningCircle } from '@phosphor-icons/react';
 import { useState } from 'react';
 
+import { PREVIEW_NETWORK } from '../../../../lab/tools/desktop-preview/constants';
 import { LOCAL_NODE_STATE, type LocalNodeState } from '../node-status';
 import { WALLET_STATUS } from '../wallet/model';
 import { LOCAL_NODE_LABELS } from './constants';
@@ -48,7 +49,7 @@ export function SystemStatus({ state, onRetry, onPayments }: { state: LocalNodeS
     update
       ? { label: 'Desktop app', value: 'Gyblos ' + update + ' is available', tone: TONE.INFO, action: { label: 'View update', run: () => { setOpen(false); openPreviewUpdate(); } } }
       : { label: 'Desktop app', value: 'Up to date', tone: TONE.SUCCESS },
-    { label: 'Network', value: network === 'Testnet' ? 'Testnet · test funds only' : 'Mainnet', tone: network === 'Testnet' ? TONE.INFO : TONE.SUCCESS },
+    { label: 'Network', value: network === PREVIEW_NETWORK.TESTNET ? 'Testnet · test funds only' : PREVIEW_NETWORK.MAINNET, tone: network === PREVIEW_NETWORK.TESTNET ? TONE.INFO : TONE.SUCCESS },
   );
   const nodeIssue = nodeTone(state) === TONE.DANGER;
   const issues = [

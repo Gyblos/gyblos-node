@@ -155,7 +155,6 @@
   "tests/control-wire.test.ts": 275283674,
   "tests/desktop-activity-empty-state.test.ts": 186764180,
   "tests/desktop-activity.test.ts": 715378470,
-  "tests/desktop-add-funds.test.ts": 573589841,
   "tests/desktop-agent-boundaries.test.ts": 1031856799,
   "tests/desktop-agent-secrets.test.ts": 282358860,
   "tests/desktop-agent-setup.test.ts": 1539626776,

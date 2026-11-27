@@ -14,7 +14,7 @@ void test('Add funds offers the faucet on Testnet only, from chat and Usage & pa
   assert.doesNotMatch(kit, /onClick=\{openPreviewFunds\}/);
   assert.match(
     kit,
-    /network === 'Testnet' \? <AddBuyerFunds \/> : <PreviewMainnetFunds \/>/,
+    /network === PREVIEW_NETWORK\.TESTNET \? <AddBuyerFunds \/> : <PreviewMainnetFunds \/>/,
   );
   const payments = await view('Payments.tsx.preview');
   assert.match(payments, /<PreviewFundsDialog host=\{FUNDS_HOST\.PAYMENTS\}/);

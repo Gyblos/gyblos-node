@@ -143,13 +143,16 @@ void test('preview refreshes the observed balance after a simulated top-up and w
 void test('preview re-enabling testnet clears the hidden network flags', async () => {
   const settings = await view('Settings.tsx.preview');
   const choose = settings.slice(settings.indexOf('function chooseShowTestnet'));
-  assert.match(choose, /params\.delete\(PREVIEW_QUERY\.NETWORK\)/);
-  assert.match(choose, /params\.delete\(PREVIEW_QUERY\.TESTNET\)/);
+  const functionEnd = choose.indexOf('window.dispatchEvent');
+  const toggle = choose.slice(0, functionEnd);
+  const showBranch = toggle.slice(0, toggle.indexOf('} else {'));
+  const hideBranch = toggle.slice(toggle.indexOf('} else {'));
+  assert.match(showBranch, /params\.delete\(PREVIEW_QUERY\.NETWORK\)/);
+  assert.match(showBranch, /params\.delete\(PREVIEW_QUERY\.TESTNET\)/);
   assert.ok(
     choose.indexOf('params.delete(PREVIEW_QUERY.NETWORK)') <
       choose.indexOf('function BuyerPreferences'),
   );
-  const hideBranch = choose.slice(choose.indexOf('} else {'));
   assert.match(
     hideBranch,
     /params\.set\(PREVIEW_QUERY\.NETWORK, PREVIEW_QUERY\.NETWORK_MAINNET\)/,
@@ -158,7 +161,6 @@ void test('preview re-enabling testnet clears the hidden network flags', async (
     hideBranch,
     /params\.set\(PREVIEW_QUERY\.TESTNET, PREVIEW_QUERY\.TESTNET_HIDDEN\)/,
   );
-  const showBranch = choose.slice(0, choose.indexOf('} else {'));
   assert.doesNotMatch(showBranch, /params\.set\(PREVIEW_QUERY/);
   assert.doesNotMatch(hideBranch, /params\.delete\(PREVIEW_QUERY/);
 });

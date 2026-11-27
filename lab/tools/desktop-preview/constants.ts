@@ -3,6 +3,11 @@ export const PREVIEW_DENSITY = {
   COMPACT: 'compact',
   COMFORTABLE: 'comfortable',
 } as const;
+export const PREVIEW_NETWORK = {
+  TESTNET: 'Testnet',
+  MAINNET: 'Mainnet',
+} as const;
+
 export const PREVIEW_QUERY = {
   NETWORK: 'network',
   NETWORK_MAINNET: 'mainnet',
