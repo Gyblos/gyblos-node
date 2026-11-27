@@ -6,7 +6,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, useSyn
 
 import { AGENT_TOOLS, type AgentTool } from '@gyblos/node/agent-setup-constants';
 
-import { CHAT_FILTER, CHAT_STATE, PREVIEW_DENSITY, PREVIEW_FUNDING } from '../../../../lab/tools/desktop-preview/constants';
+import { CHAT_FILTER, CHAT_STATE, PREVIEW_DENSITY, PREVIEW_FUNDING, PREVIEW_QUERY } from '../../../../lab/tools/desktop-preview/constants';
 import { DESKTOP_UPDATE } from '../constants';
 import { observeDesktopUpdates } from '../update-session';
 import type { BuyerFunding } from '../funding/model';
@@ -426,7 +426,7 @@ function settingsState() {
   const query = new URLSearchParams(location.search);
   window.previewSettings ??= {
     freeFallback: query.get('fallback') === 'on',
-    showTestnet: query.get('testnet') !== 'hidden',
+    showTestnet: query.get(PREVIEW_QUERY.TESTNET) !== PREVIEW_QUERY.TESTNET_HIDDEN,
     sellerMode: 'Auto',
   };
   return window.previewSettings;
@@ -581,7 +581,7 @@ function subscribeNetwork(listener: () => void) {
 export function usePreviewNetwork(): PreviewNetworkName {
   const showTestnet = usePreviewSetting('showTestnet');
   return useSyncExternalStore(subscribeNetwork, (): PreviewNetworkName =>
-    !showTestnet || new URLSearchParams(location.search).get('network') === 'mainnet' ? 'Mainnet' : 'Testnet',
+    !showTestnet || new URLSearchParams(location.search).get(PREVIEW_QUERY.NETWORK) === PREVIEW_QUERY.NETWORK_MAINNET ? 'Mainnet' : 'Testnet',
   );
 }
 

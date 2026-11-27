@@ -5,6 +5,7 @@ import { useState } from 'react';
 
 import { ActionButton } from './ActionButton';
 import { Appearance } from './Appearance';
+import { PREVIEW_QUERY } from '../../../../lab/tools/desktop-preview/constants';
 import { BUTTON_VARIANT } from './constants';
 import { Dropdown } from './Dropdown';
 import { FormField, FormInput } from './Form';
@@ -54,9 +55,14 @@ function buyerConfig(mode: SellerMode, freeFallback: boolean, showTestnet: boole
 }
 function chooseShowTestnet(show: boolean) {
   setPreviewSetting('showTestnet', show);
-  if (show) return;
   const params = new URLSearchParams(location.search);
-  params.set('network', 'mainnet');
+  if (show) {
+    params.delete(PREVIEW_QUERY.NETWORK);
+    params.delete(PREVIEW_QUERY.TESTNET);
+  } else {
+    params.set(PREVIEW_QUERY.NETWORK, PREVIEW_QUERY.NETWORK_MAINNET);
+    params.set(PREVIEW_QUERY.TESTNET, PREVIEW_QUERY.TESTNET_HIDDEN);
+  }
   history.replaceState(null, '', '?' + params.toString());
   window.dispatchEvent(new Event(PREVIEW_EVENT.NETWORK));
 }

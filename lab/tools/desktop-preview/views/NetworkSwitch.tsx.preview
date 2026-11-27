@@ -5,8 +5,8 @@ function PreviewNetwork() {
   const network = usePreviewNetwork();
   const choose = (next: (typeof PREVIEW_NETWORKS)[number]) => {
     const params = new URLSearchParams(location.search);
-    if (next === 'Mainnet') params.set('network', 'mainnet');
-    else params.delete('network');
+    if (next === 'Mainnet') params.set(PREVIEW_QUERY.NETWORK, PREVIEW_QUERY.NETWORK_MAINNET);
+    else params.delete(PREVIEW_QUERY.NETWORK);
     history.replaceState(null, '', '?' + params.toString());
     window.dispatchEvent(new Event(PREVIEW_EVENT.NETWORK));
   };
