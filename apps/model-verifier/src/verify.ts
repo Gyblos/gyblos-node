@@ -20,6 +20,7 @@ import { challengeSetDigest, type ChallengeSet } from './challenge-set';
 import {
   MODEL_VERIFIER_CODES,
   MODEL_VERIFIER_PHASES,
+  ModelVerifierError,
   SECRET_BYTES,
   SellerQuoteError,
   TEMPLATE_MARKER,
@@ -128,11 +129,21 @@ async function scoreAnswer(
       rendered + text.slice(0, at),
       rule.topLogprobs,
     );
-    if (candidates)
+    if (candidates) {
+      if (
+        candidates.length === 0 ||
+        candidates.some(
+          ({ token, logprob }) => token.length === 0 && logprob >= floor,
+        )
+      )
+        throw new ModelVerifierError(
+          MODEL_VERIFIER_CODES.REFERENCE_UNAVAILABLE,
+        );
       checks.push({
         at,
         deviation: isDeviation(text.slice(at), candidates, floor),
       });
+    }
   }
   return { challenge, prompt, text, digest, checks };
 }

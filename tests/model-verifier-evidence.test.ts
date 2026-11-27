@@ -178,7 +178,14 @@ void test(
         });
       if (url.pathname === ROUTES.ollamaGenerate)
         return Response.json({
-          logprobs: [{ top_logprobs: [{ token: ' w', logprob: -0.1 }] }],
+          logprobs: [
+            {
+              top_logprobs: Array.from({ length: 20 }, (_, index) => ({
+                token: index === 0 ? ' w' : ` token${index}`,
+                logprob: -0.1,
+              })),
+            },
+          ],
         });
       assert.fail('Unexpected Ollama route.');
     });

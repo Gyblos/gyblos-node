@@ -61,6 +61,16 @@ reference. A point where the declared model's most likely next token ends the
 answer is not counted: Ollama returns no probabilities there, so the point says
 nothing either way.
 
+An empty, incomplete or malformed candidate list is an invalid reference
+response, not a deviation by the seller. A complete list can contain empty
+display strings for non-matching low-probability alternatives, such as control
+or incomplete UTF-8 tokens; those entries are ignored. An empty alternative at
+or above the deviation probability floor is ambiguous, and a list with no usable
+non-empty token is invalid. If retries do not recover, the run stops with
+`REFERENCE_UNAVAILABLE` and does not issue a signed result. Ollama's display
+strings do not always preserve raw token bytes, so byte-level token fidelity
+remains a reference-runtime limitation.
+
 This approach needs no log probabilities from the seller and no protocol change,
 it tolerates sampling, and it works for any engine that serves an open-weight
 catalog model. An honest seller sampling from the declared model almost never
