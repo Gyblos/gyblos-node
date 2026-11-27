@@ -49,7 +49,10 @@ El verificador es de código abierto, así que cualquiera con [Ollama](https://o
 puede correr la misma verificación contra un vendedor y obtener un resultado comparable. Los pasos para correrlo
 están en la [nota de diseño del verificador](https://github.com/Gyblos/gyblos-node/blob/develop/docs/model-verifier.md#run-it) del repositorio.
 
-Cada corrida escribe el resultado firmado y, a su lado, un archivo de evidencia. La evidencia guarda las
-preguntas, las respuestas y cada comprobación, más cada respuesta que no se pudo puntuar y por qué, para que otra
-persona pueda revisar cómo se llegó al veredicto. `check` también rechaza un resultado cuyos recuentos de evidencia
-no pueden ajustarse al conjunto de pruebas publicado antes de mostrar el veredicto.
+Cada corrida escribe el resultado firmado y el archivo de evidencia juntos en un directorio nuevo. La
+publicación es atómica para quien lee, pero no hace fsync de los archivos ni de los directorios, así que un fallo
+del sistema operativo o un corte de energía todavía puede perder el directorio nuevo o dejar artefactos
+incompletos. Si usas `--out`, elige una ruta que todavía no exista. La evidencia guarda las preguntas, las
+respuestas y cada comprobación, más cada respuesta que no se pudo puntuar y por qué, para que otra persona pueda
+revisar cómo se llegó al veredicto. `check` también rechaza un resultado cuyos recuentos de evidencia no pueden
+ajustarse al conjunto de pruebas publicado antes de mostrar el veredicto.
