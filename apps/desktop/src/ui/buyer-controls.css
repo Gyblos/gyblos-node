@@ -364,28 +364,20 @@ html
   .preview-strategy-icon {
   color: var(--pk-success);
 }
-html .app.desktop-frame .pk-balance-line {
-  display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 6px;
-  margin: 0 0 4px;
-  padding: 2px 4px 8px 8px;
-  border-bottom: 1px solid var(--subtle-line);
-  font-size: 13px;
-  line-height: 18px;
-  color: var(--muted);
+html .app.desktop-frame .preview-menu-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+  border-top: 1px solid var(--line);
 }
-html .app.desktop-frame .pk-balance-line strong {
-  font-family: var(--font-mono);
-  font-weight: 500;
-  color: var(--ink);
-  overflow-wrap: anywhere;
+html .app.desktop-frame .preview-menu-actions .dropdown-footer {
+  flex: 1;
+  justify-content: center;
+  margin-top: 0;
+  border-top: 0;
 }
-html .app.desktop-frame .pk-balance-line strong[data-unavailable] {
-  font-family: inherit;
-  font-weight: inherit;
-  color: var(--muted);
+html .app.desktop-frame .preview-menu-actions .dropdown-footer span {
+  flex: none;
 }
 html .app.desktop-frame .preview-trigger-caret {
   color: var(--muted);
@@ -394,17 +386,4 @@ html .app.desktop-frame .pk-badge-line {
   display: flex;
   flex-basis: 100%;
   gap: 4px;
-}
-html .app.desktop-frame .pk-balance-line > svg {
-  flex: none;
-  color: var(--muted);
-}
-html .app.desktop-frame .pk-balance-line .ui-button.pk-balance-add {
-  gap: 4px;
-  min-height: 26px;
-  height: 26px;
-  margin-left: auto;
-  padding: 0 6px;
-  font-size: 12px;
-  font-weight: 500;
 }

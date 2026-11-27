@@ -50,8 +50,8 @@ This table governs the mockup. `CodeBlock`, `DetailSummary`, `Tag`,
 `statusTone`, `FilterChips`, `Delta`, `Savings`, `SegmentedBar`, `StatGrid`,
 `Panel`, `TableRow`, `AmountEditor`, `CompactAmount`, `PreviewAnswerSkeleton`,
 `Notice`, `Switch`, `PreviewFundsDialog`, `PreviewStatusBar`,
-`PreviewUpdateButton`, `PreviewSkeletonRows`, `PreviewEmptyLine`,
-`PreviewSectionIcon`, `Kbd`, `PreviewToaster` / `showPreviewToast`,
+`PreviewUpdateButton`, `PreviewSkeletonRows`, `PreviewInlineSpinner`,
+`PreviewEmptyLine`, `PreviewSectionIcon`, `Kbd`, `PreviewToaster` / `showPreviewToast`,
 `PreviewConversationPanel`, `PreviewConversationMenu`, `PreviewChatDetails`,
 `PreviewAgentLogos`, `previewIcon`
 exist only in the preview views until a port is approved; shipped desktop code
@@ -63,7 +63,7 @@ its transcript, draft and archive entry, and keep payment journals and receipts.
 | Need                              | Use                                                                                                                                                                                                | Not                                                    |
 | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
 | Button, icon-only button          | `Button`, `IconButton` (`./UI`); collapsible header action `ActionButton` (`./ActionButton`)                                                                                                       | raw `<button>` with its own styles                     |
-| Chat model menu balance           | `ModelMenuBalance` with a payer-scoped observation and Add funds action                                                                                                                            | custom wallet rows in pickers                          |
+| Chat model menu funds action      | compact footer actions in the model picker; the composer tab owns the balance                                                                                                                      | duplicated balance rows in pickers                     |
 | Pick one value from a list        | `Dropdown` + `MenuItem role="menuitemradio"`                                                                                                                                                       | native `<select>`                                      |
 | Pick among 2-5 visible options    | `FilterChips` (counts) or `ChoiceCard` (`./UI`)                                                                                                                                                    | ad-hoc pill rows                                       |
 | Turn a global setting on or off   | `Switch` in a settings row                                                                                                                                                                         | checkbox or custom toggle                              |
@@ -130,6 +130,7 @@ Compact density adds these shared pieces; each renders the comfortable markup, o
 | Need                                 | Use                                                                                            |
 | ------------------------------------ | ---------------------------------------------------------------------------------------------- |
 | Loading list                         | `PreviewSkeletonRows` with `count`                                                             |
+| Inline loading beside text           | `PreviewInlineSpinner` with adjacent text naming what is loading                               |
 | Empty list or search                 | `PreviewEmptyLine` with an `icon` and one line of text                                         |
 | Settings header icon                 | `Section` `icon` with `PreviewSectionIcon`                                                     |
 | Menu or header glyph                 | `previewIcon(size)`: 16 px with a 1.5 px stroke (`bold`) in compact density                    |
