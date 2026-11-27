@@ -169,6 +169,33 @@ to an owned `/tmp/gyb-paid-chat-tokenizer-*` (or `/private/tmp/...`) home
 prepared with `prepareModelTokenizer`. The test re-checks both artifact hashes
 and refuses any other location. Without the variable it is skipped.
 
+### Delegated channel renewal with OpenCode and fetch
+
+The driver uses the actual local buyer HTTP endpoint, a synthetic funded seller
+and an isolated spending key. On macOS with native Iroh and the OpenCode CLI,
+run all three scenarios:
+
+```sh
+OPENCODE_BIN="$HOME/.opencode/bin/opencode" node --import tsx tests/lab/opencode-renewal.ts
+```
+
+To run only the direct HTTP scenario on a supported native platform:
+
+```sh
+node --import tsx tests/lab/opencode-renewal.ts --fetch-only
+```
+
+Each scenario starts with fresh homes and spends through normal paid requests
+until the remaining escrow is below the next quote. The direct fetch and
+OpenCode scenarios verify a complete paid answer on the replacement. The mixed
+scenario additionally holds the opening while two fetch requests reach the buyer
+alongside the active OpenCode turn. Assertions count seller dispatches, accepted
+approvals and deposits, match the original charge and refund, and check the
+shared key balance. The client reports cold and warm first visible text, first
+text during renewal, and the synthetic hold time in milliseconds. OpenCode CLI
+timings include process startup. Each CLI invocation is bounded at 55 seconds.
+Each scenario allows 180 seconds including setup and conditioning.
+
 ### Agent tool loop
 
 `tools-acceptance.test.ts` runs the product seller and `buyer:free` with a

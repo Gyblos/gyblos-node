@@ -139,9 +139,10 @@ export function httpMultiError(
 
 // Native HTTP diagnostics observe admission/body consumption and server-side close, never payloads.
 export function httpMultiHttpObservation(
-  host: HttpMultisellerHost,
+  host: { buyer(): { url: string } },
   marker: string,
 ) {
+  const arrived = batchDeferred<void>();
   const bodyRead = batchDeferred<void>();
   const closed = batchDeferred<void>();
   const events = channel('http.server.request.start');
@@ -165,6 +166,7 @@ export function httpMultiHttpObservation(
       value.request.socket.localPort !== Number(new URL(host.buyer().url).port)
     )
       return;
+    arrived.resolve();
     request = value.request;
     response = value.response;
     request.once('end', bodyRead.resolve);
@@ -172,6 +174,7 @@ export function httpMultiHttpObservation(
   };
   events.subscribe(incoming);
   return {
+    arrived: arrived.promise,
     bodyRead: bodyRead.promise,
     closed: closed.promise,
     dispose() {
