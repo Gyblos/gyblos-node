@@ -329,10 +329,13 @@ void test('the three APIs keep the HTTP stream status and expose the key review 
           /text\/event-stream/,
         );
         const stream = await response.text();
-        const terminal = stream
-          .trimEnd()
-          .split(/\r?\n\r?\n/)
-          .at(-1);
+        const frames = stream.split(/\r?\n\r?\n/);
+        assert.equal(
+          frames.pop(),
+          '',
+          'The terminal SSE frame must end with a blank line',
+        );
+        const terminal = frames.at(-1);
         assert.ok(terminal);
         const names = terminal
           .split(/\r?\n/)
