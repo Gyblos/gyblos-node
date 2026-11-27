@@ -68,10 +68,14 @@ export async function openBuyerIdentityState(
     return {
       async known(nodeId: string) {
         if (failed) identityStateUnavailable();
-        const bytes = await readIdentityFile(path);
-        return (
-          bytes !== undefined && parseIdentityStates(bytes, scope).has(nodeId)
-        );
+        try {
+          const bytes = await readIdentityFile(path);
+          return (
+            bytes !== undefined && parseIdentityStates(bytes, scope).has(nodeId)
+          );
+        } catch {
+          return false;
+        }
       },
       async evaluate(
         input: BuyerIdentityInput,

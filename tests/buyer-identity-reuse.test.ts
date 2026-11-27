@@ -1,7 +1,7 @@
 // Exercises public identity reuse with deterministic clocks, synthetic signed accounts and loopback RPC.
 // No real chain, funded keys, discovery trust or operator data is used.
 import assert from 'node:assert/strict';
-import { readFile, realpath, writeFile } from 'node:fs/promises';
+import { readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import test from 'node:test';
 
@@ -198,6 +198,30 @@ void test('a reused binding whose row another process pruned is read from the re
     const calls = f.rpc.state.calls.length;
     assert.equal((await verifier.verify(f.subject)).ok, true);
     assert.ok(f.rpc.state.calls.length > calls);
+  } finally {
+    await f.close();
+  }
+});
+
+void test('a cache check that cannot read the history falls back to the registry', async () => {
+  const f = await fixture();
+  try {
+    const verifier = await openBuyerIdentityVerifier(f.environment, f.rpc.rpc, {
+      configuredNodeIds: [],
+    });
+    assert.equal((await verifier.verify(f.subject)).ok, true);
+    const file = join(
+      homeLayout(f.environment).roles.buyer,
+      ROLE_FILES.identityState,
+    );
+    const saved = await readFile(file, 'utf8');
+    await rm(file);
+    await symlink(join(file, '..', 'missing'), file);
+    const calls = f.rpc.state.calls.length;
+    await assert.rejects(verifier.verify(f.subject));
+    assert.ok(f.rpc.state.calls.length > calls);
+    await rm(file);
+    await writeFile(file, saved, { mode: 0o600 });
   } finally {
     await f.close();
   }
