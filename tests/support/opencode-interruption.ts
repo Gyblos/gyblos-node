@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 
+import { DIAGNOSTIC_LEVELS } from '@gyblos/runtime/constants';
+import {
+  createDiagnostics,
+  diagnosticCause,
+  type DiagnosticSink,
+} from '@gyblos/runtime/diagnostics';
+
+import { OPENCODE_PROXY_DIAGNOSTICS } from './paid-acceptance-constants';
+
 export const interruptedFragment = 'a'.repeat(64) + ' ';
 export async function interruptedGeneration(
   onText: ((text: string) => Promise<void>) | undefined,
@@ -15,24 +24,35 @@ export async function interruptedGeneration(
     }),
   );
 }
-export type ProxyStage = 'input' | 'upstream' | 'stream';
+type Phases = typeof OPENCODE_PROXY_DIAGNOSTICS.phases;
+export type ProxyStage = Phases[keyof Phases];
 export function interruptionProxy(options: {
   upstream(init: RequestInit): Promise<Response>;
   headers(response: Response): Promise<void>;
   cut(seen: string): Promise<boolean>;
-  disconnected(): void;
+  disconnected?(): void;
+  diagnostics?: DiagnosticSink;
   failure(stage: ProxyStage): void;
 }) {
+  const { phases, codes } = OPENCODE_PROXY_DIAGNOSTICS;
+  const diagnostics = createDiagnostics({
+    ...OPENCODE_PROXY_DIAGNOSTICS,
+    phases: Object.values(phases),
+    codes: Object.values(codes),
+    sink: options.diagnostics,
+    level: DIAGNOSTIC_LEVELS.DEBUG,
+  });
   return createServer(async (req, res) => {
+    const observation = diagnostics.start();
     const signal = new AbortController();
     res.on('close', () => signal.abort());
-    let stage: ProxyStage = 'input';
+    let stage: ProxyStage = phases.INPUT;
     let plannedCut = false;
     try {
       const chunks: Buffer[] = [];
       for await (const chunk of req) chunks.push(chunk);
       assert.equal(req.url, '/v1/chat/completions');
-      stage = 'upstream';
+      stage = phases.UPSTREAM;
       const response = await options.upstream({
         method: 'POST',
         headers: {
@@ -58,7 +78,7 @@ export function interruptionProxy(options: {
           ),
         ),
       );
-      stage = 'stream';
+      stage = phases.STREAM;
       assert.ok(response.body);
       let seen = '';
       for await (const bytes of response.body) {
@@ -68,13 +88,20 @@ export function interruptionProxy(options: {
           plannedCut = true;
           res.destroy();
           signal.abort();
-          options.disconnected();
+          options.disconnected?.();
           return;
         }
       }
       res.end();
-    } catch {
-      if (!plannedCut) options.failure(stage);
+    } catch (error) {
+      if (!plannedCut) {
+        observation.report({
+          phase: stage,
+          code: codes.FAILED,
+          cause: diagnosticCause(error),
+        });
+        options.failure(stage);
+      }
       res.destroy();
     }
   });

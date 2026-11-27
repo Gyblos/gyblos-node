@@ -44,7 +44,7 @@ if (isMain(import.meta.url)) {
   const originalFetch = fetch;
   const start = performance.now();
   const now = () => Math.round(performance.now() - start);
-  const cutSignal = new AbortController();
+  const teardown = new AbortController();
   const failures: ProxyStage[] = [];
   const answer = 'The next answer arrived.';
   let phase = 'warmup';
@@ -74,13 +74,10 @@ if (isMain(import.meta.url)) {
       const text = answer;
       if (phase === 'interrupt' && partialRuns === 0) {
         partialRuns++;
+        assert.ok(input.signal);
         return interruptedGeneration(
           input.onText,
-          AbortSignal.any(
-            input.signal
-              ? [input.signal, cutSignal.signal]
-              : [cutSignal.signal],
-          ),
+          AbortSignal.any([input.signal, teardown.signal]),
         );
       } else await input.onText?.(text);
       return {
@@ -113,10 +110,9 @@ if (isMain(import.meta.url)) {
       console.log('CUT', cut, 'approvals', host.finance.approvals());
       return true;
     },
-    disconnected: () => cutSignal.abort(),
+    diagnostics: (record) => console.log(JSON.stringify(record)),
     failure(stage) {
       failures.push(stage);
-      console.log('PROXY_FAILURE', phase, stage);
     },
   });
   try {
@@ -335,7 +331,7 @@ if (isMain(import.meta.url)) {
       }
     }
   } finally {
-    cutSignal.abort();
+    teardown.abort();
     proxy.closeAllConnections();
     proxy.close();
     try {

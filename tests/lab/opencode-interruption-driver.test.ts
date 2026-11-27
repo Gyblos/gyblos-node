@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import {
+  diagnosticRecord,
+  type DiagnosticRecord,
+} from '@gyblos/runtime/diagnostics';
+
+import { OPENCODE_PROXY_DIAGNOSTICS } from '../support/paid-acceptance-constants';
+
 void test('the OpenCode driver can be imported without a binary or startup side effects', async () => {
   await import('./opencode-interruption');
 });
@@ -27,6 +34,7 @@ void test('the signed prefix remains the only output until the downstream cut', 
 void test('the proxy distinguishes upstream and streaming failures from the intentional cut', async (t) => {
   const { interruptionProxy } =
     await import('../support/opencode-interruption');
+  const records: DiagnosticRecord[] = [];
   const phases: string[] = [];
   let step = 0;
   let cutCount = 0;
@@ -48,6 +56,9 @@ void test('the proxy distinguishes upstream and streaming failures from the inte
     disconnected: () => {
       cutCount++;
     },
+    diagnostics: (record) => {
+      records.push(record);
+    },
     failure: (stage) => phases.push(stage),
   });
   t.after(
@@ -67,5 +78,13 @@ void test('the proxy distinguishes upstream and streaming failures from the inte
       .then((res) => res.text())
       .catch(() => undefined);
   assert.deepEqual(phases, ['upstream', 'stream']);
+  assert.deepEqual(
+    records.map((record) => [diagnosticRecord(record)?.phase, record.code]),
+    ['upstream', 'stream'].map((phase) => [
+      phase,
+      OPENCODE_PROXY_DIAGNOSTICS.codes.FAILED,
+    ]),
+  );
+  assert.ok(!JSON.stringify(records).includes('private synthetic canary'));
   assert.equal(cutCount, 1);
 });

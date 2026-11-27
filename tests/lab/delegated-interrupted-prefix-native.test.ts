@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { once } from 'node:events';
 import test from 'node:test';
 
 import { batchSessionPathsIn } from '@gyblos/config';
@@ -25,18 +26,20 @@ void test(
   async (t) => {
     const request = globalThis.fetch;
     const cut = new AbortController();
+    let sellerStopped: Promise<unknown> | undefined;
     const host = await sessionProductHost(undefined, undefined, {
       meter: { ...blockTestMeter, output: blockTestMeter.count },
       contextTokens: 64000,
       maxTokens: 160,
       observe: () => {},
-      generate: (input) =>
-        interruptedGeneration(
-          input.onText,
-          AbortSignal.any(
-            input.signal ? [cut.signal, input.signal] : [cut.signal],
-          ),
-        ),
+      generate: (input) => {
+        assert.ok(input.signal);
+        sellerStopped = once(input.signal, 'abort', {
+          signal: AbortSignal.timeout(8000),
+        });
+        void sellerStopped.catch(() => undefined);
+        return interruptedGeneration(input.onText, input.signal);
+      },
     });
     t.after(async () => {
       cut.abort();
@@ -81,6 +84,8 @@ void test(
       }
     }
     assert.ok(cut.signal.aborted);
+    assert.ok(sellerStopped);
+    await sellerStopped;
     await host.restartBuyer();
     assert.equal((await status()).blocked, true);
     const stored = await inspectBatchSession(
@@ -88,7 +93,7 @@ void test(
     );
     assert.ok(stored?.snapshot.channelId);
     const { channelId, cumulativeAtomic } = stored.snapshot;
-    assert.ok(BigInt(cumulativeAtomic) > 0n);
+    assert.equal(cumulativeAtomic, '136');
     host.finance.settled.set(channelId, {
       channelId,
       chargedAtomic: cumulativeAtomic,
@@ -100,7 +105,7 @@ void test(
     await host.restartBuyer();
     const after = await status();
     assert.equal(after.blocked, false);
-    assert.equal(after.keys[0]?.spentAtomic, cumulativeAtomic);
+    assert.equal(after.keys[0]?.spentAtomic, '136');
     assert.equal(after.keys[0]?.reservedAtomic, '0');
     assert.equal(host.finance.approvals(), 1);
     assert.deepEqual(host.finance.calls, ['deposit']);

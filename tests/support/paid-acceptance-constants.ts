@@ -57,3 +57,10 @@ export interface PaidAcceptanceReport {
   confirmedReceipts: number;
   telemetryEvents: number;
 }
+
+export const OPENCODE_PROXY_DIAGNOSTICS = {
+  component: 'lab-opencode',
+  operation: 'proxy',
+  phases: { INPUT: 'input', UPSTREAM: 'upstream', STREAM: 'stream' },
+  codes: { FAILED: 'PROXY_REQUEST_FAILED' },
+} as const;
