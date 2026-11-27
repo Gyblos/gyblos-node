@@ -167,7 +167,11 @@ that require them don't work. In every client, turn off HTTP and stream retries.
 
 Send `tools` as each API defines them. When the model wants a tool, the answer ends with
 `finish_reason: "tool_calls"` (Anthropic: `stop_reason: "tool_use"`) and carries the call. Your program
-runs the tool and sends the result back in the next request, with the whole conversation:
+runs the tool and sends the result back in the next request, with the whole conversation. A tool description
+longer than 8 KiB is shortened to fit. More than 128 tools gets an error for the whole list; a name that is not 1
+to 64 letters, digits, `_` or `-`, a repeated name, or a schema over 64 KiB gets an error naming the tool, such as
+`tools[3]: ...`. In the Chat Completions and Messages formats, prompt-cache marks and reasoning fields from other
+providers in the history are ignored:
 
 ```js
 import OpenAI from 'openai';
@@ -275,6 +279,8 @@ finishes, and `usage` counts everything it generated.
 The table gives the HTTP status before the response headers are sent. For a key review, the buyer sends `x-should-retry: false`. Configure your client to stop automatic retries while the ledger requires review. For a key review in a Responses JSON body, the Gyblos code appears in `error.code` for a verified unsent request or `error.gyblos_code` after possible dispatch.
 
 Once streaming starts, the HTTP status stays 200. Chat Completions sends a final data event with `error.code`. Anthropic Messages sends an `error` event with `error.code`. Responses sends a `response.failed` event with `response.error.gyblos_code`.
+
+If the buyer confirms a cancellation before payment preparation and dispatch, the reserved allowance becomes available again.
 
 Errors use each API's own shape, so SDKs raise their usual exceptions. For other problems, see
 [Troubleshooting](/en/help/troubleshooting#buyer-and-desktop).

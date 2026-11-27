@@ -2,7 +2,7 @@
 // Never stores prompts, signed offers, authorization journals or private identity material.
 import { randomUUID } from 'node:crypto';
 import { constants } from 'node:fs';
-import { lstat, mkdir, open, rename, rm } from 'node:fs/promises';
+import { link, lstat, mkdir, open, rename, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { FILE_MODES } from '@gyblos/config';
@@ -31,6 +31,29 @@ import { BuyerSelectionError } from './selection-config';
 
 function unavailable(): never {
   throw new BuyerSelectionError(BUYER_SELECTION_CODES.DISCOVERY_STATE);
+}
+async function acquireLock(lock: string) {
+  for (let attempts = 0; ; attempts += 1) {
+    try {
+      return await open(lock, 'wx', FILE_MODES.privateFile);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST' || attempts > 0)
+        throw error;
+    }
+    const claim = `${lock}.${randomUUID()}.claim`;
+    try {
+      await rename(lock, claim);
+    } catch {
+      continue;
+    }
+    const info = await lstat(claim);
+    if (Date.now() - info.mtimeMs < BUYER_DISCOVERY.lockStaleMs) {
+      await link(claim, lock).catch(() => undefined);
+      await rm(claim, { force: true });
+      unavailable();
+    }
+    await rm(claim, { force: true });
+  }
 }
 async function privateDirectory(directory: string) {
   try {
@@ -206,7 +229,7 @@ export async function buyerDiscoveryState(
       try {
         if (failed) unavailable();
         await privateDirectory(directory);
-        handle = await open(lock, 'wx', FILE_MODES.privateFile);
+        handle = await acquireLock(lock);
         const current = await readMonotonicRows(
           path,
           rows,
@@ -232,8 +255,15 @@ export async function buyerDiscoveryState(
       } finally {
         try {
           if (handle) {
+            const held = await handle.stat();
+            const onDisk = await lstat(lock).catch(() => undefined);
             await handle.close();
-            await rm(lock);
+            if (
+              onDisk !== undefined &&
+              onDisk.dev === held.dev &&
+              onDisk.ino === held.ino
+            )
+              await rm(lock);
           }
         } catch {
           failed = true;

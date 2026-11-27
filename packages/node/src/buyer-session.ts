@@ -4,6 +4,7 @@ import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
 import { recountSessionInput } from '@gyblos/core/session-input';
 import type { BatchStoredSession } from '@gyblos/payments-upto/batch-session';
 import { verifyBatchQuote } from '@gyblos/protocol/batch-channel';
+import { BuyerApiKeyError } from '@gyblos/protocol/buyer-api-keys';
 import { CONTROL_METERING_MODES } from '@gyblos/protocol/constants';
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
 import type { ChatTokenizer } from '@gyblos/protocol/engine';
@@ -24,9 +25,11 @@ import type {
 import { createBuyerBatchSession } from './batch-buyer';
 import type { BuyerBatchSessionOptions } from './batch-buyer-types';
 import {
+  channelTurnAuthority,
   prepareNewChannel,
   UnsentChannelRequestError,
   type PreparedChannel,
+  type StartChannelWork,
 } from './buyer-channel-prepare';
 import { UnsentOpeningError } from './buyer-opening-retry';
 import { checkPreviousOpening, disposeAbsent } from './buyer-opening-state';
@@ -48,6 +51,10 @@ export { UnsentChannelRequestError } from './buyer-channel-prepare';
 export interface BuyerSessionOptions<Remote extends BatchDestination> {
   // Known capability of the financial adapter. Unspecified adapters negotiate after construction.
   financialPermission?: BuyerBatchSessionOptions<Remote>['financialPermission'];
+  authorizeRequest?: (
+    quote: SignedOfferV2,
+    signal: AbortSignal,
+  ) => Promise<(() => Promise<void>) | undefined>;
   onDeclined?: BuyerBatchSessionOptions<Remote>['onDeclined'];
   beforeInference?: BuyerBatchSessionOptions<Remote>['beforeInference'];
   switchingAllowed?(): Promise<boolean>;
@@ -81,9 +88,10 @@ export interface State<Remote extends BatchDestination> {
 function getBackend<Remote extends BatchDestination>(
   state: State<Remote>,
   signal: AbortSignal,
+  start: StartChannelWork,
 ) {
   if (!state.backend) {
-    const pending = state.options.backend();
+    const pending = start(() => state.options.backend());
     state.backend = pending;
     void pending.catch(() => {
       if (state.backend === pending) state.backend = undefined;
@@ -91,62 +99,68 @@ function getBackend<Remote extends BatchDestination>(
   }
   return bounded(state.backend, signal);
 }
+function verifyOpeningQuote<Remote extends BatchDestination>(
+  options: BuyerSessionOptions<Remote>,
+  quote: SignedOfferV2,
+  terms: PaymentSessionTerms,
+) {
+  return verifyBatchQuote(
+    quote,
+    terms,
+    options.endpoint.id().toString(),
+    options.now(),
+  );
+}
 async function openCurrent<Remote extends BatchDestination>(
   state: State<Remote>,
   quote: SignedOfferV2 | undefined,
   signal: AbortSignal,
+  start: StartChannelWork,
 ): Promise<Current<Remote>> {
   const options = state.options;
   const stored = await bounded(options.inspect(), signal);
   if (stored?.notCreated || stored?.openingReturned) {
     if (!quote) return sessionFail(SESSION_CODES.CLOSED);
-    const backend = await getBackend(state, signal);
-    if (!backend.renew) return sessionFail(SESSION_CODES.CLOSED);
     const replacement = replacementTerms(
       options.policy,
       options.now,
       quote,
       stored.priorSpentAtomic,
     )('0');
-    await verifyBatchQuote(
-      quote,
-      replacement,
-      options.endpoint.id().toString(),
-      options.now(),
-    );
-    signal.throwIfAborted();
-    await backend.renew(
-      stored.snapshot.channelId,
-      replacement,
-      options.policy.depositAtomic,
+    await verifyOpeningQuote(options, quote, replacement);
+    const switching =
       stored.terms.sellerNodeId !== replacement.sellerNodeId &&
-        (await options.switchingAllowed?.()),
+      (await options.switchingAllowed?.());
+    const backend = await getBackend(state, signal, start);
+    const renew = backend.renew?.bind(backend);
+    if (!renew) return sessionFail(SESSION_CODES.CLOSED);
+    await start(() =>
+      renew(
+        stored.snapshot.channelId,
+        replacement,
+        options.policy.depositAtomic,
+        switching,
+      ),
     );
     const renewed = await options.inspect();
     if (!renewed || renewed.notCreated || renewed.openingReturned)
       return sessionFail(SESSION_CODES.UNVERIFIED);
-    return openCurrent(state, quote, signal);
+    return openCurrent(state, quote, signal, start);
   }
   const terms =
     stored?.terms ??
     (quote ? newSessionTerms(quote, options.policy, options.now()) : undefined);
   if (!terms) return sessionFail(SESSION_CODES.UNAVAILABLE);
-  if (quote && !stored)
-    await verifyBatchQuote(
-      quote,
-      terms,
-      options.endpoint.id().toString(),
-      options.now(),
-    );
+  if (quote && !stored) await verifyOpeningQuote(options, quote, terms);
   const preparation =
     quote && !stored && options.openingSupportsBlocks !== undefined
-      ? await prepareNewChannel(options, quote, terms, signal)
+      ? await start(() => prepareNewChannel(options, quote, terms, signal))
       : options.preparation;
   signal.throwIfAborted();
   const destination = options.destination(terms);
-  const backend = await getBackend(state, signal);
+  const backend = await getBackend(state, signal, start);
   signal.throwIfAborted();
-  const financial = await backend.create(terms);
+  const financial = await start(() => backend.create(terms));
   try {
     if (signal.aborted || state.lifetime.signal.aborted)
       return sessionFail(SESSION_CODES.UNAVAILABLE);
@@ -173,9 +187,10 @@ function current<Remote extends BatchDestination>(
   state: State<Remote>,
   quote: SignedOfferV2 | undefined,
   signal: AbortSignal,
+  start: StartChannelWork = (work) => work(),
 ) {
   if (!state.current) {
-    const pending = openCurrent(state, quote, signal);
+    const pending = openCurrent(state, quote, signal, start);
     state.current = pending;
     void pending.catch(() => {
       if (state.current === pending) state.current = undefined;
@@ -187,15 +202,15 @@ async function run<Remote extends BatchDestination>(
   state: State<Remote>,
   quote: SignedOfferV2,
   input: FreeExecutionBuildInput,
-  external: AbortSignal,
+  signal: AbortSignal,
+  start: StartChannelWork,
   onDelta?: (text: string) => Promise<void>,
 ) {
-  const signal = AbortSignal.any([external, state.lifetime.signal]);
   recountSessionInput(quote, input, state.options.meter);
   await bounded(state.options.verify(quote, signal), signal);
   if (await bounded(state.options.unresolved(), signal))
     return sessionFail(SESSION_CODES.UNVERIFIED);
-  const opened = await current(state, quote, signal);
+  const opened = await current(state, quote, signal, start);
   if (
     BigInt(opened.priorSpentAtomic) + BigInt(opened.terms.depositAtomic) >
       BigInt(state.options.policy.depositAtomic) ||
@@ -212,23 +227,23 @@ async function run<Remote extends BatchDestination>(
     opened.terms.owner !== quote.offer.owner;
   if (switching && !(await state.options.switchingAllowed?.()))
     throw new UnsentSellerBusyError(quote.offer.nodeId);
-  const renew = () => renewable(state, opened, quote, signal, switching);
+  const renew = () => renewable(state, opened, quote, signal, switching, start);
   const ready =
     switching && state.options.financialPermission
       ? await state.options.financialPermission(renew)
       : await renew();
   const before = ready.financial.snapshot();
-  const value = await ready.host
-    .execute(quote, input, signal, onDelta)
-    .catch(async (error: unknown) => {
-      if (
-        error instanceof UnsentOpeningError &&
-        error.code === SESSION_CODES.OPENING_ABSENT
-      ) {
-        await disposeAbsent(state, ready);
-      }
-      throw error;
-    });
+  const value = await start(() =>
+    ready.host.execute(quote, input, signal, onDelta),
+  ).catch(async (error: unknown) => {
+    if (
+      error instanceof UnsentOpeningError &&
+      error.code === SESSION_CODES.OPENING_ABSENT
+    ) {
+      await disposeAbsent(state, ready);
+    }
+    throw error;
+  });
   const after = ready.financial.snapshot();
   return {
     value,
@@ -248,6 +263,7 @@ async function renewable<Remote extends BatchDestination>(
   quote: SignedOfferV2,
   signal: AbortSignal,
   switching: boolean,
+  start: StartChannelWork,
 ): Promise<Current<Remote>> {
   const backend = await state.backend!;
   const plan = await prepareRenewal(
@@ -257,9 +273,12 @@ async function renewable<Remote extends BatchDestination>(
     signal,
     switching,
     !!backend.renew,
+    start,
   ).catch((cause: unknown) => {
     if (
+      signal.aborted ||
       !switching ||
+      cause instanceof BuyerApiKeyError ||
       cause instanceof UnsentSellerBusyError ||
       cause instanceof UnsentChannelLimitError
     )
@@ -268,14 +287,16 @@ async function renewable<Remote extends BatchDestination>(
   });
   if (!plan) return opened;
   state.current = undefined;
-  await backend.renew!(
-    plan.channelId,
-    plan.terms,
-    state.options.policy.depositAtomic,
-    switching,
+  await start(() =>
+    backend.renew!(
+      plan.channelId,
+      plan.terms,
+      state.options.policy.depositAtomic,
+      switching,
+    ),
   );
   signal.throwIfAborted();
-  return current(state, quote, signal);
+  return current(state, quote, signal, start);
 }
 
 async function unresolved<Remote extends BatchDestination>(
@@ -325,10 +346,24 @@ export function createBuyerSessionManager<Remote extends BatchDestination>(
       onDelta?: (text: string) => Promise<void>,
     ) {
       if (state.active) return sessionFail(SESSION_CODES.BUSY);
+      const currentSignal = AbortSignal.any([signal, state.lifetime.signal]);
+      const authority = channelTurnAuthority(
+        options.authorizeRequest,
+        quote,
+        currentSignal,
+      );
       state.active = true;
       try {
-        return await run(state, quote, data, signal, onDelta);
+        return await run(
+          state,
+          quote,
+          data,
+          currentSignal,
+          authority.start,
+          onDelta,
+        );
       } finally {
+        await authority.settled();
         state.active = false;
       }
     },

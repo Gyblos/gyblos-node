@@ -177,11 +177,13 @@ has a single-process lock and durable writes. It stores no prompts, responses or
 signed payments. After a restart, keys keep their limits and usage, and a
 configured client keeps working with the same key.
 
-An interrupted paid reservation, a failed write or an inconsistent state fails
-closed. Unknown reservations also block operator inference and the creation of
-new keys. Revocation stays available and does not clear an obligation. The buyer
-does not reconcile a delegated reservation from financial history; inspect the
-payment state with the [recovery](recovery.md) commands first.
+A cancellation proven to precede financial preparation and dispatch releases its
+own reservation. An interrupted paid reservation, a failed write or an
+inconsistent state fails closed. Unknown reservations also block operator
+inference and the creation of new keys. Revocation stays available and does not
+clear an obligation. The buyer does not reconcile a delegated reservation from
+financial history; inspect the payment state with the [recovery](recovery.md)
+commands first.
 
 > **Warning:** Never delete the permission ledger or its lock to resume
 > spending, and never restore an older copy. Doing so erases recorded
