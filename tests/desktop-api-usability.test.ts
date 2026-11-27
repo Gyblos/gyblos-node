@@ -120,7 +120,11 @@ void test('revealing a key is explicit, main-frame scoped, transient and unavail
 });
 
 void test('HTTP and streaming failures reach the desktop as static guidance with one prompt attempt', async () => {
-  for (const streaming of [false, true]) {
+  for (const [streaming, limit] of [
+    [false, false],
+    [true, false],
+    [false, true],
+  ] as const) {
     let posts = 0;
     const budget = new X402Budget({
       read: async () => undefined,
@@ -130,7 +134,9 @@ void test('HTTP and streaming failures reach the desktop as static guidance with
       if (options?.method !== 'POST') return Response.json(policy);
       posts++;
       const error = {
-        code: FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE,
+        code: limit
+          ? FREE_EXECUTION_CODES.LIMIT
+          : FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE,
         reason: FREE_EXECUTION_STOP_REASONS.ENGINE_TIMEOUT,
         message: 'PRIVATE_CANARY_DO_NOT_REFLECT',
       };
@@ -167,7 +173,12 @@ void test('HTTP and streaming failures reach the desktop as static guidance with
           },
         ],
       );
-      assert.match(result.error ?? '', /did not finish in time/);
+      if (limit)
+        assert.equal(
+          parseX402Result(result).failureReason,
+          FREE_EXECUTION_CODES.LIMIT,
+        );
+      else assert.match(result.error ?? '', /did not finish in time/);
       assert.match(result.error ?? '', /not retried/);
       assert.doesNotMatch(
         JSON.stringify(result),
@@ -263,6 +274,23 @@ for (const [code, neverSent, reason] of [
         ],
       );
       assert.match(unconfirmed.error ?? '', /select a seller/i);
+      assert.equal(posts, 0);
+      const stale = await handler(
+        { sender: contents, senderFrame: mainFrame },
+        [
+          {
+            action: X402_ACTION.SEND,
+            offerId: 'stale',
+            policyId: paid.policyId,
+            id: 'stale-request',
+            prompt: 'synthetic',
+          },
+        ],
+      );
+      assert.equal(
+        parseX402Result(stale).failureReason,
+        CHAT_FAILURE.STALE_OFFER,
+      );
       assert.equal(posts, 0);
       const result = await handler(
         { sender: contents, senderFrame: mainFrame },

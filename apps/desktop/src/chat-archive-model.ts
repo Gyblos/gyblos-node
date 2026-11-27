@@ -117,8 +117,10 @@ function parseMessage(value: unknown): ArchivedMessage | null {
       (!failureReason ||
         role !== CHAT_ROLE.ASSISTANT ||
         (state !== MESSAGE_STATE.FAILED && state !== MESSAGE_STATE.STOPPED) ||
-        (method !== PAYMENT_METHOD.USDC &&
-          failureReason !== CHAT_FAILURE.INTERRUPTED))) ||
+        (failureReason === CHAT_FAILURE.PAYPAL_PROMPT_TOO_LONG
+          ? method !== PAYMENT_METHOD.PAYPAL
+          : method !== PAYMENT_METHOD.USDC &&
+            failureReason !== CHAT_FAILURE.INTERRUPTED))) ||
     ('metrics' in item && (!metrics || role !== CHAT_ROLE.ASSISTANT)) ||
     ('reasoning' in item && (!reasoning || method !== PAYMENT_METHOD.USDC)) ||
     !text(item.text) ||

@@ -6,6 +6,7 @@ import {
 } from '@gyblos/node/constants';
 
 import {
+  CHAT_FAILURE,
   PAYPAL_STATUS_POLL_MAX_OUTSTANDING,
   PAYPAL_STATUS_POLL_TIMEOUT_MS,
 } from './constants';
@@ -322,7 +323,7 @@ export class PaypalChatController {
           paypalFailure(PAYPAL_DESKTOP_ERROR.INVALID_PROMPT),
         ),
       });
-      return;
+      return CHAT_FAILURE.PAYPAL_PROMPT_TOO_LONG;
     }
     const draftRevision = this.draftRevision;
     this.update({ busy: true, notice: '', pendingPrompt: draft, draft: '' });

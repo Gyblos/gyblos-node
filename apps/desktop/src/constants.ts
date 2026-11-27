@@ -1,6 +1,7 @@
 // Owns fixed desktop host and compatibility-probe values.
 import { BUYER_API } from '@gyblos/protocol/buyer-api';
 import { BUYER_KEY_CODES } from '@gyblos/protocol/buyer-api-keys';
+import { FREE_EXECUTION_CODES } from '@gyblos/protocol/constants';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
@@ -10,6 +11,9 @@ export const CHAT_FAILURE = {
   DECLINED: SESSION_CODES.REQUEST_DECLINED,
   INTERRUPTED: 'interrupted-response',
   NOT_SENT: 'not-sent',
+  STALE_OFFER: 'stale-seller-offer',
+  FREE_LIMIT: FREE_EXECUTION_CODES.LIMIT,
+  PAYPAL_PROMPT_TOO_LONG: 'paypal-prompt-too-long',
   QUOTE_EXPIRED: PAID_EXECUTION_CODES.EXPIRED,
   TOKENIZER_UNAVAILABLE: BUYER_API.TOKENIZER_UNAVAILABLE,
   PEER: PAID_EXECUTION_CODES.PEER,

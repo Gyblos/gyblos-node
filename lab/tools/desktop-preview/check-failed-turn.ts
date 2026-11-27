@@ -1,4 +1,8 @@
+import type { PREVIEW_FAILURE } from './constants';
+
 export async function checkFailedTurn(
+  examples: typeof PREVIEW_FAILURE,
+  sendAction: string,
   reviewAction: string,
   paypalSend: string,
 ) {
@@ -26,7 +30,56 @@ export async function checkFailedTurn(
     );
   await wait(() => Boolean(composer()?.value), 'Missing restored draft');
   const reviewCase = new URLSearchParams(location.search).get('status-proof');
-  if (example === 'unsent-shared-review') {
+  if (example === examples.STOP) {
+    const buyer = window.desktopX402!;
+    let emit: Parameters<typeof buyer.onProgress>[0] | undefined;
+    buyer.onProgress = (listener) => {
+      emit = listener;
+      return () => {};
+    };
+    const run = buyer.run;
+    buyer.run = async (input) => {
+      if (
+        input &&
+        typeof input === 'object' &&
+        'action' in input &&
+        input.action === sendAction &&
+        'id' in input &&
+        typeof input.id === 'string'
+      ) {
+        emit?.({ id: input.id, text: 'unfinished response' });
+        return new Promise(() => {});
+      }
+      return run(input);
+    };
+    const submit = () =>
+      buttons('button[type=submit]').find((el) => !el.disabled);
+    await wait(() => Boolean(submit()), 'Cannot send in stop fixture');
+    submit()!.click();
+    await wait(
+      () => document.body.innerText.includes('unfinished response'),
+      'Missing live delta',
+    );
+    buttons('[aria-label="Stop response"]')[0]?.click();
+    await wait(
+      () =>
+        Boolean(
+          document.querySelector('.chat-answer:last-of-type [role=status]')
+            ?.textContent,
+        ) &&
+        Array.from(document.querySelectorAll('.chat-answer'))
+          .at(-1)
+          ?.textContent?.includes('interrupted') === true,
+      'Stop did not end the response',
+    );
+    const turn = Array.from(document.querySelectorAll('.chat-answer')).at(-1)!;
+    if (
+      !turn.querySelector('[aria-label="Copy response"]') ||
+      !turn.querySelector('[aria-label="Response details"]') ||
+      !turn.querySelector('details summary')
+    )
+      throw new Error('Missing stopped answer controls');
+  } else if (example === examples.SHARED_UNSENT) {
     const status = () =>
       document.querySelector('.chat-answer [role=status]')?.textContent ?? '';
     const correct = () =>
@@ -37,13 +90,43 @@ export async function checkFailedTurn(
     if (!correct()) throw new Error('Missing verified unsent shared review');
     const check = button('.chat-answer button', 'Check status');
     if (!check) throw new Error('Missing status check for prior reservation');
+    const keys = window.desktopUsdcApiKeys;
+    if (!keys) throw new Error('Missing authenticated key bridge');
+    const run = keys.run;
+    let checks = 0;
+    keys.run = async (request) => {
+      checks++;
+      const result = await run(request);
+      return {
+        ...result,
+        snapshot: result.snapshot && { ...result.snapshot, blocked: true },
+      };
+    };
     check.click();
     await wait(
-      () => /budget.*review/i.test(status()),
+      () =>
+        checks === 1 &&
+        status().includes('An API key reservation still needs review.'),
       'Budget check did not report',
     );
+    keys.run = run;
+    check.click();
+    await wait(
+      () => status().includes('The key ledger reports no pending reservation.'),
+      'Missing cleared key status',
+    );
+    keys.run = async (input) => ({
+      ...(await run(input)),
+      policyId: 'f'.repeat(64),
+    });
+    check.click();
+    await wait(
+      () =>
+        status().includes('Could not confirm the API key reservation status.'),
+      'Accepted a different key ledger',
+    );
     if (!correct())
-      throw new Error('Budget review changed the known turn outcome');
+      throw new Error('Key review changed the known turn outcome');
   } else if (reviewCase) {
     const buyer = window.desktopX402;
     if (!buyer) throw new Error('Missing buyer bridge');
@@ -94,8 +177,8 @@ export async function checkFailedTurn(
     )?.textContent;
     if (!text?.includes('The charge for this turn remains unconfirmed.'))
       throw new Error('Turn certainty was lost');
-  } else if (example === 'declined-turn' || example === 'expired-quote') {
-    if (example === 'expired-quote') {
+  } else if (example === examples.DECLINED || example === examples.EXPIRED) {
+    if (example === examples.EXPIRED) {
       const status = document.querySelector(
         '.chat-answer [role=status]',
       )?.textContent;
@@ -137,7 +220,7 @@ export async function checkFailedTurn(
     }
     if (!saved) throw new Error('The newer draft was overwritten');
   } else {
-    if (example === 'paypal-turn') {
+    if (example === examples.PAYPAL) {
       buttons('button[aria-label="Choose payment method"]')[0]?.click();
       await wait(
         () =>

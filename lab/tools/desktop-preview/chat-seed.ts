@@ -6,6 +6,8 @@ import { BUYER_KEY_CODES } from '@gyblos/protocol/buyer-api-keys';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
+import { PREVIEW_FAILURE } from './constants';
+
 const AGE_DAYS: Record<number, number> = {
   0: 4,
   1: 1,
@@ -40,15 +42,17 @@ export function seedFailedTurn(
   example: string | null,
 ) {
   if (
-    example !== 'failed-turn' &&
-    example !== 'unsent-shared-review' &&
-    example !== 'declined-turn' &&
-    example !== 'expired-quote' &&
-    example !== 'paypal-turn'
+    example !== PREVIEW_FAILURE.INTERRUPTED &&
+    example !== PREVIEW_FAILURE.SHARED &&
+    example !== PREVIEW_FAILURE.STOP &&
+    example !== PREVIEW_FAILURE.SHARED_UNSENT &&
+    example !== PREVIEW_FAILURE.DECLINED &&
+    example !== PREVIEW_FAILURE.EXPIRED &&
+    example !== PREVIEW_FAILURE.PAYPAL
   )
     return false;
   const id = 'interrupted-turn';
-  const paypal = example === 'paypal-turn';
+  const paypal = example === PREVIEW_FAILURE.PAYPAL;
   const origin = chat.startPaypal(
     'How do I read a file in TypeScript?',
     { ...model, free: false },
@@ -57,23 +61,23 @@ export function seedFailedTurn(
     paypal ? PAYMENT_METHOD.PAYPAL : PAYMENT_METHOD.USDC,
   );
   if (origin) {
-    if (example === 'failed-turn')
+    if (example === PREVIEW_FAILURE.SHARED)
       chat.appendBuyer(
         origin,
         id,
         'Read the file with:\n\n```ts\nconst text =',
       );
     chat.setDraft('How should I handle an empty file?');
-    if (!paypal)
+    if (!paypal && example !== PREVIEW_FAILURE.INTERRUPTED)
       chat.failPaypal(
         origin,
         id,
         '',
-        example === 'unsent-shared-review'
+        example === PREVIEW_FAILURE.SHARED_UNSENT
           ? CHAT_FAILURE.KEY_REVIEW_NOT_SENT
-          : example === 'failed-turn'
+          : example === PREVIEW_FAILURE.SHARED
             ? sharedReviewFailure.failureReason
-            : example === 'expired-quote'
+            : example === PREVIEW_FAILURE.EXPIRED
               ? PAID_EXECUTION_CODES.EXPIRED
               : SESSION_CODES.REQUEST_DECLINED,
       );

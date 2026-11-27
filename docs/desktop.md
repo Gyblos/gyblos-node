@@ -132,7 +132,13 @@ conversation content is not encrypted.
   turn incurred no charge. When an earlier key reservation caused the refusal,
   the turn retains its spending review action. Editing a declined question
   preserves an existing draft in its conversation. A budget status check cannot
-  establish a charge for the specific turn.
+  establish a charge for the specific turn. Check status on a key review reads
+  the authenticated key ledger. For interrupted paid responses it can reconcile
+  local spending records against verified payment evidence. When the original
+  session is unavailable, review the payment history in Payments.
+- Earlier desktop versions may decline to load archives containing newer turn
+  metadata. An unreadable archive disables saving and preserves the original
+  file. Reopen it with the newer desktop version to recover the conversations.
 - x402 history holds verified references and amounts, or an explicit free result
   with no hash. Uncertain values never appear as confirmed spending or available
   balance.

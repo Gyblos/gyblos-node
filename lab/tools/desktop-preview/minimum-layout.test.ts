@@ -13,6 +13,7 @@ import { DESKTOP } from '@gyblos/desktop/window-chrome';
 import { X402_ACTION } from '@gyblos/desktop/x402-model';
 
 import { buildPreview } from './build';
+import { PREVIEW_FAILURE } from './constants';
 
 async function render(root: string, url: URL, width: number) {
   const { stdout } = await promisify(execFile)(
@@ -127,7 +128,7 @@ void test('a restored USDC failure renders one recovery explanation and preserve
     for (const theme of ['light', 'dark']) {
       url.search = new URLSearchParams({
         screen: 'chat',
-        review: 'failed-turn',
+        review: PREVIEW_FAILURE.SHARED,
         theme,
       }).toString();
       const html = await render(root, url, DESKTOP.MIN_WIDTH);
@@ -148,21 +149,22 @@ void test('a restored USDC failure renders one recovery explanation and preserve
 });
 
 for (const example of [
-  'failed-turn',
-  'paypal-turn',
-  'declined-turn',
-  'expired-quote',
-  'unsent-shared-review',
-  'unbound-review',
-  'review-error',
+  PREVIEW_FAILURE.SHARED,
+  PREVIEW_FAILURE.STOP,
+  PREVIEW_FAILURE.PAYPAL,
+  PREVIEW_FAILURE.DECLINED,
+  PREVIEW_FAILURE.EXPIRED,
+  PREVIEW_FAILURE.SHARED_UNSENT,
+  PREVIEW_FAILURE.OTHER_TURN,
+  PREVIEW_FAILURE.REVIEW_ERROR,
 ]) {
   const proof =
-    example === 'unbound-review'
+    example === PREVIEW_FAILURE.OTHER_TURN
       ? 'other-turn'
-      : example === 'review-error'
+      : example === PREVIEW_FAILURE.REVIEW_ERROR
         ? 'error'
         : undefined;
-  const review = proof ? 'failed-turn' : example;
+  const review = proof ? PREVIEW_FAILURE.INTERRUPTED : example;
   void test(`shipped chat preserves independent recovery actions for ${example}`, async () => {
     const root = await mkdtemp(join(tmpdir(), 'gyblos-failed-turn-'));
     try {
@@ -176,7 +178,7 @@ for (const example of [
       await writeFile(
         join(output, 'probe.mjs'),
         stripTypeScriptTypes(probe) +
-          `\ncheckFailedTurn(${JSON.stringify(X402_ACTION.REVIEW)}, ${JSON.stringify(PAYPAL_ACTION.SEND)}).catch(error => { document.documentElement.dataset.recoveryPassed = error.message; });`,
+          `\ncheckFailedTurn(${JSON.stringify(PREVIEW_FAILURE)}, ${JSON.stringify(X402_ACTION.SEND)}, ${JSON.stringify(X402_ACTION.REVIEW)}, ${JSON.stringify(PAYPAL_ACTION.SEND)}).catch(error => { document.documentElement.dataset.recoveryPassed = error.message; });`,
       );
       const entry = join(output, 'index.html');
       const html = await readFile(entry, 'utf8');

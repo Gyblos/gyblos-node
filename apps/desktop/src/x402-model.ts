@@ -101,6 +101,7 @@ export function paidSellerLimitNotice(
   return undefined;
 }
 export class PaidSellerLimitError extends Error {}
+export class StaleSellerOffer extends PaidSellerLimitError {}
 export function x402Id(value: unknown): value is string {
   return (
     typeof value === 'string' &&

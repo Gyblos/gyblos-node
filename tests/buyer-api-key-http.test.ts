@@ -3,11 +3,16 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { startFreeBuyerHttp } from '@gyblos/buyer/free-http';
+import {
+  desktopBuyerFailure,
+  DesktopBuyerFailure,
+} from '@gyblos/desktop/buyer-error';
 import { createBuyerApiKeys } from '@gyblos/node/buyer-api-keys';
 import { SESSION_VERDICTS } from '@gyblos/node/constants';
 import { BUYER_API, parseBuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 import {
   BUYER_API_KEYS,
+  BUYER_KEY_CODES,
   parseBuyerApiKeysReply,
 } from '@gyblos/protocol/buyer-api-keys';
 import { ENGINE_DONE_REASONS, MODEL_IDS } from '@gyblos/protocol/constants';
@@ -39,7 +44,6 @@ async function fixture() {
         sellerNodeId: 'b'.repeat(64),
       });
       calls += 1;
-      if (uncertain) throw new Error('synthetic unknown financial outcome');
       const charged = calls === 1 ? '40' : '60';
       return {
         text: 'synthetic answer',
@@ -48,7 +52,7 @@ async function fixture() {
         payment: {
           verdict: SESSION_VERDICTS.APPROVED,
           maxAtomic: '60',
-          expectedAtomic: charged,
+          expectedAtomic: uncertain ? '39' : charged,
           chargedAtomic: null,
           sellerAtomic: null,
           feeAtomic: null,
@@ -220,26 +224,31 @@ void test('an uncertain delegated payment blocks operator Chat and new grants wi
   try {
     const key = await f.keys.create('Synthetic', '100');
     f.uncertain();
-    assert.equal(
-      (
-        await fetch(f.host.url, {
-          method: 'POST',
-          headers: {
-            authorization: 'Bearer ' + key.secret,
-            'content-type': 'application/json',
-          },
-          body,
-        })
-      ).status,
-      500,
-    );
+    const dispatched = await fetch(f.host.url, {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer ' + key.secret,
+        'content-type': 'application/json',
+      },
+      body,
+    });
+    assert.equal(dispatched.status, 503);
+    const result = await dispatched.json();
+    assert.equal(result.error.code, BUYER_KEY_CODES.REVIEW);
+    const dispatchedFailure = desktopBuyerFailure(result.error, f.policy);
+    assert.ok(dispatchedFailure instanceof DesktopBuyerFailure);
+    assert.equal(dispatchedFailure.neverSent, false);
     const root = await fetch(f.host.url, {
       method: 'POST',
       headers: { ...f.owner, 'content-type': 'application/json' },
       body,
     });
     assert.equal(root.status, 503);
-    assert.match(await root.text(), /BUYER_KEY_NEEDS_REVIEW/);
+    const rejection = await root.json();
+    assert.equal(rejection.error.code, BUYER_KEY_CODES.REVIEW);
+    const failure = desktopBuyerFailure(rejection.error, f.policy);
+    assert.ok(failure instanceof DesktopBuyerFailure);
+    assert.equal(failure.neverSent, true);
     assert.equal(f.calls(), 1);
     assert.equal((await f.keys.snapshot()).keys[0]?.reservedAtomic, '60');
     await assert.rejects(

@@ -44,7 +44,7 @@ import {
   seedFailedTurn,
   sharedReviewFailure,
 } from './chat-seed';
-import { PREVIEW } from './constants';
+import { PREVIEW, PREVIEW_FAILURE } from './constants';
 import { exampleKeys } from './example-keys';
 import { previewFunding } from './funding';
 import { requestObject as read, type AgentExamples } from './input';
@@ -56,7 +56,7 @@ export function createPreviewHost(
   agentExamples: AgentExamples,
 ) {
   const query = new URLSearchParams(search);
-  const failedTurn = query.get('review') === 'failed-turn';
+  const failedTurn = query.get('review') === PREVIEW_FAILURE.SHARED;
   const ready = query.get('connection-state') !== 'unconfigured';
   const example = '00000000-0000-4000-8000-000000000001';
   const now = Date.now();

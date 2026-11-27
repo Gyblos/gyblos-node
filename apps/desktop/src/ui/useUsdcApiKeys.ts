@@ -19,6 +19,26 @@ declare global {
     };
   }
 }
+export async function keyReviewStatus(policyId: string | undefined) {
+  try {
+    const state = parseUsdcApiState(
+      await window.desktopUsdcApiKeys?.run({ action: USDC_API_ACTION.STATUS }),
+    );
+    if (
+      policyId &&
+      state.policyId === policyId &&
+      state.snapshot &&
+      !state.error
+    )
+      return state.snapshot.blocked
+        ? 'An API key reservation still needs review.'
+        : 'The key ledger reports no pending reservation.';
+  } catch {
+    return 'Could not confirm the API key reservation status.';
+  }
+  return 'Could not confirm the API key reservation status.';
+}
+
 function useKeyReveal(
   running: { current: boolean },
   mounted: { current: boolean },

@@ -5,9 +5,9 @@ import { PAYMENT_METHOD } from '../paypal-model';
 import { X402_ACTION } from '../x402-model';
 import type { ChatMessage } from './chat-state';
 import { BUTTON_VARIANT } from './constants';
-import { MessageText } from './MessageText';
 import { Notice } from './Notice';
 import { Button } from './UI';
+import { keyReviewStatus } from './useUsdcApiKeys';
 import type { X402View } from './useX402';
 
 function beforeSending(reason: ChatMessage['failureReason']) {
@@ -18,8 +18,37 @@ function beforeSending(reason: ChatMessage['failureReason']) {
       return 'The buyer could not prepare the token counter before sending this question.';
     case CHAT_FAILURE.PEER:
       return 'The buyer could not open a channel with this seller before sending this question.';
+    case CHAT_FAILURE.STALE_OFFER:
+      return 'Refresh the model list to verify the seller and its current price before sending.';
+    case CHAT_FAILURE.PAYPAL_PROMPT_TOO_LONG:
+      return 'Shorten the question to fit the PayPal message limit.';
     case CHAT_FAILURE.NOT_SENT:
       return 'The buyer stopped this question before sending it.';
+  }
+}
+
+function failureExplanation(
+  message: ChatMessage,
+  free: boolean,
+  stopped: string | undefined,
+) {
+  if (stopped) return stopped + ' No charge was made for this turn.';
+  switch (message.failureReason) {
+    case CHAT_FAILURE.FREE_LIMIT:
+      return (
+        'Shorten the question or choose a model with a higher limit.' +
+        (free ? '' : ' The final charge is unknown.')
+      );
+    case CHAT_FAILURE.KEY_REVIEW_NOT_SENT:
+      return 'An earlier API key reservation paused Desktop and connected tools before this question was sent. No charge was made for this turn.';
+    case CHAT_FAILURE.KEY_REVIEW:
+      return 'An API key spending review paused Desktop and connected tools for this request. The final charge is unknown.';
+    case CHAT_FAILURE.DECLINED:
+      return 'The seller declined this question before charging you.';
+    default:
+      return free
+        ? 'The free response was interrupted. Any text shown is incomplete.'
+        : `The ${message.paymentMethod === PAYMENT_METHOD.PAYPAL ? 'PayPal' : 'USDC'} response was interrupted. The final charge is unknown.`;
   }
 }
 
@@ -28,15 +57,18 @@ export function FailedTurn({
   buyer,
   separateDraft,
   onReview,
+  onConnections,
   onEdit,
 }: {
   message: ChatMessage;
   buyer?: X402View;
   separateDraft: boolean;
   onReview?: () => void;
+  onConnections: () => void;
   onEdit: () => void;
 }) {
   const [observation, setObservation] = useState('');
+  const [checking, setChecking] = useState(false);
   const declined = message.failureReason === CHAT_FAILURE.DECLINED;
   const unsentReview =
     message.failureReason === CHAT_FAILURE.KEY_REVIEW_NOT_SENT;
@@ -49,6 +81,12 @@ export function FailedTurn({
     !!message.paymentSessionId &&
     message.paymentSessionId === buyer?.state.summary.sessionId;
   async function checkStatus() {
+    if (shared) {
+      setChecking(true);
+      setObservation(await keyReviewStatus(buyer?.state.policy?.policyId));
+      setChecking(false);
+      return;
+    }
     const status = await buyer?.run({ action: X402_ACTION.REVIEW });
     const budgetStatus =
       status?.error || !status?.summary.available
@@ -57,28 +95,14 @@ export function FailedTurn({
           ? 'The desktop budget still has spending under review.'
           : 'The desktop budget reports no pending review.';
     setObservation(
-      unsentReview
-        ? budgetStatus
-        : budgetStatus + ' The charge for this turn remains unconfirmed.',
+      budgetStatus + ' The charge for this turn remains unconfirmed.',
     );
   }
   const stopped = beforeSending(message.failureReason);
-  const explanation = stopped
-    ? stopped + ' No charge was made for this turn.'
-    : unsentReview
-      ? 'An earlier API key reservation paused Desktop and connected tools before this question was sent. No charge was made for this turn.'
-      : shared
-        ? 'An API key spending review paused Desktop and connected tools for this request. The final charge is unknown.'
-        : declined
-          ? 'The seller declined this question before charging you.'
-          : free
-            ? 'The free response was interrupted. Any text shown is incomplete.'
-            : `The ${message.paymentMethod === PAYMENT_METHOD.PAYPAL ? 'PayPal' : 'USDC'} response was interrupted. The final charge is unknown.`;
   return (
-    <article className="chat-answer" aria-label="Assistant">
-      {message.text && <MessageText text={message.text} />}
+    <>
       <Notice>
-        {explanation}
+        {failureExplanation(message, free, stopped)}
         {observation && ' ' + observation}
       </Notice>
       <div className="answer-actions">
@@ -89,17 +113,20 @@ export function FailedTurn({
         ) : sameSession ? (
           <Button
             variant={BUTTON_VARIANT.SECONDARY}
-            disabled={buyer?.busy}
+            disabled={buyer?.busy || checking}
             onClick={() => void checkStatus()}
           >
             Check status
           </Button>
         ) : (
-          <Button variant={BUTTON_VARIANT.SECONDARY} onClick={onReview}>
-            Review in Payments
+          <Button
+            variant={BUTTON_VARIANT.SECONDARY}
+            onClick={shared ? onConnections : onReview}
+          >
+            {shared ? 'Review in Connections' : 'Review in Payments'}
           </Button>
         )}
       </div>
-    </article>
+    </>
   );
 }

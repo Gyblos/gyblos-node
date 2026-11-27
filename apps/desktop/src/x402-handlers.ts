@@ -16,6 +16,7 @@ import type { DesktopSellerChoice, X402Client } from './x402-client';
 import {
   effectiveX402Policy,
   PaidSellerLimitError,
+  StaleSellerOffer,
   X402_ACTION,
   x402Explorer,
   x402Id,
@@ -46,8 +47,10 @@ function actionError(action: unknown, blocked: boolean, error: unknown) {
 }
 function actionFailure(action: unknown, blocked: boolean, error: unknown) {
   const failure = { error: actionError(action, blocked, error) };
-  if (action !== X402_ACTION.SEND || !(error instanceof DesktopBuyerFailure))
-    return failure;
+  if (action !== X402_ACTION.SEND) return failure;
+  if (error instanceof StaleSellerOffer)
+    return { ...failure, failureReason: CHAT_FAILURE.STALE_OFFER };
+  if (!(error instanceof DesktopBuyerFailure)) return failure;
   if (error.code === CHAT_FAILURE.KEY_REVIEW)
     return {
       ...failure,
@@ -56,7 +59,10 @@ function actionFailure(action: unknown, blocked: boolean, error: unknown) {
         : CHAT_FAILURE.KEY_REVIEW,
     };
   if (blocked) return failure;
-  if (error.code === CHAT_FAILURE.DECLINED)
+  if (
+    error.code === CHAT_FAILURE.DECLINED ||
+    error.code === CHAT_FAILURE.FREE_LIMIT
+  )
     return { ...failure, failureReason: error.code };
   if (error.neverSent)
     return {
@@ -184,7 +190,7 @@ async function selectedOffer(
       ? await resolveOffer?.(input.offerId)
       : undefined;
   if ('offerId' in input && !selected)
-    throw new PaidSellerLimitError(
+    throw new StaleSellerOffer(
       'Refresh the model list to verify this seller and its current price.',
     );
   if (selected && (!input.policyId || input.policyId !== policy?.policyId))

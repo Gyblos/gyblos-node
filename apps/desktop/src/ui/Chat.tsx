@@ -669,9 +669,7 @@ export function Chat({
                                 : 'Copy message'
                             }
                             title="Copy message"
-                            onClick={() => {
-                              void copy(user.text, user.id);
-                            }}
+                            onClick={() => void copy(user.text, user.id)}
                           >
                             {copied === user.id ? (
                               <Check size={14} />
@@ -693,43 +691,44 @@ export function Chat({
                       }
                     />
                   )}
-                  {answer &&
-                  (answer.failureReason ||
-                    answer.state === MESSAGE_STATE.FAILED) ? (
-                    <FailedTurn
+                  {answer && (
+                    <ChatAnswer
                       message={answer}
-                      buyer={x402}
-                      separateDraft={
-                        !!user && !!session.draft && session.draft !== user.text
+                      recovery={
+                        (answer.failureReason ||
+                          answer.state === MESSAGE_STATE.FAILED) && (
+                          <FailedTurn
+                            message={answer}
+                            onConnections={onConnections}
+                            buyer={x402}
+                            separateDraft={
+                              !!user &&
+                              !!session.draft &&
+                              session.draft !== user.text
+                            }
+                            onReview={
+                              answer.paymentMethod === PAYMENT_METHOD.PAYPAL
+                                ? onReviewPaypal
+                                : onReviewX402
+                            }
+                            onEdit={() => user && editFailedQuestion(user.text)}
+                          />
+                        )
                       }
-                      onReview={
-                        answer.paymentMethod === PAYMENT_METHOD.PAYPAL
-                          ? onReviewPaypal
-                          : onReviewX402
+                      run={session.run}
+                      copied={copied === answer.id}
+                      canReuse={
+                        answer === session.messages.at(-1) && !!lastUser
                       }
-                      onEdit={() => user && editFailedQuestion(user.text)}
+                      reuseDisabled={busy || !online}
+                      onCopy={() => void copy(answer.text, answer.id)}
+                      onReuse={() => {
+                        if (!lastUser) return;
+                        setDraft(lastUser.text);
+                        input.current?.focus();
+                      }}
+                      onDetails={() => setDetails(answer.id)}
                     />
-                  ) : (
-                    answer && (
-                      <ChatAnswer
-                        message={answer}
-                        run={session.run}
-                        copied={copied === answer.id}
-                        canReuse={
-                          answer === session.messages.at(-1) && !!lastUser
-                        }
-                        reuseDisabled={busy || !online}
-                        onCopy={() => {
-                          void copy(answer.text, answer.id);
-                        }}
-                        onReuse={() => {
-                          if (!lastUser) return;
-                          setDraft(lastUser.text);
-                          input.current?.focus();
-                        }}
-                        onDetails={() => setDetails(answer.id)}
-                      />
-                    )
                   )}
                 </div>
               ))}

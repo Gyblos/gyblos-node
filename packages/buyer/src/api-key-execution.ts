@@ -15,6 +15,7 @@ import { UnsentChannelLimitError } from '@gyblos/node/session-policy';
 import {
   BUYER_KEY_CHARGE,
   BUYER_KEY_CODES,
+  BuyerApiKeyError,
   buyerKeyFail,
 } from '@gyblos/protocol/buyer-api-keys';
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
@@ -115,6 +116,11 @@ export async function recordApiKeyPayment(
   if (payment.verdict === SESSION_VERDICTS.APPROVED)
     await complete(operation, payment);
 }
+export class UnsentKeyReview extends BuyerApiKeyError {
+  constructor() {
+    super(BUYER_KEY_CODES.REVIEW);
+  }
+}
 export async function executeApiKey(
   keys: BuyerApiKeys | undefined,
   keyId: string | undefined,
@@ -124,8 +130,17 @@ export async function executeApiKey(
     operation?: BuyerApiKeyOperation,
   ) => Promise<ChatResult>,
 ) {
-  await keys?.reconcileAbandoned();
-  keys?.assertReady();
+  try {
+    await keys?.reconcileAbandoned();
+    keys?.assertReady();
+  } catch (error) {
+    if (
+      error instanceof BuyerApiKeyError &&
+      error.code === BUYER_KEY_CODES.REVIEW
+    )
+      throw new UnsentKeyReview();
+    throw error;
+  }
   if (!keys || !keyId) return execute(signal);
   const operation = keys.operation(keyId);
   const current = AbortSignal.any([signal, operation.signal]);
