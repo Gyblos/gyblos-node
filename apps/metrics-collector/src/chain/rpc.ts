@@ -8,7 +8,14 @@
 // Workers) throws an error marked as such, which lets the run move to its fallback endpoint; so does an
 // endpoint whose genesis hash is not the indexed network's, marked apart as a wrong network.
 import { CHAIN_DEVNET_HOSTS, CHAIN_INDEX, LOOPBACK_HOSTS } from '../constants';
-import { ChainShapeError, list, nullable, num, record, text } from './json';
+import {
+  boundedNum,
+  ChainShapeError,
+  list,
+  nullable,
+  record,
+  text,
+} from './json';
 
 const FINALIZED = 'finalized';
 const JSON_RPC = '2.0';
@@ -132,11 +139,11 @@ function caller(url: string, fetcher: typeof fetch) {
 function signatureOf(entry: unknown): ChainSignature {
   const value = record(entry, 'signature');
   const blockTime = nullable(value.blockTime, (present) =>
-    num(present, 'signature.blockTime'),
+    boundedNum(present, 'signature.blockTime', 0, CHAIN_INDEX.maxBlockTimeSec),
   );
   return {
     signature: text(value.signature, 'signature'),
-    slot: num(value.slot, 'signature.slot'),
+    slot: boundedNum(value.slot, 'signature.slot', 0, CHAIN_INDEX.maxSlot),
     failed: value.err !== null && value.err !== undefined,
     blockTimeMs:
       blockTime === null ? null : blockTime * CHAIN_INDEX.msPerSecond,

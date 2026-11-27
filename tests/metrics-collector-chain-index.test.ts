@@ -216,7 +216,7 @@ void test('a followed channel that floods its list is dropped unread', async () 
     ...Array.from({ length: CHAIN_INDEX.signaturesPerPage }, (_, index) =>
       withSignature(`spam${index}`, undefined, {
         // Newer than the open.
-        slot: 1e12 - index,
+        slot: 6e8 - index,
         addresses: [PROGRAM, channel],
       }),
     ),

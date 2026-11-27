@@ -25,6 +25,16 @@ export function num(value: unknown, where: string): number {
     throw new ChainShapeError(where);
   return value;
 }
+export function boundedNum(
+  value: unknown,
+  where: string,
+  min: number,
+  max: number,
+): number {
+  const parsed = num(value, where);
+  if (parsed < min || parsed > max) throw new ChainShapeError(where);
+  return parsed;
+}
 export const nullable = <T>(
   value: unknown,
   read: (present: unknown) => T,

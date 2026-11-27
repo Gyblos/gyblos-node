@@ -62,6 +62,7 @@ import {
   envelopes,
   observations,
   receipts,
+  reports,
 } from './schema';
 import { dayOf, distinctWhere, inRange, ordered } from './sql-primitives';
 
@@ -165,6 +166,16 @@ async function scan(database: CollectorDatabase, now: number) {
           .from(conflicts)
           .innerJoin(receipts, eq(receipts.receiptKey, conflicts.receiptKey))
           .where(and(gte(conflicts.insertedAt, since), isNotNull(receiptDay))),
+      )
+      .onConflictDoNothing(),
+    database
+      .insert(aggDirtyDays)
+      .select(
+        database
+          .selectDistinct(day(receiptDay))
+          .from(reports)
+          .innerJoin(receipts, eq(receipts.receiptKey, reports.receiptKey))
+          .where(and(gte(reports.insertedAt, since), isNotNull(receiptDay))),
       )
       .onConflictDoNothing(),
     ...(changed ? staleVersionMarks(database, day) : []),
