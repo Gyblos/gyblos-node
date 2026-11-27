@@ -1,9 +1,11 @@
 import { Info, Warning } from '@phosphor-icons/react';
+import { useRef, useState } from 'react';
 
 import type { BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 import { BUYER_KEY_CODES } from '@gyblos/protocol/buyer-api-keys';
 
 import { sellerChannelStatus, type BuyerFunding } from '../funding/model';
+import { X402_ACTION } from '../x402-model';
 import { fundingAmount } from './BuyerFunding';
 import { BUTTON_VARIANT } from './constants';
 import { DetailSummary, type DetailItem } from './DetailSummary';
@@ -58,6 +60,7 @@ export function ChannelReviewDetails({
   refresh(): void;
   close(): void;
 }) {
+  const { pending, checkStatus } = useChannelReview(funding, refresh);
   const status = sellerChannelStatus(funding);
   const ready = !checking && status.label === 'Ready';
   const Icon = ready ? Info : Warning;
@@ -99,15 +102,15 @@ export function ChannelReviewDetails({
         </p>
         <FormActions>
           {!checking && funding?.balanceAtomic == null && (
-            <Button disabled={!policy} onClick={refresh}>
+            <Button disabled={!policy || pending} onClick={refresh}>
               Refresh wallet
             </Button>
           )}
           <Button onClick={close}>{backLabel}</Button>
           <Button
             variant={BUTTON_VARIANT.PRIMARY}
-            disabled={!policy || checking}
-            onClick={refresh}
+            disabled={!policy || checking || pending}
+            onClick={() => void checkStatus()}
           >
             Check status
           </Button>
@@ -154,4 +157,26 @@ function channelEvidence(model: ModelOption, funding: BuyerFunding | null) {
       { label: 'Final settlement', value: 'Unconfirmed' },
     );
   return rows;
+}
+
+function useChannelReview(funding: BuyerFunding | null, refresh: () => void) {
+  const reviewing = useRef(false);
+  const [pending, setPending] = useState(false);
+  async function checkStatus() {
+    if (reviewing.current) return;
+    if (funding?.channelBlocker === BUYER_KEY_CODES.REVIEW) {
+      reviewing.current = true;
+      setPending(true);
+      try {
+        await window.desktopX402
+          ?.run({ action: X402_ACTION.REVIEW })
+          .catch(() => undefined);
+      } finally {
+        reviewing.current = false;
+        setPending(false);
+      }
+    }
+    refresh();
+  }
+  return { pending, checkStatus };
 }

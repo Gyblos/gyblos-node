@@ -9,6 +9,9 @@ import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 
 import { DESKTOP } from '@gyblos/desktop/window-chrome';
+import { X402_ACTION } from '@gyblos/desktop/x402-model';
+import { BUYER_KEY_CODES } from '@gyblos/protocol/buyer-api-keys';
+import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
 import { buildPreview } from './build';
 
@@ -33,20 +36,23 @@ async function render(root: string, url: URL, width: number) {
   return stdout;
 }
 
-async function minimumLayout(head = '') {
+async function minimumLayout(
+  head = '',
+  probeName = 'check-minimum-layout.ts',
+  invoke = 'checkMinimumLayout()',
+) {
   const root = await mkdtemp(join(tmpdir(), 'gyblos-minimum-layout-'));
   try {
     const output = await buildPreview(join(root, 'dist'));
     const baseline = join(output, 'desktop');
     await copyFile(join(output, 'preview.js'), join(baseline, 'preview.js'));
-    const probe = await readFile(
-      new URL('./check-minimum-layout.ts', import.meta.url),
-      'utf8',
-    );
+    const probe = await readFile(new URL(probeName, import.meta.url), 'utf8');
     await writeFile(
       join(baseline, 'probe.mjs'),
       stripTypeScriptTypes(probe) +
-        '\ncheckMinimumLayout().catch((error) => {document.documentElement.dataset.layoutPassed = error.message;});',
+        '\n' +
+        invoke +
+        '.catch((error) => {document.documentElement.dataset.layoutPassed = error.message;});',
     );
     const entry = join(baseline, 'index.html');
     const html = await readFile(entry, 'utf8');
@@ -115,4 +121,19 @@ void test('the design-system dialog hides the action tooltip while its label is 
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+void test('confirmed paid Chat keeps the draft during a fresh seller check and manually recovers late evidence', async () => {
+  const args = [
+    SESSION_CODES.CLOSED,
+    BUYER_KEY_CODES.REVIEW,
+    X402_ACTION.REVIEW,
+    X402_ACTION.SEND,
+  ];
+  const result = await minimumLayout(
+    '',
+    'check-pinned-seller.ts',
+    'checkPinnedSeller(...' + JSON.stringify(args) + ')',
+  );
+  assert.equal(result.passed, 'verified');
 });

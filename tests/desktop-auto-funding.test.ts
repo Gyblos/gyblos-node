@@ -109,3 +109,49 @@ void test('seller channel review keeps wallet evidence separate from verified re
     );
   }
 });
+
+void test('Auto and a pinned seller show the buyer reason for each verified refusal', async () => {
+  const { autoFundingNotice, pinnedFundingNotice } =
+    await import('@gyblos/desktop/funding-model');
+  const { channelBlockerMessage } =
+    await import('@gyblos/node/buyer-channel-message');
+  const funded = {
+    network: DEVNET,
+    payer,
+    balanceAtomic: '2000000',
+    channelRemainingAtomic: null,
+    faucetAvailable: true,
+  };
+  for (const channelBlocker of [
+    SESSION_CODES.STATUS_UNKNOWN,
+    SESSION_CODES.CLOSED,
+  ]) {
+    assert.equal(
+      autoFundingNotice(channelBlocker),
+      channelBlockerMessage(channelBlocker),
+    );
+    assert.equal(
+      pinnedFundingNotice({ ...funded, channelBlocker }),
+      channelBlockerMessage(channelBlocker),
+    );
+  }
+  assert.equal(
+    pinnedFundingNotice(null),
+    channelBlockerMessage(SESSION_CODES.STATUS_UNKNOWN),
+  );
+  assert.equal(pinnedFundingNotice(funded), undefined);
+  const switching = {
+    ...funded,
+    channelBlocker: SESSION_CODES.REPLACEMENT_REQUIRED,
+    switchingAtomic: '700000',
+  };
+  assert.equal(
+    pinnedFundingNotice(switching),
+    channelBlockerMessage(SESSION_CODES.REPLACEMENT_REQUIRED),
+  );
+  assert.equal(
+    pinnedFundingNotice(switching, { switchingAtomic: '700000' }),
+    undefined,
+  );
+  assert.ok(pinnedFundingNotice(switching, { switchingAtomic: '800000' }));
+});

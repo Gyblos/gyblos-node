@@ -9,7 +9,11 @@ import { MILLISECONDS_PER_MINUTE } from '@gyblos/config/constants';
 import { atomicToUsdc, usdcToAtomic } from '@gyblos/node/node-config-price';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
-import { depositShortfall, sellerResponseLimit } from '../funding/model';
+import {
+  depositShortfall,
+  sellerResponseLimit,
+  type ReplacementTerms,
+} from '../funding/model';
 import { paidSellerLimitNotice, X402_ACTION } from '../x402-model';
 import { AmountField } from './AmountField';
 import { fundingAmount, WalletBalanceNotice } from './BuyerFunding';
@@ -25,12 +29,8 @@ import { Button } from './UI';
 import { useBuyerFunding } from './useBuyerFunding';
 import type { X402View } from './useX402';
 
-function useSellerConfirmation(
-  model: CatalogModel,
-  buyer: X402View,
-  confirm: (id: string) => void,
-  availableMaximum?: string,
-) {
+function useSellerConfirmation(props: TermsProps) {
+  const { model, buyer, confirm, availableMaximum } = props;
   const { policy } = buyer.state;
   const [maximum, setMaximum] = useState(() =>
     policy && policy.maxAtomic !== '0'
@@ -91,7 +91,11 @@ function useSellerConfirmation(
           'The channel terms were updated. Review them and confirm the seller.',
         );
       else if (notice) setError(notice);
-      else confirm(result.policy.policyId);
+      else
+        confirm(result.policy.policyId, {
+          switchingAtomic: props.switching,
+          replacementAtomic: props.replacement,
+        });
     } finally {
       setSaving(false);
     }
@@ -102,7 +106,7 @@ interface SellerDialogProps {
   model: CatalogModel;
   buyer: X402View;
   close(): void;
-  confirm(policyId: string): void;
+  confirm(policyId: string, consent?: ReplacementTerms): void;
 }
 export function PaidSellerDialog(
   props: SellerDialogProps & { addFunds(): void },
@@ -191,9 +195,9 @@ type TermsProps = SellerDialogProps & {
   availableMaximum?: string;
 };
 function SellerTerms(props: TermsProps) {
-  const { model, buyer, close, confirm } = props;
+  const { model, buyer, close } = props;
   const { maximum, setMaximum, error, setError, saving, select } =
-    useSellerConfirmation(model, buyer, confirm, props.availableMaximum);
+    useSellerConfirmation(props);
   const { policy } = buyer.state;
   const deposit =
     props.replacement ??

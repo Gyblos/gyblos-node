@@ -25,6 +25,7 @@ import {
 } from 'react';
 
 import { CHAT_STORAGE_STATE, DESKTOP_ACTIVITY } from '../constants';
+import { pinnedFundingNotice, type ReplacementTerms } from '../funding/model';
 import {
   PAYMENT_METHOD,
   paypalDollars,
@@ -101,6 +102,7 @@ type Props = {
   models: readonly ModelOption[];
   onSelectModel: (id: string) => void;
   confirmedPolicy?: string;
+  replacement?: ReplacementTerms;
   onDefaultModel?: () => void;
   autoModels?: readonly string[];
   onAutoModel?: (name: string) => void;
@@ -163,6 +165,7 @@ export function Chat({
   models,
   onSelectModel,
   confirmedPolicy,
+  replacement,
   onDefaultModel,
   autoModels,
   onAutoModel,
@@ -191,7 +194,7 @@ export function Chat({
   const usingPaypal = paymentMethod === PAYMENT_METHOD.PAYPAL;
   const usingX402 = !usingPaypal && !!x402;
   const payer = x402?.state.policy?.payer;
-  const { funding, loading, refresh } = useBuyerFunding(
+  const { funding, loading, refresh, verify } = useBuyerFunding(
     payer,
     model.offerId,
     active && usingX402 && !!payer,
@@ -275,8 +278,38 @@ export function Chat({
                   model.name,
                 )
               : undefined;
+  const pinnedPaid =
+    usingX402 && !!model.offerId && !model.automatic && !model.free;
+  const channelNotice = pinnedPaid
+    ? loading
+      ? 'Checking finalized channel status…'
+      : pinnedFundingNotice(funding, replacement)
+    : undefined;
+  const verification = useRef<symbol | null>(null);
+  useLayoutEffect(
+    () => () => {
+      verification.current = null;
+    },
+    [
+      active,
+      activeId,
+      model,
+      paymentMethod,
+      confirmedPolicy,
+      replacement,
+      session.draftRevision,
+      loadingHistory,
+      online,
+      busy,
+      x402Ready,
+      limitNotice,
+      payer,
+      x402?.state.policy?.policyId,
+    ],
+  );
   const canSend =
     !limitNotice &&
+    !channelNotice &&
     !loadingHistory &&
     online &&
     !busy &&
@@ -473,12 +506,21 @@ export function Chat({
     setNearBottom(true);
     input.current?.focus();
   }
-  function submit() {
+  async function submit() {
     if (!canSend || !session.draft.trim()) return;
     if (usingX402 && x402) {
       if (!x402Ready) {
         onReviewX402?.();
         return;
+      }
+      if (pinnedPaid) {
+        if (verification.current) return;
+        const token = Symbol();
+        verification.current = token;
+        const observation = await verify();
+        if (verification.current !== token) return;
+        verification.current = null;
+        if (pinnedFundingNotice(observation, replacement)) return;
       }
       if (!session.messages.length) captureComposer();
       follow.current = true;
@@ -754,7 +796,7 @@ export function Chat({
             }
             value={session.draft}
             onChange={setDraft}
-            onSubmit={submit}
+            onSubmit={() => void submit()}
           >
             <div className="composer-leading">
               <ModelDropdown
@@ -875,6 +917,7 @@ export function Chat({
           )}
           <p className="composer-note" role="status">
             {limitNotice ||
+              channelNotice ||
               (!usingPaypal && notice) ||
               (busy && session.draft.trim()
                 ? run

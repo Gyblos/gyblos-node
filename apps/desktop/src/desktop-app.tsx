@@ -7,7 +7,11 @@ import { MODEL_IDS } from '@gyblos/protocol/constants';
 
 import manifest from '../package.json';
 import { WINDOW_CHROME } from './constants';
-import { autoFundingAvailable, FUNDING } from './funding/model';
+import {
+  autoFundingAvailable,
+  autoFundingNotice,
+  type ReplacementTerms,
+} from './funding/model';
 import {
   canSelectPreviewModel,
   canSwitchPaymentMethod,
@@ -219,6 +223,7 @@ export function DesktopApp() {
     (typeof UI_DIALOG)[keyof typeof UI_DIALOG] | null
   >(null);
   const [confirmedPolicy, setConfirmedPolicy] = useState<string>();
+  const [replacement, setReplacement] = useState<ReplacementTerms>();
   const [paidModel, setPaidModel] = useState<Model | null>(null);
   const [toast, setToast] = useState('');
   const chatRef = useRef<ChatHandle>(null);
@@ -319,13 +324,7 @@ export function DesktopApp() {
       if (attempt !== autoAttempt.current) return;
       const available = autoFundingAvailable(policy, funding);
       if (available !== true) {
-        setToast(
-          available === false
-            ? 'Add devnet USDC to open a channel.'
-            : available === FUNDING.channelLimit
-              ? 'Channel capacity cannot cover this response. Review Payments.'
-              : 'Could not confirm channel funds. Check Payments and try again.',
-        );
+        setToast(autoFundingNotice(available));
         navigate(UI_VIEW.PAYMENTS);
         if (available === false) setModal(UI_DIALOG.ADD_FUNDS);
         return;
@@ -350,11 +349,7 @@ export function DesktopApp() {
   function choose(next: Model) {
     autoAttempt.current++;
     if (paymentMethod === PAYMENT_METHOD.PAYPAL) return;
-    if (
-      next.id === model.id &&
-      (!next.offerId || confirmedPolicy === x402.state.policy?.policyId)
-    )
-      return;
+    if (next.id === model.id && (!next.offerId || next.free)) return;
     if (!next.free) {
       setPaidModel(next);
       return;
@@ -505,6 +500,7 @@ export function DesktopApp() {
               onBrowseApplications={() => navigate(UI_VIEW.TOOLS)}
               models={chatModels}
               confirmedPolicy={confirmedPolicy}
+              replacement={replacement}
               onDefaultModel={() => setModel(MODELS[0])}
               autoModels={autoModels}
               onAutoModel={(name) => void chooseAuto(name)}
@@ -701,7 +697,8 @@ export function DesktopApp() {
               setModal(UI_DIALOG.ADD_FUNDS);
             }}
             close={() => setPaidModel(null)}
-            confirm={(policyId) => {
+            confirm={(policyId, consent) => {
+              setReplacement(consent);
               setConfirmedPolicy(policyId);
               setModel(paidModel);
               setPaidModel(null);

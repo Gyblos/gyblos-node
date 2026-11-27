@@ -142,6 +142,7 @@ void test('only the same connected devnet buyer can copy or open the fixed Circl
     },
   });
   assert.equal((await service.balance(event, []))?.balanceAtomic, '0');
+  assert.equal(await service.balance(event, ['56'.repeat(32)]), null);
   assert.equal(await service.copy(event, ['other']), false);
   assert.equal(await service.copy(event, [payer]), true);
   assert.equal(await service.faucet(event, [payer]), true);

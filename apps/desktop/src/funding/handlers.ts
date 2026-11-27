@@ -108,6 +108,7 @@ export function fundingHandlers(ports: FundingPorts) {
         const seller = args.length
           ? ports.resolveOffer(controlHex(args[0]))
           : undefined;
+        if (args.length && !seller) return null;
         const [balanceAtomic, channel] = await Promise.all([
           sharedBalance(target.policy.payer, target.url).catch(() => null),
           seller ? ports.remaining(target.policy, seller, target.url) : null,

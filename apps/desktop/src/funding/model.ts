@@ -116,6 +116,39 @@ export function autoFundingAvailable(
   if (capacity.includes(null)) return null;
   return capacity.includes(false) ? false : FUNDING.channelLimit;
 }
+export type ReplacementTerms = Pick<
+  BuyerFunding,
+  'switchingAtomic' | 'replacementAtomic'
+>;
+export function pinnedFundingNotice(
+  funding: BuyerFunding | null,
+  consent?: ReplacementTerms,
+) {
+  const blocker = funding
+    ? funding.channelBlocker
+    : SESSION_CODES.STATUS_UNKNOWN;
+  if (
+    blocker === SESSION_CODES.REPLACEMENT_REQUIRED &&
+    funding &&
+    consent &&
+    funding.channelRemainingAtomic === null &&
+    (consent.switchingAtomic !== undefined ||
+      consent.replacementAtomic !== undefined) &&
+    funding.switchingAtomic === consent.switchingAtomic &&
+    funding.replacementAtomic === consent.replacementAtomic
+  )
+    return undefined;
+  return blocker ? channelBlockerMessage(blocker) : undefined;
+}
+export function autoFundingNotice(
+  available: Exclude<ReturnType<typeof autoFundingAvailable>, true>,
+) {
+  if (isChannelBlocker(available)) return channelBlockerMessage(available);
+  if (available === false) return 'Add devnet USDC to open a channel.';
+  if (available === FUNDING.channelLimit)
+    return 'Channel capacity cannot cover this response. Review Payments.';
+  return 'Could not confirm channel funds. Check Payments and try again.';
+}
 export function depositShortfall(balanceAtomic: string, depositAtomic: string) {
   const difference =
     BigInt(controlAtomic(depositAtomic)) - BigInt(controlAtomic(balanceAtomic));

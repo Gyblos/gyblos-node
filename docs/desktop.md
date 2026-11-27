@@ -92,9 +92,12 @@ from that environment are passed to the managed buyer.
 
 In **Models**, select a paid offer and choose **Check payment channel** to see
 its verified status, remaining escrow and wallet balance. **Check status**
-refreshes the observation without sending a message or opening a channel. If the
-wallet observation fails, the last verified balance and its time appear when
-available.
+refreshes the observation. When an API key reservation needs review, it first
+checks for finalized evidence and reconciles the reservation when possible.
+**Refresh wallet** only updates the observation. Before sending to a pinned paid
+seller, Chat checks the channel again and keeps the draft if spending is
+blocked. If the wallet observation fails, the last verified balance and its time
+appear when available.
 
 The signed quote decides whether an answer is free or paid. Paid execution keeps
 the buyer's devnet, model, reasoning, identity, recount and journal checks; the
