@@ -67,13 +67,12 @@ async function executePaidSession(
   current.throwIfAborted();
   await manager.preflight(winner.quote, input, current);
   current.throwIfAborted();
-  await reserveApiKey(permission, winner.quote, current);
   const id = winner.quote.offer.requestId;
   if (state.selections.has(id)) return sessionFail(SESSION_CODES.BINDING);
   const scope = (state.openingIntent ??= new AsyncLocalStorage<
     string | undefined
   >());
-  state.selections.set(id, winner);
+  state.selections.set(id, { ...winner, permission });
   if (sending) state.sending.set(id, sending);
   let result: Awaited<ReturnType<typeof manager.execute>>;
   try {

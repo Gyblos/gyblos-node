@@ -276,6 +276,8 @@ finishes, and `usage` counts everything it generated.
 | 503 `BUYER_KEY_NEEDS_REVIEW`  | An earlier paid request on this key has an uncertain outcome. Review it in **Payments**     |
 | 504                           | The seller didn't answer in time                                                            |
 
+If the buyer confirms a cancellation before payment preparation and dispatch, the reserved allowance becomes available again.
+
 Errors use each API's own shape, so SDKs raise their usual exceptions. For other problems, see
 [Troubleshooting](/en/help/troubleshooting#buyer-and-desktop).
 
