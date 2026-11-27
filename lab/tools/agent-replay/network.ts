@@ -126,6 +126,20 @@ function traced(
   };
 }
 
+function freeConfig(sellers: AcceptanceSession[]) {
+  const config = acceptanceSelection(sellers[0]!);
+  config.request.maxTokens = AGENT_REPLAY.maxTokens;
+  config.request.maxAtomic = AGENT_REPLAY.freePrice;
+  config.request.priceCeilings = {
+    inputAtomicPerMtok: AGENT_REPLAY.freePrice,
+    outputAtomicPerMtok: AGENT_REPLAY.freePrice,
+  };
+  config.sellers = sellers.flatMap(
+    (seller) => acceptanceSelection(seller).sellers,
+  );
+  return config;
+}
+
 export async function startReplayNetwork(
   count: number,
   signal: AbortSignal,
@@ -139,20 +153,11 @@ export async function startReplayNetwork(
   try {
     endpoint = await createAcceptanceBuyerEndpoint();
     const bound = endpoint;
-    const config = acceptanceSelection(first!);
-    config.request.maxTokens = AGENT_REPLAY.maxTokens;
-    config.request.maxAtomic = '0';
-    config.request.priceCeilings = {
-      inputAtomicPerMtok: '0',
-      outputAtomicPerMtok: '0',
-    };
-    config.sellers = sellers.flatMap(
-      (seller) => acceptanceSelection(seller).sellers,
-    );
+    const config = freeConfig(sellers);
     const traces = new Map<string, SellerTrace>();
     const cooldowns: CooldownEvent[] = [];
     const nodes = config.sellers.map((seller) => seller.nodeId);
-    const origin = Date.now();
+    const origin = performance.now();
     const dependencies = freeBuyerDependencies(
       {
         config,
@@ -167,7 +172,7 @@ export async function startReplayNetwork(
         parallel: TRANSPORT_LIMITS.maxConcurrent,
         onSellerFailure: (failure) =>
           cooldowns.push({
-            atMs: Date.now() - origin,
+            atMs: performance.now() - origin,
             seller: nodes.indexOf(failure.nodeId) + 1,
             phase: failure.phase,
             code: failure.code,
@@ -188,13 +193,17 @@ export async function startReplayNetwork(
     );
     return {
       url: host.url,
+      origin,
       traces,
       cooldowns,
       async close() {
         stopRenewal();
-        await host.close();
-        await bound.close();
-        await Promise.allSettled(sellers.map((seller) => seller.close()));
+        try {
+          await host.close();
+        } finally {
+          await bound.close().catch(() => {});
+          await Promise.allSettled(sellers.map((seller) => seller.close()));
+        }
       },
     };
   } catch (error) {

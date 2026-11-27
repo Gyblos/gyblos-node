@@ -4,6 +4,7 @@ export const AGENT_REPLAY = {
   pace: { firstTokenMs: 400, tokenMs: 15, tokens: 60 },
   caps: { dailyTokenCap: 10_000_000, perBuyerCap: 1_000_000 },
   maxTokens: 256,
+  freePrice: '0',
   turnChars: 250,
   runMs: 15 * 60_000,
   percentiles: [50, 95],

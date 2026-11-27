@@ -1,7 +1,6 @@
 import { performance } from 'node:perf_hooks';
 
 import { FREE_BUYER } from '@gyblos/buyer/constants';
-import { HTTP_STATUS } from '@gyblos/config';
 import { MODEL_IDS, type FreeChatRole } from '@gyblos/protocol/constants';
 
 import { AGENT_REPLAY, type ReplayRole } from './constants';

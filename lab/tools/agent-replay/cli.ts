@@ -38,7 +38,7 @@ export async function main() {
     try {
       const records = joinTraces(
         count,
-        await replayAgentSession(network.url, signal),
+        await replayAgentSession(network.url, network.origin, signal),
         network.traces,
       ).map((record) => ({ runId, mode, ...record }));
       await appendFile(

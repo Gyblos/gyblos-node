@@ -1,5 +1,3 @@
-import { performance } from 'node:perf_hooks';
-
 import { FREE_CHAT_ROLES } from '@gyblos/protocol/constants';
 
 import { replayRequest, type ReplayMessage, type ReplayTiming } from './client';
@@ -17,8 +15,11 @@ function padding(turn: number) {
   );
 }
 
-export async function replayAgentSession(url: string, signal: AbortSignal) {
-  const origin = performance.now();
+export async function replayAgentSession(
+  url: string,
+  origin: number,
+  signal: AbortSignal,
+) {
   const timings: ReplayTiming[] = [];
   let sequence = 0;
   const history: ReplayMessage[] = [

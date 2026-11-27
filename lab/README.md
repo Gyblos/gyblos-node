@@ -33,8 +33,12 @@ loop.
 
 For each request it writes a JSONL line with time to headers, time to first
 token, total time, HTTP status and code, and the seller that served it. It
-prints a summary with percentiles, failures and seller cooldowns. `--out <dir>`
-keeps the file; `--ollama` uses the gate Ollama engine.
+prints a summary with percentiles, failures and seller cooldowns.
+
+Each run writes a new `agent-replay-<runId>.jsonl`. Its records carry the run id
+and the engine mode. `--out <dir>` chooses the directory, and creates it if
+needed; without it, the file goes to a new temporary directory. `--ollama` uses
+the gate Ollama engine instead, so the synthetic pacing does not apply.
 
 ## Batch-settlement channel check
 

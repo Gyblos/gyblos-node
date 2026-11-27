@@ -6,6 +6,7 @@ import type { SellerTrace } from './network';
 
 export type ReplayRecord = Omit<ReplayTiming, 'text'> & {
   sellerCount: number;
+  traced: boolean;
   sellers: number[];
   waitsMs: number[];
 };
@@ -44,23 +45,26 @@ export function joinTraces(
     return {
       ...timing,
       sellerCount,
+      traced: trace !== undefined,
       sellers: trace?.sellers ?? [],
       waitsMs: (trace?.waitsMs ?? []).map(round),
     };
   });
 }
 
+const completed = (record: ReplayRecord) =>
+  record.status === HTTP_STATUS.ok &&
+  record.firstTokenMs !== null &&
+  record.code === null;
+
 export function summarize(records: ReplayRecord[]) {
-  const served = records.filter(
-    (record) =>
-      record.status === HTTP_STATUS.ok && record.firstTokenMs !== null,
-  );
+  const served = records.filter(completed);
+  const failed = records.filter((record) => !completed(record));
   const failures: Record<string, number> = {};
-  for (const record of records)
-    if (record.status !== HTTP_STATUS.ok || record.firstTokenMs === null) {
-      const key = `${record.status}:${record.code ?? 'none'}`;
-      failures[key] = (failures[key] ?? 0) + 1;
-    }
+  for (const record of failed) {
+    const key = `${record.status}:${record.code ?? 'none'}`;
+    failures[key] = (failures[key] ?? 0) + 1;
+  }
   const bySeller: Record<string, number> = {};
   for (const record of served) {
     const seller = String(record.sellers.at(-1) ?? 0);
@@ -71,6 +75,8 @@ export function summarize(records: ReplayRecord[]) {
     requests: records.length,
     served: served.length,
     failures,
+    untraced: records.filter((record) => !record.traced).length,
+    failedTotalMs: spread(failed.map((record) => record.totalMs)),
     reselected: records.filter((record) => record.sellers.length > 1).length,
     bySeller,
     headersMs: spread(served.map((record) => record.headersMs ?? 0)),
