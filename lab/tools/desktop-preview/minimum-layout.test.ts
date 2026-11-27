@@ -33,7 +33,7 @@ async function render(root: string, url: URL, width: number) {
   return stdout;
 }
 
-void test('the desktop renderer fits its model picker and Limits controls at native minimum width', async () => {
+async function minimumLayout(head = '') {
   const root = await mkdtemp(join(tmpdir(), 'gyblos-minimum-layout-'));
   try {
     const output = await buildPreview(join(root, 'dist'));
@@ -54,20 +54,31 @@ void test('the desktop renderer fits its model picker and Limits controls at nat
       entry,
       html.replace(
         '<script type="module"',
-        '<script src="./preview.js"></script><script type="module" src="./probe.mjs"></script><script type="module"',
+        head +
+          '<script src="./preview.js"></script><script type="module" src="./probe.mjs"></script><script type="module"',
       ),
     );
     const url = pathToFileURL(entry);
     url.search =
       'screen=chat&connection-state=ready&funding=ready&seller-budget=ready';
     const stdout = await render(root, url, DESKTOP.MIN_WIDTH);
-    assert.equal(
-      /data-layout-passed="([^"]+)"/.exec(stdout)?.[1],
-      String(DESKTOP.MIN_WIDTH),
-    );
+    return /data-layout-passed="([^"]+)"/.exec(stdout)?.[1];
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+}
+
+void test('the desktop renderer fits its model picker and Limits controls at native minimum width', async () => {
+  assert.equal(await minimumLayout(), String(DESKTOP.MIN_WIDTH));
+});
+
+void test('the minimum-width probe measures the live pane while a slide snapshot is still entering', async () => {
+  assert.equal(
+    await minimumLayout(
+      '<style>.slide-snapshot--in{animation-play-state:paused!important;animation-delay:-150ms!important}</style>',
+    ),
+    String(DESKTOP.MIN_WIDTH),
+  );
 });
 
 void test('the design-system dialog hides the action tooltip while its label is visible', async () => {
