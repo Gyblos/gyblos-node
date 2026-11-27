@@ -31,15 +31,24 @@ interface Registry {
   [key: string]: unknown;
 }
 
+const NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
+const PATH_SEGMENT = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
+
+function isRelativeFilePath(value: string): boolean {
+  return value.split('/').every((segment) => PATH_SEGMENT.test(segment));
+}
+
 function isRegistryFile(value: unknown): value is RegistryFile {
   return (
     typeof value === 'object' &&
     value !== null &&
     'path' in value &&
     typeof value.path === 'string' &&
+    isRelativeFilePath(value.path) &&
     'type' in value &&
     typeof value.type === 'string' &&
-    (!('target' in value) || typeof value.target === 'string')
+    (!('target' in value) ||
+      (typeof value.target === 'string' && isRelativeFilePath(value.target)))
   );
 }
 
@@ -49,6 +58,7 @@ function isRegistryItem(value: unknown): value is RegistryItem {
     value !== null &&
     'name' in value &&
     typeof value.name === 'string' &&
+    NAME_PATTERN.test(value.name) &&
     (!('files' in value) ||
       (Array.isArray(value.files) && value.files.every(isRegistryFile))) &&
     (!('registryDependencies' in value) ||
