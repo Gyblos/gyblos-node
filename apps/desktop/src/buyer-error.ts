@@ -1,5 +1,6 @@
 // Static desktop explanations for validated buyer failures; remote text is never displayed.
 // Presentation does not change retry decisions, budget reservations or payment uncertainty.
+import { RESPONSES_CODES } from '@gyblos/buyer/constants';
 import {
   BUYER_ROUTING_CODES,
   SELLER_SELECTION_CODES,
@@ -150,6 +151,12 @@ export function desktopBuyerFailure(
       'The selected seller could not open a payment channel. Choose another seller.',
       true,
     );
+  const reportedCode =
+    row.code === RESPONSES_CODES.contextFull &&
+    row[RESPONSES_CODES.field] === FREE_EXECUTION_CODES.LIMIT &&
+    typeof row[BUYER_API.NEVER_SENT_FIELD] === 'boolean'
+      ? FREE_EXECUTION_CODES.LIMIT
+      : row.code;
   const code = [
     CHAT_FAILURE.KEY_REVIEW,
     BUYER_ROUTING_CODES.BUSY,
@@ -162,7 +169,7 @@ export function desktopBuyerFailure(
     SESSION_CODES.LIMIT,
     ...Object.values(FREE_EXECUTION_CODES),
     ...Object.values(SELLER_SELECTION_CODES),
-  ].find((code) => code === row.code);
+  ].find((code) => code === reportedCode);
   return code
     ? new DesktopBuyerFailure(
         code,

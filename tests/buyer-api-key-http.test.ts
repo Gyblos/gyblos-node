@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import { CHAT_ROUTES, FREE_BUYER } from '@gyblos/buyer/constants';
 import { startFreeBuyerHttp } from '@gyblos/buyer/free-http';
 import {
   desktopBuyerFailure,
@@ -243,7 +244,23 @@ void test('an uncertain delegated payment blocks operator Chat and new grants wi
       headers: { ...f.owner, 'content-type': 'application/json' },
       body,
     });
-    assert.equal(root.status, 503);
+    const responses = await fetch(new URL(CHAT_ROUTES.responses, f.host.url), {
+      method: 'POST',
+      headers: { ...f.owner, 'content-type': 'application/json' },
+      body: JSON.stringify({ model: MODEL_IDS.QWEN3_0_6B, input: 'synthetic' }),
+    });
+    assert.deepEqual(
+      [
+        root.status,
+        root.headers.get(FREE_BUYER.noRetryHeader),
+        responses.status,
+        responses.headers.get(FREE_BUYER.noRetryHeader),
+      ],
+      [503, 'false', 400, 'false'],
+    );
+    const refused = await responses.json();
+    assert.equal(refused.error.code, BUYER_KEY_CODES.REVIEW);
+    assert.equal(refused.error[BUYER_API.NEVER_SENT_FIELD], true);
     const rejection = await root.json();
     assert.equal(rejection.error.code, BUYER_KEY_CODES.REVIEW);
     const failure = desktopBuyerFailure(rejection.error, f.policy);

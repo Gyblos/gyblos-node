@@ -133,8 +133,10 @@ conversation content is not encrypted.
   the turn retains its spending review action. Editing a declined question
   preserves an existing draft in its conversation. A budget status check cannot
   establish a charge for the specific turn. Check status on a key review reads
-  whether the authenticated key ledger currently allows requests. For
-  interrupted paid responses it can reconcile local spending records against
+  whether the authenticated key ledger currently allows requests. A key review
+  refusal disables automatic retries. Chat Completions returns HTTP 503 with
+  `x-should-retry: false` and Responses returns HTTP 400 with the same header.
+  For interrupted paid responses it can reconcile local spending records against
   verified payment evidence. When the original session is unavailable, review
   the payment history in Payments.
 - Earlier desktop versions may decline to load archives containing newer turn
