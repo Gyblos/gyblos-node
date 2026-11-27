@@ -168,9 +168,10 @@ that require them don't work. In every client, turn off HTTP and stream retries.
 Send `tools` as each API defines them. When the model wants a tool, the answer ends with
 `finish_reason: "tool_calls"` (Anthropic: `stop_reason: "tool_use"`) and carries the call. Your program
 runs the tool and sends the result back in the next request, with the whole conversation. A tool description
-longer than 8 KiB is shortened to fit; a tool over the other limits (128 tools, names of 1 to 64 letters, digits,
-`_` or `-`, schemas up to 64 KiB) gets an error naming it, such as `tools[3]: ...`. Prompt-cache marks and reasoning
-fields from other providers in the history are ignored:
+longer than 8 KiB is shortened to fit. More than 128 tools gets an error for the whole list; a name that is not 1
+to 64 letters, digits, `_` or `-`, a repeated name, or a schema over 64 KiB gets an error naming the tool, such as
+`tools[3]: ...`. In the Chat Completions and Messages formats, prompt-cache marks and reasoning fields from other
+providers in the history are ignored:
 
 ```js
 import OpenAI from 'openai';

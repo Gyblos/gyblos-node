@@ -171,10 +171,10 @@ reintentos HTTP y de stream.
 Envía `tools` como define cada API. Cuando el modelo quiere usar una herramienta, la respuesta termina con
 `finish_reason: "tool_calls"` (Anthropic: `stop_reason: "tool_use"`) y trae la llamada. Tu programa
 ejecuta la herramienta y devuelve el resultado en la siguiente solicitud, con toda la conversación. Una
-descripción de herramienta de más de 8 KiB se acorta para que quepa; una herramienta fuera de los otros límites (128
-herramientas, nombres de 1 a 64 letras, dígitos, `_` o `-`, esquemas de hasta 64 KiB) recibe un error que la
-nombra, como `tools[3]: ...`. Las marcas de caché y los campos de razonamiento de otros proveedores en el historial
-se ignoran:
+descripción de herramienta de más de 8 KiB se acorta para que quepa. Más de 128 herramientas reciben un error para
+toda la lista; un nombre que no tenga de 1 a 64 letras, dígitos, `_` o `-`, un nombre repetido o un esquema de más
+de 64 KiB reciben un error que nombra la herramienta, como `tools[3]: ...`. En los formatos Chat Completions y
+Messages, las marcas de caché y los campos de razonamiento de otros proveedores en el historial se ignoran:
 
 ```js
 import OpenAI from 'openai';
