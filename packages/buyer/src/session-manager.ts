@@ -31,13 +31,11 @@ import {
   inspectBatchSession,
 } from '@gyblos/payments-upto/batch-session';
 import { canonicalJson } from '@gyblos/protocol';
-import { batchFail } from '@gyblos/protocol/batch-channel';
 import type { BuyerSellerChoice } from '@gyblos/protocol/buyer-api';
 import { BUYER_KEY_CODES, buyerKeyFail } from '@gyblos/protocol/buyer-api-keys';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
 import type { ChatTokenizer } from '@gyblos/protocol/engine';
-import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import { SESSION_CODES, sessionFail } from '@gyblos/protocol/payment-session';
 
 import { reserveApiKey } from './api-key-execution';
@@ -57,6 +55,7 @@ import type { BuyerExecutionFactory } from './free-startup';
 import { verifyBuyerIdentity } from './identity';
 import { restoredSellerAddress } from './seller-address';
 import {
+  activeMeter,
   createSessionPreflight,
   prepareChosenMeter,
   sessionMeter,
@@ -94,26 +93,6 @@ function trustedQuote(
     )
       return sessionFail(SESSION_CODES.UNVERIFIED);
     signal.throwIfAborted();
-  };
-}
-function activeMeter(state: SessionState): ChatTokenizer {
-  const current = () => {
-    if (!state.meter) return sessionFail();
-    return state.meter;
-  };
-  return {
-    input: (text) => current().input(text),
-    chat: (messages, tools, choice) => current().chat(messages, tools, choice),
-    output: (text, calls) => {
-      const meter = current();
-      if (!meter.output) return batchFail(PAID_EXECUTION_CODES.UNSUPPORTED);
-      return meter.output(text, calls);
-    },
-    count: (text) => current().count(text),
-    get stablePrefix() {
-      const meter = state.meter;
-      return meter?.stablePrefix?.bind(meter);
-    },
   };
 }
 function sessionReceipts(

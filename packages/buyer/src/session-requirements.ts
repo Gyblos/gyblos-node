@@ -204,3 +204,24 @@ export async function checkDesktopPool(
   await manager.reconcile(AbortSignal.timeout(PAID_BUYER_HTTP_MS));
   if (await manager.unresolved()) return sessionFail(SESSION_CODES.UNVERIFIED);
 }
+
+export function activeMeter(state: { meter?: ChatTokenizer }): ChatTokenizer {
+  const current = () => {
+    if (!state.meter) return sessionFail();
+    return state.meter;
+  };
+  return {
+    input: (text) => current().input(text),
+    chat: (messages, tools, choice) => current().chat(messages, tools, choice),
+    output: (text, calls) => {
+      const meter = current();
+      if (!meter.output) return batchFail(PAID_EXECUTION_CODES.UNSUPPORTED);
+      return meter.output(text, calls);
+    },
+    count: (text) => current().count(text),
+    get stablePrefix() {
+      const meter = state.meter;
+      return meter?.stablePrefix?.bind(meter);
+    },
+  };
+}

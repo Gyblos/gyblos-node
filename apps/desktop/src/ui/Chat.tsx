@@ -519,6 +519,11 @@ export function Chat({
     setNearBottom(true);
     input.current?.focus();
   }
+  function prepareChatSend() {
+    if (!session.messages.length) captureComposer();
+    follow.current = true;
+    setNearBottom(true);
+  }
   async function submit() {
     if (!canSend || !session.draft.trim()) return;
     if (usingX402 && x402) {
@@ -535,9 +540,7 @@ export function Chat({
         verification.current = null;
         if (pinnedFundingNotice(observation, policy, replacement)) return;
       }
-      if (!session.messages.length) captureComposer();
-      follow.current = true;
-      setNearBottom(true);
+      prepareChatSend();
       const id = crypto.randomUUID();
       const conversation = chat.startPaypal(
         session.draft,
@@ -590,9 +593,7 @@ export function Chat({
       return;
     }
     if (usingPaypal) {
-      if (!session.messages.length) captureComposer();
-      follow.current = true;
-      setNearBottom(true);
+      prepareChatSend();
       void sendPaypalMessage(chat, paypal.chat, crypto.randomUUID());
       return;
     }

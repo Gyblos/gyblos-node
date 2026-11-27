@@ -3,7 +3,6 @@ import { PROTOCOL_FEE } from '@gyblos/config';
 import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
 import { recountSessionInput } from '@gyblos/core/session-input';
 import type { BatchStoredSession } from '@gyblos/payments-upto/batch-session';
-import { verifyBatchQuote } from '@gyblos/protocol/batch-channel';
 import { BuyerApiKeyError } from '@gyblos/protocol/buyer-api-keys';
 import { CONTROL_METERING_MODES } from '@gyblos/protocol/constants';
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
@@ -28,6 +27,7 @@ import {
   channelTurnAuthority,
   prepareNewChannel,
   UnsentChannelRequestError,
+  verifyOpeningQuote,
   type PreparedChannel,
   type StartChannelWork,
 } from './buyer-channel-prepare';
@@ -105,18 +105,6 @@ function getBackend<Remote extends BatchDestination>(
     });
   }
   return bounded(state.backend, signal);
-}
-function verifyOpeningQuote<Remote extends BatchDestination>(
-  options: BuyerSessionOptions<Remote>,
-  quote: SignedOfferV2,
-  terms: PaymentSessionTerms,
-) {
-  return verifyBatchQuote(
-    quote,
-    terms,
-    options.endpoint.id().toString(),
-    options.now(),
-  );
 }
 async function openCurrent<Remote extends BatchDestination>(
   state: State<Remote>,

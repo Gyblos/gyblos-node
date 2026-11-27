@@ -30,6 +30,7 @@ import {
 import {
   buyerKeyState,
   keyReservation,
+  parseCompletedKey,
   type BuyerKeyReservation,
   type BuyerKeyState,
 } from './buyer-api-key-state';
@@ -377,30 +378,6 @@ export class BuyerApiKeys {
     await this.queue;
     await this.files.close?.();
   }
-}
-function parseCompletedKey(
-  key: BuyerKeyState['keys'][number],
-  reserved: string,
-  charge: string,
-  kind: BuyerKeyCharge,
-) {
-  const { digest: secretDigest, ...summary } = key;
-  return {
-    ...parseBuyerApiKeySummary({
-      ...summary,
-      reservedAtomic: String(BigInt(key.reservedAtomic) - BigInt(reserved)),
-      spentAtomic: String(BigInt(key.spentAtomic) + BigInt(charge)),
-      settledAtomic: String(
-        BigInt(key.settledAtomic) +
-          (kind === BUYER_KEY_CHARGE.SETTLED ? BigInt(charge) : 0n),
-      ),
-      approvedAtomic: String(
-        BigInt(key.approvedAtomic) +
-          (kind === BUYER_KEY_CHARGE.APPROVED ? BigInt(charge) : 0n),
-      ),
-    }),
-    digest: secretDigest,
-  };
 }
 export type BuyerApiKeyOperation = ReturnType<BuyerApiKeys['operation']>;
 export async function createBuyerApiKeys(options: {

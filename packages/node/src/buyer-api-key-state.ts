@@ -2,12 +2,14 @@
 import { BUYER_API, buyerAtomic } from '@gyblos/protocol/buyer-api';
 import {
   BUYER_API_KEYS,
+  BUYER_KEY_CHARGE,
   BUYER_KEY_CODES,
   buyerKeyFail,
   keyObject,
   parseBuyerApiKeySummary,
   parseBuyerKeyScope,
   type BuyerApiKeySummary,
+  type BuyerKeyCharge,
   type BuyerKeyScope,
 } from '@gyblos/protocol/buyer-api-keys';
 
@@ -139,4 +141,29 @@ export function keyReservation(
   keyId: string,
 ) {
   return reservation({ ...value, id, keyId });
+}
+
+export function parseCompletedKey(
+  key: BuyerKeyRecord,
+  reserved: string,
+  charge: string,
+  kind: BuyerKeyCharge,
+) {
+  const { digest: secretDigest, ...summary } = key;
+  return {
+    ...parseBuyerApiKeySummary({
+      ...summary,
+      reservedAtomic: String(BigInt(key.reservedAtomic) - BigInt(reserved)),
+      spentAtomic: String(BigInt(key.spentAtomic) + BigInt(charge)),
+      settledAtomic: String(
+        BigInt(key.settledAtomic) +
+          (kind === BUYER_KEY_CHARGE.SETTLED ? BigInt(charge) : 0n),
+      ),
+      approvedAtomic: String(
+        BigInt(key.approvedAtomic) +
+          (kind === BUYER_KEY_CHARGE.APPROVED ? BigInt(charge) : 0n),
+      ),
+    }),
+    digest: secretDigest,
+  };
 }
