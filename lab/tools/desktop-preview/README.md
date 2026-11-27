@@ -24,6 +24,13 @@ changes last only until the page reloads. A copied API key is deliberately
 invalid. Connection examples can be copied from the setup guide on the
 Connections screen.
 
+Open `?screen=models&channel=unknown` to review paid channel status. The fixture
+also accepts `eligible`, `expired` and `settled`. **Check status** on the
+unknown fixture reveals a synthetic final settlement. Add `wallet=unknown` or
+`wallet=zero` to inspect wallet evidence independently. The
+`reservation=pending` fixture shows the reserved amount, usage approval and
+settlement separately.
+
 ## Approved brand assets
 
 The browser build applies the approved brand kit 3.0.0 terminal symbol and the

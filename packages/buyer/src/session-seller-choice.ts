@@ -4,6 +4,7 @@ import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 import { primaryRelayUrl } from '@gyblos/transport-iroh/endpoint';
 
 import type { FreeWinner } from './free-execution';
+import type { SelectionRoute } from './free-route';
 import type { PreparedSelection } from './free-selection';
 import { UnsentSellerChoiceError } from './seller-choice-error';
 
@@ -63,4 +64,14 @@ export function verifyChosenOffer(
     offer.prices.outputAtomicPerMtok !== choice.outputAtomicPerMtok
   )
     throw new UnsentSellerChoiceError(SESSION_CODES.BINDING);
+}
+
+export async function preferChannel(
+  selectionRoute: SelectionRoute | undefined,
+  paidAuto: boolean | undefined,
+  previousSeller: () => Promise<string | undefined>,
+) {
+  return selectionRoute?.open && paidAuto && !selectionRoute.previousSeller
+    ? { ...selectionRoute, previousSeller: await previousSeller() }
+    : selectionRoute;
 }

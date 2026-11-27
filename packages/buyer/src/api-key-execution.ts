@@ -26,6 +26,7 @@ import type {
   FreeChatStreamExecutor,
 } from './free-sse';
 import type { RoutedModel } from './model-routes';
+import { UnsentSellerChoiceError } from './seller-choice-error';
 
 export async function reserveApiKey(
   operation: BuyerApiKeyOperation | undefined,
@@ -73,7 +74,8 @@ export async function executeApiKeySession<T>(
       await operation.complete('0', BUYER_KEY_CHARGE.SETTLED);
     // Only locally proven unsent requests release their matching reservation.
     if (
-      (error instanceof UnsentSellerBusyError ||
+      (error instanceof UnsentSellerChoiceError ||
+        error instanceof UnsentSellerBusyError ||
         error instanceof UnsentChannelRequestError ||
         error instanceof UnsentChannelLimitError ||
         error instanceof UnsentChannelPeerError) &&

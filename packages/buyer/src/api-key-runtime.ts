@@ -20,7 +20,7 @@ export async function withBuyerApiKeys(
         mint: prepared.config.request.asset,
         payer: role.buyer,
       },
-      runtime.confirmUnchargedKey,
+      runtime.confirmKeyCharge,
     );
     try {
       await apiKeys.reconcileAbandoned();
@@ -31,6 +31,13 @@ export async function withBuyerApiKeys(
     return {
       ...runtime,
       apiKeys,
+      reconcilePool: runtime.confirmKeyCharge
+        ? async () => {
+            await apiKeys.reconcileAbandoned(true);
+            apiKeys.assertReady();
+            await runtime.reconcilePool?.();
+          }
+        : runtime.reconcilePool,
       close: async () => {
         try {
           await runtime.close();

@@ -13,6 +13,7 @@ import {
   parseBuyerApiKeyCommand,
 } from '@gyblos/protocol/buyer-api-keys';
 
+import { channelBlockerMessage } from './channel-blocker';
 import { FREE_BUYER } from './constants';
 import type { ChatErrorView } from './free-http';
 
@@ -107,6 +108,8 @@ export function buyerApiKeyErrorView(
     detail:
       error.code === BUYER_KEY_CODES.LIMIT
         ? 'The API key spend limit cannot cover this request.'
-        : undefined,
+        : error.code === BUYER_KEY_CODES.REVIEW
+          ? channelBlockerMessage(BUYER_KEY_CODES.REVIEW)
+          : undefined,
   };
 }

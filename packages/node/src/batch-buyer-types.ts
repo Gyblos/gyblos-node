@@ -23,6 +23,7 @@ export interface BuyerBatchSessionOptions<Remote extends BatchDestination> {
   beforeInference?(
     requestId: string,
     ref: import('./desktop-opening').DesktopRequestBinding,
+    executionDigest: string,
   ): Promise<void>;
   preparation?: import('./buyer-channel-prepare').PreparedChannel;
   receipt?: (

@@ -37,12 +37,13 @@ export interface BuyerApiKeyFiles {
 }
 export type BuyerApiKeyQuote = Omit<BuyerKeyReservation, 'id' | 'keyId'>;
 const digest = (value: string) => createHash('sha256').update(value).digest();
-export type ConfirmUnchargedKey = (
+export type ConfirmKeyCharge = (
   reservation: BuyerApiKeyQuote,
   scope: BuyerKeyScope,
-) => Promise<boolean>;
+) => Promise<string | undefined>;
 export class BuyerApiKeys {
   private proof?: Promise<void>;
+  private checked?: string;
   private failed = false;
   private closed = false;
   private queue: Promise<unknown> = Promise.resolve();
@@ -50,7 +51,7 @@ export class BuyerApiKeys {
   constructor(
     private state: BuyerKeyState,
     private readonly files: BuyerApiKeyFiles,
-    private readonly confirmUncharged?: ConfirmUnchargedKey,
+    private readonly confirmCharge?: ConfirmKeyCharge,
   ) {}
   private serial<T>(work: () => Promise<T>) {
     const result = this.queue.then(work);
@@ -218,32 +219,35 @@ export class BuyerApiKeys {
     });
     this.active.delete(id);
   }
-  reconcileAbandoned() {
+  reconcileAbandoned(manual = false) {
     if (!this.proof)
-      this.proof = this.recoverUncharged().finally(() => {
+      this.proof = this.recoverCharge(manual).finally(() => {
         this.proof = undefined;
       });
     return this.proof;
   }
-  private async recoverUncharged() {
-    const prove = this.confirmUncharged;
+  private async recoverCharge(manual: boolean) {
+    const prove = this.confirmCharge;
     const [orphan] = this.state.pending;
     if (
       !prove ||
       this.state.pending.length !== 1 ||
       !orphan ||
+      (!manual && this.checked === orphan.id) ||
       this.active.size
     )
       return;
-    const proved = await prove(orphan, this.state.scope).catch(() => false);
-    if (proved)
+    this.checked = orphan.id;
+    const charge = await prove(orphan, this.state.scope).catch(() => undefined);
+    if (!this.closed && charge !== undefined)
       await this.serial(async () => {
         if (
+          !this.closed &&
           this.state.pending.length === 1 &&
           this.state.pending[0]?.id === orphan.id &&
           !this.active.size
         )
-          await this.finish(orphan.id, '0', BUYER_KEY_CHARGE.SETTLED);
+          await this.finish(orphan.id, charge, BUYER_KEY_CHARGE.SETTLED);
       });
   }
   operation(keyId: string) {
@@ -278,6 +282,29 @@ export class BuyerApiKeys {
         reserved = true;
         maximum = quote.maxAtomic;
       },
+      bindExecution: (requestId: string, executionDigest: string) =>
+        this.serial(async () => {
+          this.writable();
+          const current = this.state.pending.find((item) => item.id === id);
+          if (
+            !current ||
+            current.requestId !== requestId ||
+            current.executionDigest ||
+            controller.signal.aborted
+          )
+            return buyerKeyFail(BUYER_KEY_CODES.REVIEW);
+          const bound = keyReservation(
+            { ...current, executionDigest },
+            id,
+            keyId,
+          );
+          await this.save({
+            ...this.state,
+            pending: this.state.pending.map((item) =>
+              item.id === id ? bound : item,
+            ),
+          });
+        }),
       complete: async (charge: string, kind: BuyerKeyCharge) => {
         if (finished || !reserved) return buyerKeyFail(BUYER_KEY_CODES.REVIEW);
         await this.complete(id, charge, kind);
@@ -293,6 +320,8 @@ export class BuyerApiKeys {
       },
       abandon: () => {
         this.active.delete(id);
+        if (reserved && !finished && !this.closed)
+          void this.reconcileAbandoned().catch(() => {});
       },
     };
   }
@@ -331,12 +360,12 @@ export type BuyerApiKeyOperation = ReturnType<BuyerApiKeys['operation']>;
 export async function createBuyerApiKeys(options: {
   files: BuyerApiKeyFiles;
   scope: BuyerKeyScope;
-  confirmUncharged?: ConfirmUnchargedKey;
+  confirmCharge?: ConfirmKeyCharge;
 }) {
   const scope = parseBuyerKeyScope(options.scope);
   return new BuyerApiKeys(
     buyerKeyState(await options.files.read(), scope),
     options.files,
-    options.confirmUncharged,
+    options.confirmCharge,
   );
 }

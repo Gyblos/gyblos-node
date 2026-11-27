@@ -210,6 +210,9 @@ importers:
 
   apps/desktop:
     dependencies:
+      '@gyblos/buyer':
+        specifier: workspace:*
+        version: link:../../packages/buyer
       '@gyblos/config':
         specifier: workspace:*
         version: link:../../packages/config

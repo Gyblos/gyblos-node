@@ -186,6 +186,13 @@ make a check pass, don't run setup into another home, and never run `docker comp
 | An error says the seller was too slow (`engine_timeout`)                               | Send the message again; another seller usually answers. With a coding agent, you can also shorten or compact the conversation                                     |
 | `An unfinished payment needs review. New messages are blocked.`                        | Open **Payments** and review the payment. Don't delete app data to clear it; ask for help if it stays unresolved                                                  |
 
+A paid request can be refused even when the wallet has USDC. An expired
+channel or a channel with verified final settlement cannot fund another turn.
+Check its status in **Payments** before authorizing a new deposit. An uncertain
+channel stays blocked while the buyer checks the evidence. A delegated key
+under review pauses Desktop and connected coding tools. A status check never
+sends the question or creates a deposit.
+
 ## Ask for help safely [#ask-for-help-safely]
 
 Write in the [Gyblos Telegram](https://t.me/gyblos) with the error code and these outputs. The group is

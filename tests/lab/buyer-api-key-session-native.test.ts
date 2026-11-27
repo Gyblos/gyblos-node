@@ -9,7 +9,7 @@ import { batchSessionPathsIn, rolePathIn } from '@gyblos/config';
 import { buyerApiKeyPathsIn } from '@gyblos/config/home';
 import type { BuyerApiKeyQuote } from '@gyblos/node/buyer-api-keys';
 import {
-  finalizedUnchargedRequest,
+  finalizedKeyCharge,
   inspectBatchSession,
 } from '@gyblos/payments-upto/batch-session';
 import { BATCH_CHANNEL } from '@gyblos/protocol/batch-channel';
@@ -19,6 +19,7 @@ import {
   parseBuyerApiKeysReply,
 } from '@gyblos/protocol/buyer-api-keys';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
+import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
 import { NATIVE_CAPABILITY } from '../support/native-runtime';
 import { paidAcceptanceMeter } from '../support/paid-acceptance-engine';
@@ -201,26 +202,27 @@ void test(
       network: existing.terms.network,
     };
     const confirm = (candidate: BuyerApiKeyQuote) =>
-      finalizedUnchargedRequest(
+      finalizedKeyCharge(
         batchSessionPathsIn(process.env, P2P_ROLES.BUYER),
         candidate,
         identity,
         existing.terms.buyerNodeId,
         async () => {
           observations++;
+          return undefined;
         },
       );
     assert.equal(
       await confirm({ ...binding, sellerNodeId: '0'.repeat(64) }),
-      false,
+      undefined,
     );
     assert.equal(
       await confirm({ ...binding, requestId: '0'.repeat(32) }),
-      false,
+      undefined,
     );
-    assert.equal(await confirm({ ...binding, maxAtomic: '1' }), false);
+    assert.equal(await confirm({ ...binding, maxAtomic: '1' }), undefined);
     assert.equal(observations, 0);
-    assert.equal(await confirm(binding), false);
+    assert.equal(await confirm(binding), undefined);
     assert.equal(observations, 1);
 
     host.finance.settled.set(channelId, {
@@ -290,5 +292,99 @@ void test(
     assert.equal(snapshot.keys[0]?.reservedAtomic, '0');
     assert.equal(host.engine.attempts(), 1);
     assert.equal(host.finance.approvals(), 1);
+  },
+);
+
+for (const expired of [false, true])
+  void test(
+    `a ${expired ? 'clock-expired' : 'finalized'} channel blocks delegated inference before any further deposit or dispatch across restart`,
+    { skip: NATIVE_CAPABILITY.transportSkip },
+    async (t) => {
+      const request = globalThis.fetch;
+      const host = await sessionProductHost();
+      t.after(host.close);
+      const { ask } = await buyerClient(host, request);
+      const first = await ask(64);
+      assert.equal(first.status, 200, await first.clone().text());
+      const existing = await inspectBatchSession(
+        batchSessionPathsIn(process.env, P2P_ROLES.BUYER),
+      );
+      assert.ok(existing?.snapshot.channelId);
+      const { channelId, cumulativeAtomic } = existing.snapshot;
+      if (expired)
+        host.advanceChannelClock(existing.terms.expiresAt - Date.now() + 1);
+      else
+        host.finance.settled.set(channelId, {
+          channelId,
+          chargedAtomic: cumulativeAtomic,
+          refundedAtomic: String(
+            BigInt(existing.terms.depositAtomic) - BigInt(cumulativeAtomic),
+          ),
+          transaction: 'syntheticConfirmedClose',
+        });
+      const calls = [...host.finance.calls];
+      const generations = host.engine.attempts();
+      for (const restart of [false, true]) {
+        if (restart) await host.restartBuyer();
+        const denied = await ask(64);
+        assert.equal(denied.status, 400, await denied.clone().text());
+        assert.equal(denied.headers.get('x-should-retry'), 'false');
+        const reply = await denied.json();
+        assert.equal(
+          reply.error.code,
+          expired ? SESSION_CODES.EXPIRED : SESSION_CODES.CLOSED,
+        );
+        assert.equal(reply.error[BUYER_API.NEVER_SENT_FIELD], true);
+        assert.deepEqual(host.finance.calls, calls);
+        assert.equal(host.engine.attempts(), generations);
+      }
+    },
+  );
+
+void test(
+  'finality changing after preflight blocks the selected request before renewal and releases only its reservation',
+  { skip: NATIVE_CAPABILITY.transportSkip },
+  async (t) => {
+    const request = globalThis.fetch;
+    const host = await sessionProductHost();
+    t.after(host.close);
+    const { ask, owner } = await buyerClient(host, request);
+    const first = await ask(64);
+    assert.equal(first.status, 200, await first.clone().text());
+    const existing = await inspectBatchSession(
+      batchSessionPathsIn(process.env, P2P_ROLES.BUYER),
+    );
+    assert.ok(existing?.snapshot.channelId);
+    const original = host.finance.observeChannel;
+    host.finance.observeChannel = async (...args) => {
+      const result = await original(...args);
+      host.finance.settled.set(args[2], {
+        channelId: args[2],
+        chargedAtomic: existing.snapshot.cumulativeAtomic,
+        refundedAtomic: String(
+          BigInt(existing.terms.depositAtomic) -
+            BigInt(existing.snapshot.cumulativeAtomic),
+        ),
+        transaction: 'syntheticConfirmedClose',
+      });
+      return result;
+    };
+    await host.restartBuyer();
+    const calls = [...host.finance.calls];
+    const attempts = host.engine.attempts();
+    const denied = await ask(64);
+    const reply = await denied.json();
+    assert.equal(reply.error?.code, SESSION_CODES.CLOSED);
+    assert.equal(denied.status, 400);
+    assert.equal(reply.error[BUYER_API.NEVER_SENT_FIELD], true);
+    assert.deepEqual(host.finance.calls, calls);
+    assert.equal(host.engine.attempts(), attempts);
+    const status = parseBuyerApiKeysReply(
+      await (
+        await owner(new URL(BUYER_API_KEYS.PATH, host.buyer().url))
+      ).json(),
+    ).snapshot;
+    assert.equal(status.blocked, false);
+    assert.equal(status.keys[0]?.reservedAtomic, '0');
   },
 );

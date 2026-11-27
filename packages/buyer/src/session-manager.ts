@@ -2,10 +2,14 @@
 import type { AsyncLocalStorage } from 'node:async_hooks';
 
 import {
+  batchPoolChannelPaths,
   batchPoolPathsIn,
   batchSessionPathsIn,
 } from '@gyblos/config/home-payments';
-import type { ConfirmUnchargedKey } from '@gyblos/node/buyer-api-keys';
+import type {
+  BuyerApiKeyOperation,
+  ConfirmKeyCharge,
+} from '@gyblos/node/buyer-api-keys';
 import {
   createBuyerSessionManager,
   type BuyerSessionOptions,
@@ -17,19 +21,25 @@ import {
 import { createBuyerSessionPool } from '@gyblos/node/buyer-session-pool';
 import { desktopOpening } from '@gyblos/node/desktop-opening';
 import {
+  batchSessionObserver,
   batchSessionTerminal,
-  finalizedUnchargedRequest,
+  finalizedKeyCharge,
   inspectBatchPool,
   inspectBatchSession,
 } from '@gyblos/payments-upto/batch-session';
 import { canonicalJson } from '@gyblos/protocol';
 import { batchFail } from '@gyblos/protocol/batch-channel';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
+import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
 import type { ChatTokenizer } from '@gyblos/protocol/engine';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import { SESSION_CODES, sessionFail } from '@gyblos/protocol/payment-session';
 
-import { PAID_BUYER_HTTP_MS } from './constants';
+import {
+  observeChannelAt,
+  paidChannelEligibility,
+} from './channel-eligibility';
+import { PAID_BUYER_HTTP_MS, PAYMENT_REVIEW } from './constants';
 import {
   permitsWinner,
   relayAllowed,
@@ -38,7 +48,9 @@ import {
 } from './free-selection';
 import type { BuyerExecutionFactory } from './free-startup';
 import { verifyBuyerIdentity } from './identity';
+import { reviewPayment } from './payment-review';
 import { restoredSellerAddress } from './seller-address';
+import { UnsentSellerChoiceError } from './seller-choice-error';
 import {
   createSessionPreflight,
   prepareChosenMeter,
@@ -50,6 +62,7 @@ type Context = Parameters<BuyerExecutionFactory>[0];
 type Options = BuyerStartupOptions;
 type Winner = Awaited<ReturnType<typeof selectWinner>>;
 export interface SessionState {
+  keyOperations: Map<string, BuyerApiKeyOperation>;
   openingIntent?: AsyncLocalStorage<string | undefined>;
   selections: Map<string, Winner>;
   sending: Map<string, () => void>;
@@ -162,7 +175,8 @@ function desktopPermissions(
       const intent = state.openingIntent?.getStore();
       if (intent) await desktopOpening(process.env).declined(intent);
     },
-    beforeInference: async (_id, ref) => {
+    beforeInference: async (id, ref, executionDigest) => {
+      await state.keyOperations.get(id)?.bindExecution(id, executionDigest);
       const intent = state.openingIntent?.getStore();
       if (intent) await desktopOpening(process.env).consume(intent, ref);
     },
@@ -181,20 +195,61 @@ async function previousSeller(
 function inspectSingle() {
   return inspectBatchSession(batchSessionPathsIn(process.env, P2P_ROLES.BUYER));
 }
-function singleKeyProof(
-  context: Context,
-  reconcile: (signal: AbortSignal) => Promise<unknown>,
-): ConfirmUnchargedKey | undefined {
-  if (context.prepared.config.session?.totalDepositAtomic !== undefined)
-    return undefined;
-  return (ref, scope) =>
-    finalizedUnchargedRequest(
-      batchSessionPathsIn(process.env, P2P_ROLES.BUYER),
-      ref,
-      scope,
-      context.endpoint.id().toString(),
-      () => reconcile(AbortSignal.timeout(PAID_BUYER_HTTP_MS)),
+function keyProof(context: Context, options: Options): ConfirmKeyCharge {
+  return async (ref, scope) => {
+    const pool = batchPoolPathsIn(process.env);
+    const entries = await inspectBatchPool(pool, { includeLegacy: false });
+    const slot = entries.find(
+      (entry) => entry.terms.sellerNodeId === ref.sellerNodeId,
     );
+    if (entries.length && !slot) return undefined;
+    const paths =
+      slot && !slot.legacy
+        ? batchPoolChannelPaths(pool, ref.sellerNodeId)
+        : pool.legacy;
+    return reviewPayment((signal) =>
+      finalizedKeyCharge(
+        paths,
+        ref,
+        scope,
+        context.endpoint.id().toString(),
+        (terms, channelId) =>
+          options.observeSettlement
+            ? options.observeSettlement(channelId)
+            : batchSessionObserver({
+                paths,
+                terms,
+                rpcUrl: context.role.rpcUrl,
+              }).settlement(channelId, signal),
+      ),
+    );
+  };
+}
+function checkSelectedChannel(
+  context: Context,
+  options: Options,
+  state: SessionState,
+) {
+  const observe =
+    options.observeChannel ?? observeChannelAt(context.role.rpcUrl);
+  return async (quote: SignedOfferV2, signal: AbortSignal, intent?: string) => {
+    const result = await paidChannelEligibility(
+      process.env,
+      {
+        ...quote.offer,
+        payer: quote.offer.buyer,
+        pinnedNodeId: context.prepared.config.pinnedNodeId,
+        replacementAuthorized:
+          !!intent && (await desktopOpening(process.env).armed(intent)),
+        activeRequest: (id) => state.selections.has(id),
+      },
+      options.channelClock ?? Date.now,
+      observe,
+      AbortSignal.any([signal, AbortSignal.timeout(PAYMENT_REVIEW.deadlineMs)]),
+    );
+    if (result.blocker)
+      throw new UnsentSellerChoiceError(result.blocker, quote.offer.nodeId);
+  };
 }
 export function makeManager(
   context: Context,
@@ -203,6 +258,7 @@ export function makeManager(
   state: SessionState,
 ) {
   const { prepared, role, endpoint, relayOnly } = context;
+  const checkChannel = checkSelectedChannel(context, options, state);
   const common: Parameters<
     typeof createBuyerSessionManager<ReturnType<typeof sellerAddress>>
   >[0] = {
@@ -217,9 +273,7 @@ export function makeManager(
     endpoint,
     now: Date.now,
     inspect: inspectSingle,
-    backend: async () => {
-      return (options.batch ?? buyerSessionChain)(role);
-    },
+    backend: async () => (options.batch ?? buyerSessionChain)(role),
     destination: sessionDestination(context, state, policy),
     meter: activeMeter(state),
     transport: {
@@ -241,6 +295,8 @@ export function makeManager(
           !batchSessionTerminal(entry.stored),
       );
     },
+    checkReusableChannel: (quote, signal) =>
+      checkChannel(quote, signal, state.openingIntent?.getStore()),
     verify: trustedQuote(context, state),
     receipt: sessionReceipts(context, state),
   };
@@ -262,7 +318,8 @@ export function makeManager(
   );
   return {
     ...manager,
-    confirmUnchargedKey: singleKeyProof(context, manager.reconcile),
+    checkChannel,
+    confirmKeyCharge: keyProof(context, options),
     previousSeller: () =>
       previousSeller(policy.totalDepositAtomic, common.inspect),
     preparePaidChat: async () => {

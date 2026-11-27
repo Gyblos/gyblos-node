@@ -46,6 +46,7 @@ export async function prepareRenewal<Remote extends BatchDestination>(
           BigInt(opened.terms.depositAtomic)))
   )
     return undefined;
+  if (snapshot.channelId) await options.checkReusableChannel?.(quote, signal);
   const proposed = newSessionTerms(quote, options.policy, options.now());
   await verifyBatchQuote(
     quote,

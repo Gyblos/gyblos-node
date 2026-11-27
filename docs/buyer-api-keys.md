@@ -169,8 +169,14 @@ configured client keeps working with the same key.
 An interrupted paid reservation, a failed write or an inconsistent state fails
 closed. Unknown reservations also block operator inference and the creation of
 new keys. Revocation stays available and does not clear an obligation. The buyer
-does not reconcile a delegated reservation from financial history; inspect the
-payment state with the [recovery](recovery.md) commands first.
+checks the matching channel for finalized settlement at startup and on the next
+request. Checks start immediately and again at two and six seconds, with a
+ten-second deadline. A single abandoned reservation can be released or charged
+its attributable amount when the settlement matches the private usage records.
+Older reservations without an execution digest require proof of zero charge.
+Missing or conflicting proof keeps spending paused for both Desktop and coding
+tools. The buyer operator can request another check from Payments. A status
+check cannot fund a replacement or resubmit the original prompt.
 
 > **Warning:** Never delete the permission ledger or its lock to resume
 > spending, and never restore an older copy. Doing so erases recorded

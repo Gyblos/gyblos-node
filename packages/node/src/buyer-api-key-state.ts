@@ -21,6 +21,7 @@ export interface BuyerKeyReservation {
   requestId: string;
   requestDigest: string;
   sellerNodeId: string;
+  executionDigest?: string;
 }
 export interface BuyerKeyState {
   version: typeof BUYER_API_KEYS.VERSION;
@@ -53,8 +54,16 @@ function reservation(value: unknown): BuyerKeyReservation {
     'requestId',
     'requestDigest',
     'sellerNodeId',
+    ...(value &&
+    typeof value === 'object' &&
+    Object.hasOwn(value, 'executionDigest')
+      ? ['executionDigest']
+      : []),
   ]);
   if (
+    (row.executionDigest !== undefined &&
+      (typeof row.executionDigest !== 'string' ||
+        !BUYER_API_KEYS.DIGEST_PATTERN.test(row.executionDigest))) ||
     typeof row.id !== 'string' ||
     !BUYER_API.POLICY_PATTERN.test(row.id) ||
     typeof row.keyId !== 'string' ||
@@ -76,6 +85,9 @@ function reservation(value: unknown): BuyerKeyReservation {
     requestId: row.requestId,
     requestDigest: row.requestDigest,
     sellerNodeId: row.sellerNodeId,
+    ...(typeof row.executionDigest === 'string' && {
+      executionDigest: row.executionDigest,
+    }),
   };
 }
 export function buyerKeyState(

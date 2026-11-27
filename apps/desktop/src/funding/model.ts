@@ -1,9 +1,14 @@
 // Public payment funding facts. Unknown observations are distinct from confirmed zero.
+import {
+  isChannelBlocker,
+  type ChannelBlocker,
+} from '@gyblos/buyer/channel-blocker';
 import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
 import { DEVNET } from '@gyblos/config/network';
 import {
   controlAddress,
   controlAtomic,
+  controlInteger,
   controlObject,
 } from '@gyblos/protocol/control-validation';
 
@@ -18,11 +23,14 @@ export interface BuyerFunding {
   network: typeof DEVNET;
   payer: string;
   balanceAtomic: string | null;
+  lastBalanceAtomic?: string;
+  lastBalanceAt?: number;
   faucetAvailable: boolean;
   channelRemainingAtomic: string | null;
   switchingAtomic?: string;
   replacementAtomic?: string;
   poolLimited?: true;
+  channelBlocker?: ChannelBlocker;
 }
 export function sellerResponseLimit(
   funding: BuyerFunding | null,
@@ -43,6 +51,7 @@ export function autoFundingAvailable(
   if (!deposit || !observations.length) return null;
   const capacity = observations.map((item) => {
     if (!item || item.payer !== policy.payer) return null;
+    if (item.channelBlocker) return item.channelBlocker;
     if (item.poolLimited) return FUNDING.channelLimit;
     const escrow = item.channelRemainingAtomic ?? item.switchingAtomic;
     if (escrow != null && BigInt(escrow) >= BigInt(policy.maxAtomic))
@@ -61,6 +70,8 @@ export function autoFundingAvailable(
     );
   });
   if (capacity.includes(true)) return true;
+  const blocker = capacity.find(isChannelBlocker);
+  if (blocker) return blocker;
   if (capacity.includes(null)) return null;
   return capacity.includes(false) ? false : FUNDING.channelLimit;
 }
@@ -79,6 +90,16 @@ export function parseBuyerFunding(value: unknown): BuyerFunding | null {
       'channelRemainingAtomic',
       ...(value &&
       typeof value === 'object' &&
+      Object.hasOwn(value, 'lastBalanceAtomic')
+        ? ['lastBalanceAtomic', 'lastBalanceAt']
+        : []),
+      ...(value &&
+      typeof value === 'object' &&
+      Object.hasOwn(value, 'channelBlocker')
+        ? ['channelBlocker']
+        : []),
+      ...(value &&
+      typeof value === 'object' &&
       Object.hasOwn(value, 'poolLimited')
         ? ['poolLimited']
         : []),
@@ -94,6 +115,8 @@ export function parseBuyerFunding(value: unknown): BuyerFunding | null {
         : []),
     ]);
     if (
+      (row.channelBlocker !== undefined &&
+        !isChannelBlocker(row.channelBlocker)) ||
       (row.poolLimited !== undefined && row.poolLimited !== true) ||
       row.network !== DEVNET ||
       row.faucetAvailable !== (row.balanceAtomic !== null)
@@ -101,6 +124,13 @@ export function parseBuyerFunding(value: unknown): BuyerFunding | null {
       return null;
     return {
       network: DEVNET,
+      ...(row.lastBalanceAtomic !== undefined && {
+        lastBalanceAtomic: controlAtomic(row.lastBalanceAtomic),
+        lastBalanceAt: controlInteger(row.lastBalanceAt, 1),
+      }),
+      ...(isChannelBlocker(row.channelBlocker) && {
+        channelBlocker: row.channelBlocker,
+      }),
       ...(row.poolLimited === true && { poolLimited: true }),
       ...(row.replacementAtomic !== undefined && {
         replacementAtomic: controlAtomic(row.replacementAtomic),

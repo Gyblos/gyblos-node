@@ -293,3 +293,8 @@ export const BUYER_HTTP_DIAGNOSTICS = {
     REFUSED: 'HTTP_REFUSED',
   },
 } as const;
+
+export const PAYMENT_REVIEW = {
+  offsetsMs: [0, 2000, 6000],
+  deadlineMs: 10000,
+} as const;

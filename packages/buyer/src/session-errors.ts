@@ -18,6 +18,7 @@ import { PaymentError } from '@gyblos/protocol/payment';
 import { PaymentSessionError } from '@gyblos/protocol/payment-session';
 
 import { buyerApiKeyErrorView } from './api-key-http';
+import { channelBlockerMessage, isChannelBlocker } from './channel-blocker';
 import { FREE_BUYER_CODES, PAID_BUYER_CODES } from './constants';
 import type { ChatErrorView } from './free-http';
 import { UnsentSellerChoiceError } from './seller-choice-error';
@@ -67,6 +68,12 @@ export async function unsentSessionPreflight<T>(
 
 // Paid errors only; anything else is left to the free answer.
 export function classifyPaidError(error: unknown): ChatErrorView | undefined {
+  if (error instanceof UnsentSellerChoiceError && isChannelBlocker(error.code))
+    return {
+      ...unavailable(error.code, true),
+      status: HTTP_STATUS.badRequest,
+      detail: channelBlockerMessage(error.code),
+    };
   if (
     error instanceof UnsentOpeningError ||
     error instanceof UnsentSessionPreflightError ||

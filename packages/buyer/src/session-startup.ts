@@ -46,6 +46,7 @@ import {
 } from './session-requirements';
 import { pinnedBusy, routeScope, sessionRouter } from './session-routing';
 import {
+  preferChannel,
   prepareChosenSeller,
   verifyChosenOffer,
 } from './session-seller-choice';
@@ -67,6 +68,8 @@ async function executePaidSession(
   current.throwIfAborted();
   await manager.preflight(winner.quote, input, current);
   current.throwIfAborted();
+  await manager.checkChannel(winner.quote, current, openingIntent);
+  current.throwIfAborted();
   await reserveApiKey(permission, winner.quote, current);
   const id = winner.quote.offer.requestId;
   if (state.selections.has(id)) return sessionFail(SESSION_CODES.BINDING);
@@ -74,6 +77,7 @@ async function executePaidSession(
     string | undefined
   >());
   state.selections.set(id, winner);
+  if (permission) state.keyOperations.set(id, permission);
   if (sending) state.sending.set(id, sending);
   let result: Awaited<ReturnType<typeof manager.execute>>;
   try {
@@ -91,6 +95,7 @@ async function executePaidSession(
     );
   } finally {
     state.selections.delete(id);
+    state.keyOperations.delete(id);
     state.sending.delete(id);
   }
   const payment: ChatPayment = {
@@ -106,15 +111,6 @@ async function executePaidSession(
   };
   await recordApiKeyPayment(permission, payment);
   return { ...result.value, payment };
-}
-async function preferChannel(
-  selectionRoute: SelectionRoute | undefined,
-  paidAuto: boolean | undefined,
-  previousSeller: () => Promise<string | undefined>,
-) {
-  return selectionRoute?.open && paidAuto && !selectionRoute.previousSeller
-    ? { ...selectionRoute, previousSeller: await previousSeller() }
-    : selectionRoute;
 }
 function sessionSelection(
   context: Context,
@@ -335,7 +331,11 @@ export async function startSessionQuoteRuntime(
     return sessionFail();
   requireBuyerIdentity(prepared.config, prepared.identity);
   const token = await endpointToken();
-  const state: SessionState = { selections: new Map(), sending: new Map() };
+  const state: SessionState = {
+    selections: new Map(),
+    sending: new Map(),
+    keyOperations: new Map(),
+  };
   const manager = makeManager(context, options, policy, state);
   const router =
     policy.totalDepositAtomic === undefined
@@ -355,7 +355,7 @@ export async function startSessionQuoteRuntime(
     router,
   );
   return {
-    confirmUnchargedKey: manager.confirmUnchargedKey,
+    confirmKeyCharge: manager.confirmKeyCharge,
     sellerChoice: true,
     singlePaidChannel: !router && prepared.config.request.maxAtomic !== '0',
     reconcilePool: router

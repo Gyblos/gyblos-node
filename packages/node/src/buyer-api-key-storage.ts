@@ -7,20 +7,20 @@ import {
   writePrivateFile,
 } from '@gyblos/runtime/private-file';
 
-import { createBuyerApiKeys, type ConfirmUnchargedKey } from './buyer-api-keys';
+import { createBuyerApiKeys, type ConfirmKeyCharge } from './buyer-api-keys';
 import { BUYER_API_KEY_STORAGE } from './constants';
 
 export async function openBuyerApiKeys(
   environment: HomeEnvironment,
   scope: BuyerKeyScope,
-  confirmUncharged?: ConfirmUnchargedKey,
+  confirmCharge?: ConfirmKeyCharge,
 ) {
   const paths = buyerApiKeyPathsIn(environment);
   const lock = await acquireProcessLock(paths.lock);
   try {
     return await createBuyerApiKeys({
       scope,
-      confirmUncharged,
+      confirmCharge,
       files: {
         read: () =>
           readPrivateFile(paths.state, BUYER_API_KEY_STORAGE.MAX_BYTES),

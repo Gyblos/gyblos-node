@@ -62,7 +62,20 @@ void test('Payments checks the finalized charge for the original dispatched chat
   await new X402Budget(files, opening).reserve('message-id', policy, intent);
   await opening.consume(intent, binding);
   const restarted = new X402Budget(files, opening);
-  assert.equal(await restarted.review(async () => undefined), false);
+  let reads = 0;
+  const unavailable = async () => {
+    reads++;
+    return undefined;
+  };
+  assert.deepEqual(
+    await Promise.all([
+      restarted.review(unavailable, true),
+      restarted.review(unavailable, true),
+    ]),
+    [false, false],
+  );
+  assert.equal(await restarted.review(unavailable, true), false);
+  assert.equal(reads, 1);
   assert.equal((await restarted.summary()).blocked, true);
   assert.equal(
     await restarted.review(async (ref) => {

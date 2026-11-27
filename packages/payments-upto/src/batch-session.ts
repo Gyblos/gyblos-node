@@ -13,7 +13,7 @@ export {
 } from './batch-session-backend';
 export {
   finalizedRequestCharge,
-  finalizedUnchargedRequest,
+  finalizedKeyCharge,
 } from './batch-request-review';
 export { batchSessionObserver } from './batch-session-observer';
 export {

@@ -89,6 +89,9 @@ export async function endpointToken() {
 }
 
 export interface BuyerStartupOptions {
+  observeSettlement?: BuyerSessionBackend['observe'];
+  channelClock?: () => number;
+  observeChannel?: import('./channel-eligibility').ObserveChannel;
   desktopChosenPrices?: boolean;
   preparePaidTokenizer?: boolean;
   telemetry?: import('@gyblos/protocol/telemetry').TelemetrySink;

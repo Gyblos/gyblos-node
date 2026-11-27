@@ -50,6 +50,10 @@ export interface BuyerSessionOptions<Remote extends BatchDestination> {
   financialPermission?: BuyerBatchSessionOptions<Remote>['financialPermission'];
   onDeclined?: BuyerBatchSessionOptions<Remote>['onDeclined'];
   beforeInference?: BuyerBatchSessionOptions<Remote>['beforeInference'];
+  checkReusableChannel?(
+    quote: SignedOfferV2,
+    signal: AbortSignal,
+  ): Promise<void>;
   switchingAllowed?(): Promise<boolean>;
   openingSupportsBlocks?: boolean;
   preparation?: PreparedChannel;
@@ -218,6 +222,8 @@ async function run<Remote extends BatchDestination>(
       ? await state.options.financialPermission(renew)
       : await renew();
   const before = ready.financial.snapshot();
+  if (before.channelId)
+    await state.options.checkReusableChannel?.(quote, signal);
   const value = await ready.host
     .execute(quote, input, signal, onDelta)
     .catch(async (error: unknown) => {

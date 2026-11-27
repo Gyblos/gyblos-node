@@ -814,7 +814,7 @@
   "packages/node/src/buyer-api-keys.ts": 2,
   "packages/node/src/buyer-chain.ts": 1,
   "packages/node/src/buyer-channel-prepare.ts": 2,
-  "packages/node/src/buyer-funding.ts": 2,
+  "packages/node/src/buyer-funding.ts": 1,
   "packages/node/src/buyer-init-constants.ts": 1,
   "packages/node/src/buyer-init-plan.ts": 8,
   "packages/node/src/buyer-init.ts": 2,
