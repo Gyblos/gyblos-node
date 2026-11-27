@@ -89,18 +89,12 @@ export function chatConversation(
   turns: readonly ChatTurn[],
 ): ToolChatMessage[] {
   const messages: ToolChatMessage[] = [];
-  const instructions = [
-    ...system,
-    ...turns
-      .filter((turn) => turn.role === FREE_CHAT_ROLES.SYSTEM)
-      .map((turn) => turn.text),
-  ]
-    .filter((text) => text.length > 0)
-    .join(JOIN);
+  const instructions = system.filter((text) => text.length > 0).join(JOIN);
   if (instructions)
     messages.push({ role: FREE_CHAT_ROLES.SYSTEM, content: instructions });
   for (const turn of turns) {
-    if (turn.role === FREE_CHAT_ROLES.SYSTEM) continue;
+    if (turn.role === FREE_CHAT_ROLES.SYSTEM)
+      throw refuse(CHAT_MESSAGE_DETAILS.order);
     const calls = 'toolCalls' in turn && turn.toolCalls;
     if (turn.text.length === 0 && turn.role !== TOOL_ROLE && !calls) continue;
     if (!joined(messages.at(-1), turn)) messages.push(message(turn));

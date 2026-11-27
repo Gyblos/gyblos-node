@@ -1037,7 +1037,8 @@ details matter when you change or debug the endpoint:
   (`cache_control`) on messages and text parts, and another provider's reasoning
   (`reasoning`, `reasoning_content`, `reasoning_details`) on a message are
   ignored, never sent to a seller. A `system` message later in the conversation
-  is added to the leading instructions instead of being refused.
+  is added to the leading instructions, as the Anthropic format does, instead of
+  being refused; the Responses route keeps it in place as user text.
 - **Tool limits.** At most 128 tools; a name is 1 to 64 letters, digits, `_` or
   `-` and unique; an input schema is at most 64 KiB. A refusal names the tool by
   its index (`tools[3]: ...`). A description longer than 8 KiB is shortened to

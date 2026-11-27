@@ -4,7 +4,14 @@ import test from 'node:test';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
 import { TOOL_LIMITS } from '@gyblos/protocol/tools';
 
-import { CODEX, host, TEXT } from './support/buyer-responses';
+import {
+  CODEX,
+  host,
+  post,
+  SHELL,
+  TEXT,
+  user,
+} from './support/buyer-responses';
 
 const tool = (name: string, description = 'Runs a command') => ({
   type: 'function',
@@ -78,7 +85,7 @@ void test('system text in the middle of a conversation joins the leading instruc
 });
 
 void test('a tool description over the limit is shortened to fit, not refused', async () => {
-  const long = 'é'.repeat(TOOL_LIMITS.descriptionBytes);
+  const long = 'a' + '😀'.repeat(TOOL_LIMITS.descriptionBytes);
   const { status, seen, body } = await chat({
     messages: [{ role: 'user', content: 'hi' }],
     tools: [tool('bash', long)],
@@ -101,9 +108,25 @@ for (const [name, tools, message] of [
     /^tools\[1\]: another tool/,
   ],
   [
+    'a schema too large',
+    [
+      {
+        type: 'function',
+        function: {
+          name: 'big',
+          parameters: {
+            type: 'object',
+            description: 'x'.repeat(TOOL_LIMITS.jsonBytes),
+          },
+        },
+      },
+    ],
+    /^tools\[0\]: the input schema/,
+  ],
+  [
     'too many tools',
     Array.from({ length: TOOL_LIMITS.maxTools + 1 }, (_, n) => tool(`t${n}`)),
-    /^at most 128 tools/,
+    new RegExp(`^at most ${TOOL_LIMITS.maxTools} tools`),
   ],
 ] as const)
   void test(`a refused tool list says which tool and why: ${name}`, async () => {
@@ -115,3 +138,19 @@ for (const [name, tools, message] of [
     assert.match(body.error.message, message);
     assert.equal(body.error.param, 'tools');
   });
+
+void test('a Responses tool refusal counts the tools the client sent, skipped ones included', async () => {
+  const server = await host(TEXT, []);
+  try {
+    const response = await post(server.url, {
+      ...CODEX,
+      input: [user('hi')],
+      tools: [{ type: 'web_search' }, SHELL, SHELL],
+    });
+    const body = await response.json();
+    assert.equal(response.status, 400);
+    assert.match(body.error.message, /^tools\[2\]: another tool/);
+  } finally {
+    await server.close();
+  }
+});

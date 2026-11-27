@@ -186,9 +186,7 @@ function openAiConversation(value: unknown) {
     if (!role)
       throw invalidChat(FREE_CHAT_FIELDS.MESSAGES, CHAT_MESSAGE_DETAILS.shape);
     const text = textOf(message.content, OPENAI_CHAT.partFields);
-    // System and developer instructions before the first turn lead the conversation; later ones are
-    // refused by the conversation check rather than moved.
-    if (role === 'system' && turns.length === 0) system.push(text);
+    if (role === 'system') system.push(text);
     else turns.push({ role, text });
   }
   return chatConversation(system, turns);

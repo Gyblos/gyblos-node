@@ -41,18 +41,21 @@ function only(
     throw invalidChat(field, detail);
 }
 function shortened(description: string) {
-  const bytes = Buffer.from(description);
-  if (bytes.length <= TOOL_LIMITS.descriptionBytes) return description;
-  const text = bytes.subarray(0, TOOL_LIMITS.descriptionBytes).toString('utf8');
-  return text.endsWith('\uFFFD') ? text.slice(0, -1) : text;
+  const { read } = new TextEncoder().encodeInto(
+    description,
+    new Uint8Array(TOOL_LIMITS.descriptionBytes),
+  );
+  return description.slice(0, read);
 }
 function toolProblem(
   entries: { name: unknown; parameters: string }[],
+  positions?: readonly number[],
 ): string | undefined {
   if (entries.length > TOOL_LIMITS.maxTools)
     return FREE_CHAT_DETAILS.tooManyTools;
   const names = new Set<unknown>();
-  for (const [index, { name, parameters }] of entries.entries()) {
+  for (const [at, { name, parameters }] of entries.entries()) {
+    const index = positions?.[at] ?? at;
     try {
       toolName(name);
     } catch {
@@ -63,10 +66,10 @@ function toolProblem(
     if (Buffer.byteLength(parameters) > TOOL_LIMITS.jsonBytes)
       return FREE_CHAT_DETAILS.toolSchema(index);
   }
-  return undefined;
 }
 function definitions(
   entries: { name: unknown; description: unknown; schema: unknown }[],
+  positions?: readonly number[],
 ): ToolDefinition[] {
   const tools = entries.map(({ name, description, schema }) => ({
     name,
@@ -75,13 +78,16 @@ function definitions(
       : {}),
     parameters: JSON.stringify(schema ?? EMPTY_SCHEMA),
   }));
-  const problem = toolProblem(tools);
+  const problem = toolProblem(tools, positions);
   if (problem) throw invalidChat('tools', problem);
   return checked('tools', FREE_CHAT_DETAILS.tools, () => parseTools(tools));
 }
 
 // OpenAI: [{type: 'function', function: {name, description?, parameters?, strict?}}].
-export function openAiTools(value: unknown): ToolDefinition[] | undefined {
+export function openAiTools(
+  value: unknown,
+  positions?: readonly number[],
+): ToolDefinition[] | undefined {
   if (absent(value) || (Array.isArray(value) && !value.length)) return;
   if (!Array.isArray(value))
     throw invalidChat('tools', FREE_CHAT_DETAILS.tools);
@@ -103,6 +109,7 @@ export function openAiTools(value: unknown): ToolDefinition[] | undefined {
         schema: fn.parameters,
       };
     }),
+    positions,
   );
 }
 export function openAiToolChoice(value: unknown): ToolChoice | undefined {

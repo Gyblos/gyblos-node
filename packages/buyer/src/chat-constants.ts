@@ -356,7 +356,7 @@ export const CHAT_MESSAGE_DETAILS = {
   shape:
     'messages must be a non-empty list of system, user and assistant messages with text content',
   order:
-    'the conversation must start with a user message, answer every tool call with one result, and end with a user message or results; system instructions go first',
+    'the conversation must start with a user message, answer every tool call with one result, and end with a user message or results',
   parts: 'only text content is supported; images and other parts are not',
   tools: 'the legacy function role is not supported; use tools',
   toolCalls:
