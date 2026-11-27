@@ -1,6 +1,8 @@
 import { setTimeout as delay } from 'node:timers/promises';
 
 import { ROUTES } from '@gyblos/config';
+import { boundedText } from '@gyblos/core/engine-http';
+import { jsonFields } from '@gyblos/core/engine-provider';
 import { MODEL_CLASSIFICATIONS } from '@gyblos/protocol/constants';
 import { resolveModel, usesPinnedTokenizer } from '@gyblos/protocol/models';
 
@@ -72,30 +74,9 @@ async function call(
     throw unavailable();
   }
   try {
-    if (!response.body) throw unavailable();
-    const reader = response.body.getReader();
-    const chunks: Uint8Array[] = [];
-    let size = 0;
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        size += value.byteLength;
-        if (size > MODEL_VERIFIER.referenceMaxResponseBytes) {
-          await reader.cancel();
-          throw unavailable();
-        }
-        chunks.push(value);
-      }
-    } finally {
-      reader.releaseLock();
-    }
-    const parsed: unknown = JSON.parse(
-      new TextDecoder('utf-8', { fatal: true }).decode(
-        Buffer.concat(chunks, size),
-      ),
+    return jsonFields(
+      await boundedText(response, MODEL_VERIFIER.referenceMaxResponseBytes),
     );
-    return record(parsed);
   } catch {
     throw unavailable();
   }
@@ -111,15 +92,13 @@ function validBytes(value: unknown) {
   );
 }
 
+function validLogprob(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value <= 0;
+}
+
 function validOptionalTokenLogprob(entry: Record<string, unknown>) {
   if ('token' in entry && typeof entry.token !== 'string') return false;
-  if (
-    'logprob' in entry &&
-    (typeof entry.logprob !== 'number' ||
-      !Number.isFinite(entry.logprob) ||
-      entry.logprob > 0)
-  )
-    return false;
+  if ('logprob' in entry && !validLogprob(entry.logprob)) return false;
   return validBytes(entry.bytes);
 }
 
@@ -144,9 +123,7 @@ function parseCandidates(
     const candidate = record(item);
     if (
       typeof candidate.token !== 'string' ||
-      typeof candidate.logprob !== 'number' ||
-      !Number.isFinite(candidate.logprob) ||
-      candidate.logprob > 0 ||
+      !validLogprob(candidate.logprob) ||
       !validBytes(candidate.bytes)
     )
       throw unavailable();

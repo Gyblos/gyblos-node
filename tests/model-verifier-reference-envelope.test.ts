@@ -78,7 +78,7 @@ void test('oversized reference responses are cancelled before decoding', async (
 
 void test('malformed reference response envelopes are rejected at the boundary', async () => {
   const valid = validEnvelope();
-  const entry = valid.logprobs[0];
+  const entry = valid.logprobs[0]!;
   const topLogprobs = entry.top_logprobs;
   const cases = [
     ['not done', { ...valid, done: false }],
