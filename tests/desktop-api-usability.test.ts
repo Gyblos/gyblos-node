@@ -4,6 +4,7 @@ import test from 'node:test';
 
 import { SELLER_SELECTION_CODES } from '@gyblos/core/constants';
 import { desktopBuyerFailure } from '@gyblos/desktop/buyer-error';
+import { CHAT_FAILURE } from '@gyblos/desktop/chat-archive-model';
 import {
   emptyUsdcApi,
   parseUsdcApiSecret,
@@ -184,12 +185,12 @@ void test('HTTP and streaming failures reach the desktop as static guidance with
 for (const [code, neverSent, reason] of [
   [FREE_EXECUTION_CODES.TIMEOUT, false, undefined],
   [BUYER_KEY_CODES.REVIEW, false, BUYER_KEY_CODES.REVIEW],
-  [BUYER_KEY_CODES.REVIEW, true, BUYER_KEY_CODES.REVIEW],
+  [BUYER_KEY_CODES.REVIEW, true, CHAT_FAILURE.KEY_REVIEW_NOT_SENT],
   [PAID_EXECUTION_CODES.EXPIRED, true, PAID_EXECUTION_CODES.EXPIRED],
   [PAID_EXECUTION_CODES.EXPIRED, false, undefined],
   [BUYER_API.TOKENIZER_UNAVAILABLE, true, BUYER_API.TOKENIZER_UNAVAILABLE],
   [PAID_EXECUTION_CODES.PEER, true, PAID_EXECUTION_CODES.PEER],
-  [SESSION_CODES.BINDING, true, 'not-sent'],
+  [SESSION_CODES.BINDING, true, CHAT_FAILURE.NOT_SENT],
   [SESSION_CODES.BINDING, false, undefined],
   ['UNKNOWN_CODE', true, undefined],
 ] as const) {

@@ -38,7 +38,10 @@ export function FailedTurn({
 }) {
   const [observation, setObservation] = useState('');
   const declined = message.failureReason === CHAT_FAILURE.DECLINED;
-  const shared = message.failureReason === CHAT_FAILURE.KEY_REVIEW;
+  const unsentReview =
+    message.failureReason === CHAT_FAILURE.KEY_REVIEW_NOT_SENT;
+  const shared =
+    unsentReview || message.failureReason === CHAT_FAILURE.KEY_REVIEW;
   const free =
     message.model.free && message.paymentMethod === PAYMENT_METHOD.USDC;
   const sameSession =
@@ -54,19 +57,23 @@ export function FailedTurn({
           ? 'The desktop budget still has spending under review.'
           : 'The desktop budget reports no pending review.';
     setObservation(
-      budgetStatus + ' The charge for this turn remains unconfirmed.',
+      unsentReview
+        ? budgetStatus
+        : budgetStatus + ' The charge for this turn remains unconfirmed.',
     );
   }
   const stopped = beforeSending(message.failureReason);
   const explanation = stopped
     ? stopped + ' No charge was made for this turn.'
-    : shared
-      ? 'An API key spending review paused Desktop and connected tools for this request. The final charge is unknown.'
-      : declined
-        ? 'The seller declined this question before charging you.'
-        : free
-          ? 'The free response was interrupted. Any text shown is incomplete.'
-          : `The ${message.paymentMethod === PAYMENT_METHOD.PAYPAL ? 'PayPal' : 'USDC'} response was interrupted. The final charge is unknown.`;
+    : unsentReview
+      ? 'An earlier API key reservation paused Desktop and connected tools before this question was sent. No charge was made for this turn.'
+      : shared
+        ? 'An API key spending review paused Desktop and connected tools for this request. The final charge is unknown.'
+        : declined
+          ? 'The seller declined this question before charging you.'
+          : free
+            ? 'The free response was interrupted. Any text shown is incomplete.'
+            : `The ${message.paymentMethod === PAYMENT_METHOD.PAYPAL ? 'PayPal' : 'USDC'} response was interrupted. The final charge is unknown.`;
   return (
     <article className="chat-answer" aria-label="Assistant">
       {message.text && <MessageText text={message.text} />}

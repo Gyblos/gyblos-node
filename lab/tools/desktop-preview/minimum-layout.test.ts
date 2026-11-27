@@ -152,6 +152,7 @@ for (const example of [
   'paypal-turn',
   'declined-turn',
   'expired-quote',
+  'unsent-shared-review',
   'unbound-review',
   'review-error',
 ]) {

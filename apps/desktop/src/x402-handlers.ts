@@ -49,7 +49,12 @@ function actionFailure(action: unknown, blocked: boolean, error: unknown) {
   if (action !== X402_ACTION.SEND || !(error instanceof DesktopBuyerFailure))
     return failure;
   if (error.code === CHAT_FAILURE.KEY_REVIEW)
-    return { ...failure, failureReason: error.code };
+    return {
+      ...failure,
+      failureReason: error.neverSent
+        ? CHAT_FAILURE.KEY_REVIEW_NOT_SENT
+        : CHAT_FAILURE.KEY_REVIEW,
+    };
   if (blocked) return failure;
   if (error.code === CHAT_FAILURE.DECLINED)
     return { ...failure, failureReason: error.code };

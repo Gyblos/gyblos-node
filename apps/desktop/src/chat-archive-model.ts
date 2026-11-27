@@ -17,6 +17,7 @@ import { CHAT_ROLE, MESSAGE_STATE, TOOLS } from './ui/constants';
 import type { ChatModel } from './ui/model-types';
 
 export {
+  CHAT_FAILURE,
   CHAT_STORAGE,
   CHAT_STORAGE_STATE,
   type ChatArchiveState,

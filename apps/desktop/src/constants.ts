@@ -6,6 +6,7 @@ import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
 export const CHAT_FAILURE = {
   KEY_REVIEW: BUYER_KEY_CODES.REVIEW,
+  KEY_REVIEW_NOT_SENT: 'key-review-not-sent',
   DECLINED: SESSION_CODES.REQUEST_DECLINED,
   INTERRUPTED: 'interrupted-response',
   NOT_SENT: 'not-sent',

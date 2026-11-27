@@ -26,7 +26,25 @@ export async function checkFailedTurn(
     );
   await wait(() => Boolean(composer()?.value), 'Missing restored draft');
   const reviewCase = new URLSearchParams(location.search).get('status-proof');
-  if (reviewCase) {
+  if (example === 'unsent-shared-review') {
+    const status = () =>
+      document.querySelector('.chat-answer [role=status]')?.textContent ?? '';
+    const correct = () =>
+      status().includes('earlier API key reservation') &&
+      status().includes('Desktop and connected tools') &&
+      status().includes('No charge was made for this turn.') &&
+      !/unknown|unconfirmed/i.test(status());
+    if (!correct()) throw new Error('Missing verified unsent shared review');
+    const check = button('.chat-answer button', 'Check status');
+    if (!check) throw new Error('Missing status check for prior reservation');
+    check.click();
+    await wait(
+      () => /budget.*review/i.test(status()),
+      'Budget check did not report',
+    );
+    if (!correct())
+      throw new Error('Budget review changed the known turn outcome');
+  } else if (reviewCase) {
     const buyer = window.desktopX402;
     if (!buyer) throw new Error('Missing buyer bridge');
     const run = buyer.run;

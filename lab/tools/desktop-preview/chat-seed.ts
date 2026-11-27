@@ -1,3 +1,4 @@
+import { CHAT_FAILURE } from '@gyblos/desktop/chat-archive-model';
 import type { ChatController } from '@gyblos/desktop/chat-controller';
 import { PAYMENT_METHOD } from '@gyblos/desktop/paypal-model';
 import type { X402Result } from '@gyblos/desktop/x402-model';
@@ -40,6 +41,7 @@ export function seedFailedTurn(
 ) {
   if (
     example !== 'failed-turn' &&
+    example !== 'unsent-shared-review' &&
     example !== 'declined-turn' &&
     example !== 'expired-quote' &&
     example !== 'paypal-turn'
@@ -67,11 +69,13 @@ export function seedFailedTurn(
         origin,
         id,
         '',
-        example === 'failed-turn'
-          ? sharedReviewFailure.failureReason
-          : example === 'expired-quote'
-            ? PAID_EXECUTION_CODES.EXPIRED
-            : SESSION_CODES.REQUEST_DECLINED,
+        example === 'unsent-shared-review'
+          ? CHAT_FAILURE.KEY_REVIEW_NOT_SENT
+          : example === 'failed-turn'
+            ? sharedReviewFailure.failureReason
+            : example === 'expired-quote'
+              ? PAID_EXECUTION_CODES.EXPIRED
+              : SESSION_CODES.REQUEST_DECLINED,
       );
   }
   return true;

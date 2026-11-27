@@ -8,6 +8,7 @@ import { test } from 'node:test';
 import { desktopChatPaths } from '@gyblos/config/home-desktop';
 import { createChatArchiveHandlers } from '@gyblos/desktop/chat-archive-handlers';
 import {
+  CHAT_FAILURE,
   CHAT_STORAGE,
   parseChatArchive,
   projectChatArchive,
@@ -357,28 +358,30 @@ void test('pinned and renamed conversations survive reopening and deletion remov
   assert.equal(reopened.getSnapshot().activeId, 'next');
 });
 
-void test('a failed USDC turn reopens with its reason, partial answer and later draft', () => {
-  const chat = new ChatController('first');
-  chat.startPaypal('Question', model, 'paid', undefined, PAYMENT_METHOD.USDC);
-  chat.appendBuyer('first', 'paid', '```ts\nconst partial =');
-  chat.setDraft('Newer draft');
-  chat.failPaypal(
-    'first',
-    'paid',
-    'REMOTE_ERROR_CANARY',
-    BUYER_KEY_CODES.REVIEW,
-  );
-  const archive = projectChatArchive(chat.getSnapshot());
-  assert.ok(archive);
-  const restored = restoreChatArchive(archive).sessions[0]!;
-  assert.equal(restored.messages.at(-1)?.failureReason, BUYER_KEY_CODES.REVIEW);
-  assert.equal(restored.messages.at(-1)?.text, '```ts\nconst partial =');
-  assert.equal(restored.messages.at(-1)?.paymentMethod, PAYMENT_METHOD.USDC);
-  assert.equal(restored.draft, 'Newer draft');
-  assert.equal(restored.paypalRun, null);
-  assert.equal(restored.run, null);
-  assert.doesNotMatch(JSON.stringify(archive), /REMOTE_ERROR_CANARY/);
-});
+for (const reason of [
+  CHAT_FAILURE.KEY_REVIEW,
+  CHAT_FAILURE.KEY_REVIEW_NOT_SENT,
+]) {
+  void test(`a failed USDC turn reopens with ${reason}, its text and later draft`, () => {
+    const chat = new ChatController('first');
+    chat.startPaypal('Question', model, 'paid', undefined, PAYMENT_METHOD.USDC);
+    const partial =
+      reason === CHAT_FAILURE.KEY_REVIEW ? '```ts\nconst partial =' : '';
+    if (partial) chat.appendBuyer('first', 'paid', partial);
+    chat.setDraft('Newer draft');
+    chat.failPaypal('first', 'paid', 'REMOTE_ERROR_CANARY', reason);
+    const archive = projectChatArchive(chat.getSnapshot());
+    assert.ok(archive);
+    const restored = restoreChatArchive(archive).sessions[0]!;
+    assert.equal(restored.messages.at(-1)?.failureReason, reason);
+    assert.equal(restored.messages.at(-1)?.text, partial);
+    assert.equal(restored.messages.at(-1)?.paymentMethod, PAYMENT_METHOD.USDC);
+    assert.equal(restored.draft, 'Newer draft');
+    assert.equal(restored.paypalRun, null);
+    assert.equal(restored.run, null);
+    assert.doesNotMatch(JSON.stringify(archive), /REMOTE_ERROR_CANARY/);
+  });
+}
 
 void test('reopening an interrupted USDC response never attributes it to PayPal', () => {
   const chat = new ChatController('first');
