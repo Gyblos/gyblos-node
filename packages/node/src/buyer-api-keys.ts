@@ -22,6 +22,10 @@ import {
   type BuyerKeyCharge,
   type BuyerKeyScope,
 } from '@gyblos/protocol/buyer-api-keys';
+import {
+  createDiagnostics,
+  type DiagnosticSink,
+} from '@gyblos/runtime/diagnostics';
 
 import {
   buyerKeyState,
@@ -29,6 +33,7 @@ import {
   type BuyerKeyReservation,
   type BuyerKeyState,
 } from './buyer-api-key-state';
+import { BUYER_KEY_LEDGER_DIAGNOSTICS } from './constants';
 
 export interface BuyerApiKeyFiles {
   read(): Promise<string | undefined>;
@@ -47,11 +52,22 @@ export class BuyerApiKeys {
   private closed = false;
   private queue: Promise<unknown> = Promise.resolve();
   private readonly active = new Map<string, AbortController>();
+  private readonly diagnostics;
   constructor(
     private state: BuyerKeyState,
     private readonly files: BuyerApiKeyFiles,
     private readonly confirmUncharged?: ConfirmUnchargedKey,
-  ) {}
+    sink?: DiagnosticSink,
+  ) {
+    const catalog = BUYER_KEY_LEDGER_DIAGNOSTICS;
+    this.diagnostics = createDiagnostics({
+      component: catalog.component,
+      operation: catalog.operation,
+      phases: [catalog.phase],
+      codes: [catalog.code],
+      sink,
+    });
+  }
   private serial<T>(work: () => Promise<T>) {
     const result = this.queue.then(work);
     this.queue = result.catch(() => {});
@@ -72,6 +88,8 @@ export class BuyerApiKeys {
       this.state = next;
     } catch {
       this.failed = true;
+      const { phase, code } = BUYER_KEY_LEDGER_DIAGNOSTICS;
+      this.diagnostics.start().report({ phase, code });
       return buyerKeyFail(BUYER_KEY_CODES.REVIEW);
     }
   }
@@ -332,11 +350,13 @@ export async function createBuyerApiKeys(options: {
   files: BuyerApiKeyFiles;
   scope: BuyerKeyScope;
   confirmUncharged?: ConfirmUnchargedKey;
+  diagnostics?: DiagnosticSink;
 }) {
   const scope = parseBuyerKeyScope(options.scope);
   return new BuyerApiKeys(
     buyerKeyState(await options.files.read(), scope),
     options.files,
     options.confirmUncharged,
+    options.diagnostics,
   );
 }

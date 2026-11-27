@@ -4,6 +4,7 @@ import test from 'node:test';
 
 import { SELLER_SELECTION_CODES } from '@gyblos/core/constants';
 import { desktopBuyerFailure } from '@gyblos/desktop/buyer-error';
+import { CHAT_FAILURE } from '@gyblos/desktop/chat-archive-model';
 import {
   emptyUsdcApi,
   parseUsdcApiSecret,
@@ -13,14 +14,18 @@ import {
 import { X402Budget } from '@gyblos/desktop/x402-budget';
 import { X402Client } from '@gyblos/desktop/x402-client';
 import { createX402Handlers } from '@gyblos/desktop/x402-handlers';
-import { X402_ACTION } from '@gyblos/desktop/x402-model';
+import { parseX402Result, X402_ACTION } from '@gyblos/desktop/x402-model';
+import { BUYER_API } from '@gyblos/protocol/buyer-api';
+import { BUYER_KEY_CODES } from '@gyblos/protocol/buyer-api-keys';
 import {
   FREE_EXECUTION_CODES,
   FREE_EXECUTION_STOP_REASONS,
 } from '@gyblos/protocol/constants';
+import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
+import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
 import { desktopAgentFixture } from './support/desktop-agent';
-import { frame, policy } from './support/desktop-stream';
+import { chunk, frame, policy } from './support/desktop-stream';
 
 void test('free seller selection does not tell a free-only buyer to add funds', () => {
   const error = desktopBuyerFailure(
@@ -115,8 +120,14 @@ void test('revealing a key is explicit, main-frame scoped, transient and unavail
 });
 
 void test('HTTP and streaming failures reach the desktop as static guidance with one prompt attempt', async () => {
-  for (const streaming of [false, true]) {
+  for (const [streaming, limit] of [
+    [false, false],
+    [true, false],
+    [false, true],
+    [true, true],
+  ] as const) {
     let posts = 0;
+    let partial = '';
     const budget = new X402Budget({
       read: async () => undefined,
       write: async () => {},
@@ -125,14 +136,24 @@ void test('HTTP and streaming failures reach the desktop as static guidance with
       if (options?.method !== 'POST') return Response.json(policy);
       posts++;
       const error = {
-        code: FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE,
+        code: limit
+          ? FREE_EXECUTION_CODES.LIMIT
+          : FREE_EXECUTION_CODES.SELLER_CANNOT_CONTINUE,
         reason: FREE_EXECUTION_STOP_REASONS.ENGINE_TIMEOUT,
         message: 'PRIVATE_CANARY_DO_NOT_REFLECT',
       };
       return streaming
-        ? new Response(frame({ error }), {
-            headers: { 'content-type': 'text/event-stream' },
-          })
+        ? new Response(
+            limit
+              ? Buffer.concat([
+                  frame(chunk('Visible partial answer')),
+                  frame({ error }),
+                ])
+              : frame({ error }),
+            {
+              headers: { 'content-type': 'text/event-stream' },
+            },
+          )
         : Response.json({ error }, { status: 502 });
     });
     const contents = {};
@@ -144,7 +165,11 @@ void test('HTTP and streaming failures reach the desktop as static guidance with
       async () => {},
       undefined,
       undefined,
-      streaming ? () => {} : undefined,
+      streaming
+        ? (event) => {
+            partial += event.text;
+          }
+        : undefined,
     );
     try {
       await client.connect(
@@ -162,7 +187,13 @@ void test('HTTP and streaming failures reach the desktop as static guidance with
           },
         ],
       );
-      assert.match(result.error ?? '', /did not finish in time/);
+      if (streaming && limit) assert.equal(partial, 'Visible partial answer');
+      if (limit)
+        assert.equal(
+          parseX402Result(result).failureReason,
+          FREE_EXECUTION_CODES.LIMIT,
+        );
+      else assert.match(result.error ?? '', /did not finish in time/);
       assert.match(result.error ?? '', /not retried/);
       assert.doesNotMatch(
         JSON.stringify(result),
@@ -177,88 +208,130 @@ void test('HTTP and streaming failures reach the desktop as static guidance with
   }
 });
 
-void test('payment uncertainty overrides friendly seller guidance without clearing its reservation', async () => {
-  const paid = {
-    ...policy,
-    model: 'qwen3-0.6b',
-    depositAtomic: '25000',
-    lifetimeMs: 900000,
-    maxAtomic: '100',
-  };
-  const budget = new X402Budget({
-    read: async () => undefined,
-    write: async () => {},
-  });
-  let posts = 0;
-  const client = new X402Client(budget, async (_url, options) => {
-    if (options?.method !== 'POST') return Response.json(paid);
-    posts++;
-    return Response.json(
-      { error: { code: FREE_EXECUTION_CODES.TIMEOUT } },
-      { status: 502 },
-    );
-  });
-  const contents = {};
-  const mainFrame = {};
-  const handler = createX402Handlers(
-    client,
-    budget,
-    { contents, mainFrame: () => mainFrame, destroyed: () => false },
-    async () => {},
-    undefined,
-    undefined,
-    undefined,
-    (id) =>
-      id === 'confirmed'
-        ? {
-            nodeId: 'a'.repeat(64),
-            owner: paid.payer,
-            modelId: paid.model,
-            variant: null,
-            quantization: null,
-            contextTokens: 2048,
-            inputAtomicPerMtok: '30',
-            outputAtomicPerMtok: '90',
-            expiresAt: Date.now() + 60000,
-          }
-        : undefined,
-  );
-  try {
-    await client.connect(
-      'http://127.0.0.1:8090/v1/chat/completions',
-      'synthetic-operator-token',
-    );
-    await client.authorize('100');
-    const unconfirmed = await handler(
-      { sender: contents, senderFrame: mainFrame },
-      [
+for (const [code, neverSent, reason] of [
+  [FREE_EXECUTION_CODES.TIMEOUT, false, undefined],
+  [BUYER_KEY_CODES.REVIEW, false, BUYER_KEY_CODES.REVIEW],
+  [BUYER_KEY_CODES.REVIEW, true, CHAT_FAILURE.KEY_REVIEW_NOT_SENT],
+  [PAID_EXECUTION_CODES.EXPIRED, true, PAID_EXECUTION_CODES.EXPIRED],
+  [PAID_EXECUTION_CODES.EXPIRED, false, undefined],
+  [BUYER_API.TOKENIZER_UNAVAILABLE, true, BUYER_API.TOKENIZER_UNAVAILABLE],
+  [PAID_EXECUTION_CODES.PEER, true, PAID_EXECUTION_CODES.PEER],
+  [SESSION_CODES.BINDING, true, CHAT_FAILURE.NOT_SENT],
+  [SESSION_CODES.BINDING, false, undefined],
+  ['UNKNOWN_CODE', true, undefined],
+] as const) {
+  void test(`the buyer handler validates the turn reason for ${code} (never sent: ${neverSent})`, async () => {
+    const paid = {
+      ...policy,
+      model: 'qwen3-0.6b',
+      depositAtomic: '25000',
+      lifetimeMs: 900000,
+      maxAtomic: '100',
+    };
+    const budget = new X402Budget({
+      read: async () => undefined,
+      write: async () => {},
+    });
+    let posts = 0;
+    const client = new X402Client(budget, async (_url, options) => {
+      if (options?.method !== 'POST') return Response.json(paid);
+      posts++;
+      return Response.json(
         {
-          action: X402_ACTION.SEND,
-          id: 'before-confirmation',
-          prompt: 'synthetic',
+          error: {
+            code,
+            message: 'REMOTE_ERROR_CANARY',
+            [BUYER_API.NEVER_SENT_FIELD]: neverSent,
+          },
         },
-      ],
+        { status: 502 },
+      );
+    });
+    const contents = {};
+    const mainFrame = {};
+    const handler = createX402Handlers(
+      client,
+      budget,
+      { contents, mainFrame: () => mainFrame, destroyed: () => false },
+      async () => {},
+      undefined,
+      undefined,
+      undefined,
+      (id) =>
+        id === 'confirmed'
+          ? {
+              nodeId: 'a'.repeat(64),
+              owner: paid.payer,
+              modelId: paid.model,
+              variant: null,
+              quantization: null,
+              contextTokens: 2048,
+              inputAtomicPerMtok: '30',
+              outputAtomicPerMtok: '90',
+              expiresAt: Date.now() + 60000,
+            }
+          : undefined,
     );
-    assert.match(unconfirmed.error ?? '', /select a seller/i);
-    assert.equal(posts, 0);
-    const result = await handler({ sender: contents, senderFrame: mainFrame }, [
-      {
-        action: X402_ACTION.SEND,
-        id: 'synthetic-paid',
-        offerId: 'confirmed',
-        policyId: paid.policyId,
-        prompt: 'synthetic',
-      },
-    ]);
-    assert.match(result.error ?? '', /Spending status needs review/);
-    assert.equal(result.summary.blocked, true);
-    assert.equal(posts, 1);
-    assert.equal((await budget.summary()).records.length, 0);
-  } finally {
-    await client.close();
-  }
-});
-
+    try {
+      await client.connect(
+        'http://127.0.0.1:8090/v1/chat/completions',
+        'synthetic-operator-token',
+      );
+      await client.authorize('100');
+      const unconfirmed = await handler(
+        { sender: contents, senderFrame: mainFrame },
+        [
+          {
+            action: X402_ACTION.SEND,
+            id: 'before-confirmation',
+            prompt: 'synthetic',
+          },
+        ],
+      );
+      assert.match(unconfirmed.error ?? '', /select a seller/i);
+      assert.equal(posts, 0);
+      const stale = await handler(
+        { sender: contents, senderFrame: mainFrame },
+        [
+          {
+            action: X402_ACTION.SEND,
+            offerId: 'stale',
+            policyId: paid.policyId,
+            id: 'stale-request',
+            prompt: 'synthetic',
+          },
+        ],
+      );
+      assert.equal(
+        parseX402Result(stale).failureReason,
+        CHAT_FAILURE.STALE_OFFER,
+      );
+      assert.equal(posts, 0);
+      const result = await handler(
+        { sender: contents, senderFrame: mainFrame },
+        [
+          {
+            action: X402_ACTION.SEND,
+            id: 'synthetic-paid',
+            offerId: 'confirmed',
+            policyId: paid.policyId,
+            prompt: 'synthetic',
+          },
+        ],
+      );
+      if (!neverSent)
+        assert.match(result.error ?? '', /Spending status needs review/);
+      const parsed = parseX402Result(result);
+      assert.equal(parsed.failureReason, reason);
+      assert.doesNotMatch(JSON.stringify(parsed), /REMOTE_ERROR_CANARY/);
+      assert.equal(result.summary.blocked, !neverSent);
+      assert.equal(posts, 1);
+      assert.equal((await budget.summary()).records.length, 0);
+    } finally {
+      await client.close();
+    }
+  });
+}
 void test('secret replies reject extra fields and a navigation during refresh prevents a late reveal', async (t) => {
   const fixture = await desktopAgentFixture();
   t.after(() => fixture.close());

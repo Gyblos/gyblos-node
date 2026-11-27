@@ -1,6 +1,7 @@
 // Opens one owner-only buyer permission ledger; lifecycle owns the lock and never repairs unsafe files.
 import { buyerApiKeyPathsIn, type HomeEnvironment } from '@gyblos/config/home';
 import type { BuyerKeyScope } from '@gyblos/protocol/buyer-api-keys';
+import type { DiagnosticSink } from '@gyblos/runtime/diagnostics';
 import {
   acquireProcessLock,
   readPrivateFile,
@@ -14,6 +15,7 @@ export async function openBuyerApiKeys(
   environment: HomeEnvironment,
   scope: BuyerKeyScope,
   confirmUncharged?: ConfirmUnchargedKey,
+  diagnostics?: DiagnosticSink,
 ) {
   const paths = buyerApiKeyPathsIn(environment);
   const lock = await acquireProcessLock(paths.lock);
@@ -21,6 +23,7 @@ export async function openBuyerApiKeys(
     return await createBuyerApiKeys({
       scope,
       confirmUncharged,
+      diagnostics,
       files: {
         read: () =>
           readPrivateFile(paths.state, BUYER_API_KEY_STORAGE.MAX_BYTES),

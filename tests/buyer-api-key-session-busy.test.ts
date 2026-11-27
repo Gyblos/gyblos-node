@@ -9,6 +9,7 @@ import {
 import { classifyPaidError } from '@gyblos/buyer/session-errors';
 import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
 import { createBuyerApiKeys } from '@gyblos/node/buyer-api-keys';
+import { createBuyerSessionManager } from '@gyblos/node/buyer-session';
 import { createBuyerSessionPool } from '@gyblos/node/buyer-session-pool';
 import { BUYER_KEY_CHARGE } from '@gyblos/protocol/buyer-api-keys';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
@@ -255,3 +256,74 @@ for (const condition of ['expired', 'closed', 'catalog capacity'] as const) {
     );
   });
 }
+
+void test('cancellation during paid quote verification keeps the delegated allowance available', async (t) => {
+  const fixture = await multisellerLoopback();
+  t.after(() => fixture.close());
+  const scope = {
+    network: fixture.a.terms.network,
+    mint: fixture.a.terms.mint,
+    payer: fixture.a.terms.buyer,
+  };
+  const keys = await createBuyerApiKeys({
+    files: { read: async () => undefined, write: async () => {} },
+    scope,
+  });
+  t.after(() => keys.close());
+  const quote = await fixture.offers[0]!.quote(1);
+  for (const pooled of [false, true]) {
+    const key = await keys.create('Synthetic', '1000');
+    const controller = new AbortController();
+    const reason = new Error('synthetic verification cancellation');
+    let cancelVerification = true;
+    const verify = async () => {
+      if (cancelVerification) {
+        controller.abort(reason);
+        throw reason;
+      }
+    };
+    const op = keys.operation(key.id);
+    const options = {
+      ...fixture.options,
+      verify,
+      authorizeRequest: async (signed: typeof quote, signal: AbortSignal) => {
+        await reserveApiKey(op, signed, signal);
+        return op.releaseUnsent;
+      },
+    };
+    const buyer = pooled
+      ? createBuyerSessionPool(options)
+      : createBuyerSessionManager({
+          ...options,
+          inspect: async () => undefined,
+          backend: async () => assert.fail('unexpected financial preparation'),
+        });
+    t.after(() => buyer.close());
+    try {
+      await assert.rejects(
+        executeApiKeySession(op, quote.offer.nodeId, () =>
+          buyer.execute(quote, fixture.offers[0]!.input, controller.signal),
+        ),
+        (error) => error === reason,
+      );
+    } finally {
+      op.abandon();
+    }
+    const snapshot = await keys.snapshot();
+    assert.equal(snapshot.keys[0]?.reservedAtomic, '0');
+    assert.equal(snapshot.blocked, false);
+    assert.equal(fixture.prepared(), 0);
+    assert.deepEqual(fixture.a.calls, []);
+    cancelVerification = false;
+    await keys.revoke(key.id);
+    await assert.rejects(
+      buyer.execute(
+        quote,
+        fixture.offers[0]!.input,
+        new AbortController().signal,
+      ),
+      /BUYER_KEY_REVOKED/,
+    );
+    assert.equal(fixture.prepared(), 0);
+  }
+});

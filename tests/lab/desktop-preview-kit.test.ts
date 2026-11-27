@@ -23,7 +23,6 @@ void test('preview kit status tones follow the mockup design rules', async () =>
   const kit = await readFile(new URL('PreviewKit.tsx.preview', views), 'utf8');
   for (const name of [
     'Tag',
-    'Notice',
     'Switch',
     'Delta',
     'Savings',
@@ -33,6 +32,15 @@ void test('preview kit status tones follow the mockup design rules', async () =>
     'PreviewKitShowcase',
   ])
     assert.match(kit, new RegExp('export function ' + name + '\\b'), name);
+  assert.match(kit, /import \{ Notice \} from '\.\/Notice';/);
+  assert.match(kit, /export \{ Notice \};/);
+  const notice = await readFile(
+    new URL('../../apps/desktop/src/ui/Notice.tsx', import.meta.url),
+    'utf8',
+  );
+  assert.match(notice, /export function Notice\(/);
+  assert.match(notice, /tone = TONE\.WARNING/);
+  assert.match(notice, /data-tone=\{tone\} role="status"/);
   const design = await readFile(new URL('../DESIGN.md', views), 'utf8');
   for (const tone of ['success', 'warning', 'danger', 'info', 'neutral'])
     assert.match(design, new RegExp('`' + tone + '`'));

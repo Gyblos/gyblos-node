@@ -1,6 +1,7 @@
 // Presents a response on the shared reading surface with the Gyblos generation signal.
 // Execution, clipboard state and session transitions remain with the caller.
 import { ArrowClockwise, Check, Copy, Info } from '@phosphor-icons/react';
+import type { ReactNode } from 'react';
 
 import {
   CHAT_PHASE,
@@ -16,6 +17,7 @@ import { TurnActivity } from './TurnActivity';
 import { IconButton } from './UI';
 
 type Props = {
+  recovery?: ReactNode;
   message: ChatMessage;
   run: ChatRun | null;
   copied: boolean;
@@ -27,6 +29,7 @@ type Props = {
 };
 
 function AnswerActions({
+  recovery,
   message,
   copied,
   canReuse,
@@ -38,13 +41,9 @@ function AnswerActions({
   if (message.state === MESSAGE_STATE.PENDING) return null;
   return (
     <div className="answer-actions">
-      {message.state !== MESSAGE_STATE.COMPLETE && (
+      {!recovery && message.state !== MESSAGE_STATE.COMPLETE && (
         <span className="answer-state" role="status">
-          {message.state === MESSAGE_STATE.FAILED
-            ? 'Response unavailable'
-            : message.text
-              ? 'Stopped · partial response'
-              : 'Stopped'}
+          {message.text ? 'Stopped · partial response' : 'Stopped'}
         </span>
       )}
       {message.text && (
@@ -55,7 +54,7 @@ function AnswerActions({
           {copied ? <Check size={14} /> : <Copy size={14} />}
         </IconButton>
       )}
-      {canReuse && (
+      {!recovery && canReuse && (
         <IconButton
           label="Reuse question"
           disabled={reuseDisabled}
@@ -117,11 +116,10 @@ export function ChatAnswer(props: Props) {
       )}
       {message.text ? (
         <MessageText text={message.text} />
-      ) : message.state === MESSAGE_STATE.FAILED ? (
-        <p className="stopped-note">Response unavailable.</p>
-      ) : message.state === MESSAGE_STATE.STOPPED ? (
+      ) : !props.recovery && message.state === MESSAGE_STATE.STOPPED ? (
         <p className="stopped-note">Stopped before a response arrived.</p>
       ) : null}
+      {props.recovery}
       <AnswerActions {...props} />
     </article>
   );

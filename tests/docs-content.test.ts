@@ -8,6 +8,7 @@ import test from 'node:test';
 
 import { REGISTRATION } from '@gyblos/discovery-index/constants';
 import { STATUS_RESULTS } from '@gyblos/node-app/constants';
+import { BUYER_KEY_CODES } from '@gyblos/protocol/buyer-api-keys';
 
 const ROOT = join(import.meta.dirname, '..');
 const CONTENT = join(ROOT, 'apps/docs/content/docs');
@@ -170,5 +171,27 @@ void test('the manual install page matches what install.sh writes and runs', asy
     assert.ok(text.includes(`--mint ${value('MINT')}\n`), `${page}: mint`);
     const identity = /^RELEASE_IDENTITY='([^']+)'$/m.exec(installer)?.[1];
     assert.ok(identity && text.includes(`'${identity}'`), `${page}: identity`);
+  }
+});
+
+void test('buyer error tables identify spending review responses for each API', async () => {
+  for (const path of [
+    join(ROOT, 'docs/buyer-api-keys.md'),
+    ...['use-from-code.mdx', 'use-from-code.es.mdx'].map((name) =>
+      join(CONTENT, 'buyers', name),
+    ),
+  ]) {
+    const text = await readFile(path, 'utf8');
+    const rows = text
+      .split('\n')
+      .filter(
+        (line) => line.startsWith('|') && line.includes(BUYER_KEY_CODES.REVIEW),
+      )
+      .join('\n');
+    assert.match(rows, /503 \(Chat Completions, Anthropic Messages\)/, path);
+    assert.match(rows, /400 \(Responses\)/, path);
+    assert.match(text, /x-should-retry: false/, path);
+    assert.match(text, /`response\.failed`/, path);
+    assert.match(text, /`response\.error\.gyblos_code`/, path);
   }
 });

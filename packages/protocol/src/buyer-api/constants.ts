@@ -14,6 +14,8 @@ export const BUYER_API = {
   CHAT_PATH: '/v1/gyblos/chat',
   PAYMENT_FIELD: 'gyblos_payment',
   EXECUTION_FIELD: 'gyblos_execution',
+  ERROR_CODE_FIELD: 'gyblos_code',
+  CONTEXT_LENGTH_EXCEEDED: 'context_length_exceeded',
   NEVER_SENT_FIELD: 'gyblos_never_sent',
   VERSION: 1,
   POLICY_CHANGED_STATUS: 412,

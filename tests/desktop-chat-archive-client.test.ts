@@ -101,3 +101,29 @@ void test('undoing an oversized draft recovers the saved indicator without anoth
     await store.close();
   }
 });
+
+void test('a reader preserves history with unsupported turn metadata', async () => {
+  const archive = projectChatArchive(conversation().getSnapshot())!;
+  const bytes = JSON.stringify({
+    ...archive,
+    sessions: archive.sessions.map((session) => ({
+      ...session,
+      messages: session.messages.map((message) => ({
+        ...message,
+        futureField: true,
+      })),
+    })),
+  });
+  const storage = files();
+  await storage.write(bytes);
+  const store = new ChatArchiveStore(storage);
+  const loaded = await store.load();
+  assert.equal(loaded.available, false);
+  assert.equal(
+    store.save({ generation: loaded.generation, sequence: 1, archive })
+      .available,
+    false,
+  );
+  await store.close();
+  assert.equal(await storage.read(), bytes);
+});

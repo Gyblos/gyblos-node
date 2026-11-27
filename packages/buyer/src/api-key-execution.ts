@@ -15,6 +15,7 @@ import { UnsentChannelLimitError } from '@gyblos/node/session-policy';
 import {
   BUYER_KEY_CHARGE,
   BUYER_KEY_CODES,
+  BuyerApiKeyError,
   buyerKeyFail,
 } from '@gyblos/protocol/buyer-api-keys';
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
@@ -34,14 +35,18 @@ export async function reserveApiKey(
 ) {
   if (!operation) return;
   operation.signal.throwIfAborted();
+  signal?.throwIfAborted();
   await operation.reserve({
     maxAtomic: quote.offer.maxAtomic,
     requestId: quote.offer.requestId,
     requestDigest: quote.offer.requestDigest,
     sellerNodeId: quote.offer.nodeId,
   });
-  operation.signal.throwIfAborted();
-  signal?.throwIfAborted();
+  const cancelled = operation.signal.aborted ? operation.signal : signal;
+  if (cancelled?.aborted) {
+    await operation.releaseUnsent().catch(() => undefined);
+    cancelled.throwIfAborted();
+  }
 }
 export async function executeApiKeyFree(
   operation: BuyerApiKeyOperation | undefined,
@@ -115,6 +120,11 @@ export async function recordApiKeyPayment(
   if (payment.verdict === SESSION_VERDICTS.APPROVED)
     await complete(operation, payment);
 }
+export class UnsentKeyReview extends BuyerApiKeyError {
+  constructor() {
+    super(BUYER_KEY_CODES.REVIEW);
+  }
+}
 export async function executeApiKey(
   keys: BuyerApiKeys | undefined,
   keyId: string | undefined,
@@ -124,8 +134,17 @@ export async function executeApiKey(
     operation?: BuyerApiKeyOperation,
   ) => Promise<ChatResult>,
 ) {
-  await keys?.reconcileAbandoned();
-  keys?.assertReady();
+  try {
+    await keys?.reconcileAbandoned();
+    keys?.assertReady();
+  } catch (error) {
+    if (
+      error instanceof BuyerApiKeyError &&
+      error.code === BUYER_KEY_CODES.REVIEW
+    )
+      throw new UnsentKeyReview();
+    throw error;
+  }
   if (!keys || !keyId) return execute(signal);
   const operation = keys.operation(keyId);
   const current = AbortSignal.any([signal, operation.signal]);
@@ -136,7 +155,9 @@ export async function executeApiKey(
   } catch (error) {
     // A verified free route cannot create a financial obligation. Paid errors remain under review.
     if (operation.reserved() && operation.maximum() === '0')
-      await operation.complete('0', BUYER_KEY_CHARGE.SETTLED);
+      await operation
+        .complete('0', BUYER_KEY_CHARGE.SETTLED)
+        .catch(() => undefined);
     throw error;
   } finally {
     operation.abandon();

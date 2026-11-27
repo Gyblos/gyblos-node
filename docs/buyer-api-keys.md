@@ -111,11 +111,22 @@ free offers only; restart the buyer afterwards.
 
 ## Errors a client sees
 
-| Code                      | HTTP | Meaning                                                                 |
-| ------------------------- | ---- | ----------------------------------------------------------------------- |
-| `BUYER_KEY_LIMIT_REACHED` | 400  | The key's remaining limit cannot cover this request; nothing was sent   |
-| `BUYER_KEY_REVOKED`       | 403  | The key was revoked; nothing was sent                                   |
-| `BUYER_KEY_NEEDS_REVIEW`  | 503  | An earlier paid request on this key has an uncertain outcome; see below |
+| Code                      | HTTP                                                        | Meaning                                                               |
+| ------------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------- |
+| `BUYER_KEY_LIMIT_REACHED` | 400                                                         | The key's remaining limit cannot cover this request; nothing was sent |
+| `BUYER_KEY_REVOKED`       | 403                                                         | The key was revoked; nothing was sent                                 |
+| `BUYER_KEY_NEEDS_REVIEW`  | 503 (Chat Completions, Anthropic Messages), 400 (Responses) | The key ledger requires review before accepting new requests.         |
+
+The table gives the HTTP status before the response headers are sent. For a key
+review, the buyer sends `x-should-retry: false`. Configure your client to stop
+automatic retries while the ledger requires review. For a key review in a
+Responses JSON body, the Gyblos code appears in `error.code` for a verified
+unsent request or `error.gyblos_code` after possible dispatch.
+
+Once streaming starts, the HTTP status stays 200. Chat Completions sends a final
+data event with `error.code`. Anthropic Messages sends an `error` event with
+`error.code`. Responses sends a `response.failed` event with
+`response.error.gyblos_code`.
 
 A refusal for local validation, such as input that does not fit the model's
 context, leaves the key usable; it is not an uncertain payment.
@@ -166,11 +177,13 @@ has a single-process lock and durable writes. It stores no prompts, responses or
 signed payments. After a restart, keys keep their limits and usage, and a
 configured client keeps working with the same key.
 
-An interrupted paid reservation, a failed write or an inconsistent state fails
-closed. Unknown reservations also block operator inference and the creation of
-new keys. Revocation stays available and does not clear an obligation. The buyer
-does not reconcile a delegated reservation from financial history; inspect the
-payment state with the [recovery](recovery.md) commands first.
+A cancellation proven to precede financial preparation and dispatch releases its
+own reservation. An interrupted paid reservation, a failed write or an
+inconsistent state fails closed. Unknown reservations also block operator
+inference and the creation of new keys. Revocation stays available and does not
+clear an obligation. The buyer does not reconcile a delegated reservation from
+financial history; inspect the payment state with the [recovery](recovery.md)
+commands first.
 
 > **Warning:** Never delete the permission ledger or its lock to resume
 > spending, and never restore an older copy. Doing so erases recorded

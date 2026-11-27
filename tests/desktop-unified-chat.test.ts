@@ -2,6 +2,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import {
+  CHAT_FAILURE,
+  projectChatArchive,
+} from '@gyblos/desktop/chat-archive-model';
 import { ChatController } from '@gyblos/desktop/chat-controller';
 import { sendPaypalMessage } from '@gyblos/desktop/chat-paypal';
 import { PaypalChatController } from '@gyblos/desktop/paypal-chat';
@@ -14,6 +18,7 @@ import {
   RESPONSE_COST_KIND,
   RESPONSE_COST_UNIT,
 } from '@gyblos/desktop/response-metrics';
+import { PAYPAL_REQUEST_LIMITS } from '@gyblos/node/constants';
 
 import { setup } from './support/desktop-paypal-chat-fixture';
 
@@ -138,4 +143,27 @@ void test('received text appears before delayed acknowledgement and another send
   }
   assert.equal(chat.getSnapshot().sessions[0]?.draft, 'Next draft');
   assert.equal(paypal.getSnapshot().pendingMessageId, null);
+});
+
+void test('a locally oversized PayPal question is restored as editable and unsent', async () => {
+  const { run } = await setup();
+  let sends = 0;
+  const paypal = new PaypalChatController(async (request) => {
+    if (request.action === PAYPAL_ACTION.SEND) sends++;
+    return run(request);
+  });
+  await paypal.refresh();
+  await paypal.create();
+  await paypal.approve();
+  const chat = new ChatController('one');
+  const question = 'x'.repeat(PAYPAL_REQUEST_LIMITS.promptBytes + 1);
+  chat.setDraft(question);
+  await sendPaypalMessage(chat, paypal, 'oversized');
+  const archive = projectChatArchive(chat.getSnapshot());
+  assert.equal(sends, 0);
+  assert.equal(archive?.sessions[0]?.draft, question);
+  assert.equal(
+    archive?.sessions[0]?.messages.at(-1)?.failureReason,
+    CHAT_FAILURE.PAYPAL_PROMPT_TOO_LONG,
+  );
 });
