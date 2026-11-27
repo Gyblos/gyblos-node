@@ -2,6 +2,7 @@
 // served, which are accepted and ignored because they do not change what is asked, and which are refused
 // unless they hold the value that changes nothing. Refusal text is fixed and never quotes the request.
 import { FREE_CHAT_ROLES, FREE_EXECUTION } from '@gyblos/protocol/constants';
+import { TOOL_LIMITS } from '@gyblos/protocol/tools';
 
 export const FREE_CHAT_FIELDS = {
   MODEL: 'model',
@@ -123,8 +124,12 @@ export const OPENAI_CHAT = {
     'refusal',
     'tool_calls',
     'tool_call_id',
+    'cache_control',
+    'reasoning',
+    'reasoning_content',
+    'reasoning_details',
   ] as readonly string[],
-  partFields: ['type', 'text'] as readonly string[],
+  partFields: ['type', 'text', 'cache_control'] as readonly string[],
 } as const;
 
 export const ANTHROPIC_CHAT = {
@@ -322,6 +327,13 @@ export const FREE_CHAT_DETAILS = {
   json: 'the body must be valid UTF-8 JSON',
   tools:
     'tools must be functions, each with a unique name and a JSON Schema object for its input',
+  tooManyTools: `at most ${TOOL_LIMITS.maxTools} tools can be offered at once`,
+  toolName: (index: number) =>
+    `tools[${index}]: a name must be 1 to ${TOOL_LIMITS.nameCharacters} letters, digits, _ or -`,
+  duplicateTool: (index: number) =>
+    `tools[${index}]: another tool already has this name`,
+  toolSchema: (index: number) =>
+    `tools[${index}]: the input schema must be a JSON object of at most ${TOOL_LIMITS.jsonBytes} bytes`,
   toolChoice:
     'tool_choice must be auto, none, required (any) or one named tool',
   serverTools:
@@ -344,7 +356,7 @@ export const CHAT_MESSAGE_DETAILS = {
   shape:
     'messages must be a non-empty list of system, user and assistant messages with text content',
   order:
-    'the conversation must start with a user message, answer every tool call with one result, and end with a user message or results; system instructions go first',
+    'the conversation must start with a user message, answer every tool call with one result, and end with a user message or results',
   parts: 'only text content is supported; images and other parts are not',
   tools: 'the legacy function role is not supported; use tools',
   toolCalls:
