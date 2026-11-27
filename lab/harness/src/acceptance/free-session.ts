@@ -21,6 +21,7 @@ export async function createFreeSeller(
     mode?: AcceptanceMode;
     pace?: EnginePace;
     caps?: { dailyTokenCap: number; perBuyerCap: number };
+    offerSet?: boolean;
   } = {},
 ) {
   const run = await createAcceptanceSession(
@@ -28,6 +29,7 @@ export async function createFreeSeller(
     signal,
     {
       pace: engine.pace,
+      offerSet: engine.offerSet,
       index: shared?.index,
       clock: shared?.clock,
       admissionClock: shared?.admissionClock,

@@ -14,11 +14,12 @@ import {
   ollamaSelection,
 } from '@gyblos/node/engine-registry-ollama';
 import { prepareSellerFreeExecution } from '@gyblos/node/free-execution';
-import { recountedMeter } from '@gyblos/node/free-meter';
+import { DECLARED_METER, recountedMeter } from '@gyblos/node/free-meter';
 import { sellerLimits } from '@gyblos/node/node-config-limits';
 import { openSellerSequence } from '@gyblos/node/public-sequence';
 import { createSellerPublisher } from '@gyblos/node/publisher';
 import type { SellerCatalogOffer } from '@gyblos/node/seller-offer';
+import { SellerOfferSet } from '@gyblos/node/seller-offer-set';
 import { CONTROL_METERING_MODES } from '@gyblos/protocol/constants';
 import type { SignedPublicV2 } from '@gyblos/protocol/control-types';
 import type { ChatTokenizer } from '@gyblos/protocol/engine';
@@ -50,6 +51,7 @@ export interface AcceptanceHostOptions {
   workspace: AcceptanceWorkspace;
   index: AcceptanceIndex;
   signal: AbortSignal;
+  offerSet?: boolean;
 }
 export async function startAcceptanceHost(options: AcceptanceHostOptions) {
   const { clock, engine, identity, signal } = options;
@@ -104,15 +106,28 @@ export async function startAcceptanceHost(options: AcceptanceHostOptions) {
     });
     // Paid acceptance still quotes the v1 PoC listing, which the daemon no longer serves.
     const offer = options.offer ?? pocPaidListing();
+    const controlOffer = {
+      offer,
+      selection: ollamaSelection(offer.modelId),
+      meteringMode: CONTROL_METERING_MODES.RECOUNTED,
+      model: initial.model,
+      capabilities: engine.engine.capabilities(),
+      readiness: current.readiness,
+    };
+    const offerSet = options.offerSet
+      ? new SellerOfferSet(clock.now)
+      : undefined;
+    offerSet?.add({
+      ...controlOffer,
+      index: 0,
+      engine: current.engine,
+      meter: options.tokenizer
+        ? recountedMeter(options.tokenizer)
+        : DECLARED_METER,
+      observation: current,
+    });
     const control = await prepareSellerControl({
-      offers: singleControlOffer({
-        offer,
-        selection: ollamaSelection(offer.modelId),
-        meteringMode: CONTROL_METERING_MODES.RECOUNTED,
-        model: initial.model,
-        capabilities: engine.engine.capabilities(),
-        readiness: current.readiness,
-      }),
+      offers: offerSet ?? singleControlOffer(controlOffer),
       owner: identity.owner,
       nodeId: wire.nodeId,
       nodeSigner: wire.nodeSigner,
@@ -173,13 +188,17 @@ export async function startAcceptanceHost(options: AcceptanceHostOptions) {
     return {
       wire,
       observation: current,
+      startRenewal() {
+        offerSet?.start(() => control.records.refresh().catch(() => {}));
+        publisher.start();
+      },
       publisher,
       control,
       sent,
       async close() {
         detach();
         engine.release();
-        await current.stop();
+        await (offerSet ?? current).stop();
         try {
           await publisher.stop();
         } finally {
