@@ -64,6 +64,7 @@ export interface VerificationInput {
   set: ChallengeSet;
   key: VerifierKey;
   now: () => number;
+  outputTokens: (text: string) => number;
   onAnswer?: (index: number, failure?: UnscoredEvidence['code']) => void;
 }
 export interface VerificationOutput {
@@ -213,6 +214,10 @@ export async function runVerification(
       const failure = sellerFailure(index + 1, error);
       unscored.push(failure);
       input.onAnswer?.(index, failure.code);
+      continue;
+    }
+    if (input.outputTokens(text) > set.rule.maxTokens) {
+      skip(index, prompt, text, MODEL_VERIFIER_CODES.OUTPUT_LIMIT);
       continue;
     }
     if (TEMPLATE_MARKER.test(text)) {

@@ -43,6 +43,7 @@ async function runReferenceVerification(
     set: CHALLENGE_SET,
     key,
     now: () => 1_800_000_000_000,
+    outputTokens: (text) => text.length,
   });
 }
 
@@ -106,6 +107,7 @@ void test('a verification run refuses to sign when the reference changed', async
         set: CHALLENGE_SET,
         key,
         now: () => 1_800_000_000_000,
+        outputTokens: (text) => text.length,
       }),
       (error: unknown) =>
         error instanceof ModelVerifierError &&

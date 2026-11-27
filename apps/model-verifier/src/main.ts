@@ -180,6 +180,8 @@ async function verify(values: Record<string, string | undefined>) {
     await readJson(values.seller, MODEL_VERIFIER_CODES.INVALID_SELLER),
   );
   if (values.out) await rejectExistingOutput(values.out);
+  const { outputTokenCounter } = await import('./tokenizer');
+  const outputTokens = await outputTokenCounter(process.env);
   const paths = modelVerifierLayout(process.env);
   const key = await loadVerifierKey(paths.key, true);
   const reference = await openReference(
@@ -199,6 +201,7 @@ async function verify(values: Record<string, string | undefined>) {
         set: CHALLENGE_SET,
         key,
         now: Date.now,
+        outputTokens,
         onAnswer: (index, failure) =>
           console.error(
             JSON.stringify({

@@ -38,7 +38,11 @@ make honest sellers fail, so it is not a signal here.
 model catalog shares one tokenizer and chat template
 (`packages/protocol/src/models.ts`), so a count cannot tell `qwen3-0.6b` from
 `qwen3-32b`. It could only catch a seller that serves another model family, and
-the chosen signal already catches that. It is not used.
+the chosen signal already catches that. Token counts are not an identity signal.
+Separately, the verifier recounts every seller answer with the pinned tokenizer
+and does not score one over the requested output limit; that closes a
+length-dilution escape but says nothing by itself about which model wrote the
+answer.
 
 **Throughput.** Tokens per second depend on the seller's hardware, load and
 batching as much as on model size. A large GPU serving a small model looks like
@@ -57,9 +61,10 @@ its 20 most likely next tokens with their log probabilities. The point is a
 most probable candidate that is has a probability below 0.1 % (1,000 parts per
 million). An answer that contains a chat template marker such as `<|im_end|>` is
 not scored and counts as unanswered, because those markers could steer the
-reference. A point where the declared model's most likely next token ends the
-answer is not counted: Ollama returns no probabilities there, so the point says
-nothing either way.
+reference. An answer whose pinned-tokenizer recount exceeds the requested
+`maxTokens` is also not scored and counts as unanswered. A point where the
+declared model's most likely next token ends the answer is not counted: Ollama
+returns no probabilities there, so the point says nothing either way.
 
 An empty, incomplete or malformed candidate list is an invalid reference
 response, not a deviation by the seller. A complete list can contain empty
@@ -103,8 +108,8 @@ deviant answers.
 
 `failAt` is the smallest number of deviant answers whose probability under a
 binomial distribution over the scored answers, with the assumed honest rate, is
-at most 0.01 %. With 30 answers it is 12. An empty answer, or one with no point
-left to check, counts as unanswered.
+at most 0.01 %. With 30 answers it is 12. An empty answer, one over the output
+token limit, or one with no point left to check counts as unanswered.
 
 - `fail`: deviant answers ≥ `failAt`. This holds even when prompts went
   unanswered, because `failAt` is computed for the answers actually scored.
@@ -128,8 +133,9 @@ Assumptions behind the bound:
   are not measured separately. A prompt above the rate would risk failing an
   honest seller; it would not help a substitute.
 - The rate holds among scored answers. Answers are excluded only when they are
-  blank, carry a chat template marker, fail in transport or leave no point to
-  check, none of which depends on whether their checked points deviate.
+  blank, exceed the recounted output token limit, carry a chat template marker,
+  fail in transport or leave no point to check, none of which depends on whether
+  their checked points deviate.
 - Partial runs are not measured separately. Excluded answers tend to be short,
   and a longer answer has more chances to deviate, so the worst case restricted
   to full-length answers (24 checks) is the relevant one: 17 deviant answers in
@@ -152,9 +158,11 @@ What the rule catches, and what it does not:
 The reference is the declared model run by the verifier in its own Ollama, under
 the catalog alias of that model (for example `qwen3-1.7b` → `qwen3:1.7b`). The
 verifier refuses models without a catalog alias or without the pinned Qwen3
-tokenizer and template. The prompt is rendered with the Qwen3 template the
-Ollama engine adapter uses (`renderChat` in `packages/engine-ollama`, thinking
-off). The reference model's Ollama digest is recorded in the signed result.
+tokenizer and template. It loads the hash-pinned public tokenizer artifacts
+prepared in the Gyblos home directory and recounts each seller answer with them.
+The prompt is rendered with the Qwen3 template the Ollama engine adapter uses
+(`renderChat` in `packages/engine-ollama`, thinking off). The reference model's
+Ollama digest is recorded in the signed result.
 
 What that makes reproducible, and what it does not:
 
@@ -224,7 +232,13 @@ A run takes a few minutes on this machine, mostly the seller's generation.
 From a checkout of the repository set up as in
 [CONTRIBUTING.md](../CONTRIBUTING.md#set-up-nodejs-and-pnpm), with
 [Ollama](https://ollama.com) running and the declared model pulled
-(`ollama pull qwen3:1.7b`), write the seller's public details to `seller.json`:
+(`ollama pull qwen3:1.7b`), prepare the pinned tokenizer artifacts once:
+
+```sh
+pnpm node:tokenizer
+```
+
+Then write the seller's public details to `seller.json`:
 
 ```json
 {
@@ -242,22 +256,23 @@ pnpm model-verifier verify --seller seller.json --model qwen3-1.7b
 pnpm model-verifier check RESULT_DIRECTORY/result.json
 ```
 
-`verify` runs the challenge set against one seller, prints the verdict and
-publishes `result.json` (the signed result) and `evidence.json` (the prompts,
-the answers and every check, plus any reply that could not be scored and why)
-together in a new result directory. Publication is atomic for readers, but it
-does not fsync the files or directories, so an operating-system crash or power
-loss can still lose the new directory or leave incomplete artifacts. If you pass
-`--out`, choose a path that does not already exist. `check` verifies a result's
-signature and that its rule and evidence counts fit the published challenge set,
-and prints its verdict. `pnpm model-verifier address` prints the verifier's
-public address. The verifier key is created on first use in
-`model-verifier/verifier.key` inside the Gyblos home directory. The docs site
-explains the results for sellers:
+`verify` requires those artifacts and stops with `TOKENIZER_UNAVAILABLE` when
+they are missing or fail their pinned hashes. It runs the challenge set against
+one seller, prints the verdict and publishes `result.json` (the signed result)
+and `evidence.json` (the prompts, the answers and every check, plus any reply
+that could not be scored and why) together in a new result directory.
+Publication is atomic for readers, but it does not fsync the files or
+directories, so an operating-system crash or power loss can still lose the new
+directory or leave incomplete artifacts. If you pass `--out`, choose a path that
+does not already exist. `check` verifies a result's signature and that its rule
+and evidence counts fit the published challenge set, and prints its verdict.
+`pnpm model-verifier address` prints the verifier's public address. The verifier
+key is created on first use in `model-verifier/verifier.key` inside the Gyblos
+home directory. The docs site explains the results for sellers:
 [Model verification](https://docs.gyblos.com/en/sellers/model-verification). The
 app uses public package entries only (protocol, core, the Iroh transport and the
-Ollama engine's chat template) and never imports the buyer, node or desktop
-code.
+Ollama engine's chat template and pinned tokenizer) and never imports the buyer,
+node or desktop code.
 
 ## Signed result
 

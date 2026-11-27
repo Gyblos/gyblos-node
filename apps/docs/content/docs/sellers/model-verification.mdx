@@ -11,10 +11,12 @@ outside, as an ordinary buyer of your free offer. It does not read your machine,
 1. It asks your free offer a fixed, public set of 30 short prompts, with reasoning off and at most 200 output
    tokens each. Your free offer must allow at least 200 output tokens per request; otherwise it refuses every
    prompt and the run is inconclusive.
-2. It rereads each answer with the declared model, run on the verifier's own machine. At up to 24 points per
+2. It recounts each answer with the pinned Qwen3 tokenizer. An answer over the requested 200-token limit is
+   not scored and counts as unanswered.
+3. It rereads each answer with the declared model, run on the verifier's own machine. At up to 24 points per
    answer it checks that your next words are among the 20 the declared model finds most likely, with a
    probability of at least 0.1 %.
-3. It counts the answers with at least one point that fails that check and signs a result with its own key.
+4. It counts the answers with at least one point that fails that check and signs a result with its own key.
    The points are chosen with a secret drawn for each run, after the answer arrives, and each run asks from a
    new buyer address. An empty answer, or one with no point to check, counts as unanswered.
 
@@ -34,7 +36,7 @@ a penalty: today it changes nothing in discovery, routing or payments.
 
 In `evidence.json`, each prompt has a numbered outcome. Unscored outcomes
 distinguish a failed quote, a failed execution or a reply that could not be
-scored. Quote and execution failures record a code, not raw error details.
+scored, including one over the output token limit. Quote and execution failures record a code, not raw error details.
 
 If the reference Ollama returns an empty, incomplete or malformed candidate list and retries do not recover, the command stops with
 `REFERENCE_UNAVAILABLE` and does not issue a signed result. A complete list can contain empty display strings for
@@ -53,7 +55,8 @@ genuine answers count toward it too.
 ## Repeat a check [#reproduce]
 
 The verifier is open source, so anyone with [Ollama](https://ollama.com) and the declared model can run the
-same check against a seller and get a result they can compare. The steps to run it are in the
+same check against a seller and get a result they can compare. The first run also needs the pinned tokenizer
+artifacts; the design note explains how to prepare them. The steps to run it are in the
 [model verifier design note](https://github.com/Gyblos/gyblos-node/blob/develop/docs/model-verifier.md#run-it) in the repository.
 
 A run writes the signed result and an evidence file together in a new directory. Publication is atomic for

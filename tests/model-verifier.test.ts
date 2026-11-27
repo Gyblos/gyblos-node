@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -13,6 +14,7 @@ import {
 import { loadVerifierKey } from '@gyblos/model-verifier/key';
 import { main } from '@gyblos/model-verifier/main';
 import { openReference } from '@gyblos/model-verifier/reference';
+import { outputTokenCounter } from '@gyblos/model-verifier/tokenizer';
 import {
   runVerification,
   type UnscoredEvidence,
@@ -88,6 +90,10 @@ async function verifyWith(
     set: CHALLENGE_SET,
     key,
     now: () => 1_800_000_000_000,
+    outputTokens: (text) => {
+      const trimmed = text.trim();
+      return trimmed ? trimmed.split(/\s+/).length : 0;
+    },
     onAnswer: (_index, failure) => {
       if (failure) failures.push(failure);
     },
@@ -222,6 +228,45 @@ void test('a blank answer or one with nothing to check counts as unanswered', as
       new Set([MODEL_VERIFIER_CODES.EMPTY_ANSWER]),
     );
     assert.equal(verdict, MODEL_VERIFICATION_VERDICTS.INCONCLUSIVE);
+  });
+});
+
+void test('the pinned tokenizer artifacts are required for verification', async () => {
+  await withHome(async (home) => {
+    await assert.rejects(
+      outputTokenCounter({ GYBLOS_HOME: home }),
+      isCode(MODEL_VERIFIER_CODES.TOKENIZER_UNAVAILABLE),
+    );
+  });
+});
+
+void test('an answer over the requested output token limit is not scored', async () => {
+  await withHome(async (home) => {
+    let calls = 0;
+    const words = (count: number) =>
+      Array.from({ length: count }, () => 'word').join(' ');
+    const outcome = await verifyWith(home, async () => {
+      calls += 1;
+      return words(calls === 1 ? 201 : 200);
+    });
+    const overlong = outcome.unscored[0];
+    assert.equal(
+      outcome.signed.result.evidence.answers,
+      CHALLENGE_SET.prompts.length - 1,
+    );
+    assert.deepEqual(overlong, {
+      challenge: 1,
+      phase: MODEL_VERIFIER_PHASES.SCORING,
+      prompt: CHALLENGE_SET.prompts[0],
+      text: words(201),
+      digest: createHash('sha256').update(words(201)).digest('hex'),
+      code: MODEL_VERIFIER_CODES.OUTPUT_LIMIT,
+    });
+    assert.ok(overlong && 'digest' in overlong && overlong.digest);
+    assert.equal(
+      outcome.signed.result.verdict,
+      MODEL_VERIFICATION_VERDICTS.INCONCLUSIVE,
+    );
   });
 });
 
@@ -385,6 +430,7 @@ void test('a point where the reference would end the answer is not counted', asy
       set: CHALLENGE_SET,
       key,
       now: () => 1_800_000_000_000,
+      outputTokens: (text) => text.length,
     });
     const { evidence } = outcome.signed.result;
     assert.equal(evidence.checks, calls / 2);
