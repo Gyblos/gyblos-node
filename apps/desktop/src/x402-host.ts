@@ -11,10 +11,10 @@ import {
   type BrowserWindow,
 } from 'electron';
 
-import { setBuyerRenewalBudget } from '@gyblos/buyer/auto-settings';
 import { desktopX402Paths } from '@gyblos/config/home-desktop';
 import { reviewDesktopCharge } from '@gyblos/node/buyer-funding';
 import { desktopOpening } from '@gyblos/node/desktop-opening';
+import { BUYER_SIDECAR } from '@gyblos/protocol/buyer-api';
 import {
   acquireProcessLock,
   readPrivateFile,
@@ -45,21 +45,21 @@ function managedBuyer(
     // Packaged releases upload receipts to the metrics collector; development runs do not.
     app.isPackaged ? app.getVersion() : undefined,
   );
+  const fork = (args: string[]) =>
+    utilityProcess.fork(join(directory, DESKTOP_X402.SERVICE_FILE), args, {
+      cwd: profile,
+      stdio: 'ignore',
+      env: environment,
+    });
   const service = new ManagedBuyer(
     (_home, _token, maxAtomic, autoPrices) =>
-      utilityProcess.fork(
-        join(directory, DESKTOP_X402.SERVICE_FILE),
+      fork(
         maxAtomic === undefined
           ? []
           : [
               maxAtomic,
               ...(autoPrices === undefined ? [] : [JSON.stringify(autoPrices)]),
             ],
-        {
-          cwd: profile,
-          stdio: 'ignore',
-          env: environment,
-        },
       ),
     () => client.disconnect(),
   );
@@ -72,7 +72,23 @@ function managedBuyer(
         service.stopWhenIdle(() => {
           if (!client.policy()) void managed.start().catch(() => {});
         }),
-      setRenewalBudget: (amount) => setBuyerRenewalBudget(environment, amount),
+      setRenewalBudget: (amount) =>
+        new Promise<void>((resolve, reject) => {
+          const writer = fork([
+            BUYER_SIDECAR.SET_RENEWAL,
+            JSON.stringify(amount),
+          ]);
+          const timeout = setTimeout(
+            () => writer.kill(),
+            DESKTOP_X402.START_MS,
+          );
+          writer.once('exit', (code) => {
+            clearTimeout(timeout);
+            if (code === 0) resolve();
+            else
+              reject(new Error('Could not save the channel renewal budget.'));
+          });
+        }),
       close: () => service.close(),
     },
     client,

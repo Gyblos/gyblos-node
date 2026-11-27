@@ -29,6 +29,7 @@ export const BUYER_API = {
   ADDRESS_PATTERN: /^[1-9A-HJ-NP-Za-km-z]{32,44}$/,
 } as const;
 export const BUYER_SIDECAR = {
+  SET_RENEWAL: 'set-renewal',
   STOP_IF_IDLE: 'stop-if-idle',
   IDLE: 'buyer-idle',
   BUSY: 'buyer-busy',

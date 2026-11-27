@@ -14,6 +14,7 @@ import {
   parseBuyerApiKeysReply,
 } from '@gyblos/protocol/buyer-api-keys';
 import { ENGINE_DONE_REASONS, P2P_ROLES } from '@gyblos/protocol/constants';
+import { isMain } from '@gyblos/runtime';
 
 import { blockTestMeter } from '../support/batch-block-product';
 import { batchDeferred } from '../support/batch-deferred';
@@ -298,8 +299,10 @@ async function scenario(mode: 'opencode' | 'fetch' | 'mixed') {
   }
 }
 
-await scenario('fetch');
-if (!process.argv.includes('--fetch-only')) {
-  await scenario('opencode');
-  await scenario('mixed');
+if (isMain(import.meta.url)) {
+  await scenario('fetch');
+  if (!process.argv.includes('--fetch-only')) {
+    await scenario('opencode');
+    await scenario('mixed');
+  }
 }
