@@ -744,6 +744,7 @@ export function Chat({
                           <FailedTurn
                             message={answer}
                             onConnections={onConnections}
+                            onSellers={onBrowseModels}
                             buyer={x402}
                             separateDraft={
                               !!user &&

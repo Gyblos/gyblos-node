@@ -162,6 +162,9 @@ conversation content is not encrypted.
   responses it can reconcile local spending records against verified payment
   evidence. When the original session is unavailable, review the payment history
   in Payments.
+- A verified channel refusal links to Payments for channel status or to Models
+  for changed seller terms or a replacement. A PayPal question rejected by local
+  prompt validation can be edited from its turn.
 - Earlier desktop versions may decline to load archives containing newer turn
   metadata. An unreadable archive disables saving and preserves the original
   file. Reopen it with the newer desktop version to recover the conversations.

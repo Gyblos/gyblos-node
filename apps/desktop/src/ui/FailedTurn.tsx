@@ -1,6 +1,11 @@
 import { useState } from 'react';
 
+import { channelBlockerMessage } from '@gyblos/node/buyer-channel-message';
+import { isChannelBlocker } from '@gyblos/protocol/buyer-api';
+import { SESSION_CODES } from '@gyblos/protocol/payment-session';
+
 import { CHAT_FAILURE } from '../constants';
+import { paypalPromptCorrection } from '../paypal-chat-notice';
 import { PAYMENT_METHOD } from '../paypal-model';
 import { X402_ACTION } from '../x402-model';
 import type { ChatMessage } from './chat-state';
@@ -20,6 +25,8 @@ function beforeSending(reason: ChatMessage['failureReason']) {
       return 'The buyer could not open a channel with this seller before sending this question.';
     case CHAT_FAILURE.STALE_OFFER:
       return 'Refresh the model list to verify the seller and its current price before sending.';
+    case CHAT_FAILURE.PAYPAL_PROMPT_INVALID:
+      return paypalPromptCorrection;
     case CHAT_FAILURE.PAYPAL_PROMPT_TOO_LONG:
       return 'Shorten the question to fit the PayPal message limit.';
     case CHAT_FAILURE.NOT_SENT:
@@ -54,34 +61,9 @@ function failureExplanation(
   }
 }
 
-export function FailedTurn({
-  message,
-  buyer,
-  separateDraft,
-  onReview,
-  onConnections,
-  onEdit,
-}: {
-  message: ChatMessage;
-  buyer?: X402View;
-  separateDraft: boolean;
-  onReview?: () => void;
-  onConnections: () => void;
-  onEdit: () => void;
-}) {
+function useRecoveryStatus(shared: boolean, buyer?: X402View) {
   const [observation, setObservation] = useState('');
   const [checking, setChecking] = useState(false);
-  const declined = message.failureReason === CHAT_FAILURE.DECLINED;
-  const unsentReview =
-    message.failureReason === CHAT_FAILURE.KEY_REVIEW_NOT_SENT;
-  const shared =
-    unsentReview || message.failureReason === CHAT_FAILURE.KEY_REVIEW;
-  const free =
-    message.model.free && message.paymentMethod === PAYMENT_METHOD.USDC;
-  const sameSession =
-    message.paymentMethod === PAYMENT_METHOD.USDC &&
-    !!message.paymentSessionId &&
-    message.paymentSessionId === buyer?.state.summary.sessionId;
   async function checkStatus() {
     if (shared) {
       setChecking(true);
@@ -100,7 +82,51 @@ export function FailedTurn({
       budgetStatus + ' The charge for this turn remains unconfirmed.',
     );
   }
-  const stopped = beforeSending(message.failureReason);
+  return { observation, checking, checkStatus };
+}
+
+export function FailedTurn({
+  message,
+  buyer,
+  separateDraft,
+  onReview,
+  onConnections,
+  onSellers,
+  onEdit,
+}: {
+  message: ChatMessage;
+  buyer?: X402View;
+  separateDraft: boolean;
+  onReview?: () => void;
+  onConnections: () => void;
+  onSellers: () => void;
+  onEdit: () => void;
+}) {
+  const reason = message.failureReason;
+  const declined = reason === CHAT_FAILURE.DECLINED;
+  const shared =
+    reason === CHAT_FAILURE.KEY_REVIEW_NOT_SENT ||
+    reason === CHAT_FAILURE.KEY_REVIEW;
+  const { observation, checking, checkStatus } = useRecoveryStatus(
+    shared,
+    buyer,
+  );
+  const free =
+    message.model.free && message.paymentMethod === PAYMENT_METHOD.USDC;
+  const sameSession =
+    message.paymentMethod === PAYMENT_METHOD.USDC &&
+    !!message.paymentSessionId &&
+    message.paymentSessionId === buyer?.state.summary.sessionId;
+  const channel =
+    isChannelBlocker(reason) && reason !== CHAT_FAILURE.KEY_REVIEW
+      ? reason
+      : undefined;
+  const seller =
+    channel === SESSION_CODES.BINDING ||
+    channel === SESSION_CODES.REPLACEMENT_REQUIRED;
+  const stopped = channel
+    ? channelBlockerMessage(channel)
+    : beforeSending(reason);
   return (
     <>
       <Notice>
@@ -108,7 +134,14 @@ export function FailedTurn({
         {observation && ' ' + observation}
       </Notice>
       <div className="answer-actions">
-        {declined || stopped || (free && !shared) ? (
+        {channel ? (
+          <Button
+            variant={BUTTON_VARIANT.SECONDARY}
+            onClick={seller ? onSellers : onReview}
+          >
+            {seller ? 'Review sellers' : 'Review in Payments'}
+          </Button>
+        ) : declined || stopped || (free && !shared) ? (
           <Button variant={BUTTON_VARIANT.SECONDARY} onClick={onEdit}>
             {separateDraft ? 'Edit in new chat' : 'Edit question'}
           </Button>

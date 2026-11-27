@@ -320,7 +320,7 @@ export class PaypalChatController {
       this.update({
         noticeIsTurnFailure: true,
         notice: paypalChatFailure(
-          paypalFailure(PAYPAL_DESKTOP_ERROR.INVALID_PROMPT),
+          paypalFailure(PAYPAL_DESKTOP_ERROR.PROMPT_REJECTED),
         ),
       });
       return CHAT_FAILURE.PAYPAL_PROMPT_TOO_LONG;
@@ -346,7 +346,9 @@ export class PaypalChatController {
         pendingPrompt: null,
         busy: false,
       });
-      return;
+      return result.error === PAYPAL_DESKTOP_ERROR.PROMPT_REJECTED
+        ? CHAT_FAILURE.PAYPAL_PROMPT_INVALID
+        : undefined;
     }
     this.update({
       ...this.receive(result),

@@ -44,19 +44,25 @@ export function seedFailedTurn(
   const freeLimit =
     example === PREVIEW_FAILURE.PARTIAL_LIMIT ||
     example === PREVIEW_FAILURE.EMPTY_LIMIT;
-  if (
-    !freeLimit &&
-    example !== PREVIEW_FAILURE.INTERRUPTED &&
-    example !== PREVIEW_FAILURE.SHARED &&
-    example !== PREVIEW_FAILURE.STOP &&
-    example !== PREVIEW_FAILURE.SHARED_UNSENT &&
-    example !== PREVIEW_FAILURE.DECLINED &&
-    example !== PREVIEW_FAILURE.EXPIRED &&
-    example !== PREVIEW_FAILURE.PAYPAL
-  )
-    return false;
+  const failures = new Map<string, X402Result['failureReason']>([
+    [PREVIEW_FAILURE.INTERRUPTED, undefined],
+    [PREVIEW_FAILURE.PAYPAL, undefined],
+    [PREVIEW_FAILURE.PAYPAL_PROMPT, CHAT_FAILURE.PAYPAL_PROMPT_INVALID],
+    [PREVIEW_FAILURE.CLOSED, SESSION_CODES.CLOSED],
+    [PREVIEW_FAILURE.BINDING, SESSION_CODES.BINDING],
+    [PREVIEW_FAILURE.PARTIAL_LIMIT, CHAT_FAILURE.FREE_LIMIT],
+    [PREVIEW_FAILURE.EMPTY_LIMIT, CHAT_FAILURE.FREE_LIMIT],
+    [PREVIEW_FAILURE.SHARED_UNSENT, CHAT_FAILURE.KEY_REVIEW_NOT_SENT],
+    [PREVIEW_FAILURE.SHARED, sharedReviewFailure.failureReason],
+    [PREVIEW_FAILURE.EXPIRED, PAID_EXECUTION_CODES.EXPIRED],
+    [PREVIEW_FAILURE.DECLINED, SESSION_CODES.REQUEST_DECLINED],
+    [PREVIEW_FAILURE.STOP, SESSION_CODES.REQUEST_DECLINED],
+  ]);
+  if (!example || !failures.has(example)) return false;
   const id = 'interrupted-turn';
-  const paypal = example === PREVIEW_FAILURE.PAYPAL;
+  const paypal =
+    example === PREVIEW_FAILURE.PAYPAL ||
+    example === PREVIEW_FAILURE.PAYPAL_PROMPT;
   const origin = chat.startPaypal(
     'How do I read a file in TypeScript?',
     { ...model, free: freeLimit },
@@ -75,21 +81,8 @@ export function seedFailedTurn(
         'Read the file with:\n\n```ts\nconst text =',
       );
     chat.setDraft('How should I handle an empty file?');
-    if (!paypal && example !== PREVIEW_FAILURE.INTERRUPTED)
-      chat.failPaypal(
-        origin,
-        id,
-        '',
-        freeLimit
-          ? CHAT_FAILURE.FREE_LIMIT
-          : example === PREVIEW_FAILURE.SHARED_UNSENT
-            ? CHAT_FAILURE.KEY_REVIEW_NOT_SENT
-            : example === PREVIEW_FAILURE.SHARED
-              ? sharedReviewFailure.failureReason
-              : example === PREVIEW_FAILURE.EXPIRED
-                ? PAID_EXECUTION_CODES.EXPIRED
-                : SESSION_CODES.REQUEST_DECLINED,
-      );
+    const failure = failures.get(example);
+    if (failure) chat.failPaypal(origin, id, '', failure);
   }
   return true;
 }

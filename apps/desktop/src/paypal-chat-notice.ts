@@ -57,6 +57,9 @@ export function paypalCommandNotice(
     : '';
 }
 
+export const paypalPromptCorrection =
+  'Shorten the message or remove reserved model control markers, then try again.';
+
 export function paypalChatFailure(result: PaypalResult) {
   if (
     result.error === PAYPAL_DESKTOP_ERROR.INVALID_PROMPT &&
@@ -71,8 +74,8 @@ export function paypalChatFailure(result: PaypalResult) {
         result.status.limitCents)
   )
     return 'The sandbox session limit has been reached. Close it to settle recorded usage.';
-  if (result.error === PAYPAL_DESKTOP_ERROR.INVALID_PROMPT)
-    return 'Shorten the message or remove reserved model control markers, then try again.';
+  if (result.error === PAYPAL_DESKTOP_ERROR.PROMPT_REJECTED)
+    return paypalPromptCorrection;
   if (result.error === PAYPAL_DESKTOP_ERROR.NOT_APPROVED)
     return result.status?.approvalLinkAvailable
       ? 'Approve the request in PayPal Sandbox before starting the session.'
