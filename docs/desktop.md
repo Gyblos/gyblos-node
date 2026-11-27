@@ -130,9 +130,9 @@ conversation content is not encrypted.
   authorizes spending. An incomplete response reopens as interrupted. The turn
   shows its recovery action. A verified pre-dispatch refusal records that the
   turn incurred no charge. When an earlier key reservation caused the refusal,
-  the turn retains its spending review action. Editing a declined question preserves an existing
-  draft in its conversation. A budget status check cannot establish a charge for
-  the specific turn.
+  the turn retains its spending review action. Editing a declined question
+  preserves an existing draft in its conversation. A budget status check cannot
+  establish a charge for the specific turn.
 - x402 history holds verified references and amounts, or an explicit free result
   with no hash. Uncertain values never appear as confirmed spending or available
   balance.
