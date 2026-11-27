@@ -17,7 +17,7 @@ import {
 function record(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
-function tokenBalance(value: unknown, payer: string) {
+function tokenBalance(value: unknown, payer: string, mint: string) {
   if (value === null) return '0';
   if (
     !record(value) ||
@@ -37,7 +37,7 @@ function tokenBalance(value: unknown, payer: string) {
   if (
     !record(info) ||
     info.owner !== payer ||
-    info.mint !== DEVNET_USDC ||
+    info.mint !== mint ||
     info.state !== 'initialized' ||
     !record(info.tokenAmount)
   )
@@ -52,19 +52,21 @@ export async function buyerUsdcBalance(
   try {
     const rpc = createBuyerObservationRpc(rpcUrl, fetcher);
     if ((await rpc.getGenesisHash().send()) !== DEVNET_GENESIS) return null;
-    const account = await uptoTokenAccount(
-      payer,
-      DEVNET_USDC,
-      TOKEN_PROGRAM_ADDRESS,
-    );
-    const result = await rpc
-      .getAccountInfo(account, {
-        commitment: COMMITMENT,
-        encoding: 'jsonParsed',
-      })
-      .send();
-    return tokenBalance(result.value, payer);
+    return await paymentTokenBalance(rpc, payer, DEVNET_USDC);
   } catch {
     return null;
   }
+}
+
+export async function paymentTokenBalance(
+  rpc: ReturnType<typeof createBuyerObservationRpc>,
+  payer: string,
+  mint: string,
+  signal?: AbortSignal,
+) {
+  const account = await uptoTokenAccount(payer, mint, TOKEN_PROGRAM_ADDRESS);
+  const result = await rpc
+    .getAccountInfo(account, { commitment: COMMITMENT, encoding: 'jsonParsed' })
+    .send({ abortSignal: signal });
+  return tokenBalance(result.value, payer, mint);
 }

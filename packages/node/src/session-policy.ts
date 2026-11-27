@@ -20,33 +20,37 @@ export { UnsentChannelLimitError } from '@gyblos/protocol/payment-session';
 export interface BuyerSessionPolicy {
   depositAtomic: string;
   totalDepositAtomic?: string;
+  renewalBudgetAtomic?: string;
   lifetimeMs: number;
   withdrawDelaySeconds: number;
 }
 export function parseBuyerSessionPolicy(value: unknown): BuyerSessionPolicy {
   try {
-    const optional =
-      value !== null &&
-      typeof value === 'object' &&
-      Object.hasOwn(value, 'withdrawDelaySeconds');
-    const hasTotal =
-      value !== null &&
-      typeof value === 'object' &&
-      Object.hasOwn(value, 'totalDepositAtomic');
+    if (!value || typeof value !== 'object') return sessionFail();
+    const optional = Object.hasOwn(value, 'withdrawDelaySeconds');
+    const hasTotal = Object.hasOwn(value, 'totalDepositAtomic');
+    const hasBudget = Object.hasOwn(value, 'renewalBudgetAtomic');
     const row = controlObject(value, [
       'depositAtomic',
       'lifetimeMs',
       ...(hasTotal ? ['totalDepositAtomic'] : []),
+      ...(hasBudget ? ['renewalBudgetAtomic'] : []),
       ...(optional ? ['withdrawDelaySeconds'] : []),
     ]);
     const depositAtomic = controlAtomic(row.depositAtomic);
+    const renewalBudgetAtomic = hasBudget
+      ? positiveTotal(row.renewalBudgetAtomic)
+      : undefined;
     if (
+      (renewalBudgetAtomic !== undefined &&
+        (hasTotal || BigInt(renewalBudgetAtomic) < BigInt(depositAtomic))) ||
       depositAtomic === '0' ||
       BigInt(depositAtomic) > BigInt(BATCH_SESSION_DEFAULTS.maxDepositAtomic)
     )
       sessionFail();
     return {
       depositAtomic,
+      ...(renewalBudgetAtomic && { renewalBudgetAtomic }),
       ...(hasTotal
         ? { totalDepositAtomic: positiveTotal(row.totalDepositAtomic) }
         : {}),
@@ -126,15 +130,16 @@ export function replacementTerms(
   quote: SignedOfferV2,
   priorSpentAtomic?: string,
 ) {
+  const cap = BigInt(policy.depositAtomic);
   const authority =
-    BigInt(policy.depositAtomic) - BigInt(priorSpentAtomic ?? '0');
-  return (spent: string) =>
-    newSessionTerms(
+    BigInt(policy.renewalBudgetAtomic ?? policy.depositAtomic) -
+    BigInt(priorSpentAtomic ?? '0');
+  return (spent: string) => {
+    const available = authority - BigInt(spent);
+    return newSessionTerms(
       quote,
-      {
-        ...policy,
-        depositAtomic: String(authority - BigInt(spent)),
-      },
+      { ...policy, depositAtomic: String(available < cap ? available : cap) },
       now(),
     );
+  };
 }

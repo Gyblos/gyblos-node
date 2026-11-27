@@ -28,6 +28,7 @@ import { singleBuyerRegistry } from './single-buyer-registry';
 
 export async function sessionProductPayments(
   roles: Awaited<ReturnType<typeof paidAcceptanceRoles>>,
+  beforeDeposit?: () => Promise<void>,
 ) {
   assert.equal(roles.seller.role, P2P_ROLES.SELLER);
   const payer = await roleSigner(P2P_ROLES.BUYER, P2P_ROLES.BUYER);
@@ -40,6 +41,7 @@ export async function sessionProductPayments(
   let sellerCreates = 0;
   let lostAcknowledgment = false;
   let approvals = 0;
+  let walletBalance: string | null = '1000000';
   const acknowledged = () => {
     approvals++;
     if (lostAcknowledgment) {
@@ -59,7 +61,18 @@ export async function sessionProductPayments(
     child: ReturnType<typeof batchSessionPathsIn>,
   ): BuyerSessionBackend => ({
     inspect: () => sessions.inspectBatchSession(child),
+    availableBalance: async () => walletBalance,
     observe,
+    renew: (expectedChannelId, terms, totalBudgetAtomic, switchSeller) =>
+      sessions.renewBatchSession({
+        paths: child,
+        expectedChannelId,
+        terms,
+        totalBudgetAtomic,
+        switchSeller,
+        now,
+        observe,
+      }),
     create: async (terms) => {
       buyerCreates++;
       return sessions.createBatchBuyer({
@@ -77,6 +90,14 @@ export async function sessionProductPayments(
   });
   const seller: SellerSessionBackend = {
     inspect: () => inspect(P2P_ROLES.SELLER),
+    renew: (expectedChannelId, terms) =>
+      sessions.renewBatchSession({
+        paths: paths(P2P_ROLES.SELLER),
+        expectedChannelId,
+        terms,
+        now,
+        observe,
+      }),
     async create(terms: PaymentSessionTerms) {
       sellerCreates++;
       const financial = await sessions.createBatchSeller({
@@ -115,8 +136,10 @@ export async function sessionProductPayments(
               channelId: string;
               maxClaimableAmount: string;
             };
-            if (payment.payload.type === 'deposit') opened.add(raw.channelId);
-            else
+            if (payment.payload.type === 'deposit') {
+              await beforeDeposit?.();
+              opened.add(raw.channelId);
+            } else
               settled.set(raw.channelId, {
                 channelId: raw.channelId,
                 chargedAtomic: raw.maxClaimableAmount,
@@ -152,6 +175,9 @@ export async function sessionProductPayments(
   };
   return {
     observeSettlement: observe,
+    walletBalance(value: string | null) {
+      walletBalance = value;
+    },
     observeChannel: async (
       _paths: ReturnType<typeof batchSessionPathsIn>,
       _terms: PaymentSessionTerms,

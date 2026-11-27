@@ -254,3 +254,49 @@ void test(
     assert.equal(resumed.status, 200, await resumed.clone().text());
   },
 );
+
+void test(
+  'a delegated key renews healthy exhausted escrow once under its operator budget across restart',
+  { skip: NATIVE_CAPABILITY.transportSkip },
+  async (t) => {
+    const request = globalThis.fetch;
+    const host = await sessionProductHost(
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { depositAtomic: '10000', renewalBudgetAtomic: '10060' },
+    );
+    t.after(host.close);
+    const { ask } = await buyerClient(host, request, '50000');
+    const paths = batchSessionPathsIn(process.env, P2P_ROLES.BUYER);
+    const first = await ask(64);
+    assert.equal(first.status, 200, await first.clone().text());
+    const initial = await inspectBatchSession(paths);
+    assert.ok(initial?.snapshot.channelId);
+    await host.restartBuyer();
+    for (const balance of [null, '0']) {
+      host.finance.walletBalance(balance);
+      const unready = await ask(64);
+      assert.equal(unready.ok, false);
+      assert.equal(
+        (await unready.json()).error.code,
+        balance === null ? SESSION_CODES.STATUS_UNKNOWN : SESSION_CODES.LIMIT,
+      );
+      assert.deepEqual(host.finance.calls, ['deposit']);
+    }
+    host.finance.walletBalance('1000000');
+    const second = await ask(64);
+    assert.equal(second.status, 200, await second.clone().text());
+    const renewed = await inspectBatchSession(paths);
+    assert.ok(renewed?.snapshot.channelId);
+    assert.notEqual(initial.snapshot.channelId, renewed.snapshot.channelId);
+    assert.equal(renewed.priorSpentAtomic, initial.snapshot.cumulativeAtomic);
+    assert.equal(host.finance.calls.filter((x) => x === 'deposit').length, 2);
+    const calls = [...host.finance.calls];
+    const rejected = await ask(64);
+    assert.equal(rejected.ok, false);
+    assert.equal(host.engine.attempts(), 2);
+    assert.deepEqual(host.finance.calls, calls);
+  },
+);

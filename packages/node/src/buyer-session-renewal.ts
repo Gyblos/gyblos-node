@@ -8,8 +8,12 @@ import {
 } from '@gyblos/protocol/payment-session';
 import type { BatchDestination } from '@gyblos/transport-iroh/batch-client';
 
-import type { StartChannelWork } from './buyer-channel-prepare';
+import {
+  UnsentSellerChoiceError,
+  type StartChannelWork,
+} from './buyer-channel-prepare';
 import { checkPreviousOpening } from './buyer-opening-state';
+import { bounded } from './buyer-operation';
 import { UnsentSellerBusyError } from './buyer-routing';
 import type { Current, State } from './buyer-session';
 import { newSessionTerms, replacementTerms } from './session-policy';
@@ -49,6 +53,20 @@ export async function prepareRenewal<Remote extends BatchDestination>(
   )
     return undefined;
   if (snapshot.channelId) await options.checkReusableChannel?.(quote, signal);
+  if (options.policy.renewalBudgetAtomic !== undefined) {
+    if (
+      switching ||
+      snapshot.state !== SESSION_STATES.OPEN ||
+      snapshot.reservedAtomic !== '0'
+    )
+      return sessionFail(SESSION_CODES.UNVERIFIED);
+    await verifyBatchQuote(
+      quote,
+      { ...opened.terms, depositAtomic: options.policy.depositAtomic },
+      options.endpoint.id().toString(),
+      options.now(),
+    );
+  }
   const proposed = newSessionTerms(quote, options.policy, options.now());
   await verifyBatchQuote(
     quote,
@@ -64,8 +82,30 @@ export async function prepareRenewal<Remote extends BatchDestination>(
     quote,
     stored.priorSpentAtomic,
   );
-  if (snapshot.state !== SESSION_STATES.CLOSED)
-    replacement(snapshot.cumulativeAtomic);
+  if (snapshot.state !== SESSION_STATES.CLOSED) {
+    const expected = replacement(snapshot.cumulativeAtomic);
+    if (options.policy.renewalBudgetAtomic !== undefined) {
+      const backend = await state.backend;
+      const available = await bounded(
+        backend?.availableBalance?.(opened.terms, signal) ??
+          Promise.resolve(null),
+        signal,
+      ).catch(() => null);
+      signal.throwIfAborted();
+      if (available === null)
+        throw new UnsentSellerChoiceError(
+          SESSION_CODES.STATUS_UNKNOWN,
+          quote.offer.nodeId,
+        );
+      const refundable =
+        BigInt(opened.terms.depositAtomic) - BigInt(snapshot.cumulativeAtomic);
+      if (BigInt(available) + refundable < BigInt(expected.depositAtomic))
+        throw new UnsentSellerChoiceError(
+          SESSION_CODES.LIMIT,
+          quote.offer.nodeId,
+        );
+    }
+  }
   const settlement = snapshot.channelId
     ? ((await opened.host.reconcile(signal)) ??
       (await start(() => opened.host.close(signal))))

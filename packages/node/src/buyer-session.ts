@@ -142,7 +142,7 @@ async function openCurrent<Remote extends BatchDestination>(
       renew(
         stored.snapshot.channelId,
         replacement,
-        options.policy.depositAtomic,
+        options.policy.renewalBudgetAtomic ?? options.policy.depositAtomic,
         switching,
       ),
     );
@@ -217,8 +217,11 @@ async function run<Remote extends BatchDestination>(
     return sessionFail(SESSION_CODES.UNVERIFIED);
   const opened = await current(state, quote, signal, start);
   if (
+    BigInt(opened.terms.depositAtomic) > BigInt(options.policy.depositAtomic) ||
     BigInt(opened.priorSpentAtomic) + BigInt(opened.terms.depositAtomic) >
-      BigInt(options.policy.depositAtomic) ||
+      BigInt(
+        options.policy.renewalBudgetAtomic ?? options.policy.depositAtomic,
+      ) ||
     opened.terms.withdrawDelaySeconds > options.policy.withdrawDelaySeconds ||
     opened.terms.protocolFeeBps !== PROTOCOL_FEE.bps ||
     opened.terms.treasury !== PROTOCOL_FEE.treasury ||
@@ -295,7 +298,8 @@ async function renewable<Remote extends BatchDestination>(
     backend.renew!(
       plan.channelId,
       plan.terms,
-      state.options.policy.depositAtomic,
+      state.options.policy.renewalBudgetAtomic ??
+        state.options.policy.depositAtomic,
       switching,
     ),
   );

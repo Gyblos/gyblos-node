@@ -51,6 +51,7 @@ interface Selection {
   maxAtomic?: string;
   requestId?: string;
   replacementAuthorized?: boolean;
+  renewExhausted?: boolean;
   pinnedNodeId?: string;
   credentialBlocked?: boolean;
   activeRequest?(id: string, sellerNodeId: string): boolean;
@@ -154,7 +155,15 @@ export async function paidChannelEligibility(
           ? null
           : SESSION_CODES.REPLACEMENT_REQUIRED,
       );
-    return remainingChannel(terms, snapshot, selection.maxAtomic);
+    const result = remainingChannel(terms, snapshot, selection.maxAtomic);
+    if (
+      result.blocker === SESSION_CODES.REPLACEMENT_REQUIRED &&
+      selection.renewExhausted &&
+      snapshot.state === SESSION_STATES.OPEN &&
+      snapshot.reservedAtomic === '0'
+    )
+      return { ...result, blocker: null };
+    return result;
   } catch {
     return unavailable(SESSION_CODES.STATUS_UNKNOWN);
   }

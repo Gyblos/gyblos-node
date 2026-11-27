@@ -106,3 +106,20 @@ void test('session policy authorizes a separate total deposit ceiling without ch
       { code: SESSION_CODES.INVALID },
     );
 });
+
+void test('a same-seller renewal budget preserves the per-channel cap and excludes pool authority', () => {
+  const input = {
+    depositAtomic: '10000',
+    renewalBudgetAtomic: '25000',
+    lifetimeMs: 3600000,
+  };
+  assert.equal(parseBuyerSessionPolicy(input).renewalBudgetAtomic, '25000');
+  for (const patch of [
+    { renewalBudgetAtomic: '9999' },
+    { renewalBudgetAtomic: '0' },
+    { totalDepositAtomic: '25000' },
+  ])
+    assert.throws(() => parseBuyerSessionPolicy({ ...input, ...patch }), {
+      code: SESSION_CODES.INVALID,
+    });
+});

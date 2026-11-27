@@ -15,6 +15,7 @@ const USAGE = `Usage: buyer <command> [options]
        buyer ${BUYER_COMMANDS.INIT} [--advanced] [--help]
        buyer ${BUYER_COMMANDS.SETUP}      (prepares the pinned tokenizer)
        buyer ${BUYER_COMMANDS.AUTO} <max input USDC/Mtok> <max output USDC/Mtok> | off
+       buyer ${BUYER_COMMANDS.BUDGET} <total USDC> | off
        buyer ${BUYER_COMMANDS.AGENT} <opencode|pi|codex|claude> [--write] [--context <tokens>] [--token-env <NAME>]
        buyer ${BUYER_COMMANDS.WITHDRAW}   (withdraws from closed payment channels)
 `;
@@ -31,6 +32,8 @@ export const BUYER_ROUTES: BuyerRoutes = {
   [BUYER_COMMANDS.SETUP]: async () => (await import('./setup')).main(),
   [BUYER_COMMANDS.AUTO]: async (args) =>
     (await import('./auto-cli')).main([...args]),
+  [BUYER_COMMANDS.BUDGET]: async (args) =>
+    (await import('./auto-cli')).main([...args], BUYER_COMMANDS.BUDGET),
   [BUYER_COMMANDS.AGENT]: async (args) =>
     (await import('./agent-cli')).main([...args]),
   [BUYER_COMMANDS.WITHDRAW]: async () =>

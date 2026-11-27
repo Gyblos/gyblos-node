@@ -259,6 +259,7 @@ function checkSelectedChannel(
           config.routing?.allowPinnedFallback
             ? undefined
             : config.pinnedNodeId,
+        renewExhausted: config.session?.renewalBudgetAtomic !== undefined,
         replacementAuthorized: await sellerReplacementAuthorized(
           config.discovery?.paidAuto === true,
           delegated,
