@@ -31,6 +31,7 @@ import { requireBuyerIdentity } from './identity';
 import { routedRequest } from './model-routes';
 import {
   automaticPoolRoute,
+  delegatedFreeResends,
   openDiscoveryRequest,
   selectAffordableAutoQuote,
   selectConfiguredThenOpen,
@@ -114,7 +115,7 @@ function sessionSelection(
   context: Context,
   options: BuyerStartupOptions,
   buyer: string,
-  request: Context['prepared']['config']['request'],
+  getRequest: () => Context['prepared']['config']['request'],
   input: Parameters<Awaited<ReturnType<BuyerExecutionFactory>>['execute']>[0],
   permission: Parameters<typeof reserveApiKey>[0],
   router: ReturnType<typeof sessionRouter> | undefined,
@@ -127,6 +128,7 @@ function sessionSelection(
     current: AbortSignal,
     route: Parameters<BuyerRoutePorts<ChatResult>['select']>[2],
   ) => {
+    const request = getRequest();
     const policy = {
       ...request,
       maxAtomic: permission?.ceiling(request.maxAtomic) ?? request.maxAtomic,
@@ -235,11 +237,14 @@ function sessionExecutor(
     const request = routedRequest(config.request, model);
     if (model?.sellerChoice && !permission && request.maxAtomic !== '0')
       await manager.prepareChoice(model.sellerChoice.expiresAt, signal);
+    const retries = delegatedFreeResends(
+      Boolean(permission && context.dependencies.resendAfterSend),
+    );
     const select = sessionSelection(
       context,
       options,
       buyer,
-      request,
+      () => retries.request(request),
       input,
       permission,
       router,
@@ -274,8 +279,10 @@ function sessionExecutor(
         () => {
           unfit = true;
         },
+        retries,
       ),
       paid: (winner, current, sending) => {
+        if (retries.failure()) throw retries.failure();
         if (model?.freeOnly) return sessionFail(SESSION_CODES.LIMIT);
         return observeBuyerExecution(
           context.dependencies,
@@ -314,7 +321,9 @@ function sessionExecutor(
             signal,
           )
     ).catch((error: unknown) => {
-      throw unfit ? unfitOutcome(error) : error;
+      throw unfit
+        ? unfitOutcome(error, retries.failure())
+        : retries.selectionError(error);
     });
     return { ...routed.result, execution: routed.kind };
   };
@@ -355,7 +364,6 @@ export async function startSessionQuoteRuntime(
     confirmKeyCharge: manager.confirmKeyCharge,
     inspectChannel: manager.inspectChannel,
     sellerChoice: true,
-    singlePaidChannel: !router && prepared.config.request.maxAtomic !== '0',
     reconcilePool: router
       ? () => checkDesktopPool(manager, () => router.activeRequests() > 0)
       : undefined,

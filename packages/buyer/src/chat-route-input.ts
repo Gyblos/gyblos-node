@@ -18,7 +18,7 @@ export interface ChatSettings {
   selection: ModelSelection;
   maxTokens: number;
   sellerChoice?: boolean;
-  singlePaidChannel?: boolean;
+  parallel?: number;
   paidAuto?: true;
   tools?: boolean; // true only where every request runs on the free channel
   // The models served by name; absent, `selection` is the one model.

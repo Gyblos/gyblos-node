@@ -7,6 +7,7 @@ import type { SellerTrace } from './network';
 export type ReplayRecord = Omit<ReplayTiming, 'text'> & {
   sellerCount: number;
   traced: boolean;
+  admissionMs: number | null;
   sellers: number[];
   waitsMs: number[];
 };
@@ -46,6 +47,7 @@ export function joinTraces(
       ...timing,
       sellerCount,
       traced: trace !== undefined,
+      admissionMs: trace ? round(trace.admittedAtMs - timing.startMs) : null,
       sellers: trace?.sellers ?? [],
       waitsMs: (trace?.waitsMs ?? []).map(round),
     };
@@ -82,6 +84,11 @@ export function summarize(records: ReplayRecord[]) {
     headersMs: spread(served.map((record) => record.headersMs ?? 0)),
     firstTokenMs: spread(served.map((record) => record.firstTokenMs!)),
     totalMs: spread(served.map((record) => record.totalMs)),
+    admissionMs: spread(
+      served.flatMap((record) =>
+        record.admissionMs === null ? [] : [record.admissionMs],
+      ),
+    ),
     sellerWaitMs: spread(served.flatMap((record) => record.waitsMs)),
     openingFirstTokenMs: served
       .filter((record) => record.turn === 0)

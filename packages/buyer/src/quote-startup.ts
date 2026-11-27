@@ -16,7 +16,10 @@ import type { ChatResult } from './free-sse';
 import type { BuyerExecutionFactory } from './free-startup';
 import { onBuyerSelectionFailure } from './free-telemetry';
 import { routedRequest } from './model-routes';
-import { selectConfiguredThenOpen } from './quote-selection';
+import {
+  delegatedFreeResends,
+  selectConfiguredThenOpen,
+} from './quote-selection';
 import type { BuyerSelectionConfig } from './selection-config';
 import { classifyPaidError } from './session-errors';
 import {
@@ -91,6 +94,9 @@ function quoteExecutor(
 ): Runtime['execute'] {
   return async (input, signal, onDelta, model, permission) => {
     let unfit = false;
+    const retries = delegatedFreeResends(
+      Boolean(permission && context.dependencies.resendAfterSend),
+    );
     const request = routedRequest(context.prepared.config.request, model);
     const routed = await executeBuyerQuote<ChatResult>(
       {
@@ -107,12 +113,12 @@ function quoteExecutor(
             },
             excluded,
             selectionSignal,
-            {
+            retries.request({
               ...request,
               maxAtomic:
                 permission?.ceiling(request.maxAtomic) ?? request.maxAtomic,
               ...(inferenceNeedsTools(input) ? { tools: true } : {}),
-            },
+            }),
           ).catch(
             onBuyerSelectionFailure(
               selectionSignal,
@@ -133,6 +139,7 @@ function quoteExecutor(
               () => {
                 unfit = true;
               },
+              retries.onResend,
             ),
           ),
         paid: async () => {
@@ -141,7 +148,9 @@ function quoteExecutor(
       },
       signal,
     ).catch((error: unknown) => {
-      throw unfit ? unfitOutcome(error) : error;
+      throw unfit
+        ? unfitOutcome(error, retries.failure())
+        : retries.selectionError(error);
     });
     return { ...routed.result, execution: routed.kind };
   };

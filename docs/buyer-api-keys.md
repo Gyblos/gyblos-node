@@ -12,6 +12,12 @@ lifetime spending limit. Two credentials are involved:
 You create and manage keys in the [desktop app](desktop.md). Keep the app and
 its local buyer running while a client uses a key.
 
+The endpoint admits up to four active or queued chat requests. A request waiting
+for an execution slot keeps its original deadline and cancellation signal, and
+acquires its delegated-key operation only when dispatched. After a possible free
+send, safe failover accepts only signed free quotes until the request completes
+and stops after the first visible output.
+
 ## Create a key
 
 1. In **Payments**, check that the local buyer is running. The app starts its

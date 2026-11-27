@@ -1,8 +1,9 @@
 // Verified seller snapshots for one selection: each configured seller's signed catalog and presence,
 // fetched in parallel within the snapshot deadline, and the local stats a failure updates.
+
 import { SELLER_BADGES } from '@gyblos/core/constants';
 import type { KnownSeller } from '@gyblos/core/seller-selection';
-import { PUBLIC_RECORD_KINDS } from '@gyblos/protocol/constants';
+import { CONTROL_CODES, PUBLIC_RECORD_KINDS } from '@gyblos/protocol/constants';
 import type { SignedPublicV2 } from '@gyblos/protocol/control-types';
 import { verifyPublicV2 } from '@gyblos/protocol/public-v2';
 
@@ -176,9 +177,13 @@ function connectFailed(
   return recordQuote(stats, seller.nodeId, false, 0, now, backoff);
 }
 
+type SnapshotDependencies = VerifiedSelectionDependencies & {
+  renewing?: Set<string>;
+};
+
 export async function refreshSnapshots(
   config: BuyerSelectionConfig,
-  dependencies: VerifiedSelectionDependencies,
+  dependencies: SnapshotDependencies,
   clients: Map<string, BuyerControlClient>,
   // Remembered signed catalogs used by this selection, by NodeId, for its quotes.
   recalled: Map<string, SignedPublicV2>,
@@ -266,7 +271,7 @@ async function beforeSnapshot(
 async function freshSnapshot(
   client: BuyerControlClient,
   seller: StaticControlSeller,
-  dependencies: VerifiedSelectionDependencies,
+  dependencies: SnapshotDependencies,
   now: () => number,
   deadline: AbortSignal,
   refusedDiscovery: () => void,
@@ -290,7 +295,7 @@ async function freshSnapshot(
 
 async function snapshotBatch(
   config: BuyerSelectionConfig,
-  dependencies: VerifiedSelectionDependencies,
+  dependencies: SnapshotDependencies,
   clients: Map<string, BuyerControlClient>,
   recalled: Map<string, SignedPublicV2>,
   now: () => number,
@@ -350,6 +355,13 @@ async function snapshotBatch(
             ].some((code) => error.code === code)
           )
             throw error;
+          const code = failureCode(error);
+          if (code === CONTROL_CODES.STALE) {
+            dependencies.renewing?.add(seller.nodeId);
+            dependencies.snapshots?.drop(seller.nodeId);
+            failed(SELLER_FAILURE_PHASES.CONNECT, code);
+            return undefined;
+          }
           const retryAt = connectFailed(
             seller,
             clients,
@@ -359,7 +371,7 @@ async function snapshotBatch(
             pinned,
             signal,
           );
-          failed(SELLER_FAILURE_PHASES.CONNECT, failureCode(error), retryAt);
+          failed(SELLER_FAILURE_PHASES.CONNECT, code, retryAt);
           return undefined;
         }
       }),

@@ -277,11 +277,10 @@ async function requestCandidate(
     );
     return quote;
   } catch (error) {
-    releaseInBackground(race, candidate.nodeId, config, dependencies, signal);
     if (
       !querySignal.aborted &&
-      remembered &&
-      CATALOG_CHANGED.has(sellerFailureCode(error))
+      (sellerFailureCode(error) === CONTROL_CODES.STALE ||
+        (remembered && CATALOG_CHANGED.has(sellerFailureCode(error))))
     ) {
       // A quote for a remembered catalog that the seller refused because it replaced the catalog or no
       // longer lists the model says the memory is out of date, not that the seller failed: it is asked
@@ -290,6 +289,7 @@ async function requestCandidate(
       stale.add(candidate.nodeId);
       throw error;
     }
+    releaseInBackground(race, candidate.nodeId, config, dependencies, signal);
     if (!querySignal.aborted) {
       // Its catalog may have changed or it may be gone: the next request verifies it again. A seller
       // that only lost the race keeps its snapshot.

@@ -61,6 +61,7 @@ import { httpDiagnostics, httpRequestLifecycle } from './http-diagnostics';
 import { listModels } from './model-list';
 import { type RoutedModel } from './model-routes';
 import { bearerAuthorizer } from './paid-token';
+import { executionSlots } from './session-serial';
 
 export type { ChatErrorClassifier, ChatErrorView } from './chat-errors';
 
@@ -81,17 +82,6 @@ function declaredTooLarge(request: IncomingMessage) {
   const length = Number(request.headers['content-length']);
   return Number.isFinite(length) && length > FREE_EXECUTION.requestBytes;
 }
-function atCapacity(
-  settings: ChatSettings,
-  keyId: string | undefined,
-  active: number,
-) {
-  const limit =
-    settings.singlePaidChannel && keyId
-      ? PAID_BUYER.singleChannelApiRequests
-      : TRANSPORT_LIMITS.maxConcurrent;
-  return active >= limit;
-}
 // The route's format for a request this endpoint can take now; anything else is answered here: the model
 // list, or a refusal before the body is read, so a stalled oversize body holds no slot.
 function admit(
@@ -111,6 +101,8 @@ function admit(
           ? FREE_BUYER_CODES.BUSY
           : undefined;
   if (code === undefined) return api;
+  if (code === FREE_BUYER_CODES.BUSY)
+    response.setHeader(FREE_BUYER.retryAfterHeader, '1');
   replyError(response, new FreeBuyerError(code), undefined, api);
   return undefined;
 }
@@ -271,6 +263,9 @@ export function freeBuyerHandler(
   const accept = buyerApiCaller(authorize, apiKeys, desktopPolicy);
   const observe = httpDiagnostics(diagnostics);
   let active = 0;
+  const schedule = executionSlots(
+    settings.parallel ?? TRANSPORT_LIMITS.maxConcurrent,
+  );
   return async (request: IncomingMessage, response: ServerResponse) => {
     const diagnostic = observe();
     const caller = await accept(request, response);
@@ -297,7 +292,7 @@ export function freeBuyerHandler(
       replyError(response, new FreeBuyerError(FREE_BUYER_CODES.INVALID));
       return;
     }
-    const full = atCapacity(settings, caller.keyId, active);
+    const full = active >= FREE_BUYER.maxHttpRequests;
     const api = admit(request, response, full, localApi);
     if (!api) {
       if (response.statusCode >= HTTP_STATUS.badRequest) diagnostic.refused();
@@ -305,12 +300,22 @@ export function freeBuyerHandler(
     }
     diagnostic.input();
     active++;
+    const scoped = buyerApiKeyExecutors(apiKeys, caller.keyId, execute, stream);
     try {
       await serveChat(
         request,
         response,
         settings,
-        buyerApiKeyExecutors(apiKeys, caller.keyId, execute, stream),
+        {
+          execute: (input, signal, delta, model) =>
+            schedule(signal, () => scoped.execute(input, signal, delta, model)),
+          stream:
+            scoped.stream &&
+            ((input, signal, delta, model) =>
+              schedule(signal, () =>
+                scoped.stream!(input, signal, delta, model),
+              )),
+        },
         api,
         requestMs,
         diagnostic,

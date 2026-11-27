@@ -132,6 +132,7 @@ export type ErrorDiagnosticCode =
 
 // Local non-streaming compatibility surface; execution wire codes stay protocol-owned.
 export const FREE_BUYER = {
+  maxHttpRequests: 4,
   completionObject: 'chat.completion',
   chunkObject: 'chat.completion.chunk',
   streamContentType: 'text/event-stream',
@@ -188,7 +189,6 @@ export const PAID_WITHDRAW_CODES = {
 // A deposit ceiling of zero: a free quote, or a selection.json that buys nothing.
 export const isFreeAtomic = (maxAtomic: string) => maxAtomic === '0';
 export const PAID_BUYER = {
-  singleChannelApiRequests: 4,
   // The whole request, from selection to the seller's terminal.
   requestMs: BUYER_PAID_TIMEOUTS.requestMs,
   // Checking the settlement on chain and recording the outcome, once the terminal arrived.

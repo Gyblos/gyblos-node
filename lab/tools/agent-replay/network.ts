@@ -33,6 +33,7 @@ export interface CooldownEvent {
 }
 
 export interface SellerTrace {
+  admittedAtMs: number;
   tag: string;
   sellers: number[];
   waitsMs: number[];
@@ -83,9 +84,11 @@ function traced(
   dependencies: FreeBuyerDependencies,
   nodes: string[],
   traces: Map<string, SellerTrace>,
+  origin: number,
 ): FreeChatStreamExecutor {
   return (input, signal, onDelta, model) => {
     const trace: SellerTrace = {
+      admittedAtMs: performance.now() - origin,
       tag: requestTag(input),
       sellers: [],
       waitsMs: [],
@@ -170,7 +173,7 @@ export async function startReplayNetwork(
           }),
       },
     );
-    const execute = traced(dependencies, nodes, traces);
+    const execute = traced(dependencies, nodes, traces, origin);
     const host = await startFreeBuyerHttp(
       (input, deadline, _onDelta, model) =>
         execute(input, deadline, async () => {}, model),
