@@ -170,3 +170,55 @@ void test('free HTTP cancellation reaches execution and admission rejects excess
     await server.close();
   }
 });
+
+void test('an authenticated Responses call expiring in the admission queue is a retryable unsent 504', async (t) => {
+  const { startFreeBuyerHttp } = await import('@gyblos/buyer/free-http');
+  const { FREE_BUYER, PAID_BUYER } = await import('@gyblos/buyer/constants');
+  const { BUYER_API } = await import('@gyblos/protocol/buyer-api');
+  const { batchDeferred } = await import('./support/batch-deferred');
+  const started = batchDeferred<void>();
+  const finish = batchDeferred<void>();
+  let calls = 0;
+  const token = 'T'.repeat(PAID_BUYER.tokenChars);
+  const host = await startFreeBuyerHttp(
+    async () => {
+      calls++;
+      started.resolve();
+      await finish.promise;
+      return {
+        text: 'done',
+        usage: { inputTokens: 1, outputTokens: 1 },
+        finishReason: ENGINE_DONE_REASONS.STOP,
+      };
+    },
+    {
+      selection: { modelId: 'synthetic', variant: null, quantization: null },
+      maxTokens: 10,
+      parallel: 1,
+    },
+    { port: 0, requestMs: 250, token },
+  );
+  t.after(async () => {
+    finish.resolve();
+    await host.close();
+  });
+  const send = () =>
+    fetch(new URL('/v1/responses', host.url), {
+      method: 'POST',
+      headers: { ...JSON_HEADERS, authorization: 'Bearer ' + token },
+      body: JSON.stringify({
+        model: 'synthetic',
+        input: 'hello',
+        max_output_tokens: 5,
+      }),
+    });
+  const running = send();
+  await started.promise;
+  const queued = await send();
+  assert.equal(queued.status, 504);
+  assert.equal((await queued.json()).error[BUYER_API.NEVER_SENT_FIELD], true);
+  assert.equal(queued.headers.get(FREE_BUYER.noRetryHeader), null);
+  assert.equal(calls, 1);
+  const active = await running;
+  assert.equal(active.status, 400);
+});

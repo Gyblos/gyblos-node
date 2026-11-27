@@ -21,3 +21,9 @@ export class AfterFreeDispatch extends Error {
     super();
   }
 }
+
+export class UnsentAdmissionTimeout extends FreeBuyerError {
+  constructor() {
+    super(FREE_BUYER_CODES.TIMEOUT);
+  }
+}

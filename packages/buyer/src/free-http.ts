@@ -51,6 +51,7 @@ import {
   type BuyerDesktopOptions,
 } from './desktop-api';
 import { FreeBuyerError } from './free-chat';
+import { UnsentAdmissionTimeout } from './free-chat-error';
 import {
   executeFreeSse,
   type ChatResult,
@@ -81,15 +82,24 @@ type ChatExecutors = {
 function scheduledExecutors(
   schedule: ReturnType<typeof executionSlots>,
   { execute, stream }: ReturnType<typeof buyerApiKeyExecutors>,
-): ChatExecutors {
+) {
+  let queued = false;
+  const enter = <T>(signal: AbortSignal, run: () => Promise<T>) => {
+    queued = true;
+    return schedule(signal, () => {
+      queued = false;
+      return run();
+    });
+  };
   return {
+    queued: () => queued,
     execute: (input, signal, delta, model) =>
-      schedule(signal, () => execute(input, signal, delta, model)),
+      enter(signal, () => execute(input, signal, delta, model)),
     stream:
       stream &&
       ((input, signal, delta, model) =>
-        schedule(signal, () => stream(input, signal, delta, model))),
-  };
+        enter(signal, () => stream(input, signal, delta, model))),
+  } satisfies ChatExecutors & { queued(): boolean };
 }
 function isJson(request: IncomingMessage) {
   const type = request.headers['content-type']?.split(';')[0]?.trim();
@@ -184,7 +194,7 @@ async function serveChat(
   request: IncomingMessage,
   response: ServerResponse,
   settings: ChatSettings,
-  scoped: ChatExecutors,
+  scoped: ReturnType<typeof scheduledExecutors>,
   api: ChatApi,
   requestMs: number,
   diagnostic: ReturnType<ReturnType<typeof httpDiagnostics>>,
@@ -200,7 +210,9 @@ async function serveChat(
       expireRequest(request, response, cancel, () =>
         replyError(
           response,
-          new FreeBuyerError(FREE_BUYER_CODES.TIMEOUT),
+          scoped.queued()
+            ? new UnsentAdmissionTimeout()
+            : new FreeBuyerError(FREE_BUYER_CODES.TIMEOUT),
           classify,
           api,
           format,

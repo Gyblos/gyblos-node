@@ -277,3 +277,39 @@ void test('a free failover before text may try the next signed free quote with t
   assert.equal(result.result, 'answer');
   assert.equal(sends, 2);
 });
+
+void test('after waiting for a busy free seller, its temporary pin does not survive a free failover', async (t) => {
+  const sellers = await Promise.all([freeSellerFixture(), freeSellerFixture()]);
+  const quotes = await Promise.all(
+    sellers.map(async (seller) => (await seller.request()).quote),
+  );
+  const ceilings = quotes[0]!.offer.prices;
+  const router = createBuyerRouter({
+    now: Date.now,
+    policy: parseBuyerRoutingPolicy({ onBusy: BUYER_BUSY_POLICIES.WAIT }),
+    priceCeilings: ceilings,
+    unresolved: async () => false,
+    reference: async () => undefined,
+  });
+  t.after(() => router.close());
+  let sends = 0;
+  const result = await router.execute(
+    {
+      select: async (excluded, _signal, route) => {
+        if (excluded.size) assert.equal(route.pinnedNodeId, undefined);
+        const quote = quotes[excluded.size]!;
+        return { nodeId: quote.offer.nodeId, quote };
+      },
+      free: async (winner, _signal, sending) => {
+        if (++sends === 1) throw new UnsentSellerBusyError(winner.nodeId);
+        sending?.();
+        return sends === 2 ? undefined : 'answer';
+      },
+      takeFreeResend: () => sends === 2,
+      paid: async () => assert.fail('paid fallback'),
+    },
+    AbortSignal.timeout(5000),
+  );
+  assert.equal(result.result, 'answer');
+  assert.equal(sends, 3);
+});

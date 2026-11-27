@@ -289,6 +289,7 @@ async function attempt<T>(
       current.throwIfAborted();
       request.wait?.dispose();
       request.wait = undefined;
+      if (request.waitingFor) request.pinnedNodeId = state.options.pinnedNodeId;
       request.waitingFor = undefined;
     });
     if (result === undefined)
