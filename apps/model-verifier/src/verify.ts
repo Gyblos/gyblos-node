@@ -65,6 +65,11 @@ export interface VerificationInput {
   now: () => number;
   onAnswer?: (index: number, failure?: UnscoredEvidence['code']) => void;
 }
+export interface VerificationOutput {
+  signed: SignedModelVerification;
+  answers: AnswerEvidence[];
+  unscored: UnscoredEvidence[];
+}
 
 const QUOTE_CODES = [
   ...Object.values(CONTROL_CODES),
@@ -165,11 +170,9 @@ function evidenceOf(
   };
 }
 
-export async function runVerification(input: VerificationInput): Promise<{
-  signed: SignedModelVerification;
-  answers: AnswerEvidence[];
-  unscored: UnscoredEvidence[];
-}> {
+export async function runVerification(
+  input: VerificationInput,
+): Promise<VerificationOutput> {
   const { set } = input;
   const setDigest = challengeSetDigest(set);
   const nonce = randomBytes(SECRET_BYTES).toString('hex');

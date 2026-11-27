@@ -291,6 +291,12 @@ export const RESPONSES_CODES = {
   field: 'gyblos_code',
 } as const;
 
+export const CONTEXT_FULL_ERRORS = {
+  openAi: (message: string) =>
+    `This request exceeds the model's maximum context length. ${message}`,
+  anthropic: (message: string) => `prompt is too long: ${message}`,
+} as const;
+
 export const FREE_CHAT_DETAILS = {
   // A seller's engine ran out of time (engine_timeout): before any text, it could not read a prompt this
   // size in time; after text, it could not finish. The failed seller loses weight, so a resend goes elsewhere.

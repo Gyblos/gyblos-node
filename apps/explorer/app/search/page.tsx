@@ -164,13 +164,13 @@ function catalogResults(
 ) {
   const models = modelRows(summarizeOffers(discovery).models, collector.models);
   const results = models
-    .filter((model) => modelMatches(model, term))
+    .filter((model) => modelMatches(model, term, discovery.models))
     .map((model) => (
       <tr key={modelKey(model)} className="border-t border-line">
         <td className={td}>Model</td>
         <td className={td}>
           <span className="block ps-2">
-            <ModelName {...model} />
+            <ModelName {...model} models={discovery.models} />
           </span>
         </td>
       </tr>

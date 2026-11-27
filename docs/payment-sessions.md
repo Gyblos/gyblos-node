@@ -314,6 +314,9 @@ Rerouting rules:
   original verified quote, unless `allowHigherPriceFallback` is true. Even then,
   it can't exceed the configured price ceilings or the per-request and total
   budgets. With the default rule, a free request can't become a paid one.
+- The same rule applies when a free seller's context cannot hold the
+  conversation: selection skips it before anything is sent and looks for a
+  replacement under the same price limit, in every `onBusy` mode.
 - A busy local seller's active quote is the price reference while it stays
   valid. An expired or missing reference returns busy instead of rerouting.
 - Every alternative passes fresh identity, replay, model, reasoning, network,

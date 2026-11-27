@@ -46,20 +46,23 @@ vendedor Docker con Compose y un vendedor nativo mediante su servicio (consulta
 
 ### start [#start]
 
-`gyblos start` ejecuta el nodo vendedor en primer plano con `GYBLOS_CONFIG`, o con `./config.toml`. La
-imagen Docker y el servicio en segundo plano lo ejecutan por ti. No arranques un segundo vendedor sobre el
-mismo home.
+`gyblos start` ejecuta el nodo vendedor en primer plano. Lee `GYBLOS_CONFIG`; sin ella, la versión
+empaquetada lee `config.toml` en su home y cualquier otra ejecución lee `./config.toml`. La imagen Docker
+y el servicio en segundo plano lo ejecutan por ti. No arranques un segundo vendedor sobre el mismo home.
+No acepta argumentos; los extra se rechazan con un error de uso.
 
 ### setup y tokenizer [#setup-y-tokenizer]
 
 `gyblos setup --role seller --mint MINT` crea las llaves de dueño, de nodo y de pago del vendedor e
 imprime su rol público. Conserva las llaves que ya existen y añade las llaves de pago a un vendedor que no
 las tiene. No contacta ningún RPC ni fondea nada. `gyblos tokenizer` descarga y verifica el tokenizador
-público fijado e imprime `Pinned tokenizer verified.` El instalador ejecuta ambos por ti.
+público fijado e imprime `Pinned tokenizer verified.` El instalador ejecuta ambos por ti. `gyblos
+tokenizer` no acepta argumentos; los extra se rechazan con un error de uso.
 
 ### --version [#version]
 
-`gyblos --version` imprime la versión publicada. Desde el código fuente imprime `source`.
+`gyblos --version` imprime la versión publicada. Desde el código fuente imprime `source`. No acepta
+argumentos; los extra se rechazan con un error de uso.
 
 ## Revisa la configuración [#valida-la-configuración-montada]
 
@@ -79,7 +82,7 @@ Cada comando elige su archivo de configuración de forma distinta:
 | Comando                                | Archivo de configuración                                       |
 | -------------------------------------- | -------------------------------------------------------------- |
 | `config validate`                      | `--config PATH`, si no `./config.toml`; ignora `GYBLOS_CONFIG` |
-| `start`, `doctor`, `seller init`       | `GYBLOS_CONFIG`, si no `./config.toml`                         |
+| `start`, `doctor`, `seller init`       | `GYBLOS_CONFIG`; si no, el que describe [`start`](#start)      |
 | `seller status`, `register`, `service` | No aceptan `--config`                                          |
 
 En el contenedor Docker, pasa `/config/config.toml` a `config validate` de forma explícita.

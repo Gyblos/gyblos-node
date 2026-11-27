@@ -36,6 +36,13 @@
       "when": 1795609718071,
       "tag": "0011_network_history",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1795728411190,
+      "tag": "0012_model_registry",
+      "breakpoints": true
     }
   ]
 }

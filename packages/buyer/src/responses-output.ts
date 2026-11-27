@@ -9,7 +9,8 @@ import { ENGINE_DONE_REASONS } from '@gyblos/protocol/constants';
 import type { FreeExecutionStop } from '@gyblos/protocol/free-execution';
 
 import type { ChatErrorBody } from './chat-api';
-import { CHAT_MESSAGE_DETAILS, FREE_BUYER, RESPONSES_CODES } from './constants';
+import { FREE_BUYER, RESPONSES_CODES } from './constants';
+import { contextFull } from './context-full';
 import {
   executionFields,
   paymentFields,
@@ -101,22 +102,17 @@ export function responsesCompletion(model: string, result: ChatResult) {
 // A conversation over this endpoint's size or message count, or one a seller refused as longer than it
 // serves before generating anything, is reported with the code Codex reads as a full context, so it
 // compacts the history and goes on instead of stopping.
-const FULL = new Set<string>([
-  CHAT_MESSAGE_DETAILS.content,
-  CHAT_MESSAGE_DETAILS.count,
-]);
 export const responsesError = (body: ChatErrorBody) => ({
   error: {
     message: body.message,
     type: FREE_BUYER.errorType,
     param: body.param,
-    code:
-      body.contextFull || (body.neverSent && FULL.has(body.message))
-        ? RESPONSES_CODES.contextFull
-        : !body.neverSent
-          ? RESPONSES_CODES.stopped
-          : body.code,
-    ...(!body.neverSent || FULL.has(body.message)
+    code: contextFull(body)
+      ? RESPONSES_CODES.contextFull
+      : !body.neverSent
+        ? RESPONSES_CODES.stopped
+        : body.code,
+    ...(!body.neverSent || contextFull(body)
       ? { [RESPONSES_CODES.field]: body.code }
       : {}),
     ...body.extra,

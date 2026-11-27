@@ -73,8 +73,9 @@ export GYBLOS_API_KEY=YOUR_API_KEY
 Reemplaza `YOUR_API_KEY` por la key que copiaste.
 
 Cuando la app no puede saber el tamaño de contexto de un modelo, la configuración usa 32.768 tokens de
-contexto, y el límite de salida es el límite de respuesta del comprador. Un vendedor aún puede ofrecer una
-ventana menor y rechazar una solicitud. Cuando cambien los modelos, elige **Write
+contexto, y el límite de salida es el límite de respuesta del comprador. El comprador acorta el límite de
+respuesta para que quepa en el vendedor que elige. Si la conversación no cabe, tu herramienta recibe un
+error estándar de "contexto demasiado largo" y compacta la conversación en vez de detenerse. Cuando cambien los modelos, elige **Write
 configuration** otra vez.
 
 Luego elige un modelo de Gyblos con `/models` (OpenCode), `/model` (pi y Claude Code) o

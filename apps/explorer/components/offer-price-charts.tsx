@@ -3,11 +3,18 @@
 import { useState } from 'react';
 
 import { count, short, usdcDecimal, utcMinute } from '../lib/format';
+import type { CatalogModels } from '../lib/model-catalog';
+import type { GithubAccount } from '../lib/network-status';
 import type { getOfferPriceHistory } from '../lib/offer-price-history';
 import { BarChartCard } from './board/bar-chart-card';
 import { Select } from './board/select';
 import { SellerCell } from './seller-cell';
 import { ModelName } from './ui';
+
+export interface SellerIdentity {
+  name: string | null;
+  github: GithubAccount | null;
+}
 
 type Series = Awaited<
   ReturnType<typeof getOfferPriceHistory>
@@ -16,9 +23,13 @@ type Series = Awaited<
 export function OfferPriceCharts({
   series,
   bySeller,
+  models,
+  sellers = {},
 }: {
   series: Series[];
   bySeller: boolean;
+  models?: CatalogModels;
+  sellers?: Readonly<Record<string, SellerIdentity>>;
 }) {
   const [key, setKey] = useState('');
   const selected = series.find((item) => item.key === key) ?? series[0];
@@ -39,9 +50,13 @@ export function OfferPriceCharts({
     <>
       <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
         {bySeller ? (
-          <SellerCell nodeId={selected.nodeId} github={null} />
+          <SellerCell
+            nodeId={selected.nodeId}
+            name={sellers[selected.nodeId]?.name ?? null}
+            github={sellers[selected.nodeId]?.github ?? null}
+          />
         ) : (
-          <ModelName {...selected} />
+          <ModelName {...selected} models={models} />
         )}
         {options.length > 1 ? (
           <Select

@@ -9,5 +9,6 @@
   "0008_claim_signature.sql": "c69221ffdbf755dd1a5bb6cdda97ce3626df42a67149e0ca6b5564512afd90e9",
   "0009_seller_profiles.sql": "8773b103e8f1d9341bb30cfd5ea736093fbd71c018a5e246ab9ca37df6d82eba",
   "0010_offer_history.sql": "24ffc3140efde8b4db47196cd2dadf818b676a3db7e86e44e69f9df08962c318",
-  "0011_network_history.sql": "37332038ac4058c48f2296fdbe221dde9d1642ce892731b95be13c4e969a2060"
+  "0011_network_history.sql": "37332038ac4058c48f2296fdbe221dde9d1642ce892731b95be13c4e969a2060",
+  "0012_model_registry.sql": "896c2ddd906cf644a970c8be6b45a858b34efa4ba2566cdb8dbfbe6b994c8604"
 }

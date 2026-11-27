@@ -119,6 +119,7 @@ void test('llms.txt states the range presets, the buyer threshold, the longest r
     `\`${INDEX_ROUTES.SELLERS}?model=`,
     `\`${INDEX_ROUTES.UPTIME}?node=`,
     `\`${INDEX_ROUTES.NETWORK}\``,
+    `\`${INDEX_ROUTES.NETWORK_HISTORY}?days=`,
     `${collector}${COLLECTOR_ROUTES.STATS_NETWORK})`,
     `\`${COLLECTOR_ROUTES.STATS_MODELS}\``,
     `\`${COLLECTOR_ROUTES.STATS_CHAIN}\``,

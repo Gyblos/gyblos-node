@@ -51,6 +51,9 @@ The verifier is open source, so anyone with [Ollama](https://ollama.com) and the
 same check against a seller and get a result they can compare. The steps to run it are in the
 [model verifier design note](https://github.com/Gyblos/gyblos-node/blob/develop/docs/model-verifier.md#run-it) in the repository.
 
-A run writes the signed result and an evidence file next to it. The evidence keeps the prompts, the answers and
-every check, plus any reply that could not be scored and why, so someone else can review how the verdict was
-reached.
+A run writes the signed result and an evidence file together in a new directory. Publication is atomic for
+readers, but it does not fsync the files or directories, so an operating-system crash or power loss can still
+lose the new directory or leave incomplete artifacts. If you pass `--out`, choose a path that does not already
+exist. The evidence keeps the prompts, the answers and every check, plus any reply that could not be scored and
+why, so someone else can review how the verdict was reached. `check` also rejects a result whose evidence counts
+cannot fit the published challenge set before printing its verdict.

@@ -89,6 +89,14 @@ settings for its local payment-channel records.
   not establish the outcome of earlier attempts. Check confirmed chain state and
   local recovery status before considering a retry.
 
+- **Model verifier output publication.** Component `model-verifier`, operation
+  `publish-output`, phase `cleanup`: failure to remove the temporary staging
+  directory after output publication fails. The only code is
+  `OUTPUT_CLEANUP_FAILED`, with outcome `cleanup_failure` and a fixed cause
+  category. The one-shot verifier command emits the content-free record as JSON
+  on stderr before its separate `ok:false` result; it is not stored in buyer,
+  seller or lab diagnostic logs.
+
 - **Cleanup.** `withDiagnosticCleanup` records cleanup failures separately and
   preserves the original thrown value, including `undefined`. A cleanup failure
   after successful work still fails the operation. Nested receipt-startup
@@ -96,7 +104,7 @@ settings for its local payment-channel records.
   startup error.
 
 Other seller, transport, discovery and payment paths write no diagnostics. Other
-service output does not pass through this channel.
+service output does not pass through this channel unless listed above.
 
 ## Record contract
 
