@@ -268,7 +268,6 @@ export const DEMO_ACCOUNT = {
   UNITS_PER_CREDIT: 1000,
   DEFAULT_BUDGET: 2,
   TOAST_MS: 3000,
-  SAMPLE_REQUESTS: 4,
 } as const;
 export const NAVIGATION_WIDTH = { MIN: 224, DEFAULT: 224, MAX: 360 } as const;
 export const HISTORY_KEY = {

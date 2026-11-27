@@ -351,17 +351,6 @@
   min-width: 180px;
   max-width: 360px;
 }
-.desktop-frame .ui-segmented {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 2px;
-  background: var(--side-elevated);
-}
-.desktop-frame .ui-segmented .ui-button[aria-pressed='true'] {
-  color: var(--selected-ink);
-  background: var(--selected-surface);
-}
 .desktop-frame .ui-section-title {
   display: flex;
   align-items: center;
@@ -1391,11 +1380,6 @@
 .desktop-frame .sidebar-controls,
 .desktop-frame > .topbar {
   --control-size: var(--shell-control-size);
-}
-.desktop-frame .sidebar-controls .ui-segmented {
-  padding: 0;
-  gap: 2px;
-  background: var(--raised);
 }
 .ui-tooltip {
   position: fixed;
