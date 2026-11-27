@@ -6,7 +6,8 @@ import {
   REASONING_LEVELS,
 } from '@gyblos/protocol/constants';
 
-import { ACCEPTANCE_MODES } from './constants';
+import { ACCEPTANCE_MODES, type AcceptanceMode } from './constants';
+import type { EnginePace } from './engine';
 import { FREE_ACCEPTANCE } from './free-constants';
 import { createAcceptanceSession, type AcceptanceSession } from './session';
 
@@ -16,11 +17,17 @@ export async function createFreeSeller(
     Pick<AcceptanceSession, 'index' | 'clock' | 'admissionClock'>
   >,
   limited = false,
+  engine: {
+    mode?: AcceptanceMode;
+    pace?: EnginePace;
+    caps?: { dailyTokenCap: number; perBuyerCap: number };
+  } = {},
 ) {
   const run = await createAcceptanceSession(
-    ACCEPTANCE_MODES.SYNTHETIC,
+    engine.mode ?? ACCEPTANCE_MODES.SYNTHETIC,
     signal,
     {
+      pace: engine.pace,
       index: shared?.index,
       clock: shared?.clock,
       admissionClock: shared?.admissionClock,
@@ -29,12 +36,16 @@ export async function createFreeSeller(
         modelId: MODEL_IDS.QWEN3_0_6B,
         reasoning: [REASONING_LEVELS.OFF],
         caps: {
-          dailyTokenCap: limited
-            ? FREE_ACCEPTANCE.limitedDailyCap
-            : FREE_ACCEPTANCE.dailyTokenCap,
-          perBuyerCap: limited
-            ? FREE_ACCEPTANCE.limitedBuyerCap
-            : FREE_ACCEPTANCE.perBuyerCap,
+          dailyTokenCap:
+            engine.caps?.dailyTokenCap ??
+            (limited
+              ? FREE_ACCEPTANCE.limitedDailyCap
+              : FREE_ACCEPTANCE.dailyTokenCap),
+          perBuyerCap:
+            engine.caps?.perBuyerCap ??
+            (limited
+              ? FREE_ACCEPTANCE.limitedBuyerCap
+              : FREE_ACCEPTANCE.perBuyerCap),
           maxOutputTokens: FREE_ACCEPTANCE.maxOutputTokens,
         },
       },
