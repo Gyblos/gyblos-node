@@ -8,6 +8,7 @@ import test from 'node:test';
 
 import { REGISTRATION } from '@gyblos/discovery-index/constants';
 import { STATUS_RESULTS } from '@gyblos/node-app/constants';
+import { BUYER_KEY_CODES } from '@gyblos/protocol/buyer-api-keys';
 
 const ROOT = join(import.meta.dirname, '..');
 const CONTENT = join(ROOT, 'apps/docs/content/docs');
@@ -184,12 +185,13 @@ void test('buyer error tables identify spending review responses for each API', 
     const rows = text
       .split('\n')
       .filter(
-        (line) =>
-          line.startsWith('|') && line.includes('BUYER_KEY_NEEDS_REVIEW'),
+        (line) => line.startsWith('|') && line.includes(BUYER_KEY_CODES.REVIEW),
       )
       .join('\n');
-    assert.match(rows, /503 \(Chat Completions/, path);
+    assert.match(rows, /503 \(Chat Completions, Anthropic Messages\)/, path);
     assert.match(rows, /400 \(Responses\)/, path);
     assert.match(text, /x-should-retry: false/, path);
+    assert.match(text, /`response\.failed`/, path);
+    assert.match(text, /`response\.error\.gyblos_code`/, path);
   }
 });

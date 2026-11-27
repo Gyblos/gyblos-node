@@ -279,7 +279,9 @@ se cierra solo cuando el vendedor termina, y `usage` cuenta todo lo que generó.
 | 503 (Chat Completions, Anthropic Messages), 400 (Responses) `BUYER_KEY_NEEDS_REVIEW` | El registro de API keys requiere revisión. Consulta su estado en **Connections**.                 |
 | 504                                                                                  | El vendedor no respondió a tiempo                                                                 |
 
-El comprador envía `x-should-retry: false`. Configura el cliente para detener los reintentos automáticos mientras el registro requiera revisión. En Responses, si la solicitud pudo haberse enviado, el código de Gyblos aparece en `error.gyblos_code`.
+La tabla indica el estado HTTP antes de enviar las cabeceras de respuesta. Cuando el registro requiere revisión, el comprador envía `x-should-retry: false`. Configura el cliente para detener los reintentos automáticos mientras dure la revisión. En el cuerpo JSON de un rechazo por revisión de claves en Responses, el código de Gyblos aparece en `error.code` si se verificó que la solicitud no se envió, o en `error.gyblos_code` si pudo haberse enviado.
+
+Una vez iniciado el stream, el estado HTTP sigue siendo 200. Chat Completions envía un último evento de datos con `error.code`. Anthropic Messages envía un evento `error` con `error.code`. Responses envía un evento `response.failed` con `response.error.gyblos_code`.
 
 Los errores usan la forma de cada API, así que los SDK lanzan sus excepciones habituales. Para otros
 problemas, consulta [Solución de problemas](/es/help/troubleshooting#escritorio-y-comprador-local).

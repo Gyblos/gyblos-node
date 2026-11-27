@@ -4,6 +4,7 @@ import { test } from 'node:test';
 
 import { CHAT_ROUTES, FREE_BUYER } from '@gyblos/buyer/constants';
 import { startFreeBuyerHttp } from '@gyblos/buyer/free-http';
+import { ROUTES } from '@gyblos/config';
 import {
   desktopBuyerFailure,
   DesktopBuyerFailure,
@@ -14,9 +15,12 @@ import { BUYER_API, parseBuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 import {
   BUYER_API_KEYS,
   BUYER_KEY_CODES,
+  BuyerApiKeyError,
   parseBuyerApiKeysReply,
 } from '@gyblos/protocol/buyer-api-keys';
 import { ENGINE_DONE_REASONS, MODEL_IDS } from '@gyblos/protocol/constants';
+
+import { events, host, MODEL } from './support/buyer-responses';
 
 async function fixture() {
   const scope = {
@@ -275,5 +279,69 @@ void test('an uncertain delegated payment blocks operator Chat and new grants wi
   } finally {
     await f.host.close();
     await f.keys.close();
+  }
+});
+
+void test('the three APIs keep the HTTP stream status and expose the key review in their terminal event', async () => {
+  let started = false;
+  const server = await host(async (delta) => {
+    if (started) await delta('partial');
+    throw new BuyerApiKeyError(BUYER_KEY_CODES.REVIEW);
+  }, []);
+  try {
+    for (const sendDelta of [false, true]) {
+      started = sendDelta;
+      for (const path of [
+        ROUTES.inference,
+        CHAT_ROUTES.messages,
+        CHAT_ROUTES.responses,
+      ]) {
+        const responses = path === CHAT_ROUTES.responses;
+        const response = await fetch(new URL(path, server.url), {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            model: MODEL,
+            stream: true,
+            ...(responses
+              ? { input: 'synthetic' }
+              : {
+                  messages: [{ role: 'user', content: 'synthetic' }],
+                  max_tokens: 32,
+                }),
+          }),
+        });
+        assert.equal(response.headers.get(FREE_BUYER.noRetryHeader), 'false');
+        if (!started) {
+          assert.equal(response.status, responses ? 400 : 503);
+          const body = await response.json();
+          assert.equal(
+            responses
+              ? body.error[BUYER_API.ERROR_CODE_FIELD]
+              : body.error.code,
+            BUYER_KEY_CODES.REVIEW,
+          );
+          continue;
+        }
+        assert.equal(response.status, 200);
+        assert.match(
+          response.headers.get('content-type') ?? '',
+          /text\/event-stream/,
+        );
+        const event = events(await response.text()).at(-1);
+        if (responses) {
+          assert.equal(event.type, 'response.failed');
+          assert.equal(
+            event.response.error[BUYER_API.ERROR_CODE_FIELD],
+            BUYER_KEY_CODES.REVIEW,
+          );
+        } else {
+          if (path === CHAT_ROUTES.messages) assert.equal(event.type, 'error');
+          assert.equal(event.error.code, BUYER_KEY_CODES.REVIEW);
+        }
+      }
+    }
+  } finally {
+    await server.close();
   }
 });

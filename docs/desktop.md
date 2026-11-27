@@ -135,8 +135,10 @@ conversation content is not encrypted.
   establish a charge for the specific turn. Check status on a key review reads
   whether the authenticated key ledger currently allows requests. A key review
   refusal asks clients to stop automatic retries. Each client controls its retry
-  behavior. Chat Completions returns HTTP 503 with `x-should-retry: false` and
-  Responses returns HTTP 400 with the same header. For interrupted paid
+  behavior. Before streaming starts, a review refusal returns HTTP 503 for Chat
+  Completions and Anthropic Messages or HTTP 400 for Responses, with
+  `x-should-retry: false` in each case. A stream that has already started keeps
+  HTTP 200 and signals the failure in its final event. For interrupted paid
   responses it can reconcile local spending records against verified payment
   evidence. When the original session is unavailable, review the payment history
   in Payments.

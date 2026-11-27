@@ -117,10 +117,16 @@ free offers only; restart the buyer afterwards.
 | `BUYER_KEY_REVOKED`       | 403                                                         | The key was revoked; nothing was sent                                 |
 | `BUYER_KEY_NEEDS_REVIEW`  | 503 (Chat Completions, Anthropic Messages), 400 (Responses) | The key ledger requires review before accepting new requests.         |
 
-The buyer sends `x-should-retry: false` with a key review refusal. Clients
-should stop automatic retries until the ledger allows new requests. In a
-Responses error after possible dispatch, the original Gyblos code appears in
-`error.gyblos_code`.
+The table gives the HTTP status before the response headers are sent. For a key
+review, the buyer sends `x-should-retry: false`. Configure your client to stop
+automatic retries while the ledger requires review. For a key review in a
+Responses JSON body, the Gyblos code appears in `error.code` for a verified
+unsent request or `error.gyblos_code` after possible dispatch.
+
+Once streaming starts, the HTTP status stays 200. Chat Completions sends a final
+data event with `error.code`. Anthropic Messages sends an `error` event with
+`error.code`. Responses sends a `response.failed` event with
+`response.error.gyblos_code`.
 
 A refusal for local validation, such as input that does not fit the model's
 context, leaves the key usable; it is not an uncertain payment.
