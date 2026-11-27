@@ -1,6 +1,5 @@
 // Static desktop explanations for validated buyer failures; remote text is never displayed.
 // Presentation does not change retry decisions, budget reservations or payment uncertainty.
-import { RESPONSES_CODES } from '@gyblos/buyer/constants';
 import {
   BUYER_ROUTING_CODES,
   SELLER_SELECTION_CODES,
@@ -152,8 +151,8 @@ export function desktopBuyerFailure(
       true,
     );
   const reportedCode =
-    row.code === RESPONSES_CODES.contextFull &&
-    row[RESPONSES_CODES.field] === FREE_EXECUTION_CODES.LIMIT &&
+    row.code === BUYER_API.CONTEXT_LENGTH_EXCEEDED &&
+    row[BUYER_API.ERROR_CODE_FIELD] === FREE_EXECUTION_CODES.LIMIT &&
     typeof row[BUYER_API.NEVER_SENT_FIELD] === 'boolean'
       ? FREE_EXECUTION_CODES.LIMIT
       : row.code;

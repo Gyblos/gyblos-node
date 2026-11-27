@@ -1,6 +1,7 @@
 // The local chat endpoint's request vocabulary for the OpenAI and Anthropic formats: which fields are
 // served, which are accepted and ignored because they do not change what is asked, and which are refused
 // unless they hold the value that changes nothing. Refusal text is fixed and never quotes the request.
+import { BUYER_API } from '@gyblos/protocol/buyer-api';
 import { FREE_CHAT_ROLES, FREE_EXECUTION } from '@gyblos/protocol/constants';
 
 export const FREE_CHAT_FIELDS = {
@@ -284,11 +285,11 @@ export const RESPONSES_CHAT = {
 
 // Codes Codex CLI acts on: a full context makes it compact, and invalid_prompt stops without retrying.
 export const RESPONSES_CODES = {
-  contextFull: 'context_length_exceeded',
+  contextFull: BUYER_API.CONTEXT_LENGTH_EXCEEDED,
   stopped: 'invalid_prompt',
   stoppedMessage: (code: string) =>
     `The request may have been sent (${code}). It will not be retried automatically.`,
-  field: 'gyblos_code',
+  field: BUYER_API.ERROR_CODE_FIELD,
 } as const;
 
 export const CONTEXT_FULL_ERRORS = {
