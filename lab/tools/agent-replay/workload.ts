@@ -1,0 +1,49 @@
+import { performance } from 'node:perf_hooks';
+
+import { replayRequest, type ReplayMessage, type ReplayTiming } from './client';
+import { AGENT_REPLAY, REPLAY_ROLES, type ReplayRole } from './constants';
+
+const SYSTEMS: Record<ReplayRole, string> = {
+  [REPLAY_ROLES.TITLE]: AGENT_REPLAY.prompts.title,
+  [REPLAY_ROLES.SUMMARY]: AGENT_REPLAY.prompts.summary,
+  [REPLAY_ROLES.MAIN]: AGENT_REPLAY.prompts.main,
+};
+
+function padding(turn: number) {
+  return ` context-${turn}`.repeat(
+    Math.ceil(AGENT_REPLAY.turnChars / ` context-${turn}`.length),
+  );
+}
+
+export async function replayAgentSession(url: string, signal: AbortSignal) {
+  const origin = performance.now();
+  const timings: ReplayTiming[] = [];
+  let sequence = 0;
+  const history: ReplayMessage[] = [
+    { role: 'user', content: AGENT_REPLAY.prompts.task },
+  ];
+  const send = (role: ReplayRole, turn: number) => {
+    const tag = `${AGENT_REPLAY.tagPrefix}${++sequence}`;
+    const messages: ReplayMessage[] = [
+      { role: 'system', content: SYSTEMS[role] },
+      ...history.slice(0, -1),
+      { ...history.at(-1)!, content: `${history.at(-1)!.content} ${tag}` },
+    ];
+    return replayRequest(url, { tag, role, turn, messages }, origin, signal);
+  };
+  const opening = await Promise.all([
+    send(REPLAY_ROLES.TITLE, 0),
+    send(REPLAY_ROLES.SUMMARY, 0),
+    send(REPLAY_ROLES.MAIN, 0),
+  ]);
+  timings.push(...opening);
+  for (let turn = 1; turn <= AGENT_REPLAY.loopTurns; turn++) {
+    const previous = timings.at(-1)!;
+    history.push(
+      { role: 'assistant', content: previous.text || 'calling a tool' },
+      { role: 'user', content: `${AGENT_REPLAY.prompts.tool}${padding(turn)}` },
+    );
+    timings.push(await send(REPLAY_ROLES.MAIN, turn));
+  }
+  return timings;
+}

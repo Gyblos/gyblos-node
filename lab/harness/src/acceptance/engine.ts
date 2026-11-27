@@ -1,5 +1,7 @@
 // Wraps a synthetic or explicitly selected local engine with labelled busy/failure injection.
 // Never records prompts, responses or engine errors; no payments, RPC or automatic model downloads.
+import { setTimeout as delay } from 'node:timers/promises';
+
 import { DIAGNOSTICS } from '@gyblos/config';
 import { GENERATION, MODEL } from '@gyblos/engine-ollama/constants';
 import { createOllamaEngine } from '@gyblos/engine-ollama/engine';
@@ -19,7 +21,26 @@ import {
 } from './constants';
 import { AcceptanceError } from './errors';
 
-function syntheticEngine(): Engine {
+export interface EnginePace {
+  firstTokenMs: number;
+  tokenMs: number;
+  tokens: number;
+}
+const INSTANT: EnginePace = { firstTokenMs: 0, tokenMs: 0, tokens: 0 };
+
+async function pacedText(
+  input: Parameters<Engine['generate']>[0],
+  pace: EnginePace,
+) {
+  for (let token = 0; token < pace.tokens; token++) {
+    await delay(token ? pace.tokenMs : pace.firstTokenMs, undefined, {
+      signal: input.signal,
+    });
+    await input.onText?.(' t');
+    input.signal?.throwIfAborted();
+  }
+}
+function syntheticEngine(pace: EnginePace = INSTANT): Engine {
   return {
     describe: async () => ({
       name: MODEL.name,
@@ -34,16 +55,19 @@ function syntheticEngine(): Engine {
       modelIdentity: MODEL_IDENTITIES.DIGEST,
     }),
     generate: async (input) => {
-      await input.onText?.('syn');
-      input.signal?.throwIfAborted();
-      await input.onText?.('thetic');
-      input.signal?.throwIfAborted();
+      if (pace.tokens) await pacedText(input, pace);
+      else {
+        await input.onText?.('syn');
+        input.signal?.throwIfAborted();
+        await input.onText?.('thetic');
+        input.signal?.throwIfAborted();
+      }
       return {
-        text: 'synthetic',
+        text: pace.tokens ? ' t'.repeat(pace.tokens) : 'synthetic',
         finishReason: ENGINE_DONE_REASONS.STOP,
         usage: {
           inputTokens: 1,
-          outputTokens: 1,
+          outputTokens: Math.max(1, pace.tokens),
           totalDurationNs: 1,
           loadDurationNs: 0,
           inputDurationNs: 0,
@@ -53,11 +77,14 @@ function syntheticEngine(): Engine {
     },
   };
 }
-export function createAcceptanceEngine(mode: AcceptanceMode) {
+export function createAcceptanceEngine(
+  mode: AcceptanceMode,
+  pace?: EnginePace,
+) {
   const source =
     mode === ACCEPTANCE_MODES.OLLAMA
       ? createOllamaEngine(GATE_HOSTS.ollama)
-      : syntheticEngine();
+      : syntheticEngine(pace);
   let failed = false;
   let generations = 0;
   let attempts = 0;

@@ -39,7 +39,10 @@
     "./acceptance/errors": "./src/acceptance/errors.ts",
     "./acceptance/tools": "./src/acceptance/tools-run.ts",
     "./acceptance/tools-diagnostics": "./src/acceptance/tools-diagnostics.ts",
-    "./acceptance/tools-constants": "./src/acceptance/tools-constants.ts"
+    "./acceptance/tools-constants": "./src/acceptance/tools-constants.ts",
+    "./acceptance/free-session": "./src/acceptance/free-session.ts",
+    "./acceptance/native": "./src/acceptance/native.ts",
+    "./acceptance/clock": "./src/acceptance/clock.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",

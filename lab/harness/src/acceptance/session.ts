@@ -9,7 +9,7 @@ import { NODE_KEY_BYTES } from '@gyblos/node/constants';
 
 import { createAcceptanceClock, type AcceptanceClock } from './clock';
 import type { AcceptanceMode } from './constants';
-import { createAcceptanceEngine } from './engine';
+import { createAcceptanceEngine, type EnginePace } from './engine';
 import {
   startAcceptanceHost,
   type AcceptanceHost,
@@ -28,10 +28,11 @@ export async function createAcceptanceSession(
   > & {
     index?: AcceptanceIndex;
     clock?: AcceptanceClock;
+    pace?: EnginePace;
   } = {},
 ) {
   const workspace = await createAcceptanceWorkspace();
-  const engine = createAcceptanceEngine(mode);
+  const engine = createAcceptanceEngine(mode, extras.pace);
   let host: AcceptanceHost | undefined;
   let closeWire: (() => Promise<void>) | undefined;
   try {

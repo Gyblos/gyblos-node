@@ -65,7 +65,8 @@
     "buyer:init": "node --import tsx apps/buyer/src/bin.ts init",
     "explorer:dev": "pnpm --filter @gyblos/explorer dev",
     "explorer:build": "pnpm --filter @gyblos/explorer build",
-    "desktop:preview:build": "node --import tsx lab/tools/desktop-preview/build.ts"
+    "desktop:preview:build": "node --import tsx lab/tools/desktop-preview/build.ts",
+    "lab:agent-replay": "node --import tsx lab/tools/agent-replay/cli.ts"
   },
   "dependencies": {
     "@gyblos/buyer": "workspace:*",
