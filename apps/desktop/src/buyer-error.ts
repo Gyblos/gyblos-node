@@ -167,6 +167,7 @@ export function desktopBuyerFailure(
     ? new DesktopBuyerFailure(
         code,
         explanation(code, row.reason, policy.maxAtomic === '0'),
+        row[BUYER_API.NEVER_SENT_FIELD] === true,
       )
     : new Error('Buyer did not complete the request');
 }

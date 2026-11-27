@@ -21,6 +21,7 @@ import {
   FREE_EXECUTION_STOP_REASONS,
 } from '@gyblos/protocol/constants';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
+import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
 import { desktopAgentFixture } from './support/desktop-agent';
 import { frame, policy } from './support/desktop-stream';
@@ -188,6 +189,8 @@ for (const [code, neverSent, reason] of [
   [PAID_EXECUTION_CODES.EXPIRED, false, undefined],
   [BUYER_API.TOKENIZER_UNAVAILABLE, true, BUYER_API.TOKENIZER_UNAVAILABLE],
   [PAID_EXECUTION_CODES.PEER, true, PAID_EXECUTION_CODES.PEER],
+  [SESSION_CODES.BINDING, true, 'not-sent'],
+  [SESSION_CODES.BINDING, false, undefined],
   ['UNKNOWN_CODE', true, undefined],
 ] as const) {
   void test(`the buyer handler validates the turn reason for ${code} (never sent: ${neverSent})`, async () => {
