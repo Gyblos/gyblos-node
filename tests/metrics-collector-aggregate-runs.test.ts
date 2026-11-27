@@ -14,6 +14,7 @@ import {
   insertReceipt,
   NOW,
 } from './support/metrics-collector-aggregates';
+import { day, instruction, tx } from './support/metrics-collector-chain-rows';
 import { createCollectorD1 } from './support/metrics-collector-d1';
 
 // node:sqlite rows have no prototype; copy them to compare deeply.
@@ -154,6 +155,8 @@ void test('a latency on a bucket bound falls in the next bucket', async () => {
 void test('a receipt scan failure still runs the chain aggregation and retries next run', async () => {
   const database = createCollectorD1();
   insertReceipt(database, { receivedAt: DAY_START + HOUR });
+  tx(database, 'c1', NOW - 1000, 1);
+  instruction(database, 'c1', 0, 'open', 'C1', { amount: '1' });
   const batch = database.batch.bind(database);
   let batches = 0;
   database.batch = (statements) =>
@@ -166,7 +169,12 @@ void test('a receipt scan failure still runs the chain aggregation and retries n
     failed: [],
     more: false,
     scanFailed: true,
-    chain: { days: [], failed: [], more: false, scanFailed: false },
+    chain: {
+      days: [day(NOW - 1000)],
+      failed: [],
+      more: false,
+      scanFailed: false,
+    },
   });
   assert.deepEqual((await runAggregation(database, NOW + 1)).days, [DAY]);
 });

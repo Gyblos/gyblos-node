@@ -8,7 +8,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-import { runChainIndex } from '@gyblos/metrics-collector/chain/indexer';
+import {
+  CHAIN_PHASES,
+  runChainIndex,
+} from '@gyblos/metrics-collector/chain/indexer';
 import {
   ChainRpcError,
   WRONG_NETWORK,
@@ -306,7 +309,7 @@ void test('a failing lease release never masks the run failure', async () => {
   await assert.rejects(
     runChainIndex(database, endpoints(failingRpc), 2000),
     (error) => {
-      assert.equal((error as { phase?: string }).phase, 'forward');
+      assert.equal((error as { phase?: string }).phase, CHAIN_PHASES.FORWARD);
       assert.equal((error as { cleanupFailed?: boolean }).cleanupFailed, true);
       return true;
     },
@@ -337,7 +340,7 @@ void test('a failing lease release after a clean run reports the release phase',
   await assert.rejects(
     runChainIndex(database, endpoints(rpc), 2000),
     (error) => {
-      assert.equal((error as { phase?: string }).phase, 'release');
+      assert.equal((error as { phase?: string }).phase, CHAIN_PHASES.RELEASE);
       assert.equal((error as { cleanupFailed?: boolean }).cleanupFailed, false);
       return true;
     },
