@@ -479,4 +479,8 @@ void test('a run that lost its lease writes no transaction or channel rows', asy
     rows(database, 'SELECT count(*) AS c FROM collector_chain_token_deltas'),
     [{ c: 0 }],
   );
+  assert.deepEqual(
+    rows(database, 'SELECT count(*) AS c FROM collector_agg_chain_dirty_days'),
+    [{ c: 0 }],
+  );
 });
