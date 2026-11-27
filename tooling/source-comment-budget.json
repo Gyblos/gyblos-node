@@ -172,7 +172,6 @@
   "apps/desktop/src/startup-progress.ts": 3,
   "apps/desktop/src/startup-window.ts": 3,
   "apps/desktop/src/ui/ActivitySessionDetails.tsx": 1,
-  "apps/desktop/src/ui/AddFunds.tsx": 1,
   "apps/desktop/src/ui/Appearance.tsx": 2,
   "apps/desktop/src/ui/Applications.tsx": 1,
   "apps/desktop/src/ui/BuyerAgentSetup.tsx": 2,
