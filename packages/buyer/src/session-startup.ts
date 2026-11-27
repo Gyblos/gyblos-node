@@ -251,6 +251,9 @@ function sessionExecutor(
       model?.sellerChoice,
     );
     let unfit = false;
+    const onUnfit = () => {
+      unfit = true;
+    };
     const paidInput = withBatchOutputLimit(input);
     const ports: BuyerRoutePorts<ChatResult> = {
       takeFreeResend: retries.takeFreeResend,
@@ -265,9 +268,7 @@ function sessionExecutor(
               )
           : select,
         input,
-        () => {
-          unfit = true;
-        },
+        onUnfit,
         parseBuyerRoutingPolicy(config.routing),
       ),
       free: freeSessionExecution(
@@ -276,9 +277,7 @@ function sessionExecutor(
         input,
         permission,
         onDelta,
-        () => {
-          unfit = true;
-        },
+        onUnfit,
         retries,
       ),
       paid: (winner, current, sending) => {
@@ -336,10 +335,7 @@ export async function startSessionQuoteRuntime(
     return sessionFail();
   requireBuyerIdentity(prepared.config, prepared.identity);
   const token = await endpointToken();
-  const state: SessionState = {
-    selections: new Map(),
-    sending: new Map(),
-  };
+  const state: SessionState = { selections: new Map(), sending: new Map() };
   const manager = makeManager(context, options, policy, state);
   const router =
     policy.totalDepositAtomic === undefined

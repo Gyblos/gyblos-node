@@ -193,17 +193,23 @@ export async function refreshSnapshots(
   signal?: AbortSignal,
 ) {
   const skipped = new Set<StaticControlSeller>();
-  const snapshots = await snapshotBatch(
-    config,
-    dependencies,
-    clients,
-    recalled,
-    now,
-    deadline,
-    settling,
-    skipped,
-    signal,
-  );
+  const batch = (
+    sellers: StaticControlSeller[],
+    end: AbortSignal,
+    skippedSellers: Set<StaticControlSeller>,
+  ) =>
+    snapshotBatch(
+      { ...config, sellers },
+      dependencies,
+      clients,
+      recalled,
+      now,
+      end,
+      settling,
+      skippedSellers,
+      signal,
+    );
+  const snapshots = await batch(config.sellers, deadline, skipped);
   // Identity and durable discovery work may settle after the nominal snapshot deadline. A seller
   // skipped earlier must still be considered if its cooldown ended before selection actually runs.
   while (!signal?.aborted) {
@@ -219,19 +225,7 @@ export async function refreshSnapshots(
       ),
       ...(signal ? [signal] : []),
     ]);
-    snapshots.push(
-      ...(await snapshotBatch(
-        { ...config, sellers: recovered },
-        dependencies,
-        clients,
-        recalled,
-        now,
-        nextDeadline,
-        settling,
-        new Set<StaticControlSeller>(),
-        signal,
-      )),
-    );
+    snapshots.push(...(await batch(recovered, nextDeadline, new Set())));
   }
   return snapshots;
 }
@@ -244,13 +238,13 @@ async function beforeSnapshot(
   now: () => number,
   deadline: AbortSignal,
   recalled: Map<string, SignedPublicV2>,
-  refusedIdentity: () => void,
+  failed: ReturnType<typeof failureReporter>,
 ): Promise<{ complete: boolean; known?: KnownSeller }> {
   if (
     dependencies.verifyIdentity &&
     !(await dependencies.verifyIdentity(seller, deadline))
   ) {
-    refusedIdentity();
+    failed(SELLER_FAILURE_PHASES.IDENTITY, SELLER_FAILURES.IDENTITY);
     return { complete: true };
   }
   if (dependencies.snapshots?.retiring(seller.nodeId))
@@ -274,25 +268,26 @@ async function freshSnapshot(
   dependencies: SnapshotDependencies,
   now: () => number,
   deadline: AbortSignal,
-  refusedDiscovery: () => void,
+  failed: ReturnType<typeof failureReporter>,
 ) {
-  const { known, signed } = await verifiedSnapshot(
-    client,
-    seller,
-    now,
-    deadline,
-  );
+  const snapshot = await verifiedSnapshot(client, seller, now, deadline);
+  const { known, signed } = snapshot;
   if (
     dependencies.observeVerified &&
     !(await dependencies.observeVerified(known))
   ) {
-    refusedDiscovery();
+    failed(SELLER_FAILURE_PHASES.DISCOVERY, SELLER_FAILURES.DISCOVERY);
     return undefined;
   }
   dependencies.snapshots?.set(seller, known, signed);
   return known;
 }
 
+function forgetStale(dependencies: SnapshotDependencies, nodeId: string) {
+  dependencies.renewing?.add(nodeId);
+  dependencies.snapshots?.drop(nodeId);
+  return null;
+}
 async function snapshotBatch(
   config: BuyerSelectionConfig,
   dependencies: SnapshotDependencies,
@@ -321,8 +316,7 @@ async function snapshotBatch(
             now,
             deadline,
             recalled,
-            () =>
-              failed(SELLER_FAILURE_PHASES.IDENTITY, SELLER_FAILURES.IDENTITY),
+            failed,
           );
           if (remembered.complete) return remembered.known;
           deadline.throwIfAborted();
@@ -340,11 +334,7 @@ async function snapshotBatch(
             dependencies,
             now,
             deadline,
-            () =>
-              failed(
-                SELLER_FAILURE_PHASES.DISCOVERY,
-                SELLER_FAILURES.DISCOVERY,
-              ),
+            failed,
           );
         } catch (error) {
           if (
@@ -356,21 +346,18 @@ async function snapshotBatch(
           )
             throw error;
           const code = failureCode(error);
-          if (code === CONTROL_CODES.STALE) {
-            dependencies.renewing?.add(seller.nodeId);
-            dependencies.snapshots?.drop(seller.nodeId);
-            failed(SELLER_FAILURE_PHASES.CONNECT, code);
-            return undefined;
-          }
-          const retryAt = connectFailed(
-            seller,
-            clients,
-            settling,
-            dependencies,
-            now(),
-            pinned,
-            signal,
-          );
+          const retryAt =
+            code === CONTROL_CODES.STALE
+              ? forgetStale(dependencies, seller.nodeId)
+              : connectFailed(
+                  seller,
+                  clients,
+                  settling,
+                  dependencies,
+                  now(),
+                  pinned,
+                  signal,
+                );
           failed(SELLER_FAILURE_PHASES.CONNECT, code, retryAt);
           return undefined;
         }

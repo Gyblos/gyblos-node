@@ -74,6 +74,23 @@ type FreeChatExecutor = (
   model?: RoutedModel,
   permission?: BuyerApiKeyOperation,
 ) => Promise<ChatResult>;
+type ChatExecutors = {
+  execute: FreeChatExecutor;
+  stream?: FreeChatStreamExecutor;
+};
+function scheduledExecutors(
+  schedule: ReturnType<typeof executionSlots>,
+  { execute, stream }: ReturnType<typeof buyerApiKeyExecutors>,
+): ChatExecutors {
+  return {
+    execute: (input, signal, delta, model) =>
+      schedule(signal, () => execute(input, signal, delta, model)),
+    stream:
+      stream &&
+      ((input, signal, delta, model) =>
+        schedule(signal, () => stream(input, signal, delta, model))),
+  };
+}
 function isJson(request: IncomingMessage) {
   const type = request.headers['content-type']?.split(';')[0]?.trim();
   return type?.toLowerCase() === FREE_BUYER.contentType;
@@ -132,10 +149,7 @@ async function countTokens(
   }
 }
 // The executors with the request's stop sequences honored on what the client sees (see chat-stop.ts).
-function stopping(
-  scoped: { execute: FreeChatExecutor; stream?: FreeChatStreamExecutor },
-  stops: string[] | undefined,
-) {
+function stopping(scoped: ChatExecutors, stops: string[] | undefined) {
   if (!stops) return scoped;
   const { execute, stream } = scoped;
   return {
@@ -170,7 +184,7 @@ async function serveChat(
   request: IncomingMessage,
   response: ServerResponse,
   settings: ChatSettings,
-  scoped: { execute: FreeChatExecutor; stream?: FreeChatStreamExecutor },
+  scoped: ChatExecutors,
   api: ChatApi,
   requestMs: number,
   diagnostic: ReturnType<ReturnType<typeof httpDiagnostics>>,
@@ -285,10 +299,9 @@ export function freeBuyerHandler(
     const localApi = desktop.accepts(request, isJson(request))
       ? defaultChatApi
       : undefined;
-    if (
-      channelRoute &&
-      !(caller.owner && authorize && settings.sellerChoice && localApi)
-    ) {
+    const ownsChat = authorize && settings.sellerChoice && caller.owner;
+    const selectedSellerAllowed = Boolean(ownsChat && localApi && channelRoute);
+    if (channelRoute && !selectedSellerAllowed) {
       replyError(response, new FreeBuyerError(FREE_BUYER_CODES.INVALID));
       return;
     }
@@ -300,32 +313,19 @@ export function freeBuyerHandler(
     }
     diagnostic.input();
     active++;
-    const scoped = buyerApiKeyExecutors(apiKeys, caller.keyId, execute, stream);
     try {
       await serveChat(
         request,
         response,
         settings,
-        {
-          execute: (input, signal, delta, model) =>
-            schedule(signal, () => scoped.execute(input, signal, delta, model)),
-          stream:
-            scoped.stream &&
-            ((input, signal, delta, model) =>
-              schedule(signal, () =>
-                scoped.stream!(input, signal, delta, model),
-              )),
-        },
+        scheduledExecutors(
+          schedule,
+          buyerApiKeyExecutors(apiKeys, caller.keyId, execute, stream),
+        ),
         api,
         requestMs,
         diagnostic,
-        Boolean(
-          settings.sellerChoice &&
-          authorize &&
-          caller.owner &&
-          channelRoute &&
-          localApi,
-        ),
+        selectedSellerAllowed,
         classify,
       );
     } finally {
