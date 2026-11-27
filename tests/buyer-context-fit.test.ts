@@ -11,6 +11,7 @@ import {
 } from '@gyblos/buyer/free-execution';
 import { BYTES_PER_TOKEN, MIN_FITTED_ANSWER } from '@gyblos/buyer/input-size';
 import { fittingSelect } from '@gyblos/buyer/session-free';
+import { parseBuyerRoutingPolicy } from '@gyblos/core/buyer-routing';
 import { SELLER_SELECTION_CODES } from '@gyblos/core/constants';
 import { DECLARED_METER } from '@gyblos/node/free-meter';
 import {
@@ -281,6 +282,7 @@ void test('session selection passes over free sellers that cannot hold the conve
     () => {
       unfit++;
     },
+    parseBuyerRoutingPolicy(),
   );
   const winner = await select(new Set(), AbortSignal.timeout(5000), {
     priceCeilings: { inputAtomicPerMtok: '0', outputAtomicPerMtok: '0' },
@@ -288,4 +290,32 @@ void test('session selection passes over free sellers that cannot hold the conve
   assert.equal(winner.nodeId, 'large');
   assert.deepEqual(asked, ['small', 'large']);
   assert.equal(unfit, 1);
+});
+
+void test('a paid replacement for an unfit free seller respects the replacement price cap', async () => {
+  const paid = {
+    ...withContext(32768),
+    offer: {
+      ...withContext(32768).offer,
+      prices: { inputAtomicPerMtok: '5', outputAtomicPerMtok: '5' },
+      maxAtomic: '1000',
+    },
+  };
+  const pick = (allowHigherPriceFallback: boolean) =>
+    fittingSelect(
+      async (excluded, _signal, route) => {
+        if (!excluded.has('small'))
+          return { nodeId: 'small', quote: withContext(100) };
+        if (BigInt(route.priceCeilings.inputAtomicPerMtok) < 5n)
+          throw new FreeBuyerError(FREE_BUYER_CODES.UNAVAILABLE);
+        return { nodeId: 'paid', quote: paid };
+      },
+      input(2000, 4096),
+      () => {},
+      { ...parseBuyerRoutingPolicy(), allowHigherPriceFallback },
+    )(new Set(), AbortSignal.timeout(5000), {
+      priceCeilings: { inputAtomicPerMtok: '9', outputAtomicPerMtok: '9' },
+    });
+  await assert.rejects(pick(false), FreeBuyerError);
+  assert.equal((await pick(true)).nodeId, 'paid');
 });

@@ -1,3 +1,7 @@
+import {
+  fallbackPriceCeilings,
+  type BuyerRoutingPolicy,
+} from '@gyblos/core/buyer-routing';
 import { buyerQuoteKind } from '@gyblos/node/buyer-quote-execution';
 import type { BuyerRoutePorts } from '@gyblos/node/buyer-routing';
 import { OFFER_PRICING_KINDS } from '@gyblos/protocol/constants';
@@ -42,9 +46,11 @@ export function fittingSelect(
   select: BuyerRoutePorts<ChatResult>['select'],
   input: FreeExecutionBuildInput,
   onUnfit: () => void,
+  policy: BuyerRoutingPolicy,
 ): BuyerRoutePorts<ChatResult>['select'] {
-  return async (excluded, current, route) => {
+  return async (excluded, current, first) => {
     const skip = new Set(excluded);
+    let route = first;
     for (;;) {
       const winner = await select(skip, current, route);
       if (
@@ -55,6 +61,15 @@ export function fittingSelect(
         return winner;
       onUnfit();
       skip.add(winner.nodeId);
+      route = {
+        ...route,
+        priceCeilings:
+          fallbackPriceCeilings(
+            policy,
+            winner.quote.offer.prices,
+            route.priceCeilings,
+          ) ?? route.priceCeilings,
+      };
     }
   };
 }

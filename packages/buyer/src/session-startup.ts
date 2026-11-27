@@ -1,6 +1,7 @@
 // Activates the shared session manager for explicit buyer policy; free quotes never build financial services.
 import { AsyncLocalStorage } from 'node:async_hooks';
 
+import { parseBuyerRoutingPolicy } from '@gyblos/core/buyer-routing';
 import type { BuyerApiKeyOperation } from '@gyblos/node/buyer-api-keys';
 import { executeBuyerQuote } from '@gyblos/node/buyer-quote-execution';
 import type { BuyerRoutePorts } from '@gyblos/node/buyer-routing';
@@ -268,6 +269,7 @@ function sessionExecutor(
         () => {
           unfit = true;
         },
+        parseBuyerRoutingPolicy(config.routing),
       ),
       free: freeSessionExecution(
         context,
