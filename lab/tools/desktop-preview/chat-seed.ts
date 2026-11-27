@@ -2,6 +2,7 @@ import type { ChatController } from '@gyblos/desktop/chat-controller';
 import { PAYMENT_METHOD } from '@gyblos/desktop/paypal-model';
 import type { X402Result } from '@gyblos/desktop/x402-model';
 import { BUYER_KEY_CODES } from '@gyblos/protocol/buyer-api-keys';
+import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
 const AGE_DAYS: Record<number, number> = {
@@ -40,6 +41,7 @@ export function seedFailedTurn(
   if (
     example !== 'failed-turn' &&
     example !== 'declined-turn' &&
+    example !== 'expired-quote' &&
     example !== 'paypal-turn'
   )
     return false;
@@ -67,7 +69,9 @@ export function seedFailedTurn(
         '',
         example === 'failed-turn'
           ? sharedReviewFailure.failureReason
-          : SESSION_CODES.REQUEST_DECLINED,
+          : example === 'expired-quote'
+            ? PAID_EXECUTION_CODES.EXPIRED
+            : SESSION_CODES.REQUEST_DECLINED,
       );
   }
   return true;

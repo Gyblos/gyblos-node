@@ -151,6 +151,7 @@ for (const example of [
   'failed-turn',
   'paypal-turn',
   'declined-turn',
+  'expired-quote',
   'unbound-review',
   'review-error',
 ]) {

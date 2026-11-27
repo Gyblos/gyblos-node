@@ -76,7 +76,17 @@ export async function checkFailedTurn(
     )?.textContent;
     if (!text?.includes('The charge for this turn remains unconfirmed.'))
       throw new Error('Turn certainty was lost');
-  } else if (example === 'declined-turn') {
+  } else if (example === 'declined-turn' || example === 'expired-quote') {
+    if (example === 'expired-quote') {
+      const status = document.querySelector(
+        '.chat-answer [role=status]',
+      )?.textContent;
+      if (
+        !status?.includes('quote expired') ||
+        !status.includes('No charge was made for this turn.')
+      )
+        throw new Error('Missing verified quote expiration');
+    }
     const oldDraft = composer()!.value;
     const edit =
       button('.chat-answer button', 'Edit in new chat') ??

@@ -10,6 +10,19 @@ import { Notice } from './Notice';
 import { Button } from './UI';
 import type { X402View } from './useX402';
 
+function beforeSending(reason: ChatMessage['failureReason']) {
+  switch (reason) {
+    case CHAT_FAILURE.QUOTE_EXPIRED:
+      return 'The seller quote expired before the buyer sent this question.';
+    case CHAT_FAILURE.TOKENIZER_UNAVAILABLE:
+      return 'The buyer could not prepare the token counter before sending this question.';
+    case CHAT_FAILURE.PEER:
+      return 'The buyer could not open a channel with this seller before sending this question.';
+    case CHAT_FAILURE.NOT_SENT:
+      return 'The buyer stopped this question before sending it.';
+  }
+}
+
 export function FailedTurn({
   message,
   buyer,
@@ -44,13 +57,16 @@ export function FailedTurn({
       budgetStatus + ' The charge for this turn remains unconfirmed.',
     );
   }
-  const explanation = shared
-    ? 'An API key spending review paused Desktop and connected tools for this request. The final charge is unknown.'
-    : declined
-      ? 'The seller declined this question before charging you.'
-      : free
-        ? 'The free response was interrupted. Any text shown is incomplete.'
-        : `The ${message.paymentMethod === PAYMENT_METHOD.PAYPAL ? 'PayPal' : 'USDC'} response was interrupted. The final charge is unknown.`;
+  const stopped = beforeSending(message.failureReason);
+  const explanation = stopped
+    ? stopped + ' No charge was made for this turn.'
+    : shared
+      ? 'An API key spending review paused Desktop and connected tools for this request. The final charge is unknown.'
+      : declined
+        ? 'The seller declined this question before charging you.'
+        : free
+          ? 'The free response was interrupted. Any text shown is incomplete.'
+          : `The ${message.paymentMethod === PAYMENT_METHOD.PAYPAL ? 'PayPal' : 'USDC'} response was interrupted. The final charge is unknown.`;
   return (
     <article className="chat-answer" aria-label="Assistant">
       {message.text && <MessageText text={message.text} />}
@@ -59,7 +75,7 @@ export function FailedTurn({
         {observation && ' ' + observation}
       </Notice>
       <div className="answer-actions">
-        {declined || (free && !shared) ? (
+        {declined || stopped || (free && !shared) ? (
           <Button variant={BUTTON_VARIANT.SECONDARY} onClick={onEdit}>
             {separateDraft ? 'Edit in new chat' : 'Edit question'}
           </Button>

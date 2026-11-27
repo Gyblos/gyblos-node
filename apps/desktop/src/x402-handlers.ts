@@ -45,18 +45,20 @@ function actionError(action: unknown, blocked: boolean, error: unknown) {
   return 'The action could not complete.';
 }
 function actionFailure(action: unknown, blocked: boolean, error: unknown) {
-  const reason =
-    error instanceof DesktopBuyerFailure
-      ? chatFailureReason(error.code)
-      : undefined;
-  return {
-    error: actionError(action, blocked, error),
-    ...(action === X402_ACTION.SEND &&
-      reason &&
-      (!blocked || reason === CHAT_FAILURE.KEY_REVIEW) && {
-        failureReason: reason,
-      }),
-  };
+  const failure = { error: actionError(action, blocked, error) };
+  if (action !== X402_ACTION.SEND || !(error instanceof DesktopBuyerFailure))
+    return failure;
+  if (error.code === CHAT_FAILURE.KEY_REVIEW)
+    return { ...failure, failureReason: error.code };
+  if (blocked) return failure;
+  if (error.code === CHAT_FAILURE.DECLINED)
+    return { ...failure, failureReason: error.code };
+  if (error.neverSent)
+    return {
+      ...failure,
+      failureReason: chatFailureReason(error.code) ?? CHAT_FAILURE.NOT_SENT,
+    };
+  return failure;
 }
 async function referenceAction(
   input: Record<string, unknown>,

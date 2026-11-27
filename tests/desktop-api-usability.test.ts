@@ -14,11 +14,13 @@ import { X402Budget } from '@gyblos/desktop/x402-budget';
 import { X402Client } from '@gyblos/desktop/x402-client';
 import { createX402Handlers } from '@gyblos/desktop/x402-handlers';
 import { parseX402Result, X402_ACTION } from '@gyblos/desktop/x402-model';
+import { BUYER_API } from '@gyblos/protocol/buyer-api';
 import { BUYER_KEY_CODES } from '@gyblos/protocol/buyer-api-keys';
 import {
   FREE_EXECUTION_CODES,
   FREE_EXECUTION_STOP_REASONS,
 } from '@gyblos/protocol/constants';
+import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 
 import { desktopAgentFixture } from './support/desktop-agent';
 import { frame, policy } from './support/desktop-stream';
@@ -178,8 +180,17 @@ void test('HTTP and streaming failures reach the desktop as static guidance with
   }
 });
 
-for (const code of [FREE_EXECUTION_CODES.TIMEOUT, BUYER_KEY_CODES.REVIEW]) {
-  void test(`payment uncertainty preserves a reservation and allowlists the turn reason for ${code}`, async () => {
+for (const [code, neverSent, reason] of [
+  [FREE_EXECUTION_CODES.TIMEOUT, false, undefined],
+  [BUYER_KEY_CODES.REVIEW, false, BUYER_KEY_CODES.REVIEW],
+  [BUYER_KEY_CODES.REVIEW, true, BUYER_KEY_CODES.REVIEW],
+  [PAID_EXECUTION_CODES.EXPIRED, true, PAID_EXECUTION_CODES.EXPIRED],
+  [PAID_EXECUTION_CODES.EXPIRED, false, undefined],
+  [BUYER_API.TOKENIZER_UNAVAILABLE, true, BUYER_API.TOKENIZER_UNAVAILABLE],
+  [PAID_EXECUTION_CODES.PEER, true, PAID_EXECUTION_CODES.PEER],
+  ['UNKNOWN_CODE', true, undefined],
+] as const) {
+  void test(`the buyer handler validates the turn reason for ${code} (never sent: ${neverSent})`, async () => {
     const paid = {
       ...policy,
       model: 'qwen3-0.6b',
@@ -196,7 +207,13 @@ for (const code of [FREE_EXECUTION_CODES.TIMEOUT, BUYER_KEY_CODES.REVIEW]) {
       if (options?.method !== 'POST') return Response.json(paid);
       posts++;
       return Response.json(
-        { error: { code, message: 'REMOTE_ERROR_CANARY' } },
+        {
+          error: {
+            code,
+            message: 'REMOTE_ERROR_CANARY',
+            [BUYER_API.NEVER_SENT_FIELD]: neverSent,
+          },
+        },
         { status: 502 },
       );
     });
@@ -255,14 +272,12 @@ for (const code of [FREE_EXECUTION_CODES.TIMEOUT, BUYER_KEY_CODES.REVIEW]) {
           },
         ],
       );
-      assert.match(result.error ?? '', /Spending status needs review/);
+      if (!neverSent)
+        assert.match(result.error ?? '', /Spending status needs review/);
       const parsed = parseX402Result(result);
-      assert.equal(
-        parsed.failureReason,
-        code === BUYER_KEY_CODES.REVIEW ? code : undefined,
-      );
+      assert.equal(parsed.failureReason, reason);
       assert.doesNotMatch(JSON.stringify(parsed), /REMOTE_ERROR_CANARY/);
-      assert.equal(result.summary.blocked, true);
+      assert.equal(result.summary.blocked, !neverSent);
       assert.equal(posts, 1);
       assert.equal((await budget.summary()).records.length, 0);
     } finally {
