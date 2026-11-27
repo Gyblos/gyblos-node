@@ -982,8 +982,9 @@ root scripts measure both; neither stores anything.
 (Cloudflare GraphQL `d1AnalyticsAdaptiveGroups`) and the size of both databases
 (`wrangler d1 info`). It takes `CLOUDFLARE_API_TOKEN` and
 `CLOUDFLARE_ACCOUNT_ID` from the environment, or Wrangler's own login, and
-prints only the table or a static error code. Baseline for `gyblos-discovery`,
-2026-11-20 to 2026-11-26:
+prints only the table or a static error code. It runs Wrangler with
+`WRANGLER_WRITE_LOGS=false`, so the login token never reaches Wrangler's debug
+log file. Baseline for `gyblos-discovery`, 2026-11-20 to 2026-11-26:
 
 ```text
 database          size MB  read queries  write queries  rows read  rows written  p50 ms  p95 ms

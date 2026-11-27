@@ -7,6 +7,8 @@ export const D1_ANALYTICS = {
   graphqlUrl: 'https://api.cloudflare.com/client/v4/graphql',
   tokenEnv: 'CLOUDFLARE_API_TOKEN',
   accountEnv: 'CLOUDFLARE_ACCOUNT_ID',
+  wranglerLogsEnv: 'WRANGLER_WRITE_LOGS',
+  wranglerLogsOff: 'false',
   bytesPerMegabyte: 1_048_576,
   megabyteDigits: 2,
   latencyDigits: 2,
