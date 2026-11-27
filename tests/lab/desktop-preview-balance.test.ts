@@ -96,10 +96,7 @@ void test('preview funding follows the preview network', async () => {
   assert.equal(await observe('?funding=ready&network=mainnet'), null);
   const testnet = await observe('?funding=ready&network=testnet');
   assert.equal(testnet?.network, DEVNET);
-  assert.equal(
-    testnet?.balanceAtomic,
-    String(PREVIEW_FUNDING.READY_ATOMIC),
-  );
+  assert.equal(testnet?.balanceAtomic, String(PREVIEW_FUNDING.READY_ATOMIC));
 });
 
 void test('preview chat model picker keeps funds actions compact and leaves the balance in the composer tab', async () => {

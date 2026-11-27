@@ -20,7 +20,9 @@ export function previewFunding(payer: string) {
       }
       const funded =
         mode === PREVIEW_FUNDING.READY || mode === PREVIEW_FUNDING.CHECKING;
-      return query.get('network') && query.get('network') !== 'devnet'
+      const mainnet =
+        query.get('network') === 'mainnet' || query.get('testnet') === 'hidden';
+      return mainnet
         ? null
         : {
             network: DEVNET,
