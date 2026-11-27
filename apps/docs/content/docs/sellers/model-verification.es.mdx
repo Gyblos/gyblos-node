@@ -35,8 +35,9 @@ Un resultado cubre un vendedor, un modelo y una versión del conjunto de pregunt
 verificador, no una sanción: hoy no cambia nada en el descubrimiento, la selección de vendedores ni los pagos.
 
 Si el Ollama de referencia devuelve una lista de candidatos vacía, incompleta o malformada y los reintentos no lo resuelven, el comando
-se detiene con `REFERENCE_UNAVAILABLE` y no emite un resultado firmado. Es un error de la referencia, no un
-veredicto sobre el vendedor.
+se detiene con `REFERENCE_UNAVAILABLE` y no emite un resultado firmado. Una lista completa puede contener cadenas vacías
+para alternativas improbables que no coinciden; las alternativas vacías que podrían afectar una decisión, o una lista sin
+ningún token utilizable, siguen siendo errores de la referencia. Es un error de la referencia, no un veredicto sobre el vendedor.
 
 Por ahora solo se verifican ofertas gratis de modelos Qwen3 del catálogo que tienen una etiqueta pública en
 Ollama. La cuantización no se comprueba.

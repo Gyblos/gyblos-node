@@ -77,7 +77,12 @@ async function scoreAnswer(
       rule.topLogprobs,
     );
     if (candidates) {
-      if (candidates.length === 0)
+      if (
+        candidates.length === 0 ||
+        candidates.some(
+          ({ token, logprob }) => token.length === 0 && logprob >= floor,
+        )
+      )
         throw new ModelVerifierError(
           MODEL_VERIFIER_CODES.REFERENCE_UNAVAILABLE,
         );

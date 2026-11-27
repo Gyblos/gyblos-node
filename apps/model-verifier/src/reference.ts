@@ -86,11 +86,10 @@ function parseCandidates(
   const first = Array.isArray(logprobs) ? record(logprobs[0]) : {};
   const top = first.top_logprobs;
   if (!Array.isArray(top) || top.length !== topLogprobs) throw unavailable();
-  return top.map((item) => {
+  const candidates = top.map((item) => {
     const candidate = record(item);
     if (
       typeof candidate.token !== 'string' ||
-      candidate.token.length === 0 ||
       typeof candidate.logprob !== 'number' ||
       !Number.isFinite(candidate.logprob) ||
       candidate.logprob > 0
@@ -98,6 +97,8 @@ function parseCandidates(
       throw unavailable();
     return { token: candidate.token, logprob: candidate.logprob };
   });
+  if (!candidates.some(({ token }) => token.length > 0)) throw unavailable();
+  return candidates;
 }
 
 export async function openReference(
