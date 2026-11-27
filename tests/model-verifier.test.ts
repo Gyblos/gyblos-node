@@ -13,7 +13,10 @@ import {
 import { loadVerifierKey } from '@gyblos/model-verifier/key';
 import { main } from '@gyblos/model-verifier/main';
 import { openReference } from '@gyblos/model-verifier/reference';
-import { runVerification } from '@gyblos/model-verifier/verify';
+import {
+  runVerification,
+  type UnscoredEvidence,
+} from '@gyblos/model-verifier/verify';
 import { FREE_EXECUTION_CODES } from '@gyblos/protocol/constants';
 import { FreeExecutionError } from '@gyblos/protocol/free-execution';
 import {
@@ -70,7 +73,7 @@ async function verifyWith(
   ask: (prompt: string) => Promise<string>,
 ) {
   const key = await loadVerifierKey(join(home, 'verifier.key'), true);
-  const failures: string[] = [];
+  const failures: UnscoredEvidence['code'][] = [];
   const outcome = await runVerification({
     target: TARGET,
     seller: { selection: SELECTION, ask },
