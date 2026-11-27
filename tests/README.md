@@ -192,10 +192,11 @@ OPENCODE_BIN="$HOME/.opencode/bin/opencode" node --import tsx tests/lab/opencode
 ```
 
 The driver starts a conversation, then cuts the OpenCode-to-buyer HTTP stream
-after delivering an approved 65-character prefix of a 127-character answer. It
-forwards the buyer's retry headers. Each OpenCode invocation has a 55-second
-timeout. Timestamps are milliseconds from the start of the experiment and
-include CLI startup for each submitted turn.
+after delivering an approved 65-character prefix. The generator waits for the
+disconnect before stopping. The proxy reports unexpected input, upstream or
+stream failures separately and forwards the buyer's retry headers. Each OpenCode
+invocation has a 55-second timeout. Timestamps are milliseconds from the start
+of the experiment and include CLI startup for each submitted turn.
 
 The interrupted question must produce a visible partial answer and one client
 retry, with one seller generation and one accepted checkpoint for that turn. The
