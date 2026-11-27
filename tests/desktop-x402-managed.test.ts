@@ -123,3 +123,32 @@ void test('an idle acknowledgement without worker exit times out without killing
     await buyer.close();
   }
 });
+void test('a late idle reply restores the listener after actual exit when the edit has timed out', async () => {
+  const worker = new Worker();
+  const buyer = new ManagedBuyer(
+    () => worker,
+    () => {},
+    1000,
+    10,
+  );
+  const opening = buyer.start('/tmp/synthetic-buyer-home');
+  worker.emit('message', {
+    kind: BUYER_SIDECAR.READY,
+    url: 'http://127.0.0.1:8090',
+    token: 'synthetic',
+  });
+  await opening;
+  let restores = 0;
+  assert.equal(
+    await buyer.stopWhenIdle(() => {
+      restores++;
+    }),
+    false,
+  );
+  worker.emit('message', { kind: BUYER_SIDECAR.IDLE });
+  assert.equal(restores, 0);
+  worker.emit('exit', 0);
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.equal(restores, 1);
+  await buyer.close();
+});

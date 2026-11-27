@@ -86,7 +86,7 @@ interface Connection {
 interface Running {
   exit: Promise<void>;
   stop(): void;
-  stopWhenIdle(): Promise<boolean>;
+  stopWhenIdle(recover?: () => void): Promise<boolean>;
 }
 function idleStop(worker: BuyerWorker, exit: Promise<void>, timeout: number) {
   let pending: ((ok: boolean) => void) | undefined;
@@ -100,8 +100,9 @@ function idleStop(worker: BuyerWorker, exit: Promise<void>, timeout: number) {
       pending = undefined;
     }
   });
-  return async () => {
+  return async (recover?: () => void) => {
     if (pending) return false;
+    let expired = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const answered = new Promise<boolean>((resolve, reject) => {
       pending = resolve;
@@ -115,11 +116,17 @@ function idleStop(worker: BuyerWorker, exit: Promise<void>, timeout: number) {
     });
     try {
       const stopped = answered.then(async (idle) => {
-        if (idle) await exit;
+        if (idle) {
+          await exit;
+          if (expired) recover?.();
+        }
         return idle;
       });
       const deadline = new Promise<false>((resolve) => {
-        timer = setTimeout(() => resolve(false), timeout);
+        timer = setTimeout(() => {
+          expired = true;
+          resolve(false);
+        }, timeout);
       });
       return await Promise.race([stopped, deadline]);
     } finally {
@@ -242,8 +249,8 @@ export class ManagedBuyer {
     this.running = operation;
     return operation.ready;
   }
-  async stopWhenIdle() {
-    return (await this.running?.stopWhenIdle()) ?? false;
+  async stopWhenIdle(recover?: () => void) {
+    return (await this.running?.stopWhenIdle(recover)) ?? false;
   }
   async close() {
     this.closed = true;

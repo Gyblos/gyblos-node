@@ -68,7 +68,10 @@ function managedBuyer(
       start: (maxAtomic, autoPrices) =>
         service.start(profile, undefined, maxAtomic, autoPrices),
       stop: () => service.stop(),
-      stopWhenIdle: () => service.stopWhenIdle(),
+      stopWhenIdle: () =>
+        service.stopWhenIdle(() => {
+          if (!client.policy()) void managed.start().catch(() => {});
+        }),
       setRenewalBudget: (amount) => setBuyerRenewalBudget(environment, amount),
       close: () => service.close(),
     },
