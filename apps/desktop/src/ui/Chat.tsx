@@ -369,6 +369,12 @@ export function Chat({
     follow.current = true;
     setNearBottom(true);
   }
+  function editFailedQuestion(text: string) {
+    if (session.draft && session.draft !== text) reset(text);
+    else setDraft(text);
+    input.current?.focus();
+  }
+
   useImperativeHandle(ref, () => ({
     newChat: () => reset(),
     prefill: (text) => reset(text),
@@ -701,13 +707,7 @@ export function Chat({
                           ? onReviewPaypal
                           : onReviewX402
                       }
-                      onEdit={() => {
-                        if (!user) return;
-                        if (session.draft && session.draft !== user.text)
-                          reset(user.text);
-                        else setDraft(user.text);
-                        input.current?.focus();
-                      }}
+                      onEdit={() => user && editFailedQuestion(user.text)}
                     />
                   ) : (
                     answer && (
