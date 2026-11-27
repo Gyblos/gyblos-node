@@ -2,7 +2,7 @@
 // proof bounds, error diagnostic codes and synthetic inference case names.
 import { ROLE_FILES, TRANSPORT_TIMEOUTS } from '@gyblos/config';
 import { BUYER_SELECTION_FILE } from '@gyblos/node/buyer-init-constants';
-import { BUYER_KEY_REVIEW, BUYER_PAID_TIMEOUTS } from '@gyblos/node/constants';
+import { BUYER_PAID_TIMEOUTS } from '@gyblos/node/constants';
 import { BUYER_API, BUYER_SIDECAR } from '@gyblos/protocol/buyer-api';
 import type { ProtocolErrorCode } from '@gyblos/protocol/constants';
 
@@ -292,9 +292,4 @@ export const BUYER_HTTP_DIAGNOSTICS = {
     CLOSED: 'HTTP_CONNECTION_CLOSED',
     REFUSED: 'HTTP_REFUSED',
   },
-} as const;
-
-export const PAYMENT_REVIEW = {
-  offsetsMs: [0, 2000, 6000],
-  deadlineMs: BUYER_KEY_REVIEW.deadlineMs,
 } as const;

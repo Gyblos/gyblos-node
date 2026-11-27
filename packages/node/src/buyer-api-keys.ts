@@ -30,7 +30,7 @@ import {
   type BuyerKeyState,
 } from './buyer-api-key-state';
 import { bounded } from './buyer-operation';
-import { BUYER_KEY_REVIEW } from './constants';
+import { BUYER_PAYMENT_REVIEW } from './constants';
 
 export interface BuyerApiKeyFiles {
   read(): Promise<string | undefined>;
@@ -247,7 +247,7 @@ export class BuyerApiKeys {
     const queue = manual
       ? [...unchecked, ...pending.filter((row) => this.checked.has(row.id))]
       : unchecked;
-    const deadline = AbortSignal.timeout(BUYER_KEY_REVIEW.deadlineMs);
+    const deadline = AbortSignal.timeout(BUYER_PAYMENT_REVIEW.deadlineMs);
     const review = async () => {
       while (!deadline.aborted && !this.closed) {
         const item = queue.shift();
@@ -270,7 +270,7 @@ export class BuyerApiKeys {
     };
     await Promise.all(
       Array.from(
-        { length: Math.min(queue.length, BUYER_KEY_REVIEW.concurrency) },
+        { length: Math.min(queue.length, BUYER_PAYMENT_REVIEW.concurrency) },
         review,
       ),
     );

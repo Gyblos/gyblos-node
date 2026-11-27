@@ -2,7 +2,11 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { DEVNET } from '@gyblos/config/network';
-import { autoFundingAvailable, FUNDING } from '@gyblos/desktop/funding-model';
+import {
+  autoFundingAvailable,
+  FUNDING,
+  sellerResponseLimit,
+} from '@gyblos/desktop/funding-model';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
 const payer = '11111111111111111111111111111111';
@@ -49,4 +53,22 @@ void test('a closed channel explains the paid seller refusal independently of av
     };
     assert.equal(autoFundingAvailable(policy, [funding]), SESSION_CODES.CLOSED);
   }
+});
+
+void test('a funded wallet cannot expand the authority of the channel selected for a response', () => {
+  const funding = {
+    network: DEVNET,
+    payer,
+    balanceAtomic: '2000000',
+    channelRemainingAtomic: '600000',
+    faucetAvailable: true,
+  } as const;
+  assert.equal(sellerResponseLimit(funding, '1000000'), '600000');
+  assert.equal(
+    sellerResponseLimit(
+      { ...funding, channelRemainingAtomic: null },
+      '1000000',
+    ),
+    '1000000',
+  );
 });

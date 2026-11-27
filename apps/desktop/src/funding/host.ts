@@ -1,7 +1,6 @@
 // Main-process wiring; renderer receives only its validated buyer address and atomic amounts.
 import { clipboard, ipcMain, shell, type BrowserWindow } from 'electron';
 
-import type { PaidChannelEligibility } from '@gyblos/buyer/channel-eligibility';
 import type { HomeEnvironment } from '@gyblos/config/home';
 import {
   buyerUsdcBalance,
@@ -11,6 +10,7 @@ import {
 import type {
   BuyerApiPolicy,
   BuyerSellerChoice,
+  PaidChannelEligibility,
 } from '@gyblos/protocol/buyer-api';
 
 import { fundingHandlers } from './handlers';

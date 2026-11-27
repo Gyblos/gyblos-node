@@ -22,6 +22,7 @@ import { requestBuyerApiKeys } from './usdc-api-client';
 import { X402Budget } from './x402-budget';
 import {
   assertFreeBudget,
+  buyerConnection,
   buyerEndpoint,
   policyForRoute,
   policyForSeller,
@@ -32,7 +33,7 @@ import {
   waitForPaidBuyer,
   type DesktopSellerChoice,
 } from './x402-http';
-import { DESKTOP_X402, PaidSellerLimitError, x402Policy } from './x402-model';
+import { DESKTOP_X402, PaidSellerLimitError } from './x402-model';
 import {
   buyerReplyMetrics,
   buyerResponseObject as object,
@@ -44,14 +45,7 @@ export { buyerEndpoint } from './x402-http';
 export { parseBuyerReply } from './x402-reply';
 export type { DesktopSellerChoice } from './x402-http';
 export class X402Client {
-  private connection: {
-    url: URL;
-    token: string;
-    managed: boolean;
-    preparesPaidChat: boolean;
-    reconcilesPool: boolean;
-    policy: BuyerApiPolicy;
-  } | null = null;
+  private connection: Awaited<ReturnType<typeof buyerConnection>> | null = null;
   private busy = false;
   private closed = false;
   private controller: AbortController | null = null;
@@ -114,20 +108,8 @@ export class X402Client {
         redirect: 'error',
         signal: AbortSignal.timeout(DESKTOP_X402.STATUS_MS),
       });
-      const policy = x402Policy(await readJson(response));
-      this.connection = {
-        url,
-        token,
-        managed,
-        policy,
-        reconcilesPool:
-          response.headers.get(BUYER_API.RECONCILE_POOL_HEADER) ===
-          BUYER_API.RECONCILE_POOL_PATH,
-        preparesPaidChat:
-          response.headers.get(BUYER_API.PAID_PREPARATION_HEADER) ===
-          BUYER_API.PAID_PREPARATION_PATH,
-      };
-      return policy;
+      this.connection = await buyerConnection(response, url, token, managed);
+      return this.connection.policy;
     } finally {
       this.busy = false;
     }

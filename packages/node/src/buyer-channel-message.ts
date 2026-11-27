@@ -1,3 +1,4 @@
+import type { ChannelBlocker } from '@gyblos/protocol/buyer-api';
 import { BUYER_KEY_CODES } from '@gyblos/protocol/buyer-api-keys';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
@@ -16,11 +17,7 @@ const messages = {
     'Confirm the replacement channel and its deposit before sending.',
   [SESSION_CODES.BINDING]:
     'The selected seller or terms changed. Refresh the listing before sending.',
-};
-export type ChannelBlocker = keyof typeof messages;
-export function isChannelBlocker(value: unknown): value is ChannelBlocker {
-  return typeof value === 'string' && Object.hasOwn(messages, value);
-}
+} satisfies Record<ChannelBlocker, string>;
 export function channelBlockerMessage(code: ChannelBlocker) {
   return messages[code];
 }

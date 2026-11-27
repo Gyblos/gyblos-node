@@ -1,19 +1,17 @@
-// Static desktop explanations for validated buyer failures; remote text is never displayed.
-// Presentation does not change retry decisions, budget reservations or payment uncertainty.
-import {
-  channelBlockerMessage,
-  isChannelBlocker,
-  type ChannelBlocker,
-} from '@gyblos/buyer/channel-blocker';
 import {
   BUYER_ROUTING_CODES,
   SELLER_SELECTION_CODES,
   type SellerSelectionCode,
 } from '@gyblos/core/constants';
+import { channelBlockerMessage } from '@gyblos/node/buyer-channel-message';
+// Static desktop explanations for validated buyer failures; remote text is never displayed.
+// Presentation does not change retry decisions, budget reservations or payment uncertainty.
 import {
   BUYER_API,
   BUYER_SIDECAR,
+  isChannelBlocker,
   type BuyerApiPolicy,
+  type ChannelBlocker,
 } from '@gyblos/protocol/buyer-api';
 import {
   FREE_EXECUTION_CODES,

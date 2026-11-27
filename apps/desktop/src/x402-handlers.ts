@@ -1,4 +1,4 @@
-import { reviewPayment } from '@gyblos/buyer/payment-review';
+import { reviewPayment } from '@gyblos/node/buyer-payment-review';
 import {
   BUYER_API,
   parseAutoPrices,

@@ -1,16 +1,11 @@
-import { isChannelBlocker } from '@gyblos/buyer/channel-blocker';
-import type { PaidChannelEligibility } from '@gyblos/buyer/channel-eligibility';
-import { PAYMENT_REVIEW } from '@gyblos/buyer/constants';
+import { BUYER_PAYMENT_REVIEW } from '@gyblos/node/constants';
 import {
   BUYER_API,
+  parsePaidChannelEligibility,
   type BuyerApiPolicy,
   type BuyerSellerChoice,
+  type PaidChannelEligibility,
 } from '@gyblos/protocol/buyer-api';
-import {
-  controlAddress,
-  controlAtomic,
-  controlObject,
-} from '@gyblos/protocol/control-validation';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
 import { readJson } from '../x402-http';
@@ -29,7 +24,7 @@ export async function inspectDesktopChannel(
         {
           method: 'POST',
           redirect: 'error',
-          signal: AbortSignal.timeout(PAYMENT_REVIEW.deadlineMs),
+          signal: AbortSignal.timeout(BUYER_PAYMENT_REVIEW.deadlineMs),
           headers: {
             authorization: 'Bearer ' + connection.token,
             'content-type': 'application/json',
@@ -39,27 +34,8 @@ export async function inspectDesktopChannel(
         },
       ),
     );
-    const row = controlObject(value, [
-      'blocker',
-      'channelRemainingAtomic',
-      ...(value &&
-      typeof value === 'object' &&
-      Object.hasOwn(value, 'channelId')
-        ? ['channelId']
-        : []),
-    ]);
-    if (!current() || (row.blocker !== null && !isChannelBlocker(row.blocker)))
-      throw new Error();
-    return {
-      blocker: row.blocker,
-      channelRemainingAtomic:
-        row.channelRemainingAtomic === null
-          ? null
-          : controlAtomic(row.channelRemainingAtomic),
-      ...(row.channelId !== undefined && {
-        channelId: controlAddress(row.channelId),
-      }),
-    };
+    if (!current()) throw new Error();
+    return parsePaidChannelEligibility(value);
   } catch {
     return {
       blocker: SESSION_CODES.STATUS_UNKNOWN,

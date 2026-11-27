@@ -1,9 +1,9 @@
 // Only the current main frame may inspect its buyer's public funding state or open the fixed faucet.
-import type { PaidChannelEligibility } from '@gyblos/buyer/channel-eligibility';
 import { DEVNET, DEVNET_USDC } from '@gyblos/config/network';
 import type {
   BuyerApiPolicy,
   BuyerSellerChoice,
+  PaidChannelEligibility,
 } from '@gyblos/protocol/buyer-api';
 import { controlHex } from '@gyblos/protocol/control-validation';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';

@@ -98,7 +98,6 @@
     "package": "tsx scripts/package.ts"
   },
   "dependencies": {
-    "@gyblos/buyer": "workspace:*",
     "@gyblos/core": "workspace:*",
     "@gyblos/node": "workspace:*",
     "@gyblos/config": "workspace:*",

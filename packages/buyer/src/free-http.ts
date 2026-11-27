@@ -263,13 +263,11 @@ export function freeBuyerHandler(
   reconcilePool?: () => Promise<void>,
   inspectChannel?: BuyerDesktopOptions['inspectChannel'],
 ) {
-  const desktop = createDesktopApi(
-    desktopPolicy,
-    authorize !== undefined,
+  const desktop = createDesktopApi(desktopPolicy, authorize !== undefined, {
     preparePaidChat,
     reconcilePool,
     inspectChannel,
-  );
+  });
   const accept = buyerApiCaller(authorize, apiKeys, desktopPolicy);
   const observe = httpDiagnostics(diagnostics);
   let active = 0;

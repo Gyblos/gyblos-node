@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 
 import { HTTP_STATUS } from '@gyblos/config';
 import type { BuyerApiKeys } from '@gyblos/node/buyer-api-keys';
+import { channelBlockerMessage } from '@gyblos/node/buyer-channel-message';
 import { BUYER_API, type BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 import {
   BUYER_API_KEYS,
@@ -13,7 +14,6 @@ import {
   parseBuyerApiKeyCommand,
 } from '@gyblos/protocol/buyer-api-keys';
 
-import { channelBlockerMessage } from './channel-blocker';
 import { FREE_BUYER } from './constants';
 import type { ChatErrorView } from './free-http';
 

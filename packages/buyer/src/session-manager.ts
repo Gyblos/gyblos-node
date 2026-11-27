@@ -10,6 +10,7 @@ import type {
   BuyerApiKeyOperation,
   ConfirmKeyCharge,
 } from '@gyblos/node/buyer-api-keys';
+import { reviewPayment } from '@gyblos/node/buyer-payment-review';
 import {
   createBuyerSessionManager,
   type BuyerSessionOptions,
@@ -19,6 +20,7 @@ import {
   buyerSessionPoolChain,
 } from '@gyblos/node/buyer-session-chain';
 import { createBuyerSessionPool } from '@gyblos/node/buyer-session-pool';
+import { BUYER_PAYMENT_REVIEW } from '@gyblos/node/constants';
 import { desktopOpening } from '@gyblos/node/desktop-opening';
 import {
   batchSessionObserver,
@@ -41,7 +43,7 @@ import {
   observeChannelAt,
   paidChannelEligibility,
 } from './channel-eligibility';
-import { PAID_BUYER_HTTP_MS, PAYMENT_REVIEW } from './constants';
+import { PAID_BUYER_HTTP_MS } from './constants';
 import {
   permitsWinner,
   relayAllowed,
@@ -50,7 +52,6 @@ import {
 } from './free-selection';
 import type { BuyerExecutionFactory } from './free-startup';
 import { verifyBuyerIdentity } from './identity';
-import { reviewPayment } from './payment-review';
 import { restoredSellerAddress } from './seller-address';
 import { UnsentSellerChoiceError } from './seller-choice-error';
 import {
@@ -287,7 +288,10 @@ function checkSelectedChannel(
       },
       options.channelClock ?? Date.now,
       observe,
-      AbortSignal.any([signal, AbortSignal.timeout(PAYMENT_REVIEW.deadlineMs)]),
+      AbortSignal.any([
+        signal,
+        AbortSignal.timeout(BUYER_PAYMENT_REVIEW.deadlineMs),
+      ]),
     );
     if (result.blocker === BUYER_KEY_CODES.REVIEW)
       return buyerKeyFail(result.blocker);

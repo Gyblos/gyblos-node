@@ -57,6 +57,10 @@ export function createPoolAdmissions() {
     trackOperation(pending, operation);
   return {
     leases,
+    ownsRequest(id: string | null, seller: string) {
+      const lease = leases.get(seller);
+      return !!lease?.registered && lease.running && lease.requestId === id;
+    },
     enter(id: string, requestId: string) {
       if (
         closing ||

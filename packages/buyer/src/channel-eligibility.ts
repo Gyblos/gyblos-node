@@ -11,14 +11,16 @@ import {
   inspectBatchSession,
   poolFundingPending,
 } from '@gyblos/payments-upto/batch-session';
+import type {
+  ChannelBlocker,
+  PaidChannelEligibility,
+} from '@gyblos/protocol/buyer-api';
 import { BUYER_KEY_CODES } from '@gyblos/protocol/buyer-api-keys';
 import {
   SESSION_CODES,
   SESSION_STATES,
   type PaymentSessionTerms,
 } from '@gyblos/protocol/payment-session';
-
-import type { ChannelBlocker } from './channel-blocker';
 
 export type ObserveChannel = (
   paths: BatchPoolPaths['legacy'],
@@ -43,11 +45,6 @@ interface Selection {
   credentialBlocked?: boolean;
   activeRequest?(id: string, sellerNodeId: string): boolean;
 }
-export interface PaidChannelEligibility {
-  channelId?: string;
-  blocker: ChannelBlocker | null;
-  channelRemainingAtomic: string | null;
-}
 function unavailable(blocker: ChannelBlocker | null): PaidChannelEligibility {
   return { blocker, channelRemainingAtomic: null };
 }
@@ -62,6 +59,25 @@ function blocksPoolRequest(
     (row.terms.sellerNodeId === selection.nodeId &&
       row.requestId !== selection.requestId)
   );
+}
+function remainingChannel(
+  terms: PaymentSessionTerms,
+  snapshot: import('@gyblos/protocol/payment-session').SessionSnapshot,
+  maxAtomic?: string,
+): PaidChannelEligibility {
+  const remaining =
+    BigInt(terms.depositAtomic) -
+    BigInt(snapshot.cumulativeAtomic) -
+    BigInt(snapshot.reservedAtomic);
+  if (remaining < 0n) return unavailable(SESSION_CODES.STATUS_UNKNOWN);
+  return {
+    blocker:
+      maxAtomic && remaining < BigInt(maxAtomic)
+        ? SESSION_CODES.REPLACEMENT_REQUIRED
+        : null,
+    channelRemainingAtomic: String(remaining),
+    channelId: snapshot.channelId ?? undefined,
+  };
 }
 export async function paidChannelEligibility(
   environment: HomeEnvironment,
@@ -128,19 +144,7 @@ export async function paidChannelEligibility(
           ? null
           : SESSION_CODES.REPLACEMENT_REQUIRED,
       );
-    const remaining =
-      BigInt(terms.depositAtomic) -
-      BigInt(snapshot.cumulativeAtomic) -
-      BigInt(snapshot.reservedAtomic);
-    if (remaining < 0n) return unavailable(SESSION_CODES.STATUS_UNKNOWN);
-    return {
-      blocker:
-        selection.maxAtomic && remaining < BigInt(selection.maxAtomic)
-          ? SESSION_CODES.REPLACEMENT_REQUIRED
-          : null,
-      channelRemainingAtomic: String(remaining),
-      channelId: snapshot.channelId,
-    };
+    return remainingChannel(terms, snapshot, selection.maxAtomic);
   } catch {
     return unavailable(SESSION_CODES.STATUS_UNKNOWN);
   }

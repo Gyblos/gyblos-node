@@ -2,17 +2,17 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 
 import { HTTP_STATUS } from '@gyblos/config';
 import { bounded } from '@gyblos/node/buyer-operation';
+import { BUYER_PAYMENT_REVIEW } from '@gyblos/node/constants';
 import {
   BUYER_API,
   parseBuyerSellerChoice,
   type BuyerApiPolicy,
   type BuyerSellerChoice,
+  type PaidChannelEligibility,
 } from '@gyblos/protocol/buyer-api';
 
-import type { PaidChannelEligibility } from './channel-eligibility';
 import { readBody } from './chat-body';
 import { replyJson } from './chat-errors';
-import { PAYMENT_REVIEW } from './constants';
 
 export type InspectBuyerChannel = (
   choice: BuyerSellerChoice,
@@ -41,7 +41,7 @@ export async function inspectChannelRequest(
     response.writeHead(BUYER_API.POLICY_CHANGED_STATUS).end();
     return;
   }
-  const signal = AbortSignal.timeout(PAYMENT_REVIEW.deadlineMs);
+  const signal = AbortSignal.timeout(BUYER_PAYMENT_REVIEW.deadlineMs);
   let choice: BuyerSellerChoice;
   try {
     choice = parseBuyerSellerChoice(

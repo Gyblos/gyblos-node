@@ -1,10 +1,10 @@
 // Public payment funding facts. Unknown observations are distinct from confirmed zero.
+import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
+import { DEVNET } from '@gyblos/config/network';
 import {
   isChannelBlocker,
   type ChannelBlocker,
-} from '@gyblos/buyer/channel-blocker';
-import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
-import { DEVNET } from '@gyblos/config/network';
+} from '@gyblos/protocol/buyer-api';
 import {
   controlAddress,
   controlAtomic,

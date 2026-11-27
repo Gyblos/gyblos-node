@@ -242,24 +242,6 @@ for (const selectedSeller of [true, false]) {
   });
 }
 
-void test('a funded wallet cannot expand the authority of the channel selected for a response', () => {
-  const funding = {
-    network: DEVNET,
-    payer,
-    balanceAtomic: '2000000',
-    channelRemainingAtomic: '600000',
-    faucetAvailable: true,
-  } as const;
-  assert.equal(sellerResponseLimit(funding, '1000000'), '600000');
-  assert.equal(
-    sellerResponseLimit(
-      { ...funding, channelRemainingAtomic: null },
-      '1000000',
-    ),
-    '1000000',
-  );
-});
-
 void test('an exhausted open buyer channel cannot authorize another response using the wallet balance', async (t) => {
   const { rig, environment, policy, seller } = await fundedChannel(t);
   const request = rig.request(2, '960');

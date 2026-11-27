@@ -197,9 +197,14 @@ async function prepareRequest(
 export function createDesktopApi(
   policy: BuyerApiPolicy | undefined,
   authenticated: boolean,
-  preparePaidChat?: () => Promise<void>,
-  reconcilePool?: () => Promise<void>,
-  inspectChannel?: InspectBuyerChannel,
+  {
+    preparePaidChat,
+    reconcilePool,
+    inspectChannel,
+  }: Pick<
+    BuyerDesktopOptions,
+    'preparePaidChat' | 'reconcilePool' | 'inspectChannel'
+  > = {},
 ) {
   return {
     async handled(

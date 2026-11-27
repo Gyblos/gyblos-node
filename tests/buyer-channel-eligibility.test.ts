@@ -184,3 +184,21 @@ void test('existing escrow must cover the selected response ceiling before a pai
   await rig.serve(2, String(remainder));
   assert.equal((await decide('1')).blocker, SESSION_CODES.REPLACEMENT_REQUIRED);
 });
+
+void test('the public channel-status contract rejects unrecognized reasons, arbitrary fields and malformed or contradictory funding evidence', async () => {
+  const { parsePaidChannelEligibility } =
+    await import('@gyblos/protocol/buyer-api');
+  const unavailable = {
+    blocker: SESSION_CODES.STATUS_UNKNOWN,
+    channelRemainingAtomic: null,
+  };
+  assert.deepEqual(parsePaidChannelEligibility(unavailable), unavailable);
+  for (const value of [
+    { ...unavailable, blocker: 'untrusted-detail' },
+    { ...unavailable, privateNote: 'untrusted' },
+    { ...unavailable, channelId: 'bad address' },
+    { ...unavailable, channelRemainingAtomic: '-1' },
+    { ...unavailable, channelRemainingAtomic: '42' },
+  ])
+    assert.throws(() => parsePaidChannelEligibility(value));
+});
