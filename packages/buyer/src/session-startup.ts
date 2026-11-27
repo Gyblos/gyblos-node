@@ -21,7 +21,6 @@ import {
 import { ownedChat } from './chat-owned';
 import { PAID_BUYER_HTTP_MS } from './constants';
 import { observeBuyerExecution } from './execution-observation';
-import { unfitOutcome } from './free-execution';
 import type { SelectionRoute } from './free-route';
 import { selectWinner } from './free-selection';
 import type { ChatPayment, ChatResult } from './free-sse';
@@ -254,6 +253,7 @@ function sessionExecutor(
     let unfit = false;
     const paidInput = withBatchOutputLimit(input);
     const ports: BuyerRoutePorts<ChatResult> = {
+      takeFreeResend: retries.takeFreeResend,
       select: fittingSelect(
         config.discovery?.paidAuto && !model?.sellerChoice
           ? (excluded, current, route) =>
@@ -321,9 +321,7 @@ function sessionExecutor(
             signal,
           )
     ).catch((error: unknown) => {
-      throw unfit
-        ? unfitOutcome(error, retries.failure())
-        : retries.selectionError(error);
+      throw retries.selectionError(error, unfit);
     });
     return { ...routed.result, execution: routed.kind };
   };

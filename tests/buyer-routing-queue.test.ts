@@ -8,10 +8,14 @@ import {
   BUYER_BUSY_POLICIES,
   BUYER_ROUTING_CODES,
 } from '@gyblos/core/constants';
-import { UnsentSellerBusyError } from '@gyblos/node/buyer-routing';
+import {
+  createBuyerRouter,
+  UnsentSellerBusyError,
+} from '@gyblos/node/buyer-routing';
 
 import { batchDeferred } from './support/batch-deferred';
 import { routingQueueFixture as fixture } from './support/buyer-routing-queue';
+import { freeSellerFixture } from './support/free-seller';
 
 void test('queue policy validates a bounded wait and defaults to thirty seconds', () => {
   assert.equal(
@@ -241,4 +245,35 @@ void test('remote busy retains FIFO ownership while refreshing rather than letti
   } finally {
     await first;
   }
+});
+
+void test('a free failover before text may try the next signed free quote with the wait-on-busy policy', async (t) => {
+  const sellers = await Promise.all([freeSellerFixture(), freeSellerFixture()]);
+  const quotes = await Promise.all(
+    sellers.map(async (seller) => (await seller.request()).quote),
+  );
+  const ceilings = quotes[0]!.offer.prices;
+  const router = createBuyerRouter({
+    now: Date.now,
+    policy: parseBuyerRoutingPolicy({ onBusy: BUYER_BUSY_POLICIES.WAIT }),
+    priceCeilings: ceilings,
+    unresolved: async () => false,
+    reference: async () => undefined,
+  });
+  t.after(() => router.close());
+  let sends = 0;
+  const result = await router.execute(
+    {
+      select: async (excluded) => {
+        const quote = quotes[excluded.size]!;
+        return { nodeId: quote.offer.nodeId, quote };
+      },
+      free: async () => (++sends === 1 ? undefined : 'answer'),
+      takeFreeResend: () => sends === 1,
+      paid: async () => assert.fail('paid fallback'),
+    },
+    AbortSignal.timeout(1500),
+  );
+  assert.equal(result.result, 'answer');
+  assert.equal(sends, 2);
 });

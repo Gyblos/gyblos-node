@@ -7,6 +7,7 @@ import { OFFER_PRICING_KINDS } from '@gyblos/protocol/constants';
 import type { FreeClientError } from '@gyblos/transport-iroh/free-client';
 
 import { BUYER_SELECTION, FREE_BUYER } from './constants';
+import { AfterFreeDispatch } from './free-chat-error';
 import { FreeSelectionFailure, unfitOutcome } from './free-execution';
 import type { SelectionRoute } from './free-route';
 import type { BuyerSelectionConfig } from './selection-config';
@@ -110,17 +111,27 @@ export async function selectAffordableAutoQuote<
 
 export function delegatedFreeResends(enabled: boolean) {
   let retries = 0;
+  let pending = false;
   let failure: FreeClientError | undefined;
   return {
     request: (request: Request) =>
       failure ? openDiscoveryRequest(request) : request,
     failure: () => failure,
-    selectionError: (error: unknown) =>
-      failure ? unfitOutcome(error, failure) : error,
+    takeFreeResend() {
+      const allowed = pending;
+      pending = false;
+      return allowed;
+    },
+    selectionError(error: unknown, unfit = false) {
+      if (!failure) return unfit ? unfitOutcome(error) : error;
+      const outcome = unfitOutcome(error, failure);
+      return outcome === failure ? failure : new AfterFreeDispatch(outcome);
+    },
     get onResend() {
       if (!enabled || retries >= FREE_BUYER.maxResends) return undefined;
       return (error: FreeClientError) => {
         failure = error;
+        pending = true;
         retries++;
       };
     },

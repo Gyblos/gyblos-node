@@ -65,7 +65,7 @@ function errorStatus(error: unknown, code: string) {
     return HTTP_STATUS.serviceUnavailable;
   return HTTP_STATUS.internalServerError;
 }
-function freeErrorView(error: unknown): ChatErrorView {
+export function freeErrorView(error: unknown): ChatErrorView {
   const keyError = buyerApiKeyErrorView(error);
   if (keyError) return keyError;
   const known =

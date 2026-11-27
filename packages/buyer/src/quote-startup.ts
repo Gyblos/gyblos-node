@@ -10,7 +10,7 @@ import { executeApiKeyFree } from './api-key-execution';
 import { withBuyerApiKeys } from './api-key-runtime';
 import { ownedChat } from './chat-owned';
 import { PAID_BUYER, PAID_BUYER_CODES, PAID_BUYER_HTTP_MS } from './constants';
-import { executeSelectedBuyerFree, unfitOutcome } from './free-execution';
+import { executeSelectedBuyerFree } from './free-execution';
 import { selectWinner, type FreeSelectionOptions } from './free-selection';
 import type { ChatResult } from './free-sse';
 import type { BuyerExecutionFactory } from './free-startup';
@@ -148,9 +148,7 @@ function quoteExecutor(
       },
       signal,
     ).catch((error: unknown) => {
-      throw unfit
-        ? unfitOutcome(error, retries.failure())
-        : retries.selectionError(error);
+      throw retries.selectionError(error, unfit);
     });
     return { ...routed.result, execution: routed.kind };
   };

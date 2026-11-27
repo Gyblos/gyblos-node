@@ -15,3 +15,9 @@ export class FreeBuyerError extends Error {
 }
 export const invalidChat = (param: string | null, detail: string) =>
   new FreeBuyerError(FREE_BUYER_CODES.INVALID, param, detail);
+
+export class AfterFreeDispatch extends Error {
+  constructor(readonly subsequent: unknown) {
+    super();
+  }
+}

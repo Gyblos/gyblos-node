@@ -63,6 +63,7 @@ export type BuyerRoutePorts<T> = Omit<
   BuyerQuoteDependencies<T>,
   'enter' | 'unresolved' | 'select' | 'free' | 'paid'
 > & {
+  takeFreeResend?(): boolean;
   // Trusted execution port ends queue time immediately before its first possible prompt write.
   free(
     winner: BuyerQuoteWinner,
@@ -289,6 +290,14 @@ async function attempt<T>(
       request.wait = undefined;
       request.waitingFor = undefined;
     });
+    if (
+      result === undefined &&
+      request.kind === OFFER_PRICING_KINDS.FREE &&
+      request.ports.takeFreeResend?.()
+    ) {
+      request.priceCeilings = prices;
+      return undefined;
+    }
     if (
       result === undefined &&
       state.options.policy.onBusy === BUYER_BUSY_POLICIES.WAIT
