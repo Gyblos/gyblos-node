@@ -179,3 +179,33 @@ support, malformed provider output, interrupted terminals and disconnect
 cancellation without retry. Financial factories fail if called, and a fetch
 allowlist rejects any other I/O. It doesn't prove live agents, provider behavior
 or tokenizer billing.
+
+### Interrupted OpenCode generation on a paid channel
+
+On macOS with native Iroh available, run the installed OpenCode executable in an
+isolated temporary home. The command was exercised with OpenCode 2.3.2 and Node
+24.22.1. It uses a synthetic seller, an instrumented payment backend and a
+loopback-only network sandbox for the client.
+
+```sh
+OPENCODE_BIN="$HOME/.opencode/bin/opencode" node --import tsx tests/lab/opencode-interruption.ts
+```
+
+The driver starts a conversation, then cuts the OpenCode-to-buyer HTTP stream
+after delivering an approved 65-character prefix of a 127-character answer. It
+forwards the buyer's retry headers. Each OpenCode invocation has a 55-second
+timeout. Timestamps are milliseconds from the start of the experiment and
+include CLI startup for each submitted turn.
+
+The interrupted question must produce a visible partial answer and one client
+retry, with one seller generation and one accepted checkpoint for that turn. The
+key stays blocked until attributable settlement evidence arrives. The driver
+supplies a synthetic finalized settlement of 240 atomic units, invokes the
+Payments status-check endpoint and verifies that the key accounts for 136
+settled units from the interrupted turn. A new question on the original paid
+route still receives a channel-status refusal, including after a buyer restart.
+To exercise a working alternative, the fixture republishes the same model as
+free and restarts the local roles. It resubmits the new question in the same
+OpenCode session with the same delegated key and verifies a complete answer,
+zero remaining reservation and one deposit across all turns. The
+evidence-arrival and offer change times are controlled by the driver.

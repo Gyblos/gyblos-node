@@ -32,6 +32,8 @@ export async function sessionProductHost(
   totalDepositAtomic?: string,
   conversation?: {
     meter: ChatTokenizer;
+    maxTokens?: number;
+    contextTokens?: number;
     observe: (input: EngineInput) => void;
     loadMeter?: () => Promise<ChatTokenizer>;
     generate?: (
@@ -126,6 +128,12 @@ export async function sessionProductHost(
             },
             engine: {
               ...prepared.engine,
+              describe: async () => ({
+                ...(await prepared.engine.describe()),
+                ...(conversation.contextTokens && {
+                  contextTokens: conversation.contextTokens,
+                }),
+              }),
               ...(conversation.generate ? { supportsTools: () => true } : {}),
               generate: (input: EngineInput) => {
                 conversation.observe(input);
@@ -158,6 +166,8 @@ export async function sessionProductHost(
     const selection: BuyerSelectionConfig = JSON.parse(
       await readFile(path, 'utf8'),
     );
+    if (conversation?.maxTokens)
+      selection.request.maxTokens = conversation.maxTokens;
     delete selection.discovery;
     delete selection.identity;
     selection.sellers[0]!.manualTrust = true;

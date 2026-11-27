@@ -28,6 +28,7 @@ import {
   SESSION_CODES,
   type SessionBill,
 } from '@gyblos/protocol/payment-session';
+import { sessionBlockRequestDigest as blockDigest } from '@gyblos/protocol/session-blocks';
 import type { BatchDestination } from '@gyblos/transport-iroh/batch-client';
 
 import { runBuyerBlocks } from './batch-block-buyer';
@@ -176,7 +177,7 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
       sellerNodeId: terms.sellerNodeId,
       baseAtomic: options.buyer.snapshot().cumulativeAtomic,
     },
-    await batchExecutionDigest(request),
+    await (blockMode ? blockDigest : batchExecutionDigest)(request),
   );
   signal.throwIfAborted();
   if (blockMode) return runBuyerBlocks(context, request, signal, onDelta);
