@@ -2,14 +2,12 @@
 import { BUYER_API, buyerAtomic } from '@gyblos/protocol/buyer-api';
 import {
   BUYER_API_KEYS,
-  BUYER_KEY_CHARGE,
   BUYER_KEY_CODES,
   buyerKeyFail,
   keyObject,
   parseBuyerApiKeySummary,
   parseBuyerKeyScope,
   type BuyerApiKeySummary,
-  type BuyerKeyCharge,
   type BuyerKeyScope,
 } from '@gyblos/protocol/buyer-api-keys';
 
@@ -143,27 +141,44 @@ export function keyReservation(
   return reservation({ ...value, id, keyId });
 }
 
-export function parseCompletedKey(
-  key: BuyerKeyRecord,
-  reserved: string,
-  charge: string,
-  kind: BuyerKeyCharge,
+export function buyerKeyReviewQueue(
+  pendingRows: readonly BuyerKeyReservation[],
+  active: ReadonlyMap<string, AbortController>,
+  checked: ReadonlySet<string>,
+  manual: boolean,
 ) {
-  const { digest: secretDigest, ...summary } = key;
-  return {
-    ...parseBuyerApiKeySummary({
-      ...summary,
-      reservedAtomic: String(BigInt(key.reservedAtomic) - BigInt(reserved)),
-      spentAtomic: String(BigInt(key.spentAtomic) + BigInt(charge)),
-      settledAtomic: String(
-        BigInt(key.settledAtomic) +
-          (kind === BUYER_KEY_CHARGE.SETTLED ? BigInt(charge) : 0n),
+  const pending = pendingRows.filter(
+    (row) =>
+      !active.has(row.id) &&
+      !pendingRows.some(
+        (other) =>
+          other.id !== row.id &&
+          other.requestId === row.requestId &&
+          other.sellerNodeId === row.sellerNodeId,
       ),
-      approvedAtomic: String(
-        BigInt(key.approvedAtomic) +
-          (kind === BUYER_KEY_CHARGE.APPROVED ? BigInt(charge) : 0n),
-      ),
-    }),
-    digest: secretDigest,
-  };
+  );
+  const unchecked = pending.filter((row) => !checked.has(row.id));
+  return manual
+    ? [...unchecked, ...pending.filter((row) => checked.has(row.id))]
+    : unchecked;
+}
+
+export function bindKeyExecution(
+  pending: readonly BuyerKeyReservation[],
+  id: string,
+  keyId: string,
+  requestId: string,
+  executionDigest: string,
+  signal: AbortSignal,
+) {
+  const current = pending.find((item) => item.id === id);
+  if (
+    !current ||
+    current.requestId !== requestId ||
+    current.executionDigest ||
+    signal.aborted
+  )
+    return buyerKeyFail(BUYER_KEY_CODES.REVIEW);
+  const bound = keyReservation({ ...current, executionDigest }, id, keyId);
+  return pending.map((item) => (item.id === id ? bound : item));
 }

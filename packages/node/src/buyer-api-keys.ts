@@ -28,9 +28,10 @@ import {
 } from '@gyblos/runtime/diagnostics';
 
 import {
+  bindKeyExecution,
+  buyerKeyReviewQueue,
   buyerKeyState,
   keyReservation,
-  parseCompletedKey,
   type BuyerKeyReservation,
   type BuyerKeyState,
 } from './buyer-api-key-state';
@@ -254,20 +255,12 @@ export class BuyerApiKeys {
   private async recoverCharge(manual: boolean) {
     const prove = this.confirmCharge;
     if (!prove || this.closed) return;
-    const pending = this.state.pending.filter(
-      (row) =>
-        !this.active.has(row.id) &&
-        !this.state.pending.some(
-          (other) =>
-            other.id !== row.id &&
-            other.requestId === row.requestId &&
-            other.sellerNodeId === row.sellerNodeId,
-        ),
+    const queue = buyerKeyReviewQueue(
+      this.state.pending,
+      this.active,
+      this.checked,
+      manual,
     );
-    const unchecked = pending.filter((row) => !this.checked.has(row.id));
-    const queue = manual
-      ? [...unchecked, ...pending.filter((row) => this.checked.has(row.id))]
-      : unchecked;
     const deadline = AbortSignal.timeout(BUYER_PAYMENT_REVIEW.deadlineMs);
     const review = async () => {
       while (!deadline.aborted && !this.closed) {
@@ -283,18 +276,14 @@ export class BuyerApiKeys {
           if (
             !this.closed &&
             !this.active.has(item.id) &&
-            this.state.pending.some((row) => row === item)
+            this.state.pending.includes(item)
           )
             await this.finish(item.id, charge, BUYER_KEY_CHARGE.SETTLED);
         });
       }
     };
-    await Promise.all(
-      Array.from(
-        { length: Math.min(queue.length, BUYER_PAYMENT_REVIEW.concurrency) },
-        review,
-      ),
-    );
+    const workers = Math.min(queue.length, BUYER_PAYMENT_REVIEW.concurrency);
+    await Promise.all(Array.from({ length: workers }, review));
   }
 
   operation(keyId: string) {
@@ -332,25 +321,15 @@ export class BuyerApiKeys {
       bindExecution: (requestId: string, executionDigest: string) =>
         this.serial(async () => {
           this.writable();
-          const current = this.state.pending.find((item) => item.id === id);
-          if (
-            !current ||
-            current.requestId !== requestId ||
-            current.executionDigest ||
-            controller.signal.aborted
-          )
-            return buyerKeyFail(BUYER_KEY_CODES.REVIEW);
-          const bound = keyReservation(
-            { ...current, executionDigest },
+          const pending = bindKeyExecution(
+            this.state.pending,
             id,
             keyId,
+            requestId,
+            executionDigest,
+            controller.signal,
           );
-          await this.save({
-            ...this.state,
-            pending: this.state.pending.map((item) =>
-              item.id === id ? bound : item,
-            ),
-          });
+          await this.save({ ...this.state, pending });
         }),
       complete: async (charge: string, kind: BuyerKeyCharge) => {
         if (finished || !reserved) return buyerKeyFail(BUYER_KEY_CODES.REVIEW);
@@ -378,6 +357,30 @@ export class BuyerApiKeys {
     await this.queue;
     await this.files.close?.();
   }
+}
+function parseCompletedKey(
+  key: BuyerKeyState['keys'][number],
+  reserved: string,
+  charge: string,
+  kind: BuyerKeyCharge,
+) {
+  const { digest: secretDigest, ...summary } = key;
+  return {
+    ...parseBuyerApiKeySummary({
+      ...summary,
+      reservedAtomic: String(BigInt(key.reservedAtomic) - BigInt(reserved)),
+      spentAtomic: String(BigInt(key.spentAtomic) + BigInt(charge)),
+      settledAtomic: String(
+        BigInt(key.settledAtomic) +
+          (kind === BUYER_KEY_CHARGE.SETTLED ? BigInt(charge) : 0n),
+      ),
+      approvedAtomic: String(
+        BigInt(key.approvedAtomic) +
+          (kind === BUYER_KEY_CHARGE.APPROVED ? BigInt(charge) : 0n),
+      ),
+    }),
+    digest: secretDigest,
+  };
 }
 export type BuyerApiKeyOperation = ReturnType<BuyerApiKeys['operation']>;
 export async function createBuyerApiKeys(options: {

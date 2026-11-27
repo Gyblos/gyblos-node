@@ -2,15 +2,10 @@
 import type { AsyncLocalStorage } from 'node:async_hooks';
 
 import {
-  batchPoolChannelPaths,
   batchPoolPathsIn,
   batchSessionPathsIn,
 } from '@gyblos/config/home-payments';
-import type {
-  BuyerApiKeyOperation,
-  ConfirmKeyCharge,
-} from '@gyblos/node/buyer-api-keys';
-import { reviewPayment } from '@gyblos/node/buyer-payment-review';
+import type { BuyerApiKeyOperation } from '@gyblos/node/buyer-api-keys';
 import {
   createBuyerSessionManager,
   UnsentSellerChoiceError,
@@ -24,18 +19,18 @@ import { createBuyerSessionPool } from '@gyblos/node/buyer-session-pool';
 import { BUYER_PAYMENT_REVIEW } from '@gyblos/node/constants';
 import { desktopOpening } from '@gyblos/node/desktop-opening';
 import {
-  batchSessionObserver,
   batchSessionTerminal,
-  finalizedKeyCharge,
   inspectBatchPool,
   inspectBatchSession,
 } from '@gyblos/payments-upto/batch-session';
 import { canonicalJson } from '@gyblos/protocol';
+import { batchFail } from '@gyblos/protocol/batch-channel';
 import type { BuyerSellerChoice } from '@gyblos/protocol/buyer-api';
 import { BUYER_KEY_CODES, buyerKeyFail } from '@gyblos/protocol/buyer-api-keys';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
 import type { ChatTokenizer } from '@gyblos/protocol/engine';
+import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import { SESSION_CODES, sessionFail } from '@gyblos/protocol/payment-session';
 
 import { reserveApiKey } from './api-key-execution';
@@ -54,8 +49,8 @@ import {
 import type { BuyerExecutionFactory } from './free-startup';
 import { verifyBuyerIdentity } from './identity';
 import { restoredSellerAddress } from './seller-address';
+import { keyProof } from './session-key-proof';
 import {
-  activeMeter,
   createSessionPreflight,
   prepareChosenMeter,
   sessionMeter,
@@ -93,6 +88,26 @@ function trustedQuote(
     )
       return sessionFail(SESSION_CODES.UNVERIFIED);
     signal.throwIfAborted();
+  };
+}
+function activeMeter(state: SessionState): ChatTokenizer {
+  const current = () => {
+    if (!state.meter) return sessionFail();
+    return state.meter;
+  };
+  return {
+    input: (text) => current().input(text),
+    chat: (messages, tools, choice) => current().chat(messages, tools, choice),
+    output: (text, calls) => {
+      const meter = current();
+      if (!meter.output) return batchFail(PAID_EXECUTION_CODES.UNSUPPORTED);
+      return meter.output(text, calls);
+    },
+    count: (text) => current().count(text),
+    get stablePrefix() {
+      const meter = state.meter;
+      return meter?.stablePrefix?.bind(meter);
+    },
   };
 }
 function sessionReceipts(
@@ -182,38 +197,6 @@ async function previousSeller(
 }
 function inspectSingle() {
   return inspectBatchSession(batchSessionPathsIn(process.env, P2P_ROLES.BUYER));
-}
-function keyProof(context: Context, options: Options): ConfirmKeyCharge {
-  return async (ref, scope, deadline) => {
-    const pool = batchPoolPathsIn(process.env);
-    const entries = await inspectBatchPool(pool, { includeLegacy: false });
-    const slot = entries.find(
-      (entry) => entry.terms.sellerNodeId === ref.sellerNodeId,
-    );
-    if (entries.length && !slot) return undefined;
-    const paths =
-      slot && !slot.legacy
-        ? batchPoolChannelPaths(pool, ref.sellerNodeId)
-        : pool.legacy;
-    return reviewPayment(
-      (signal) =>
-        finalizedKeyCharge(
-          paths,
-          ref,
-          scope,
-          context.endpoint.id().toString(),
-          (terms, channelId) =>
-            options.observeSettlement
-              ? options.observeSettlement(channelId)
-              : batchSessionObserver({
-                  paths,
-                  terms,
-                  rpcUrl: context.role.rpcUrl,
-                }).settlement(channelId, signal),
-        ),
-      deadline,
-    );
-  };
 }
 function pickerChannel(
   context: Context,

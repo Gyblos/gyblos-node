@@ -194,16 +194,3 @@ export async function prepareNewChannel<Remote extends BatchDestination>(
     await client.settled();
   }
 }
-
-export function verifyOpeningQuote<Remote extends BatchDestination>(
-  options: BuyerSessionOptions<Remote>,
-  quote: SignedOfferV2,
-  terms: PaymentSessionTerms,
-) {
-  return verifyBatchQuote(
-    quote,
-    terms,
-    options.endpoint.id().toString(),
-    options.now(),
-  );
-}
