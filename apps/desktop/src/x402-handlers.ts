@@ -10,6 +10,7 @@ import { controlAtomic } from '@gyblos/protocol/control-validation';
 
 // Fixed main-frame actions; explorer destinations come only from confirmed stored records.
 import { BuyerSessionRequired, DesktopBuyerFailure } from './buyer-error';
+import { CHAT_FAILURE, chatFailureReason } from './constants';
 import { LegacyPaymentReview, type X402Budget } from './x402-budget';
 import type { DesktopSellerChoice, X402Client } from './x402-client';
 import {
@@ -42,6 +43,20 @@ function actionError(action: unknown, blocked: boolean, error: unknown) {
       ? `${error.message} The request was not retried.`
       : 'Response unavailable. The request was not retried.';
   return 'The action could not complete.';
+}
+function actionFailure(action: unknown, blocked: boolean, error: unknown) {
+  const reason =
+    error instanceof DesktopBuyerFailure
+      ? chatFailureReason(error.code)
+      : undefined;
+  return {
+    error: actionError(action, blocked, error),
+    ...(action === X402_ACTION.SEND &&
+      reason &&
+      (!blocked || reason === CHAT_FAILURE.KEY_REVIEW) && {
+        failureReason: reason,
+      }),
+  };
 }
 async function referenceAction(
   input: Record<string, unknown>,
@@ -314,7 +329,7 @@ export function createX402Handlers(
       const current = await summary();
       return {
         ...current,
-        error: actionError(input.action, current.summary.blocked, error),
+        ...actionFailure(input.action, current.summary.blocked, error),
       };
     }
   };

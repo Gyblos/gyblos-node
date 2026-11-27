@@ -1,4 +1,18 @@
 // Owns fixed desktop host and compatibility-probe values.
+import { BUYER_KEY_CODES } from '@gyblos/protocol/buyer-api-keys';
+import { SESSION_CODES } from '@gyblos/protocol/payment-session';
+
+export const CHAT_FAILURE = {
+  KEY_REVIEW: BUYER_KEY_CODES.REVIEW,
+  DECLINED: SESSION_CODES.REQUEST_DECLINED,
+  INTERRUPTED: 'interrupted-response',
+} as const;
+export type ChatFailureReason =
+  (typeof CHAT_FAILURE)[keyof typeof CHAT_FAILURE];
+export function chatFailureReason(value: unknown) {
+  return Object.values(CHAT_FAILURE).find((reason) => reason === value);
+}
+
 export const RESPONSE_METRICS = {
   MAX_DURATION_MS: 86_400_000,
   MS_PER_SECOND: 1000,

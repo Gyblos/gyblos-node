@@ -529,6 +529,7 @@ export function Chat({
               id,
               result?.error ??
                 'Response unavailable. Review the chat budget in Payments before trying again.',
+              result?.failureReason,
             );
         });
       return;

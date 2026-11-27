@@ -35,7 +35,10 @@ import {
 } from '@gyblos/desktop/x402-model';
 import { AGENT_TOOLS } from '@gyblos/node/agent-setup-constants';
 import { BUYER_API, type BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
-import { BUYER_API_KEYS } from '@gyblos/protocol/buyer-api-keys';
+import {
+  BUYER_API_KEYS,
+  BUYER_KEY_CODES,
+} from '@gyblos/protocol/buyer-api-keys';
 
 import { accountBudgetSnapshot, accountLimitError } from './account-budget';
 import { previewChatSeed } from './chat-seed';
@@ -51,6 +54,7 @@ export function createPreviewHost(
   agentExamples: AgentExamples,
 ) {
   const query = new URLSearchParams(search);
+  const failedTurn = query.get('review') === 'failed-turn';
   const ready = query.get('connection-state') !== 'unconfigured';
   const example = '00000000-0000-4000-8000-000000000001';
   const now = Date.now();
@@ -152,7 +156,29 @@ export function createPreviewHost(
     conversations.newChat(crypto.randomUUID());
   }
   Object.assign(window, { previewChatSeed: previewChatSeed(seeded) });
-  exampleChat('How can I use Gyblos in my coding tools?', 'preview-free-reply');
+  if (failedTurn) {
+    const id = 'interrupted-turn';
+    const origin = conversations.startPaypal(
+      'How do I read a file in TypeScript?',
+      { ...chatModel, free: false },
+      id,
+      sessionId,
+      PAYMENT_METHOD.USDC,
+    );
+    if (origin) {
+      conversations.appendBuyer(
+        origin,
+        id,
+        'Read the file with:\n\n```ts\nconst text =',
+      );
+      conversations.setDraft('How should I handle an empty file?');
+      conversations.failPaypal(origin, id, '', BUYER_KEY_CODES.REVIEW);
+    }
+  } else
+    exampleChat(
+      'How can I use Gyblos in my coding tools?',
+      'preview-free-reply',
+    );
   let archive = projectChatArchive(conversations.getSnapshot());
 
   const desktopWindow = { platform: windowPlatform(PREVIEW.platform) };
@@ -230,6 +256,7 @@ export function createPreviewHost(
       summary: {
         ...emptyX402(),
         active,
+        blocked: failedTurn,
         policy: connected ? policy : null,
         sessionId: authorized ? sessionId : null,
         limitAtomic,
@@ -280,6 +307,12 @@ export function createPreviewHost(
         await navigator.clipboard.writeText(payer);
       if (request.action === X402_ACTION.COPY_MINT)
         await navigator.clipboard.writeText(DEVNET_USDC);
+      if (failedTurn && request.action === X402_ACTION.SEND)
+        return {
+          ...buyerState(),
+          error: 'An API key reservation needs review.',
+          failureReason: BUYER_KEY_CODES.REVIEW,
+        };
       if (request.action === X402_ACTION.SEND) {
         await new Promise((resolve) =>
           window.setTimeout(resolve, PREVIEW.replyDelayMs),

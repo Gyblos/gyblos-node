@@ -120,9 +120,11 @@ units.
 ## Local history
 
 Conversations and drafts are saved privately in the persistent desktop profile,
-with model and payment labels and opaque PayPal or x402 session links.
-Credentials and signed payment payloads are excluded. Storage is local, not
-synchronized, and conversation content is not encrypted.
+with model and payment labels and opaque PayPal or x402 session links. Failed
+turns can record a fixed reason such as an unresolved API key reservation or a
+seller refusal. The archive omits remote error text. Credentials and signed
+payment payloads are excluded. Storage is local, not synchronized, and
+conversation content is not encrypted.
 
 - Restoring history never resumes inference, acknowledges a response or
   authorizes spending. An incomplete response reopens as interrupted.

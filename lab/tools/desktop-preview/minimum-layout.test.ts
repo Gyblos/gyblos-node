@@ -116,3 +116,31 @@ void test('the design-system dialog hides the action tooltip while its label is 
     await rm(root, { recursive: true, force: true });
   }
 });
+
+void test('a restored USDC failure renders one recovery explanation and preserves the next draft at minimum width', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'gyblos-failed-turn-'));
+  try {
+    const output = await buildPreview(join(root, 'dist'));
+    const url = pathToFileURL(join(output, 'index.html'));
+    for (const theme of ['light', 'dark']) {
+      url.search = new URLSearchParams({
+        screen: 'chat',
+        review: 'failed-turn',
+        theme,
+      }).toString();
+      const html = await render(root, url, DESKTOP.MIN_WIDTH);
+      const turn = html.match(
+        /<article class="chat-answer".*?<\/article>/s,
+      )?.[0];
+      assert.ok(turn);
+      assert.equal(turn.match(/role="status"/g)?.length, 1);
+      assert.match(turn, /final charge is unknown/);
+      assert.match(turn, /Desktop and connected tools are paused/);
+      assert.match(turn, /<button[^>]*>Check status<\/button>/);
+      assert.doesNotMatch(turn, /Response unavailable/);
+      assert.match(html, /How should I handle an empty file\?/);
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

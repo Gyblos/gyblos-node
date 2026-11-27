@@ -19,6 +19,7 @@ import { ChatController } from '@gyblos/desktop/chat-controller';
 import { MESSAGE_STATE } from '@gyblos/desktop/chat-state';
 import { DEMO_AUTH } from '@gyblos/desktop/demo-account';
 import { PAYMENT_METHOD } from '@gyblos/desktop/paypal-model';
+import { BUYER_KEY_CODES } from '@gyblos/protocol/buyer-api-keys';
 
 import { conversation, files, model } from './support/chat-archive-fixture';
 
@@ -85,6 +86,8 @@ void test('untrusted archives cannot add remote artwork, unknown tools, forged r
     { sentAt: Number.MAX_SAFE_INTEGER },
     { paymentSessionId: 'PAYPAL_ORDER_SECRET' },
     { authorizationId: 'SECRET' },
+    { failureReason: 'REMOTE_ERROR_CANARY' },
+    { failureReason: BUYER_KEY_CODES.REVIEW },
   ])
     assert.equal(
       parseChatArchive({
@@ -352,4 +355,38 @@ void test('pinned and renamed conversations survive reopening and deletion remov
     ['next'],
   );
   assert.equal(reopened.getSnapshot().activeId, 'next');
+});
+
+void test('a failed USDC turn reopens with its reason, partial answer and later draft', () => {
+  const chat = new ChatController('first');
+  chat.startPaypal('Question', model, 'paid', undefined, PAYMENT_METHOD.USDC);
+  chat.appendBuyer('first', 'paid', '```ts\nconst partial =');
+  chat.setDraft('Newer draft');
+  chat.failPaypal(
+    'first',
+    'paid',
+    'REMOTE_ERROR_CANARY',
+    BUYER_KEY_CODES.REVIEW,
+  );
+  const archive = projectChatArchive(chat.getSnapshot());
+  assert.ok(archive);
+  const restored = restoreChatArchive(archive).sessions[0]!;
+  assert.equal(restored.messages.at(-1)?.failureReason, BUYER_KEY_CODES.REVIEW);
+  assert.equal(restored.messages.at(-1)?.text, '```ts\nconst partial =');
+  assert.equal(restored.messages.at(-1)?.paymentMethod, PAYMENT_METHOD.USDC);
+  assert.equal(restored.draft, 'Newer draft');
+  assert.equal(restored.paypalRun, null);
+  assert.equal(restored.run, null);
+  assert.doesNotMatch(JSON.stringify(archive), /REMOTE_ERROR_CANARY/);
+});
+
+void test('reopening an interrupted USDC response never attributes it to PayPal', () => {
+  const chat = new ChatController('first');
+  chat.startPaypal('Question', model, 'paid', undefined, PAYMENT_METHOD.USDC);
+  const archive = projectChatArchive(chat.getSnapshot());
+  assert.ok(archive);
+  assert.doesNotMatch(
+    restoreChatArchive(archive).sessions[0]!.notice,
+    /PayPal/,
+  );
 });

@@ -3,7 +3,7 @@ import { BUYER_API } from '@gyblos/protocol/buyer-api';
 import { REASONING_LEVELS } from '@gyblos/protocol/constants';
 
 import { activityId } from './activity-model';
-import { CHAT_STORAGE } from './constants';
+import { CHAT_FAILURE, CHAT_STORAGE, chatFailureReason } from './constants';
 import { PAYMENT_METHOD, type PaymentMethod } from './paypal-model';
 import { parseResponseMetrics } from './response-metrics';
 import { modelArtwork } from './ui/announced-models';
@@ -50,10 +50,15 @@ export type ChatArchiveSave = {
 export function unavailableChatArchive(): ChatArchiveStatus {
   return { available: false, generation: 0, savedSequence: 0 };
 }
-function object(value: unknown, keys: string): Record<string, unknown> | null {
+function object(
+  value: unknown,
+  keys: string,
+  optional: readonly string[] = [],
+): Record<string, unknown> | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const item = Object.fromEntries(Object.entries(value));
-  return Object.keys(item).sort().join(',') === keys ? item : null;
+  const required = Object.keys(item).filter((key) => !optional.includes(key));
+  return required.sort().join(',') === keys ? item : null;
 }
 function text(
   value: unknown,
@@ -77,25 +82,14 @@ function parseModel(value: unknown): Omit<ChatModel, 'image'> | null {
     : null;
 }
 function parseMessage(value: unknown): ArchivedMessage | null {
-  const reasoningKey =
-    value && typeof value === 'object' && 'reasoning' in value
-      ? 'reasoning,'
-      : '';
-  const metricsKey =
-    value !== null && typeof value === 'object' && 'metrics' in value
-      ? 'metrics,'
-      : '';
-  const item =
-    object(
-      value,
-      `id,${metricsKey}model,paymentMethod,${reasoningKey}role,sentAt,state,text,tools`,
-    ) ??
-    object(
-      value,
-      `id,${metricsKey}model,paymentMethod,paymentSessionId,${reasoningKey}role,sentAt,state,text,tools`,
-    );
+  const item = object(
+    value,
+    'id,model,paymentMethod,role,sentAt,state,text,tools',
+    ['failureReason', 'metrics', 'paymentSessionId', 'reasoning'],
+  );
   if (!item) return null;
   const model = parseModel(item.model);
+  const failureReason = chatFailureReason(item.failureReason);
   const metrics = parseResponseMetrics(item.metrics);
   const reasoning = Object.values(REASONING_LEVELS).find(
     (level) => level === item.reasoning,
@@ -118,6 +112,12 @@ function parseMessage(value: unknown): ArchivedMessage | null {
     !role ||
     !state ||
     !method ||
+    ('failureReason' in item &&
+      (!failureReason ||
+        role !== CHAT_ROLE.ASSISTANT ||
+        (state !== MESSAGE_STATE.FAILED && state !== MESSAGE_STATE.STOPPED) ||
+        (method !== PAYMENT_METHOD.USDC &&
+          failureReason !== CHAT_FAILURE.INTERRUPTED))) ||
     ('metrics' in item && (!metrics || role !== CHAT_ROLE.ASSISTANT)) ||
     ('reasoning' in item && (!reasoning || method !== PAYMENT_METHOD.USDC)) ||
     !text(item.text) ||
@@ -144,6 +144,7 @@ function parseMessage(value: unknown): ArchivedMessage | null {
     tools,
     paymentMethod: method,
     sentAt: item.sentAt,
+    ...(failureReason && { failureReason }),
     ...(metrics ? { metrics } : {}),
     ...(reasoning ? { reasoning } : {}),
     ...(paymentId && typeof item.paymentSessionId === 'string'
@@ -253,10 +254,14 @@ export function restoreChatArchive(archive: ChatArchive): ChatSnapshot {
       notice: session.messages.some(
         (message) => message.state === MESSAGE_STATE.PENDING,
       )
-        ? 'A response was interrupted. Review Payments before sending another PayPal message.'
+        ? 'A response was interrupted. Review its payment status before sending again.'
         : '',
       messages: session.messages.map((message) => ({
         ...message,
+        ...(message.state === MESSAGE_STATE.PENDING &&
+          message.role === CHAT_ROLE.ASSISTANT && {
+            failureReason: CHAT_FAILURE.INTERRUPTED,
+          }),
         state:
           message.state === MESSAGE_STATE.PENDING
             ? message.paymentMethod === PAYMENT_METHOD.PAYPAL
