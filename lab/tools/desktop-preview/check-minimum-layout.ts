@@ -124,12 +124,10 @@ export async function checkMinimumLayout() {
   await iconOnly('Manage keys');
   (await visible('#preview-tab-overview')).click();
   await iconOnly('Spending limits');
-  const copies = Array.from(
-    document.querySelectorAll('.preview-method-copy'),
-    (copy) => copy.getBoundingClientRect().left,
-  )
-    .filter((left) => left < innerWidth)
-    .map(Math.round);
+  const copies = Array.from(document.querySelectorAll('.preview-method-copy'))
+    .filter((copy) => !copy.closest('[inert]'))
+    .map((copy) => Math.round(copy.getBoundingClientRect().left));
+  if (copies.length < 2) throw new Error('Missing payment methods');
   if (new Set(copies).size > 1) throw new Error('Misaligned payment methods');
   (await visible('#preview-tab-history')).click();
   await visible('.ui-table-region tbody tr');
