@@ -79,7 +79,7 @@ Cada comando elige su archivo de configuración de forma distinta:
 | Comando                                | Archivo de configuración                                       |
 | -------------------------------------- | -------------------------------------------------------------- |
 | `config validate`                      | `--config PATH`, si no `./config.toml`; ignora `GYBLOS_CONFIG` |
-| `start`, `doctor`, `seller init`       | `GYBLOS_CONFIG`; si no, la que describe [`start`](#start)      |
+| `start`, `doctor`, `seller init`       | `GYBLOS_CONFIG`; si no, el que describe [`start`](#start)      |
 | `seller status`, `register`, `service` | No aceptan `--config`                                          |
 
 En el contenedor Docker, pasa `/config/config.toml` a `config validate` de forma explícita.
