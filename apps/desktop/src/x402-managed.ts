@@ -137,7 +137,10 @@ function supervise(
   let stopping = false;
   let exited = false;
   let accepted = false;
-  const { promise: exit, resolve: finish } = Promise.withResolvers<void>();
+  let finish!: () => void;
+  const exit = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
   let resolveReady = (_connection: Connection) => {};
   let rejectReady = (_reason: Error) => {};
   const ready = new Promise<Connection>((resolve, reject) => {
