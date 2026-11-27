@@ -143,7 +143,9 @@ the request before a replacement deposit.
 
 With the buyer stopped, use the following contributor command with the same
 `GYBLOS_HOME` as the endpoint. The amount is in USDC. Pass `off` to disable
-automatic replacement. Start the buyer after saving the change.
+automatic replacement. If an open generation was funded under the previous
+budget, disabling renewal pins the private policy to that channel so the
+remaining deposit can still be used. Start the buyer after saving the change.
 
 ```sh
 node --import tsx apps/buyer/src/bin.ts budget 3

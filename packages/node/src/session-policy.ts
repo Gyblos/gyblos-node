@@ -4,6 +4,7 @@ import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
 import { matchBatchTerms } from '@gyblos/protocol/batch-channel';
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
 import {
+  controlAddress,
   controlAtomic,
   controlInteger,
   controlObject,
@@ -21,6 +22,7 @@ export interface BuyerSessionPolicy {
   depositAtomic: string;
   totalDepositAtomic?: string;
   renewalBudgetAtomic?: string;
+  fundedChannelId?: string;
   lifetimeMs: number;
   withdrawDelaySeconds: number;
 }
@@ -30,18 +32,21 @@ export function parseBuyerSessionPolicy(value: unknown): BuyerSessionPolicy {
     const optional = Object.hasOwn(value, 'withdrawDelaySeconds');
     const hasTotal = Object.hasOwn(value, 'totalDepositAtomic');
     const hasBudget = Object.hasOwn(value, 'renewalBudgetAtomic');
+    const hasFunded = Object.hasOwn(value, 'fundedChannelId');
     const row = controlObject(value, [
       'depositAtomic',
       'lifetimeMs',
       ...(hasTotal ? ['totalDepositAtomic'] : []),
       ...(hasBudget ? ['renewalBudgetAtomic'] : []),
       ...(optional ? ['withdrawDelaySeconds'] : []),
+      ...(hasFunded ? ['fundedChannelId'] : []),
     ]);
     const depositAtomic = controlAtomic(row.depositAtomic);
     const renewalBudgetAtomic = hasBudget
       ? positiveTotal(row.renewalBudgetAtomic)
       : undefined;
     if (
+      (hasFunded && (hasBudget || hasTotal)) ||
       (renewalBudgetAtomic !== undefined &&
         (hasTotal || BigInt(renewalBudgetAtomic) < BigInt(depositAtomic))) ||
       depositAtomic === '0' ||
@@ -51,6 +56,9 @@ export function parseBuyerSessionPolicy(value: unknown): BuyerSessionPolicy {
     return {
       depositAtomic,
       ...(renewalBudgetAtomic && { renewalBudgetAtomic }),
+      ...(hasFunded && {
+        fundedChannelId: controlAddress(row.fundedChannelId),
+      }),
       ...(hasTotal
         ? { totalDepositAtomic: positiveTotal(row.totalDepositAtomic) }
         : {}),
@@ -126,6 +134,25 @@ function positiveTotal(value: unknown) {
 
 export function spendingAuthority(policy: BuyerSessionPolicy) {
   return policy.renewalBudgetAtomic ?? policy.depositAtomic;
+}
+
+export function checkChannelAuthority(
+  policy: BuyerSessionPolicy,
+  terms: PaymentSessionTerms,
+  priorSpent: string,
+  now: number,
+) {
+  if (
+    BigInt(terms.depositAtomic) > BigInt(policy.depositAtomic) ||
+    (!policy.fundedChannelId &&
+      BigInt(priorSpent) + BigInt(terms.depositAtomic) >
+        BigInt(spendingAuthority(policy))) ||
+    terms.withdrawDelaySeconds > policy.withdrawDelaySeconds ||
+    terms.protocolFeeBps !== PROTOCOL_FEE.bps ||
+    terms.treasury !== PROTOCOL_FEE.treasury ||
+    terms.expiresAt - now > policy.lifetimeMs
+  )
+    return sessionFail(SESSION_CODES.LIMIT);
 }
 
 export function replacementTerms(

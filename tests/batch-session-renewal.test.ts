@@ -313,6 +313,10 @@ void test('closed history is bounded without evicting generations or manufacturi
         totalBudgetAtomic: '1000',
       };
       if (index === 16) {
+        assert.equal(
+          (await inspectBatchSession(options.paths))?.renewalLimitReached,
+          true,
+        );
         const full = await readFile(options.paths.state, 'utf8');
         await assert.rejects(renewBatchSession(options), {
           code: SESSION_CODES.LIMIT,

@@ -265,7 +265,7 @@ export function x402ShortAmount(
   atomic: string,
   policy: Pick<BuyerApiPolicy, 'mint'>,
 ) {
-  const [whole, fraction] = x402Amount(atomic, policy).split('.');
+  const [whole = '', fraction] = x402Amount(atomic, policy).split('.');
   const decimals = fraction?.replace(/0+$/, '');
   return decimals ? whole + '.' + decimals : whole;
 }

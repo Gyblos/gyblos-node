@@ -18,7 +18,7 @@ import {
   UnsentSellerChoiceError,
   type StartChannelWork,
 } from './buyer-channel-prepare';
-import { checkPreviousOpening } from './buyer-opening-state';
+import { checkPreviousOpening, disconnectChannel } from './buyer-opening-state';
 import { bounded } from './buyer-operation';
 import { UnsentSellerBusyError } from './buyer-routing';
 import type { Current, State } from './buyer-session';
@@ -53,6 +53,11 @@ export async function prepareRenewal<Remote extends BatchDestination>(
   )
     return undefined;
   if (snapshot.channelId) await options.checkReusableChannel?.(quote, signal);
+  if (options.policy.fundedChannelId)
+    throw new UnsentSellerChoiceError(
+      SESSION_CODES.REPLACEMENT_REQUIRED,
+      quote.offer.nodeId,
+    );
   const proposed = newSessionTerms(quote, options.policy, options.now());
   if (options.policy.renewalBudgetAtomic !== undefined)
     checkRenewalTerms(
@@ -73,6 +78,8 @@ export async function prepareRenewal<Remote extends BatchDestination>(
   await verify(proposed);
   const stored = await options.inspect();
   if (!stored || stored.pending) return sessionFail(SESSION_CODES.UNVERIFIED);
+  if (stored.renewalLimitReached)
+    throw new UnsentChannelLimitError(quote.offer.nodeId);
   const replacement = replacementTerms(
     options.policy,
     options.now,
@@ -82,13 +89,7 @@ export async function prepareRenewal<Remote extends BatchDestination>(
   if (snapshot.state !== SESSION_STATES.CLOSED) {
     const expected = replacement(snapshot.cumulativeAtomic);
     if (options.policy.renewalBudgetAtomic !== undefined)
-      await checkWallet(
-        state,
-        opened.terms,
-        snapshot.cumulativeAtomic,
-        expected,
-        signal,
-      );
+      await checkWallet(state, opened, expected, signal);
   }
   const settlement = snapshot.channelId
     ? ((await opened.host.reconcile(signal)) ??
@@ -97,9 +98,7 @@ export async function prepareRenewal<Remote extends BatchDestination>(
   const terms = replacement(settlement?.chargedAtomic ?? '0');
   await verify(terms);
   signal.throwIfAborted();
-  await opened.host.disconnect();
-  await opened.host.settled();
-  await opened.financial.dispose();
+  await disconnectChannel(opened);
   return { channelId: snapshot.channelId, terms };
 }
 
@@ -159,11 +158,12 @@ function checkRenewalTerms(
 
 async function checkWallet<Remote extends BatchDestination>(
   state: State<Remote>,
-  previous: PaymentSessionTerms,
-  spent: string,
+  opened: Current<Remote>,
   next: PaymentSessionTerms,
   signal: AbortSignal,
 ) {
+  const previous = opened.terms;
+  const spent = opened.financial.snapshot().cumulativeAtomic;
   const backend = await state.backend;
   const available = await bounded(
     backend?.availableBalance?.(previous, signal) ?? Promise.resolve(null),

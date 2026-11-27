@@ -1,5 +1,4 @@
 // One explicitly authorized reusable session for shared buyer hosts; no selection or prompt retry.
-import { PROTOCOL_FEE } from '@gyblos/config';
 import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
 import { recountSessionInput } from '@gyblos/core/session-input';
 import type { BatchStoredSession } from '@gyblos/payments-upto/batch-session';
@@ -32,13 +31,19 @@ import {
   type StartChannelWork,
 } from './buyer-channel-prepare';
 import { UnsentOpeningError } from './buyer-opening-retry';
-import { checkPreviousOpening, disposeAbsent } from './buyer-opening-state';
+import {
+  checkFundedChannel,
+  checkPreviousOpening,
+  disconnectChannel,
+  disposeAbsent,
+} from './buyer-opening-state';
 import { bounded } from './buyer-operation';
 import { UnsentSellerBusyError } from './buyer-routing';
 import { prepareRenewal } from './buyer-session-renewal';
 import { sessionApproval } from './session-accounting';
 import type { BuyerSessionBackend } from './session-backend';
 import {
+  checkChannelAuthority,
   newSessionTerms,
   parseBuyerSessionPolicy,
   replacementTerms,
@@ -124,6 +129,7 @@ async function openCurrent<Remote extends BatchDestination>(
 ): Promise<Current<Remote>> {
   const options = state.options;
   const stored = await bounded(options.inspect(), signal);
+  checkFundedChannel(options.policy.fundedChannelId, stored, quote);
   if (stored?.notCreated || stored?.openingReturned) {
     if (!quote) return sessionFail(SESSION_CODES.CLOSED);
     const replacement = replacementTerms(
@@ -217,16 +223,12 @@ async function run<Remote extends BatchDestination>(
   if (await bounded(options.unresolved(), signal))
     return sessionFail(SESSION_CODES.UNVERIFIED);
   const opened = await current(state, quote, signal, start);
-  if (
-    BigInt(opened.terms.depositAtomic) > BigInt(options.policy.depositAtomic) ||
-    BigInt(opened.priorSpentAtomic) + BigInt(opened.terms.depositAtomic) >
-      BigInt(spendingAuthority(options.policy)) ||
-    opened.terms.withdrawDelaySeconds > options.policy.withdrawDelaySeconds ||
-    opened.terms.protocolFeeBps !== PROTOCOL_FEE.bps ||
-    opened.terms.treasury !== PROTOCOL_FEE.treasury ||
-    opened.terms.expiresAt - options.now() > options.policy.lifetimeMs
-  )
-    return sessionFail(SESSION_CODES.LIMIT);
+  checkChannelAuthority(
+    options.policy,
+    opened.terms,
+    opened.priorSpentAtomic,
+    options.now(),
+  );
   const switching =
     opened.terms.sellerNodeId !== quote.offer.nodeId ||
     opened.terms.owner !== quote.offer.owner;
@@ -390,11 +392,7 @@ export function createBuyerSessionManager<Remote extends BatchDestination>(
     async close() {
       state.lifetime.abort();
       const opened = await state.current?.catch(() => undefined);
-      if (opened) {
-        await opened.host.disconnect();
-        await opened.host.settled();
-        await opened.financial.dispose();
-      }
+      if (opened) await disconnectChannel(opened);
     },
   };
 }

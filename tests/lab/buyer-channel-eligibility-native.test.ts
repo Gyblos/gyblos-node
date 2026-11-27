@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile, writeFile } from 'node:fs/promises';
 import test from 'node:test';
 
+import { setBuyerRenewalBudget } from '@gyblos/buyer/auto-settings';
 import { BUYER_SELECTION } from '@gyblos/buyer/constants';
 import type { BuyerSelectionConfig } from '@gyblos/buyer/selection-config';
 import { batchSessionPathsIn, rolePathIn } from '@gyblos/config';
@@ -303,6 +304,7 @@ void test(
       assert.deepEqual(host.finance.calls, ['deposit']);
     }
     host.finance.walletBalance('1000000');
+    await host.restartBoth();
     const second = await ask(64);
     assert.equal(second.status, 200, await second.clone().text());
     const renewed = await inspectBatchSession(paths);
@@ -314,6 +316,16 @@ void test(
     const rejected = await ask(64);
     assert.equal(rejected.ok, false);
     assert.equal(host.engine.attempts(), 2);
+    assert.deepEqual(host.finance.calls, calls);
+    await host.stopBuyer();
+    const smaller: BuyerSelectionConfig = JSON.parse(config);
+    smaller.request.maxAtomic = '1000';
+    await writeFile(configPath, JSON.stringify(smaller));
+    await setBuyerRenewalBudget(process.env, null);
+    await host.restartBoth();
+    const remaining = await ask(64);
+    assert.equal(remaining.status, 200, await remaining.clone().text());
+    assert.equal(host.engine.attempts(), 3);
     assert.deepEqual(host.finance.calls, calls);
   },
 );

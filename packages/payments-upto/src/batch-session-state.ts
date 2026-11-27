@@ -20,12 +20,13 @@ import { reserved } from './batch-session-common';
 import { withBatchState } from './batch-session-io';
 import { emptyPreparation } from './batch-session-opening-release';
 import type { BatchPaths, BatchRecord } from './batch-session-types';
-import { BATCH_BUYER_CHECKPOINTS } from './constants';
+import { BATCH_BUYER_CHECKPOINTS, BATCH_RENEWAL_STATE } from './constants';
 
 export interface BatchStoredSession {
   terms: PaymentSessionTerms;
   snapshot: SessionSnapshot;
   archivedProof?: true;
+  renewalLimitReached?: true;
   pending: boolean;
   recoverable: boolean;
   notCreated?: true;
@@ -95,6 +96,9 @@ export function storedBatchSession(record: BatchRecord): BatchStoredSession {
     record.settlement.chargedAtomic === record.cumulativeAtomic &&
     !recoverable;
   return {
+    ...((record.history?.length ?? 0) >= BATCH_RENEWAL_STATE.maxHistory && {
+      renewalLimitReached: true as const,
+    }),
     ...(returnedOpening(record) && { openingReturned: true as const }),
     ...(record.pending[BATCH_BUYER_CHECKPOINTS.OPENING_SENT] && {
       openingPending: true as const,

@@ -219,8 +219,11 @@ export async function sessionProductHost(
         buyer = undefined;
         await seller?.stop();
         await startSeller();
-        selection.sellers[0]!.directAddresses = binding.directAddresses();
-        await writeFile(path, JSON.stringify(selection), {
+        const current: BuyerSelectionConfig = JSON.parse(
+          await readFile(path, 'utf8'),
+        );
+        current.sellers[0]!.directAddresses = binding.directAddresses();
+        await writeFile(path, JSON.stringify(current), {
           mode: FILE_MODES.privateFile,
         });
         return start();

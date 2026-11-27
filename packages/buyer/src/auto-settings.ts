@@ -1,8 +1,15 @@
-import { ROLE_FILES, rolePathIn, type HomeEnvironment } from '@gyblos/config';
+import {
+  batchSessionPathsIn,
+  ROLE_FILES,
+  rolePathIn,
+  type HomeEnvironment,
+} from '@gyblos/config';
 import { checkBuyerInit } from '@gyblos/node/buyer-init';
 import { withStoppedBuyer } from '@gyblos/node/buyer-runtime';
+import { inspectBatchSession } from '@gyblos/payments-upto/batch-session';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 import type { TokenPricesV2 } from '@gyblos/protocol/control-types';
+import { SESSION_STATES } from '@gyblos/protocol/payment-session';
 import {
   acquireProcessLock,
   readPrivateFile,
@@ -45,7 +52,11 @@ export function withAutoPrices(value: unknown, prices: TokenPricesV2 | null) {
   return next;
 }
 
-function withRenewalBudget(value: unknown, budget: string | null) {
+async function withRenewalBudget(
+  value: unknown,
+  budget: string | null,
+  environment: HomeEnvironment,
+) {
   const config = parseBuyerSelectionConfig(value);
   if (!config.session)
     throw new AutoSettingsError(
@@ -61,8 +72,22 @@ function withRenewalBudget(value: unknown, budget: string | null) {
     );
   const raw = record(value);
   const session = record(raw.session);
-  if (budget === null) delete session.renewalBudgetAtomic;
-  else session.renewalBudgetAtomic = budget;
+  if (budget === null) {
+    delete session.renewalBudgetAtomic;
+    if (config.session.renewalBudgetAtomic) {
+      const stored = await inspectBatchSession(
+        batchSessionPathsIn(environment, P2P_ROLES.BUYER),
+      ).catch(() => undefined);
+      if (
+        stored?.snapshot.state === SESSION_STATES.OPEN &&
+        stored.snapshot.channelId
+      )
+        session.fundedChannelId = stored.snapshot.channelId;
+    }
+  } else {
+    delete session.fundedChannelId;
+    session.renewalBudgetAtomic = budget;
+  }
   const next = { ...raw, session };
   parseBuyerSelectionConfig(next);
   return next;
@@ -82,7 +107,7 @@ export function setBuyerRenewalBudget(
       const data = await readPrivateFile(path, BUYER_SELECTION.maxConfigBytes);
       if (!data) throw new AutoSettingsError('Missing buyer settings.');
       const raw: unknown = JSON.parse(data);
-      const next = withRenewalBudget(raw, budget);
+      const next = await withRenewalBudget(raw, budget, environment);
       await lock.verify();
       await writePrivateFile(
         path,
