@@ -10,6 +10,7 @@ import {
   unfitOutcome,
 } from '@gyblos/buyer/free-execution';
 import { BYTES_PER_TOKEN, MIN_FITTED_ANSWER } from '@gyblos/buyer/input-size';
+import { fittingSelect } from '@gyblos/buyer/session-free';
 import { SELLER_SELECTION_CODES } from '@gyblos/core/constants';
 import { DECLARED_METER } from '@gyblos/node/free-meter';
 import {
@@ -261,4 +262,30 @@ void test('no seller fitting the conversation reaches the client as a full conte
   } finally {
     await server.close();
   }
+});
+
+void test('session selection passes over free sellers that cannot hold the conversation, in every busy policy', async () => {
+  const offers: Record<string, ReturnType<typeof withContext>> = {
+    small: withContext(100),
+    large: withContext(32768),
+  };
+  const asked: string[] = [];
+  let unfit = 0;
+  const select = fittingSelect(
+    async (excluded) => {
+      const nodeId = ['small', 'large'].find((id) => !excluded.has(id))!;
+      asked.push(nodeId);
+      return { nodeId, quote: offers[nodeId]! };
+    },
+    input(2000, 4096),
+    () => {
+      unfit++;
+    },
+  );
+  const winner = await select(new Set(), AbortSignal.timeout(5000), {
+    priceCeilings: { inputAtomicPerMtok: '0', outputAtomicPerMtok: '0' },
+  });
+  assert.equal(winner.nodeId, 'large');
+  assert.deepEqual(asked, ['small', 'large']);
+  assert.equal(unfit, 1);
 });

@@ -35,7 +35,7 @@ import {
   selectConfiguredThenOpen,
 } from './quote-selection';
 import { classifyPaidError } from './session-errors';
-import { freeSessionExecution } from './session-free';
+import { fittingSelect, freeSessionExecution } from './session-free';
 import { makeManager, type SessionState } from './session-manager';
 import {
   checkDesktopPool,
@@ -254,7 +254,7 @@ function sessionExecutor(
     let unfit = false;
     const paidInput = withBatchOutputLimit(input);
     const ports: BuyerRoutePorts<ChatResult> = {
-      select:
+      select: fittingSelect(
         config.discovery?.paidAuto && !model?.sellerChoice
           ? (excluded, current, route) =>
               selectAffordableAutoQuote(
@@ -264,6 +264,11 @@ function sessionExecutor(
                 (quote) => manager.preflight(quote, paidInput, current),
               )
           : select,
+        input,
+        () => {
+          unfit = true;
+        },
+      ),
       free: freeSessionExecution(
         context,
         manager,

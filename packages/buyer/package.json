@@ -11,6 +11,7 @@
     "./chat-owned": "./src/chat-owned.ts",
     "./buyer-main": "./src/buyer-main.ts",
     "./session-errors": "./src/session-errors.ts",
+    "./session-free": "./src/session-free.ts",
     "./session-requirements": "./src/session-requirements.ts",
     "./constants": "./src/constants.ts",
     "./diagnostics": "./src/diagnostics.ts",
