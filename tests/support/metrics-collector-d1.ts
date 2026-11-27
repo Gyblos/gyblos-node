@@ -11,6 +11,8 @@ import type {
   D1Value,
 } from '@gyblos/metrics-collector/storage-d1';
 
+import { D1_LOG_KINDS, type D1LogEntry } from './d1-sqlite';
+
 const MIGRATIONS = new URL(
   '../../apps/metrics-collector/migrations/',
   import.meta.url,
@@ -20,16 +22,11 @@ export interface SqliteD1 extends D1Database {
   raw: DatabaseSync;
   rows(sql: string): D1Row[];
   // Every statement sent: direct reads/writes and each statement of every batch, with its parameters.
-  log: {
-    kind: 'direct' | 'batch';
-    batch: number;
-    sql: string;
-    params: D1Value[];
-  }[];
+  log: D1LogEntry[];
 }
 
 // D1 refuses a statement with more bound parameters than this; node:sqlite would not.
-const D1_MAX_BOUND_PARAMETERS = 100;
+export const D1_MAX_BOUND_PARAMETERS = 100;
 function checkParameters(params: D1Value[]) {
   if (params.length > D1_MAX_BOUND_PARAMETERS)
     throw new Error('too many SQL variables');
@@ -52,13 +49,13 @@ export function createCollectorD1(): SqliteD1 {
       return statement(sql, values);
     },
     all: () => {
-      log.push({ kind: 'direct', batch: 0, sql, params });
+      log.push({ kind: D1_LOG_KINDS.DIRECT, batch: 0, sql, params });
       return Promise.resolve({
         results: raw.prepare(sql).all(...params) as D1Row[],
       });
     },
     run: () => {
-      log.push({ kind: 'direct', batch: 0, sql, params });
+      log.push({ kind: D1_LOG_KINDS.DIRECT, batch: 0, sql, params });
       const result = raw.prepare(sql).run(...params);
       return Promise.resolve({ meta: { changes: Number(result.changes) } });
     },
@@ -78,7 +75,7 @@ export function createCollectorD1(): SqliteD1 {
         };
         pending.set(wrapped, () => {
           checkParameters(params);
-          log.push({ kind: 'batch', batch: batches, sql, params });
+          log.push({ kind: D1_LOG_KINDS.BATCH, batch: batches, sql, params });
           const query = raw.prepare(sql);
           // Like D1, a batched statement that returns rows (a SELECT) carries them in `results`.
           if (query.columns().length)
