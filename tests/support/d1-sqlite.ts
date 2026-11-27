@@ -30,8 +30,14 @@ export interface SqliteD1 extends D1Database {
   log: D1LogEntry[];
 }
 
+export const D1_LOG_KINDS = {
+  DIRECT: 'direct',
+  BATCH: 'batch',
+} as const;
+export type D1LogKind = (typeof D1_LOG_KINDS)[keyof typeof D1_LOG_KINDS];
+
 export interface D1LogEntry {
-  kind: 'direct' | 'batch';
+  kind: D1LogKind;
   batch: number;
   sql: string;
   params: D1Value[];
@@ -93,7 +99,7 @@ export async function createSqliteD1(): Promise<SqliteD1 | null> {
     params,
     bind: (...values) => statement(sql, values),
     all: async () => {
-      log.push({ kind: 'direct', batch: 0, sql, params });
+      log.push({ kind: D1_LOG_KINDS.DIRECT, batch: 0, sql, params });
       return {
         results: db
           .prepare(sql)
@@ -102,7 +108,7 @@ export async function createSqliteD1(): Promise<SqliteD1 | null> {
       };
     },
     run: async () => {
-      log.push({ kind: 'direct', batch: 0, sql, params });
+      log.push({ kind: D1_LOG_KINDS.DIRECT, batch: 0, sql, params });
       return run(sql, params);
     },
   });
@@ -116,7 +122,7 @@ export async function createSqliteD1(): Promise<SqliteD1 | null> {
       try {
         const results = statements.map((item) => {
           const { sql, params } = item as SqliteStatement;
-          log.push({ kind: 'batch', batch: batches, sql, params });
+          log.push({ kind: D1_LOG_KINDS.BATCH, batch: batches, sql, params });
           return run(sql, params);
         });
         db.exec('COMMIT');

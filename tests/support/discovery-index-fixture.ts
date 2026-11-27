@@ -194,11 +194,9 @@ export type HarnessKind = (typeof HARNESS_KINDS)[number];
 
 async function storageOf(kind: HarnessKind) {
   if (kind === 'memory')
-    return { storage: createMemoryStorage(), dump: () => '', database: null };
+    return { storage: createMemoryStorage(), dump: () => '' };
   const db = await createSqliteD1();
-  return db
-    ? { storage: createD1Storage(db), dump: () => db.dump(), database: db }
-    : null;
+  return db ? { storage: createD1Storage(db), dump: () => db.dump() } : null;
 }
 
 export interface PublishOptions {
@@ -276,7 +274,6 @@ export async function indexHarness(
     entries: recorded.entries,
     // The adapter itself, for storage-level checks such as uptime retention.
     storage: made.storage,
-    database: made.database,
   };
 }
 export type IndexHarness = NonNullable<

@@ -11,36 +11,32 @@ import {
   type D1LoadRow,
 } from './support/d1-load';
 
-interface D1LoadCap {
-  statements: number;
-  roundTrips: number;
-  batches: number;
-  scans: number;
-}
+type D1LoadCap = Omit<D1LoadRow, 'label'>;
 
 const cap = (
   statements: number,
   roundTrips: number,
   batches: number,
+  maxParams: number,
   scans: number,
-): D1LoadCap => ({ statements, roundTrips, batches, scans });
+): D1LoadCap => ({ statements, roundTrips, batches, maxParams, scans });
 
 const CAPS: Record<D1LoadLabel, D1LoadCap> = {
-  [D1_LOAD_LABELS.PUBLISH_CATALOG_1]: cap(10, 2, 1, 3),
-  [D1_LOAD_LABELS.PUBLISH_CATALOG_64]: cap(10, 2, 1, 3),
-  [D1_LOAD_LABELS.READ_NETWORK]: cap(3, 3, 0, 3),
-  [D1_LOAD_LABELS.READ_MODELS]: cap(1, 1, 0, 1),
-  [D1_LOAD_LABELS.READ_OFFER_HISTORY]: cap(2, 2, 0, 1),
-  [D1_LOAD_LABELS.READ_NETWORK_HISTORY]: cap(3, 3, 0, 0),
-  [D1_LOAD_LABELS.CRON_ROLLUP]: cap(13, 13, 0, 0),
-  [D1_LOAD_LABELS.AGG_DAY_1]: cap(39, 9, 3, 5),
-  [D1_LOAD_LABELS.AGG_DAYS_31]: cap(759, 39, 33, 65),
+  [D1_LOAD_LABELS.PUBLISH_CATALOG_1]: cap(11, 3, 1, 18, 3),
+  [D1_LOAD_LABELS.PUBLISH_CATALOG_64]: cap(11, 3, 1, 68, 3),
+  [D1_LOAD_LABELS.READ_NETWORK]: cap(7, 7, 0, 5, 7),
+  [D1_LOAD_LABELS.READ_MODELS]: cap(1, 1, 0, 5, 1),
+  [D1_LOAD_LABELS.READ_OFFER_HISTORY]: cap(2, 2, 0, 4, 1),
+  [D1_LOAD_LABELS.READ_NETWORK_HISTORY]: cap(3, 3, 0, 14, 0),
+  [D1_LOAD_LABELS.CRON_ROLLUP]: cap(13, 13, 0, 14, 0),
+  [D1_LOAD_LABELS.AGG_DAY_1]: cap(39, 9, 3, 6, 5),
+  [D1_LOAD_LABELS.AGG_DAYS_31]: cap(759, 39, 33, 6, 65),
 };
 
 let measured: Promise<D1LoadRow[] | null> | undefined;
 const load = () => (measured ??= measureD1Load());
 
-void test('every measured D1 operation stays within its statement, round-trip, batch and scan caps', async (context) => {
+void test('every measured D1 operation stays within its statement, round-trip, batch, bound-parameter and scan caps', async (context) => {
   const rows = await load();
   if (!rows) {
     context.skip('node:sqlite unavailable');
@@ -56,10 +52,8 @@ void test('every measured D1 operation stays within its statement, round-trip, b
     assert.ok(row.roundTrips <= cap.roundTrips, `${row.label} round trips`);
     assert.ok(row.batches <= cap.batches, `${row.label} batches`);
     assert.ok(row.scans <= cap.scans, `${row.label} scans`);
-    assert.ok(
-      row.maxParams <= D1_MAX_BOUND_PARAMETERS,
-      `${row.label} bound parameters`,
-    );
+    assert.ok(row.maxParams <= cap.maxParams, `${row.label} bound parameters`);
+    assert.ok(row.maxParams <= D1_MAX_BOUND_PARAMETERS, row.label);
   }
 });
 

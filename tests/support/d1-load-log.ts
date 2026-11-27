@@ -1,4 +1,5 @@
 import {
+  D1_LOG_KINDS,
   explainD1Statement,
   type D1LogEntry,
   type SqliteD1,
@@ -30,21 +31,22 @@ export interface D1LoadRow {
 
 const FULL_SCAN = /^SCAN (?!CONSTANT ROW)/;
 
-export function summarizeD1Log(
+function summarizeD1Log(
   label: D1LoadLabel,
   entries: readonly D1LogEntry[],
   database: Pick<SqliteD1, 'raw'>,
 ): D1LoadRow {
   const batches = new Set(
     entries
-      .filter((entry) => entry.kind === 'batch')
+      .filter((entry) => entry.kind === D1_LOG_KINDS.BATCH)
       .map((entry) => entry.batch),
   ).size;
   return {
     label,
     statements: entries.length,
     roundTrips:
-      entries.filter((entry) => entry.kind === 'direct').length + batches,
+      entries.filter((entry) => entry.kind === D1_LOG_KINDS.DIRECT).length +
+      batches,
     batches,
     maxParams: Math.max(0, ...entries.map((entry) => entry.params.length)),
     scans: entries.filter((entry) =>
