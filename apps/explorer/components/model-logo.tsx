@@ -1,9 +1,15 @@
 // Owns a model's maker mark: the family's monochrome icon drawn as a mask in the text color, so it
 // follows the theme; a model of no known family shows its initial instead.
-import { modelFamily } from '@gyblos/protocol/model-family';
+import type { ModelView } from '../lib/model-catalog';
 
-export function ModelLogo({ modelId }: { modelId: string }) {
-  const family = modelFamily(modelId);
+export function ModelLogo({
+  modelId,
+  view,
+}: {
+  modelId: string;
+  view: Pick<ModelView, 'family'>;
+}) {
+  const { family } = view;
   if (!family)
     return (
       <span
@@ -17,7 +23,6 @@ export function ModelLogo({ modelId }: { modelId: string }) {
   return (
     <span
       aria-hidden
-      title={family}
       className="inline-flex size-5 shrink-0 items-center justify-center rounded-md bg-raised"
     >
       <span className="size-3.5 bg-ink" style={{ mask, WebkitMask: mask }} />

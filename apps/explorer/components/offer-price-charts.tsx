@@ -3,6 +3,7 @@
 import { useState } from 'react';
 
 import { count, short, usdcDecimal, utcMinute } from '../lib/format';
+import type { CatalogModels } from '../lib/model-catalog';
 import type { getOfferPriceHistory } from '../lib/offer-price-history';
 import { BarChartCard } from './board/bar-chart-card';
 import { Select } from './board/select';
@@ -16,9 +17,11 @@ type Series = Awaited<
 export function OfferPriceCharts({
   series,
   bySeller,
+  models,
 }: {
   series: Series[];
   bySeller: boolean;
+  models?: CatalogModels;
 }) {
   const [key, setKey] = useState('');
   const selected = series.find((item) => item.key === key) ?? series[0];
@@ -41,7 +44,7 @@ export function OfferPriceCharts({
         {bySeller ? (
           <SellerCell nodeId={selected.nodeId} github={null} />
         ) : (
-          <ModelName {...selected} />
+          <ModelName {...selected} models={models} />
         )}
         {options.length > 1 ? (
           <Select
