@@ -5,12 +5,13 @@ checks (gates), synthetic acceptance runs and operational tools. Product code
 never imports `lab/`. "Gate" is a lab word only; pull requests have required
 checks, not gates.
 
-| Path           | Contents                                                                                            |
-| -------------- | --------------------------------------------------------------------------------------------------- |
-| `lab/harness`  | `@gyblos/lab-harness`: gate commands, acceptance runs and their fixtures.                           |
-| `lab/tools`    | Identity tools: `pnpm identity:fixtures` and the authorized-only `pnpm identity:devnet-run`.        |
-| `lab/evidence` | Curated, redacted reports from earlier authorized runs ([Published evidence](#published-evidence)). |
-| `lab/docs`     | The pages listed below.                                                                             |
+| Path                     | Contents                                                                                            |
+| ------------------------ | --------------------------------------------------------------------------------------------------- |
+| `lab/harness`            | `@gyblos/lab-harness`: gate commands, acceptance runs and their fixtures.                           |
+| `lab/tools`              | Identity tools: `pnpm identity:fixtures` and the authorized-only `pnpm identity:devnet-run`.        |
+| `lab/tools/agent-replay` | `pnpm lab:agent-replay`: an agent session against local sellers (see below).                        |
+| `lab/evidence`           | Curated, redacted reports from earlier authorized runs ([Published evidence](#published-evidence)). |
+| `lab/docs`               | The pages listed below.                                                                             |
 
 ## Lab pages
 
@@ -21,6 +22,19 @@ checks, not gates.
 
 [tests/README.md](../tests/README.md) lists every acceptance run and how the
 offline suites report counts.
+
+## Agent replay
+
+`pnpm lab:agent-replay` measures what a coding agent waits for. It starts 1, 2
+and 3 local free sellers and the real free buyer HTTP, all offline and on a real
+clock. The sellers use a paced synthetic engine and renew on the production
+tick. It then replays an OpenCode turn (3 parallel requests) and a 10-turn tool
+loop.
+
+For each request it writes a JSONL line with time to headers, time to first
+token, total time, HTTP status and code, and the seller that served it. It
+prints a summary with percentiles, failures and seller cooldowns. `--out <dir>`
+keeps the file; `--ollama` uses the gate Ollama engine. Results are in #640.
 
 ## Batch-settlement channel check
 
