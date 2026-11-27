@@ -185,3 +185,45 @@ void test('a confirmed pinned seller requires spendable escrow or a verified and
     undefined,
   );
 });
+
+void test('paid Auto can select the sole remaining seller using verified switching credit', async () => {
+  const { pinnedFundingNotice } = await import('@gyblos/desktop/funding-model');
+  const policy = { payer, maxAtomic: '10000', depositAtomic: '1000000' };
+  const nextSeller = {
+    network: DEVNET,
+    payer,
+    balanceAtomic: null,
+    faucetAvailable: false,
+    channelRemainingAtomic: null,
+    switchingAtomic: '20000',
+    channelBlocker: SESSION_CODES.REPLACEMENT_REQUIRED,
+  };
+  assert.equal(autoFundingAvailable(policy, [nextSeller], true), true);
+  assert.equal(
+    autoFundingAvailable(policy, [nextSeller]),
+    nextSeller.channelBlocker,
+  );
+  assert.ok(pinnedFundingNotice(nextSeller, policy));
+  for (const observation of [
+    { ...nextSeller, switchingAtomic: '9999' },
+    { ...nextSeller, channelRemainingAtomic: '0' },
+    { ...nextSeller, switchingAtomic: undefined, replacementAtomic: '20000' },
+  ]) {
+    assert.equal(
+      autoFundingAvailable(
+        policy,
+        [{ ...observation, balanceAtomic: '2000000' }],
+        true,
+      ),
+      nextSeller.channelBlocker,
+    );
+  }
+  assert.equal(
+    autoFundingAvailable(
+      policy,
+      [{ ...nextSeller, channelBlocker: SESSION_CODES.CLOSED }],
+      true,
+    ),
+    SESSION_CODES.CLOSED,
+  );
+});

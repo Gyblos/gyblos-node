@@ -322,7 +322,7 @@ export function DesktopApp() {
         ),
       );
       if (attempt !== autoAttempt.current) return;
-      const available = autoFundingAvailable(policy, funding);
+      const available = autoFundingAvailable(policy, funding, !!paid);
       if (available !== true) {
         setToast(autoFundingNotice(available));
         navigate(UI_VIEW.PAYMENTS);

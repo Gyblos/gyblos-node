@@ -92,12 +92,24 @@ type FundingPolicy = {
 export function autoFundingAvailable(
   policy: FundingPolicy,
   observations: readonly (BuyerFunding | null)[],
+  paidAutoSelection = false,
 ) {
   const deposit = policy.depositAtomic;
   if (!deposit || !observations.length) return null;
   const capacity = observations.map((item) => {
     if (!item || item.payer !== policy.payer) return null;
-    if (item.channelBlocker) return item.channelBlocker;
+    if (item.channelBlocker) {
+      const fundedSwitch =
+        paidAutoSelection &&
+        item.channelBlocker === SESSION_CODES.REPLACEMENT_REQUIRED &&
+        !item.poolLimited &&
+        !item.channelId &&
+        item.channelRemainingAtomic === null &&
+        item.replacementAtomic === undefined &&
+        item.switchingAtomic !== undefined &&
+        BigInt(item.switchingAtomic) >= BigInt(policy.maxAtomic);
+      return fundedSwitch || item.channelBlocker;
+    }
     if (item.poolLimited) return FUNDING.channelLimit;
     const escrow = item.channelRemainingAtomic ?? item.switchingAtomic;
     if (escrow != null && BigInt(escrow) >= BigInt(policy.maxAtomic))
