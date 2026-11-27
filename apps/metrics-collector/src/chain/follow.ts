@@ -104,7 +104,7 @@ async function followChannel(
       run.now,
       run.lease,
     ),
-    ...transactionWrites(run.orm, read, run.now),
+    ...transactionWrites(run.orm, read, run.now, run.lease),
   ]);
   if (failure) throw failure;
 }
@@ -150,6 +150,7 @@ export async function refreshChannels(run: ChainRun) {
         state: channelState(accounts[index] ?? null),
       })),
       run.now,
+      run.lease,
     );
     if (first) await run.orm.batch([first, ...rest]);
     read += batch.length;

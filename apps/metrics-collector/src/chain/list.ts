@@ -48,7 +48,7 @@ async function storeListPage(
     await run.orm.batch([
       cursorUpdate(run.orm, CHAIN_CURSOR_ID, cursor, run.now, run.lease),
       ...programCounts(run.orm, stored, run.now, run.lease),
-      ...transactionWrites(run.orm, read, run.now),
+      ...transactionWrites(run.orm, read, run.now, run.lease),
     ]);
     run.cursor = cursor;
     run.listed += stored.length;

@@ -64,6 +64,28 @@ function chunksFor<T>(
 
 const owned = (lease: number | null) =>
   sql`exists (select 1 from ${chainCursor} where ${chainCursor.id} = ${CHAIN_CURSOR_ID} and ${chainCursor.leaseUntil} = ${lease})`;
+const tuples = (rows: readonly Record<string, unknown>[]) =>
+  sql.join(
+    rows.map(
+      (row) =>
+        sql`(${sql.join(
+          Object.values(row).map((value) => sql`${value}`),
+          sql`, `,
+        )})`,
+    ),
+    sql`, `,
+  );
+const ownedInsert = <T extends SQLiteTable>(
+  orm: CollectorDatabase,
+  table: T,
+  chunk: Record<string, unknown>[],
+  lease: number | null,
+) =>
+  orm
+    .insert(table)
+    .select(
+      sql`select * from (values ${tuples(chunk)}) where ${owned(lease)}`,
+    );
 export function cursorUpdate(
   orm: CollectorDatabase,
   id: number,
@@ -238,20 +260,21 @@ export function transactionWrites(
   orm: CollectorDatabase,
   transactions: ChainTransaction[],
   now: number,
+  lease: number | null,
 ): BatchItem[] {
   const rows = rowsOf(transactions, now);
   return [
-    ...chunksFor(chainTxs, rows.txs).map((chunk) =>
-      orm.insert(chainTxs).values(chunk).onConflictDoNothing(),
+    ...chunksFor(chainTxs, rows.txs, 2).map((chunk) =>
+      ownedInsert(orm, chainTxs, chunk, lease).onConflictDoNothing(),
     ),
-    ...chunksFor(chainInstructions, rows.instructions).map((chunk) =>
-      orm.insert(chainInstructions).values(chunk).onConflictDoNothing(),
+    ...chunksFor(chainInstructions, rows.instructions, 2).map((chunk) =>
+      ownedInsert(orm, chainInstructions, chunk, lease).onConflictDoNothing(),
     ),
-    ...chunksFor(chainTokenDeltas, rows.deltas).map((chunk) =>
-      orm.insert(chainTokenDeltas).values(chunk).onConflictDoNothing(),
+    ...chunksFor(chainTokenDeltas, rows.deltas, 2).map((chunk) =>
+      ownedInsert(orm, chainTokenDeltas, chunk, lease).onConflictDoNothing(),
     ),
-    ...chunksFor(chainChannels, rows.channels).map((chunk) =>
-      orm.insert(chainChannels).values(chunk).onConflictDoUpdate({
+    ...chunksFor(chainChannels, rows.channels, 2).map((chunk) =>
+      ownedInsert(orm, chainChannels, chunk, lease).onConflictDoUpdate({
         target: chainChannels.channel,
         set: channelMerge,
       }),
@@ -265,6 +288,7 @@ export function channelStateUpserts(
   orm: CollectorDatabase,
   states: { channel: string; state: ChannelState }[],
   now: number,
+  lease: number | null,
 ): BatchItem[] {
   const rows = states.map(({ channel, state }) => ({
     ...blankChannel(channel, '', 0, now),
@@ -274,23 +298,20 @@ export function channelStateUpserts(
     payoutAtomic: atomic(state.payoutAtomic),
     accountReadAt: now,
   }));
-  return chunksFor(chainChannels, rows).map((chunk) =>
-    orm
-      .insert(chainChannels)
-      .values(chunk)
-      .onConflictDoUpdate({
-        target: chainChannels.channel,
-        set: {
-          status: sql`excluded.status`,
-          depositAtomic: sql`coalesce(excluded.deposit_atomic, ${chainChannels.depositAtomic})`,
-          settledAtomic: sql`coalesce(excluded.settled_atomic, ${chainChannels.settledAtomic})`,
-          payoutAtomic: sql`coalesce(excluded.payout_atomic, ${chainChannels.payoutAtomic})`,
-          accountReadAt: sql`excluded.account_read_at`,
-          updatedAt: sql`excluded.updated_at`,
-          // A closed channel is no longer followed.
-          following: sql`case when excluded.status = ${CHAIN_CHANNEL_CLOSED} then 0 else ${chainChannels.following} end`,
-        },
-      }),
+  return chunksFor(chainChannels, rows, 2).map((chunk) =>
+    ownedInsert(orm, chainChannels, chunk, lease).onConflictDoUpdate({
+      target: chainChannels.channel,
+      set: {
+        status: sql`excluded.status`,
+        depositAtomic: sql`coalesce(excluded.deposit_atomic, ${chainChannels.depositAtomic})`,
+        settledAtomic: sql`coalesce(excluded.settled_atomic, ${chainChannels.settledAtomic})`,
+        payoutAtomic: sql`coalesce(excluded.payout_atomic, ${chainChannels.payoutAtomic})`,
+        accountReadAt: sql`excluded.account_read_at`,
+        updatedAt: sql`excluded.updated_at`,
+        // A closed channel is no longer followed.
+        following: sql`case when excluded.status = ${CHAIN_CHANNEL_CLOSED} then 0 else ${chainChannels.following} end`,
+      },
+    }),
   );
 }
 
