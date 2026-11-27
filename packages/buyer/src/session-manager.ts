@@ -230,9 +230,7 @@ export function makeManager(
     endpoint,
     now: Date.now,
     inspect: inspectSingle,
-    backend: async () => {
-      return (options.batch ?? buyerSessionChain)(role);
-    },
+    backend: async () => (options.batch ?? buyerSessionChain)(role),
     destination: sessionDestination(context, state, policy),
     meter: activeMeter(state),
     transport: {
