@@ -328,15 +328,28 @@ void test('the three APIs keep the HTTP stream status and expose the key review 
           response.headers.get('content-type') ?? '',
           /text\/event-stream/,
         );
-        const event = events(await response.text()).at(-1);
+        const stream = await response.text();
+        const terminal = stream
+          .trimEnd()
+          .split(/\r?\n\r?\n/)
+          .at(-1);
+        assert.ok(terminal);
+        const names = terminal
+          .split(/\r?\n/)
+          .filter((line) => line.startsWith('event:'));
+        const event = events(terminal)[0];
         if (responses) {
+          assert.deepEqual(names, ['event: response.failed']);
           assert.equal(event.type, 'response.failed');
           assert.equal(
             event.response.error[BUYER_API.ERROR_CODE_FIELD],
             BUYER_KEY_CODES.REVIEW,
           );
         } else {
-          if (path === CHAT_ROUTES.messages) assert.equal(event.type, 'error');
+          if (path === CHAT_ROUTES.messages) {
+            assert.deepEqual(names, ['event: error']);
+            assert.equal(event.type, 'error');
+          } else assert.deepEqual(names, []);
           assert.equal(event.error.code, BUYER_KEY_CODES.REVIEW);
         }
       }
