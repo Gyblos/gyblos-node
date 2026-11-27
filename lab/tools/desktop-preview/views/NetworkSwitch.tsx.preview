@@ -5,7 +5,7 @@ function PreviewNetwork() {
   const network = usePreviewNetwork();
   const choose = (next: (typeof PREVIEW_NETWORKS)[number]) => {
     const params = new URLSearchParams(location.search);
-    if (next === 'Mainnet') params.set(PREVIEW_QUERY.NETWORK, PREVIEW_QUERY.NETWORK_MAINNET);
+    if (next === PREVIEW_NETWORK.MAINNET) params.set(PREVIEW_QUERY.NETWORK, PREVIEW_QUERY.NETWORK_MAINNET);
     else params.delete(PREVIEW_QUERY.NETWORK);
     history.replaceState(null, '', '?' + params.toString());
     window.dispatchEvent(new Event(PREVIEW_EVENT.NETWORK));
@@ -15,7 +15,7 @@ function PreviewNetwork() {
       <div className="preview-network" role="group" aria-label="Network">
         <span className="preview-network-single" data-network="mainnet">
           <span className="preview-network-dot" aria-hidden="true" />
-          Mainnet
+          {PREVIEW_NETWORK.MAINNET}
         </span>
       </div>
     );
@@ -24,11 +24,11 @@ function PreviewNetwork() {
       className="preview-network"
       role="radiogroup"
       aria-label="Network"
-      title={network === 'Testnet' ? 'Testnet uses test funds. After December 9 it stays available for developers through Settings.' : 'Mainnet is shown for review; the preview keeps example data.'}
+      title={network === PREVIEW_NETWORK.TESTNET ? 'Testnet uses test funds. After December 9 it stays available for developers through Settings.' : 'Mainnet is shown for review; the preview keeps example data.'}
       onKeyDown={(event) => {
         if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
         event.preventDefault();
-        const next = network === 'Testnet' ? 'Mainnet' : 'Testnet';
+        const next = network === PREVIEW_NETWORK.TESTNET ? PREVIEW_NETWORK.MAINNET : PREVIEW_NETWORK.TESTNET;
         choose(next);
         event.currentTarget.querySelector<HTMLButtonElement>('[data-network="' + next.toLowerCase() + '"]')?.focus();
       }}

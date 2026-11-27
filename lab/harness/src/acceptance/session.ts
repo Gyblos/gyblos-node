@@ -24,7 +24,7 @@ export async function createAcceptanceSession(
   signal: AbortSignal,
   extras: Pick<
     AcceptanceHostOptions,
-    'offer' | 'tokenizer' | 'admissionClock'
+    'offer' | 'tokenizer' | 'admissionClock' | 'offerSet'
   > & {
     index?: AcceptanceIndex;
     clock?: AcceptanceClock;
@@ -62,6 +62,7 @@ export async function createAcceptanceSession(
       signal,
       offer: extras.offer,
       tokenizer: extras.tokenizer,
+      offerSet: extras.offerSet,
     };
     host = await startAcceptanceHost({ ...options, wire });
     let state = await buyerDiscoveryState(workspace.environment);

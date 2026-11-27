@@ -760,15 +760,6 @@
 .desktop-frame .output-scroll > .ui-empty {
   min-height: 100%;
 }
-.desktop-frame .sidebar-meta .ui-icon-button {
-  width: var(--control-size);
-  height: var(--control-size);
-}
-.desktop-frame .sidebar-toggle > svg {
-  animation: none;
-  transition: none;
-  transform: none;
-}
 @media (max-width: 700px) {
   .desktop-frame {
     --page-gutter: 12px;
@@ -1366,18 +1357,6 @@
   gap: 4px;
 }
 
-/* Sidebar-owned controls start at the window edge, above its own menu. */
-.sidebar-controls {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  width: 100%;
-  height: var(--shell-header-height);
-  margin-bottom: 4px;
-  flex-shrink: 0;
-}
-.desktop-frame .sidebar-controls,
 .desktop-frame > .topbar {
   --control-size: var(--shell-control-size);
 }
@@ -1416,11 +1395,6 @@
   top: anchor(top);
   left: anchor(right);
   margin: 0 0 0 var(--overlay-gap);
-}
-.sidebar-controls .ui-tooltip {
-  top: anchor(bottom);
-  left: anchor(left);
-  margin: var(--overlay-gap) 0 0;
 }
 @media (prefers-reduced-motion: reduce) {
   .ui-tooltip {

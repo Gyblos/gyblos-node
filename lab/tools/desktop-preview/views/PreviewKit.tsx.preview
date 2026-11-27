@@ -6,7 +6,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, useSyn
 
 import { AGENT_TOOLS, type AgentTool } from '@gyblos/node/agent-setup-constants';
 
-import { CHAT_FILTER, CHAT_STATE, PREVIEW_DENSITY, PREVIEW_FUNDING, PREVIEW_QUERY } from '../../../../lab/tools/desktop-preview/constants';
+import { CHAT_FILTER, CHAT_STATE, PREVIEW_DENSITY, PREVIEW_FUNDING, PREVIEW_NETWORK, PREVIEW_QUERY } from '../../../../lab/tools/desktop-preview/constants';
 import { DESKTOP_UPDATE } from '../constants';
 import { observeDesktopUpdates } from '../update-session';
 import type { BuyerFunding } from '../funding/model';
@@ -450,7 +450,10 @@ export function previewSetting<K extends keyof PreviewSettings>(key: K) {
 }
 
 export const PREVIEW_EVENT = { NETWORK: 'preview:network', UPDATE: 'preview:update' } as const;
-export const PREVIEW_NETWORKS = ['Testnet', 'Mainnet'] as const;
+export const PREVIEW_NETWORKS = [
+  PREVIEW_NETWORK.TESTNET,
+  PREVIEW_NETWORK.MAINNET,
+] as const;
 
 let availableUpdate: string | null = null;
 let stopUpdates: (() => void) | undefined;
@@ -581,7 +584,8 @@ function subscribeNetwork(listener: () => void) {
 export function usePreviewNetwork(): PreviewNetworkName {
   const showTestnet = usePreviewSetting('showTestnet');
   return useSyncExternalStore(subscribeNetwork, (): PreviewNetworkName =>
-    !showTestnet || new URLSearchParams(location.search).get(PREVIEW_QUERY.NETWORK) === PREVIEW_QUERY.NETWORK_MAINNET ? 'Mainnet' : 'Testnet',
+    !showTestnet || new URLSearchParams(location.search).get(PREVIEW_QUERY.NETWORK) === PREVIEW_QUERY.NETWORK_MAINNET ? PREVIEW_NETWORK.MAINNET
+    : PREVIEW_NETWORK.TESTNET,
   );
 }
 
@@ -688,7 +692,7 @@ export function PreviewFundsDialog({ host, description, refreshFunding }: { host
     <MotionPresence>
       {open && (
         <Modal title={'Add funds · ' + network} description={description} close={() => updateFunds({ open: false })}>
-          {network === 'Testnet' ? <AddBuyerFunds /> : <PreviewMainnetFunds />}
+          {network === PREVIEW_NETWORK.TESTNET ? <AddBuyerFunds /> : <PreviewMainnetFunds />}
           <Button className="wide" onClick={() => {
             updateFunds({ atomic: PREVIEW_FUNDING.READY_ATOMIC, open: false });
             refreshFunding?.();
