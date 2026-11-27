@@ -8,9 +8,12 @@ import test from 'node:test';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 
+import { PAYPAL_ACTION } from '@gyblos/desktop/paypal-model';
 import { DESKTOP } from '@gyblos/desktop/window-chrome';
+import { X402_ACTION } from '@gyblos/desktop/x402-model';
 
 import { buildPreview } from './build';
+import { PREVIEW_FAILURE } from './constants';
 
 async function render(root: string, url: URL, width: number) {
   const { stdout } = await promisify(execFile)(
@@ -116,3 +119,88 @@ void test('the design-system dialog hides the action tooltip while its label is 
     await rm(root, { recursive: true, force: true });
   }
 });
+
+void test('a restored USDC failure renders one recovery explanation and preserves the next draft at minimum width', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'gyblos-failed-turn-'));
+  try {
+    const output = await buildPreview(join(root, 'dist'));
+    const url = pathToFileURL(join(output, 'index.html'));
+    for (const theme of ['light', 'dark']) {
+      url.search = new URLSearchParams({
+        screen: 'chat',
+        review: PREVIEW_FAILURE.SHARED,
+        theme,
+      }).toString();
+      const html = await render(root, url, DESKTOP.MIN_WIDTH);
+      const turn = html.match(
+        /<article class="chat-answer".*?<\/article>/s,
+      )?.[0];
+      assert.ok(turn);
+      assert.equal(turn.match(/role="status"/g)?.length, 1);
+      assert.match(turn, /final charge is unknown/);
+      assert.match(turn, /paused Desktop and connected tools/);
+      assert.match(turn, /<button[^>]*>Check status<\/button>/);
+      assert.doesNotMatch(turn, /Response unavailable/);
+      assert.match(html, /How should I handle an empty file\?/);
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+for (const example of [
+  PREVIEW_FAILURE.SHARED,
+  PREVIEW_FAILURE.STOP,
+  PREVIEW_FAILURE.PAYPAL,
+  PREVIEW_FAILURE.DECLINED,
+  PREVIEW_FAILURE.EXPIRED,
+  PREVIEW_FAILURE.SHARED_UNSENT,
+  PREVIEW_FAILURE.PARTIAL_LIMIT,
+  PREVIEW_FAILURE.EMPTY_LIMIT,
+  PREVIEW_FAILURE.OTHER_TURN,
+  PREVIEW_FAILURE.REVIEW_ERROR,
+]) {
+  const proof =
+    example === PREVIEW_FAILURE.OTHER_TURN
+      ? 'other-turn'
+      : example === PREVIEW_FAILURE.REVIEW_ERROR
+        ? 'error'
+        : undefined;
+  const review = proof ? PREVIEW_FAILURE.INTERRUPTED : example;
+  void test(`shipped chat preserves independent recovery actions for ${example}`, async () => {
+    const root = await mkdtemp(join(tmpdir(), 'gyblos-failed-turn-'));
+    try {
+      const preview = await buildPreview(join(root, 'dist'));
+      const output = join(preview, 'desktop');
+      await copyFile(join(preview, 'preview.js'), join(output, 'preview.js'));
+      const probe = await readFile(
+        new URL('./check-failed-turn.ts', import.meta.url),
+        'utf8',
+      );
+      await writeFile(
+        join(output, 'probe.mjs'),
+        stripTypeScriptTypes(probe) +
+          `\ncheckFailedTurn(${JSON.stringify(PREVIEW_FAILURE)}, ${JSON.stringify(X402_ACTION.SEND)}, ${JSON.stringify(X402_ACTION.REVIEW)}, ${JSON.stringify(PAYPAL_ACTION.SEND)}).catch(error => { document.documentElement.dataset.recoveryPassed = error.message; });`,
+      );
+      const entry = join(output, 'index.html');
+      const html = await readFile(entry, 'utf8');
+      await writeFile(
+        entry,
+        html.replace(
+          '<script type="module"',
+          '<script src="./preview.js"></script><script type="module" src="./probe.mjs"></script><script type="module"',
+        ),
+      );
+      const url = pathToFileURL(entry);
+      url.search = new URLSearchParams({
+        screen: 'chat',
+        review,
+        ...(proof && { 'status-proof': proof }),
+      }).toString();
+      const result = await render(root, url, DESKTOP.MIN_WIDTH);
+      assert.equal(/data-recovery-passed="([^"]+)"/.exec(result)?.[1], 'yes');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+}

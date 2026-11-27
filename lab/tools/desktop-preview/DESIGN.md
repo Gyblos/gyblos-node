@@ -46,10 +46,10 @@ or extend a shared component (in `PreviewKit` for proposals) and add its row her
 in the same change. Agents load this through the
 [`gyblos-desktop-ui` skill](../../../.agents/skills/gyblos-desktop-ui/SKILL.md).
 
-This table governs the mockup. `CodeBlock`, `DetailSummary`, `Tag`,
+This table governs the mockup. The preview and desktop share the shipped `Notice` component. `CodeBlock`, `DetailSummary`, `Tag`,
 `statusTone`, `FilterChips`, `Delta`, `Savings`, `SegmentedBar`, `StatGrid`,
 `Panel`, `TableRow`, `AmountEditor`, `CompactAmount`, `PreviewAnswerSkeleton`,
-`Notice`, `Switch`, `PreviewFundsDialog`, `PreviewStatusBar`,
+`Switch`, `PreviewFundsDialog`, `PreviewStatusBar`,
 `PreviewUpdateButton`, `PreviewSkeletonRows`, `PreviewInlineSpinner`,
 `PreviewEmptyLine`, `PreviewSectionIcon`, `Kbd`, `PreviewToaster` / `showPreviewToast`,
 `PreviewConversationPanel`, `PreviewConversationMenu`, `PreviewChatDetails`,

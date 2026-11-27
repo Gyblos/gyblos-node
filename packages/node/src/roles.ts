@@ -18,6 +18,7 @@ import {
   FILE_MODES,
   homeLayout,
   KEY_LIMITS,
+  LOOPBACK_HOST_NAMES,
   ROLE_FILES,
   ROLE_KEY_FILES,
   rolePathIn,
@@ -282,6 +283,12 @@ export async function setupRole(options: SetupOptions) {
     process.env.GYBLOS_RPC_URL ?? DEVNET_RPC_URL,
     NODE_ERROR_CODES.INVALID_ROLE_CONFIGURATION,
   );
+  const parsedRpc = new URL(rpcUrl);
+  if (
+    parsedRpc.protocol === 'http:' &&
+    !LOOPBACK_HOST_NAMES.some((host) => host === parsedRpc.hostname)
+  )
+    throw new NodeError(NODE_ERROR_CODES.INVALID_ROLE_CONFIGURATION);
   await mkdir(roleDirectory(role), {
     recursive: true,
     mode: FILE_MODES.privateDirectory,

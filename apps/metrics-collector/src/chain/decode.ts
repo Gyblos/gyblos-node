@@ -14,7 +14,14 @@ import {
   type ChainInstructionKind,
 } from '../constants';
 import { base58Decode, base58Encode } from './base58';
-import { ChainShapeError, list, nullable, num, record, text } from './json';
+import {
+  boundedNum,
+  ChainShapeError,
+  list,
+  nullable,
+  record,
+  text,
+} from './json';
 
 export interface SplitRecipient {
   owner: string;
@@ -312,11 +319,11 @@ export function decodeTransaction(value: unknown): ChainTransaction {
     ? { instructions: [], memos: [], undecodable: 0 }
     : programInstructions(message);
   const blockTime = nullable(tx.blockTime, (present) =>
-    num(present, 'blockTime'),
+    boundedNum(present, 'blockTime', 0, CHAIN_INDEX.maxBlockTimeSec),
   );
   return {
     signature,
-    slot: num(tx.slot, 'slot'),
+    slot: boundedNum(tx.slot, 'slot', 0, CHAIN_INDEX.maxSlot),
     blockTimeMs:
       blockTime === null ? null : blockTime * CHAIN_INDEX.msPerSecond,
     failed,

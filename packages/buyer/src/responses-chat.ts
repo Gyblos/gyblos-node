@@ -159,9 +159,11 @@ function responsesTools(value: unknown): ToolDefinition[] | undefined {
   if (value === undefined || value === null) return undefined;
   if (!Array.isArray(value))
     throw invalidChat('tools', FREE_CHAT_DETAILS.tools);
-  const offered = value.filter(
-    (tool: unknown) =>
-      !(isRow(tool) && RESPONSES_CHAT.skippedTools.includes(String(tool.type))),
+  const kept = (tool: unknown) =>
+    !(isRow(tool) && RESPONSES_CHAT.skippedTools.includes(String(tool.type)));
+  const offered = value.filter(kept);
+  const positions = value.flatMap((tool: unknown, index) =>
+    kept(tool) ? [index] : [],
   );
   if (value.some(mcpGroup)) warnMcpOnce();
   return openAiTools(
@@ -176,6 +178,7 @@ function responsesTools(value: unknown): ToolDefinition[] | undefined {
       const { type, ...fn } = tool;
       return { type, function: fn };
     }),
+    positions,
   );
 }
 

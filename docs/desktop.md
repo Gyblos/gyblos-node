@@ -120,12 +120,31 @@ units.
 ## Local history
 
 Conversations and drafts are saved privately in the persistent desktop profile,
-with model and payment labels and opaque PayPal or x402 session links.
-Credentials and signed payment payloads are excluded. Storage is local, not
-synchronized, and conversation content is not encrypted.
+with model and payment labels and opaque PayPal or x402 session links. Failed
+turns can record a fixed reason such as an unresolved API key reservation or a
+seller refusal. The archive omits remote error text. Credentials and signed
+payment payloads are excluded. Storage is local, not synchronized, and
+conversation content is not encrypted.
 
 - Restoring history never resumes inference, acknowledges a response or
-  authorizes spending. An incomplete response reopens as interrupted.
+  authorizes spending. An incomplete response reopens as interrupted. The turn
+  shows its recovery action. A verified pre-dispatch refusal records that the
+  turn incurred no charge. When an earlier key reservation caused the refusal,
+  the turn retains its spending review action. Editing a declined question
+  preserves an existing draft in its conversation. A budget status check cannot
+  establish a charge for the specific turn. Check status on a key review reads
+  whether the authenticated key ledger currently allows requests. A key review
+  refusal asks clients to stop automatic retries. Each client controls its retry
+  behavior. Before streaming starts, a review refusal returns HTTP 503 for Chat
+  Completions and Anthropic Messages or HTTP 400 for Responses, with
+  `x-should-retry: false` in each case. A stream that has already started keeps
+  HTTP 200 and signals the failure in its final event. For interrupted paid
+  responses it can reconcile local spending records against verified payment
+  evidence. When the original session is unavailable, review the payment history
+  in Payments.
+- Earlier desktop versions may decline to load archives containing newer turn
+  metadata. An unreadable archive disables saving and preserves the original
+  file. Reopen it with the newer desktop version to recover the conversations.
 - x402 history holds verified references and amounts, or an explicit free result
   with no hash. Uncertain values never appear as confirmed spending or available
   balance.

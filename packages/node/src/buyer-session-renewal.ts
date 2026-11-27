@@ -8,6 +8,7 @@ import {
 } from '@gyblos/protocol/payment-session';
 import type { BatchDestination } from '@gyblos/transport-iroh/batch-client';
 
+import type { StartChannelWork } from './buyer-channel-prepare';
 import { checkPreviousOpening } from './buyer-opening-state';
 import { UnsentSellerBusyError } from './buyer-routing';
 import type { Current, State } from './buyer-session';
@@ -20,6 +21,7 @@ export async function prepareRenewal<Remote extends BatchDestination>(
   signal: AbortSignal,
   switching: boolean,
   canRenew: boolean,
+  start: StartChannelWork,
 ) {
   const options = state.options;
   if (
@@ -65,7 +67,7 @@ export async function prepareRenewal<Remote extends BatchDestination>(
     replacement(snapshot.cumulativeAtomic);
   const settlement = snapshot.channelId
     ? ((await opened.host.reconcile(signal)) ??
-      (await opened.host.close(signal)))
+      (await start(() => opened.host.close(signal))))
     : undefined;
   const terms = replacement(settlement?.chargedAtomic ?? '0');
   await verifyBatchQuote(

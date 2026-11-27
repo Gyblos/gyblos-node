@@ -38,8 +38,13 @@ import { BUYER_API, type BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 import { BUYER_API_KEYS } from '@gyblos/protocol/buyer-api-keys';
 
 import { accountBudgetSnapshot, accountLimitError } from './account-budget';
-import { previewChatSeed } from './chat-seed';
-import { PREVIEW } from './constants';
+import {
+  previewChatSeed,
+  previewChatTitles,
+  seedFailedTurn,
+  sharedReviewFailure,
+} from './chat-seed';
+import { PREVIEW, PREVIEW_FAILURE } from './constants';
 import { exampleKeys } from './example-keys';
 import { previewFunding } from './funding';
 import { requestObject as read, type AgentExamples } from './input';
@@ -51,6 +56,7 @@ export function createPreviewHost(
   agentExamples: AgentExamples,
 ) {
   const query = new URLSearchParams(search);
+  const failedTurn = query.get('review') === PREVIEW_FAILURE.SHARED;
   const ready = query.get('connection-state') !== 'unconfigured';
   const example = '00000000-0000-4000-8000-000000000001';
   const now = Date.now();
@@ -101,20 +107,7 @@ export function createPreviewHost(
     });
   }
   const tenChats = query.get('review') === 'ten-chats';
-  const titles = [
-    'Product launch plan',
-    'Explain vector search',
-    'Research assistant',
-  ];
-  if (tenChats)
-    titles.push(
-      'Review API changes',
-      'Plan the onboarding flow',
-      'Compare model outputs',
-      'Summarize meeting notes',
-      'Explore search ranking',
-      'Outline a release checklist',
-    );
+  const titles = previewChatTitles(tenChats);
   const seeded: string[] = [];
   function exampleChat(title: string, receiptId: string) {
     const conversationId = conversations.getSnapshot().activeId;
@@ -152,7 +145,11 @@ export function createPreviewHost(
     conversations.newChat(crypto.randomUUID());
   }
   Object.assign(window, { previewChatSeed: previewChatSeed(seeded) });
-  exampleChat('How can I use Gyblos in my coding tools?', 'preview-free-reply');
+  if (!seedFailedTurn(conversations, chatModel, sessionId, query.get('review')))
+    exampleChat(
+      'How can I use Gyblos in my coding tools?',
+      'preview-free-reply',
+    );
   let archive = projectChatArchive(conversations.getSnapshot());
 
   const desktopWindow = { platform: windowPlatform(PREVIEW.platform) };
@@ -230,6 +227,7 @@ export function createPreviewHost(
       summary: {
         ...emptyX402(),
         active,
+        blocked: failedTurn,
         policy: connected ? policy : null,
         sessionId: authorized ? sessionId : null,
         limitAtomic,
@@ -280,6 +278,8 @@ export function createPreviewHost(
         await navigator.clipboard.writeText(payer);
       if (request.action === X402_ACTION.COPY_MINT)
         await navigator.clipboard.writeText(DEVNET_USDC);
+      if (failedTurn && request.action === X402_ACTION.SEND)
+        return { ...buyerState(), ...sharedReviewFailure };
       if (request.action === X402_ACTION.SEND) {
         await new Promise((resolve) =>
           window.setTimeout(resolve, PREVIEW.replyDelayMs),

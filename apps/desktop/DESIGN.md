@@ -25,6 +25,8 @@ Develop visual proposals in the isolated browser preview first:
 
 The desktop uses the approved terminal mark and palette. The isolated preview supplies example records to exercise the same components. The Electron renderer obtains wallet, key, catalog and spending observations through its existing host bridges.
 
+Failed Chat turns use the shared `Notice` component beside their recovery action. The notice stays with the question in history.
+
 ## Shared sources
 
 - `src/theme.ts`: light/dark semantic colors. The primary accent is `#0a28f0`.

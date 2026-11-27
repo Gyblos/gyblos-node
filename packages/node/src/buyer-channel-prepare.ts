@@ -43,6 +43,48 @@ export class UnsentChannelRequestError extends Error {
   }
 }
 
+async function withChannelAuthorization<T>(
+  authorize: BuyerSessionOptions<BatchDestination>['authorizeRequest'],
+  quote: SignedOfferV2,
+  signal: AbortSignal,
+  start: () => Promise<T>,
+): Promise<T> {
+  signal.throwIfAborted();
+  if (authorize) {
+    const release = await authorize(quote, signal);
+    if (signal.aborted) {
+      await release?.().catch(() => undefined);
+      signal.throwIfAborted();
+    }
+  }
+  return start();
+}
+
+export type StartChannelWork = <T>(work: () => Promise<T>) => Promise<T>;
+
+export function channelTurnAuthority(
+  authorize: BuyerSessionOptions<BatchDestination>['authorizeRequest'],
+  quote: SignedOfferV2,
+  signal: AbortSignal,
+) {
+  let started = false;
+  let pending: Promise<void> | undefined;
+  const start: StartChannelWork = (work) => {
+    signal.throwIfAborted();
+    if (started || !authorize) return work();
+    let finishWrite!: () => void;
+    pending = new Promise<void>((resolve) => {
+      finishWrite = resolve;
+    });
+    return withChannelAuthorization(authorize, quote, signal, () => {
+      started = true;
+      finishWrite();
+      return work();
+    }).finally(finishWrite);
+  };
+  return { start, settled: () => pending };
+}
+
 export async function verifyUnsentPoolQuote(
   quote: SignedOfferV2,
   terms: PaymentSessionTerms,

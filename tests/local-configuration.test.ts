@@ -147,6 +147,34 @@ void test(
 );
 
 void test(
+  'role setup rejects a remote plain-http RPC like seller rpc set does',
+  { skip: NATIVE_CAPABILITY.bindingSkip },
+  async () => {
+    const { setupRole } = await import('@gyblos/node/roles');
+    const directory = await mkdtemp(join(tmpdir(), 'gyblos-http-role-'));
+    const original = process.cwd();
+    const previousRpc = process.env.GYBLOS_RPC_URL;
+    try {
+      process.chdir(directory);
+      process.env.GYBLOS_RPC_URL = 'http://rpc.provider.example:8899';
+      await assert.rejects(
+        setupRole({ role: P2P_ROLES.BUYER, mint: ADDRESS }),
+        { code: NODE_ERROR_CODES.INVALID_ROLE_CONFIGURATION },
+      );
+      process.env.GYBLOS_RPC_URL = 'http://localhost:8899';
+      await setupRole({ role: P2P_ROLES.BUYER, mint: ADDRESS });
+      process.env.GYBLOS_RPC_URL = 'https://rpc.provider.example';
+      await setupRole({ role: P2P_ROLES.SELLER, mint: ADDRESS });
+    } finally {
+      if (previousRpc === undefined) delete process.env.GYBLOS_RPC_URL;
+      else process.env.GYBLOS_RPC_URL = previousRpc;
+      process.chdir(original);
+      await rm(directory, { recursive: true, force: true });
+    }
+  },
+);
+
+void test(
   'local roles reject unknown and cross-role fields without echoing input',
   { skip: NATIVE_CAPABILITY.bindingSkip },
   async () => {

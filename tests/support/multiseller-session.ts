@@ -22,16 +22,17 @@ export async function multisellerSession(
     sellers: ['34'.repeat(32), '56'.repeat(32)],
   },
   totalDepositAtomic = '20000',
+  depositAtomic = '10000',
 ) {
   const a = await sessionRig({
-    depositAtomic: '10000',
+    depositAtomic,
     buyerNodeId: nodes.buyerNodeId,
     sellerNodeId: nodes.sellers[0]!,
     transaction: 'syntheticConfirmedClose',
     treasury: PROTOCOL_FEE.treasury,
   });
   const b = await sessionRig({
-    depositAtomic: '10000',
+    depositAtomic,
     buyerNodeId: a.terms.buyerNodeId,
     sellerNodeId: nodes.sellers[1]!,
     transaction: 'syntheticConfirmedClose',
@@ -93,7 +94,7 @@ export async function multisellerSession(
     },
     options: {
       policy: {
-        depositAtomic: '10000',
+        depositAtomic,
         totalDepositAtomic,
         lifetimeMs: 3600000,
         withdrawDelaySeconds: 900,
@@ -111,8 +112,15 @@ export async function multisellerSession(
   };
 }
 
-export async function multisellerLoopback(totalDepositAtomic = '20000') {
-  const fixture = await multisellerSession(undefined, totalDepositAtomic);
+export async function multisellerLoopback(
+  totalDepositAtomic = '20000',
+  depositAtomic?: string,
+) {
+  const fixture = await multisellerSession(
+    undefined,
+    totalDepositAtomic,
+    depositAtomic,
+  );
   const wires = await Promise.all(
     fixture.rigs.map((rig, index) =>
       batchLoopback(

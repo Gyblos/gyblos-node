@@ -13,6 +13,7 @@ import {
   parseBuyerApiKeyCommand,
 } from '@gyblos/protocol/buyer-api-keys';
 
+import { UnsentKeyReview } from './api-key-execution';
 import { FREE_BUYER } from './constants';
 import type { ChatErrorView } from './free-http';
 
@@ -102,7 +103,8 @@ export function buyerApiKeyErrorView(
         : error.code === BUYER_KEY_CODES.REVOKED
           ? HTTP_STATUS.forbidden
           : HTTP_STATUS.badRequest,
-    neverSent: error.code !== BUYER_KEY_CODES.REVIEW,
+    neverSent:
+      error.code !== BUYER_KEY_CODES.REVIEW || error instanceof UnsentKeyReview,
     stop: {},
     detail:
       error.code === BUYER_KEY_CODES.LIMIT

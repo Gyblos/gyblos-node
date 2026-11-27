@@ -47,3 +47,17 @@ export const PREVIEW = {
   host: '127.0.0.1',
   port: 5196,
 } as const;
+
+export const PREVIEW_FAILURE = {
+  SHARED: 'failed-turn',
+  STOP: 'live-stop',
+  SHARED_UNSENT: 'unsent-shared-review',
+  DECLINED: 'declined-turn',
+  EXPIRED: 'expired-quote',
+  PAYPAL: 'paypal-turn',
+  OTHER_TURN: 'unbound-review',
+  REVIEW_ERROR: 'review-error',
+  INTERRUPTED: 'uncertain-turn',
+  PARTIAL_LIMIT: 'partial-free-limit',
+  EMPTY_LIMIT: 'empty-free-limit',
+} as const;

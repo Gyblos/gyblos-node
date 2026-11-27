@@ -77,13 +77,14 @@ export async function sendPaypalMessage(
     );
   });
   try {
-    await paypal.send();
+    const reason = await paypal.send();
     if (!received)
       chat.failPaypal(
         origin,
         id,
         paypal.getSnapshot().notice ||
           'Response unavailable. Review the session in Payments before sending again.',
+        reason,
       );
   } finally {
     unsubscribe();

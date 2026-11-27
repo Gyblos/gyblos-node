@@ -104,6 +104,7 @@ export const BUYER_SELECTION = {
 export const BUYER_DISCOVERY = {
   stateFile: 'discovery-state-v2.json',
   lockFile: 'discovery-state-v2.lock',
+  lockStaleMs: 30_000,
   schemaVersion: 1,
   maxPages: 8,
   wrapStart: { radix: 16, digits: 8, nodeIdDigits: 64 },
