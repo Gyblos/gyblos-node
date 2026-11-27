@@ -228,6 +228,62 @@ void test('truncated reference candidates cannot produce a signed seller verdict
   }
 });
 
+void test('low-probability empty reference alternatives do not reject usable candidates', async () => {
+  let calls = 0;
+  const candidates = Array.from(
+    { length: CHALLENGE_SET.rule.topLogprobs },
+    (_, index) => ({
+      token: index === 0 ? '' : ` token${index}`,
+      logprob: index === 0 ? -21 : -0.1,
+    }),
+  );
+  const fetchImpl: typeof fetch = async (input) => {
+    if (String(input).endsWith('/api/tags'))
+      return Response.json({
+        models: [{ name: 'qwen3:1.7b', digest: DIGEST }],
+      });
+    calls++;
+    return Response.json({
+      response: ' token1',
+      done: true,
+      logprobs: [{ top_logprobs: candidates }],
+    });
+  };
+  const reference = await openReference(
+    'http://127.0.0.1:11434',
+    'qwen3-1.7b',
+    fetchImpl,
+    0,
+  );
+  assert.deepEqual(
+    await reference.candidates('prompt', CHALLENGE_SET.rule.topLogprobs),
+    candidates,
+  );
+  assert.equal(calls, 1);
+});
+
+void test('a decision-changing empty reference alternative is unavailable', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'gyblos-verifier-ref-'));
+  try {
+    await assert.rejects(
+      runReferenceVerification(home, {
+        tag: 'qwen3:1.7b',
+        digest: DIGEST,
+        candidates: async () => [
+          { token: '', logprob: -0.1 },
+          { token: ' unlikely', logprob: -0.2 },
+        ],
+        confirm: async () => {},
+      }),
+      (error: unknown) =>
+        error instanceof ModelVerifierError &&
+        error.code === MODEL_VERIFIER_CODES.REFERENCE_UNAVAILABLE,
+    );
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
 void test('malformed reference candidates are rejected at the boundary', async () => {
   const valid = Array.from(
     { length: CHALLENGE_SET.rule.topLogprobs },
@@ -237,10 +293,8 @@ void test('malformed reference candidates are rejected at the boundary', async (
     ['truncated', valid.slice(0, 1)],
     ['extra', [...valid, { token: ' extra', logprob: -0.1 }]],
     [
-      'empty token',
-      valid.map((candidate, index) =>
-        index === 0 ? { ...candidate, token: '' } : candidate,
-      ),
+      'all empty tokens',
+      valid.map((candidate) => ({ ...candidate, token: '' })),
     ],
     [
       'positive logprob',
