@@ -46,11 +46,15 @@ export interface ChainCursorState {
 const atomic = (value: bigint | null) =>
   value === null ? null : value.toString();
 // Rows per statement so every column of `table` fits under the parameter limit.
-function chunksFor<T>(table: SQLiteTable, rows: readonly T[]): T[][] {
+function chunksFor<T>(
+  table: SQLiteTable,
+  rows: readonly T[],
+  reserved = 0,
+): T[][] {
   const columns = Object.keys(getTableColumns(table)).length;
   const size = Math.max(
     1,
-    Math.floor(COLLECTOR_LIMITS.maxBoundParameters / columns),
+    Math.floor((COLLECTOR_LIMITS.maxBoundParameters - reserved) / columns),
   );
   const result: T[][] = [];
   for (let start = 0; start < rows.length; start += size)
@@ -314,7 +318,7 @@ export function programCounts(
     updatedAt: now,
   }));
   return [
-    ...chunksFor(chainProgramDaily, rows).map((chunk) => {
+    ...chunksFor(chainProgramDaily, rows, 2).map((chunk) => {
       const values = sql.join(
         chunk.map(
           (row) =>

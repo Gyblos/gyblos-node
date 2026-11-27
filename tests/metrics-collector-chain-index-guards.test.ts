@@ -432,3 +432,17 @@ void test('a run that lost its lease never moves a followed channel cursor', asy
     [{ follow_until: 'sig-start' }],
   );
 });
+
+void test('a page spanning more days than one count statement holds stays countable', async () => {
+  const database = createCollectorD1();
+  const DAY_MS = 86_400_000;
+  const base = Date.UTC(2026, 11, 28);
+  const history = Array.from({ length: 27 }, (_, index) =>
+    withSignature(`day${index}`, undefined, {
+      blockTimeMs: base - index * DAY_MS,
+    }),
+  );
+  const { rpc } = fakeChainRpc(history);
+  await runChainIndex(database, endpoints(rpc), 1000);
+  assert.equal(counted(database), 27);
+});
