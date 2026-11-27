@@ -10,6 +10,7 @@ import {
 } from './app';
 import { chainEndpoints } from './chain/endpoints';
 import {
+  CHAIN_PHASES,
   ChainIndexError,
   runChainIndex,
   type ChainIndexResult,
@@ -126,6 +127,7 @@ export async function scheduledAggregation(bindings: unknown, now: number) {
   if (!isDatabase(database)) return undefined;
   const result = await runAggregation(database, now);
   // Day names only (no request data): a day that keeps failing must be visible in the Worker logs.
+  if (result.scanFailed) console.warn(COLLECTOR_AGGREGATION_FAILED, 'scan');
   if (result.failed.length)
     console.warn(COLLECTOR_AGGREGATION_FAILED, result.failed.join(','));
   if (result.chain.scanFailed)
@@ -227,6 +229,8 @@ export async function scheduledChainIndex(
       chainFailureReason(cause),
       `public=${primary.calls} publicLimited=${primary.rateLimited} publicWrongNetwork=${primary.wrongNetwork} paid=${fallback.calls} paidLimited=${fallback.rateLimited} paidWrongNetwork=${fallback.wrongNetwork}`,
     );
+    if (error instanceof ChainIndexError && error.cleanupFailed)
+      console.warn(COLLECTOR_CHAIN_INDEX_FAILED, CHAIN_PHASES.RELEASE);
     return undefined;
   }
 }

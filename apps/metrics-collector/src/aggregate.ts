@@ -73,6 +73,7 @@ export interface AggregationResult {
   failed: string[];
   // Dirty days are left for the next run.
   more: boolean;
+  scanFailed: boolean;
   // The chain days, scanned and recomputed after and apart from the receipt days.
   chain: ChainAggregationResult;
 }
@@ -342,18 +343,25 @@ export async function runAggregation(
   now: number,
 ): Promise<AggregationResult> {
   const orm = createD1Orm(database);
-  await scan(orm, now);
-  // Newest first: today's numbers are never starved by old days marked dirty.
-  const dirty = await orm
-    .select({ day: aggDirtyDays.day })
-    .from(aggDirtyDays)
-    .orderBy(desc(aggDirtyDays.day))
-    .limit(AGGREGATES.maxDaysPerRun + 1);
   const result: Omit<AggregationResult, 'chain'> = {
     days: [],
     failed: [],
-    more: dirty.length > AGGREGATES.maxDaysPerRun,
+    more: false,
+    scanFailed: false,
   };
+  let dirty: { day: string }[] = [];
+  try {
+    await scan(orm, now);
+    // Newest first: today's numbers are never starved by old days marked dirty.
+    dirty = await orm
+      .select({ day: aggDirtyDays.day })
+      .from(aggDirtyDays)
+      .orderBy(desc(aggDirtyDays.day))
+      .limit(AGGREGATES.maxDaysPerRun + 1);
+  } catch {
+    result.scanFailed = true;
+  }
+  result.more = dirty.length > AGGREGATES.maxDaysPerRun;
   for (const { day } of dirty.slice(0, AGGREGATES.maxDaysPerRun)) {
     const bounds = dayBounds(day);
     try {

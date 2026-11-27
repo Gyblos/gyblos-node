@@ -24,6 +24,7 @@ export const CHAIN_PHASES = {
   BACKFILL: 'backfill',
   FOLLOW: 'follow',
   ACCOUNTS: 'accounts',
+  RELEASE: 'release',
 } as const;
 export type ChainPhase = (typeof CHAIN_PHASES)[keyof typeof CHAIN_PHASES];
 
@@ -32,6 +33,7 @@ export class ChainIndexError extends Error {
   constructor(
     readonly phase: ChainPhase,
     readonly cause: unknown,
+    readonly cleanupFailed = false,
   ) {
     super(`chain index failed in ${phase}`);
     this.name = 'ChainIndexError';
@@ -82,9 +84,10 @@ async function acquireLease(orm: CollectorDatabase, now: number) {
       updatedAt: now,
     })
     .onConflictDoNothing();
+  const leaseUntil = now + CHAIN_INDEX.leaseMs;
   const taken = await orm
     .update(chainCursor)
-    .set({ leaseUntil: now + CHAIN_INDEX.leaseMs })
+    .set({ leaseUntil })
     .where(
       and(
         eq(chainCursor.id, CHAIN_CURSOR_ID),
@@ -92,13 +95,18 @@ async function acquireLease(orm: CollectorDatabase, now: number) {
       ),
     )
     .returning({ id: chainCursor.id });
-  return taken.length > 0;
+  return taken.length ? leaseUntil : null;
 }
-const releaseLease = (orm: CollectorDatabase) =>
+const releaseLease = (orm: CollectorDatabase, leaseUntil: number) =>
   orm
     .update(chainCursor)
     .set({ leaseUntil: null })
-    .where(eq(chainCursor.id, CHAIN_CURSOR_ID));
+    .where(
+      and(
+        eq(chainCursor.id, CHAIN_CURSOR_ID),
+        eq(chainCursor.leaseUntil, leaseUntil),
+      ),
+    );
 
 async function readPhases(run: ChainRun) {
   let failure: ChainIndexError | undefined;
@@ -152,12 +160,31 @@ export async function runChainIndex(
     usage: rpc.usage(),
     cursor: run.cursor,
   });
-  if (!(await acquireLease(orm, now))) return result(true, 0);
+  const leaseUntil = await acquireLease(orm, now);
+  if (leaseUntil === null) return result(true, 0);
+  let failure: unknown;
+  let channels = 0;
   try {
-    const { channels, failure } = await readPhases(run);
-    if (failure) throw failure;
-    return result(false, channels);
-  } finally {
-    await releaseLease(orm);
+    const phases = await readPhases(run);
+    channels = phases.channels;
+    if (phases.failure) throw phases.failure;
+  } catch (error) {
+    failure = error;
   }
+  let releaseError: unknown;
+  try {
+    await releaseLease(orm, leaseUntil);
+  } catch (error) {
+    releaseError = error;
+  }
+  if (failure instanceof ChainIndexError)
+    throw new ChainIndexError(
+      failure.phase,
+      failure.cause,
+      releaseError !== undefined,
+    );
+  if (failure !== undefined) throw failure;
+  if (releaseError !== undefined)
+    throw new ChainIndexError(CHAIN_PHASES.RELEASE, releaseError);
+  return result(false, channels);
 }
