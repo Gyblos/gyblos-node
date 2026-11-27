@@ -66,33 +66,36 @@ async function fundingSource(ports: FundingPorts, event: Sender) {
   };
   return url && current() ? { policy, url, current } : null;
 }
+async function fundingAction(
+  ports: FundingPorts,
+  sharedBalance: FundingPorts['balance'],
+  event: Sender,
+  args: readonly unknown[],
+  kind: typeof FUNDING.copy | typeof FUNDING.faucet,
+) {
+  if (args.length !== 1 || typeof args[0] !== 'string') return false;
+  try {
+    const target = await fundingSource(ports, event);
+    if (!target || target.policy.payer !== args[0]) return false;
+    if (kind === FUNDING.copy) ports.copy(target.policy.payer);
+    else {
+      if (
+        (await sharedBalance(target.policy.payer, target.url)) === null ||
+        !target.current()
+      )
+        return false;
+      await ports.open(FUNDING.circle);
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function fundingHandlers(ports: FundingPorts) {
   const sharedBalance = coalesceBalance(ports.balance);
   let last:
     { payer: string; url: string; atomic: string; at: number } | undefined;
-  async function action(
-    event: Sender,
-    args: readonly unknown[],
-    kind: typeof FUNDING.copy | typeof FUNDING.faucet,
-  ) {
-    if (args.length !== 1 || typeof args[0] !== 'string') return false;
-    try {
-      const target = await fundingSource(ports, event);
-      if (!target || target.policy.payer !== args[0]) return false;
-      if (kind === FUNDING.copy) ports.copy(target.policy.payer);
-      else {
-        if (
-          (await sharedBalance(target.policy.payer, target.url)) === null ||
-          !target.current()
-        )
-          return false;
-        await ports.open(FUNDING.circle);
-      }
-      return true;
-    } catch {
-      return false;
-    }
-  }
   return {
     async balance(
       event: Sender,
@@ -137,6 +140,7 @@ export function fundingHandlers(ports: FundingPorts) {
           balanceAtomic,
           faucetAvailable: balanceAtomic !== null,
           channelRemainingAtomic: channel?.channelRemainingAtomic ?? null,
+          ...(channel?.channelId && { channelId: channel.channelId }),
           ...(channel?.blocker && { channelBlocker: channel.blocker }),
           ...switching,
         };
@@ -145,8 +149,8 @@ export function fundingHandlers(ports: FundingPorts) {
       }
     },
     copy: (event: Sender, args: readonly unknown[]) =>
-      action(event, args, FUNDING.copy),
+      fundingAction(ports, sharedBalance, event, args, FUNDING.copy),
     faucet: (event: Sender, args: readonly unknown[]) =>
-      action(event, args, FUNDING.faucet),
+      fundingAction(ports, sharedBalance, event, args, FUNDING.faucet),
   };
 }

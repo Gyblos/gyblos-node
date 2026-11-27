@@ -154,3 +154,33 @@ void test('buyer credential review and an incompatible pin refuse the route befo
     await rig.dispose();
   }
 });
+
+void test('existing escrow must cover the selected response ceiling before a paid turn can reuse it', async (t) => {
+  const rig = await sessionRig({ depositAtomic: '400' });
+  t.after(rig.dispose);
+  await rig.open();
+  await rig.serve(1, '200');
+  const remainder = BigInt(rig.terms.depositAtomic) - 200n;
+  const route = {
+    payer: rig.terms.buyer,
+    network: rig.terms.network,
+    mint: rig.terms.mint,
+    nodeId: rig.terms.sellerNodeId,
+    owner: rig.terms.owner,
+  };
+  const decide = (maxAtomic: string) =>
+    paidChannelEligibility(
+      { GYBLOS_HOME: rig.root },
+      { ...route, maxAtomic },
+      rig.now,
+      async () => SESSION_STATES.OPEN,
+      new AbortController().signal,
+    );
+  assert.equal((await decide(String(remainder))).blocker, null);
+  assert.equal(
+    (await decide(String(remainder + 1n))).blocker,
+    SESSION_CODES.REPLACEMENT_REQUIRED,
+  );
+  await rig.serve(2, String(remainder));
+  assert.equal((await decide('1')).blocker, SESSION_CODES.REPLACEMENT_REQUIRED);
+});

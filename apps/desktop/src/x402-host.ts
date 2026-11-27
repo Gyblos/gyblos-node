@@ -126,7 +126,7 @@ export function registerDesktopX402(
     environment,
     () => client.policy(),
     () => client.managed(),
-    async () => (await client.manageApiKeys()).snapshot.blocked,
+    (seller) => client.inspectChannel(seller),
     resolveOffer.resolve,
   );
   const owner = frameOwner(window);

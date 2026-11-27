@@ -231,6 +231,14 @@ for (const selectedSeller of [true, false]) {
       await channelFundingRemaining(environment, policy, seller),
       null,
     );
+    const live = await paidChannelEligibility(
+      environment,
+      { ...policy, ...seller, activeRequest: (id) => id === 'af'.repeat(16) },
+      rig.now,
+      async () => SESSION_STATES.OPEN,
+      new AbortController().signal,
+    );
+    assert.equal(live.channelRemainingAtomic, selectedSeller ? null : '960');
   });
 }
 

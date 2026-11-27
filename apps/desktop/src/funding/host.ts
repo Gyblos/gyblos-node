@@ -1,12 +1,7 @@
 // Main-process wiring; renderer receives only its validated buyer address and atomic amounts.
 import { clipboard, ipcMain, shell, type BrowserWindow } from 'electron';
 
-import {
-  observeChannelAt,
-  paidChannelEligibility,
-} from '@gyblos/buyer/channel-eligibility';
-import { PAYMENT_REVIEW } from '@gyblos/buyer/constants';
-import { loadBuyerSelectionConfig } from '@gyblos/buyer/selection-config';
+import type { PaidChannelEligibility } from '@gyblos/buyer/channel-eligibility';
 import type { HomeEnvironment } from '@gyblos/config/home';
 import {
   buyerUsdcBalance,
@@ -17,7 +12,6 @@ import type {
   BuyerApiPolicy,
   BuyerSellerChoice,
 } from '@gyblos/protocol/buyer-api';
-import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
 import { fundingHandlers } from './handlers';
 import { FUNDING } from './model';
@@ -27,7 +21,9 @@ export function registerFunding(
   environment: HomeEnvironment,
   policy: () => BuyerApiPolicy | null,
   managed: () => boolean,
-  credentialBlocked: () => Promise<boolean>,
+  inspectChannel: (
+    seller: BuyerSellerChoice,
+  ) => Promise<PaidChannelEligibility>,
   resolveOffer: (id: string) => BuyerSellerChoice | undefined,
 ) {
   const handlers = fundingHandlers({
@@ -44,31 +40,7 @@ export function registerFunding(
       managed()
         ? switchingCredit(environment, current, seller)
         : Promise.resolve(null),
-    remaining: async (current, seller, rpcUrl) => {
-      try {
-        const [blocked, config] = await Promise.all([
-          credentialBlocked(),
-          managed() ? loadBuyerSelectionConfig(environment) : undefined,
-        ]);
-        return paidChannelEligibility(
-          environment,
-          {
-            ...current,
-            ...seller,
-            credentialBlocked: blocked,
-            pinnedNodeId: config?.pinnedNodeId,
-          },
-          Date.now,
-          observeChannelAt(rpcUrl),
-          AbortSignal.timeout(PAYMENT_REVIEW.deadlineMs),
-        );
-      } catch {
-        return {
-          blocker: SESSION_CODES.STATUS_UNKNOWN,
-          channelRemainingAtomic: null,
-        };
-      }
-    },
+    remaining: (_current, seller) => inspectChannel(seller),
     copy: (text) => clipboard.writeText(text),
     open: (url) => shell.openExternal(url),
   });

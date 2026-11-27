@@ -29,6 +29,8 @@ import {
 } from '@gyblos/payments-upto/batch-session';
 import { canonicalJson } from '@gyblos/protocol';
 import { batchFail } from '@gyblos/protocol/batch-channel';
+import type { BuyerSellerChoice } from '@gyblos/protocol/buyer-api';
+import { BUYER_KEY_CODES, buyerKeyFail } from '@gyblos/protocol/buyer-api-keys';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
 import type { ChatTokenizer } from '@gyblos/protocol/engine';
@@ -196,7 +198,7 @@ function inspectSingle() {
   return inspectBatchSession(batchSessionPathsIn(process.env, P2P_ROLES.BUYER));
 }
 function keyProof(context: Context, options: Options): ConfirmKeyCharge {
-  return async (ref, scope) => {
+  return async (ref, scope, deadline) => {
     const pool = batchPoolPathsIn(process.env);
     const entries = await inspectBatchPool(pool, { includeLegacy: false });
     const slot = entries.find(
@@ -207,21 +209,60 @@ function keyProof(context: Context, options: Options): ConfirmKeyCharge {
       slot && !slot.legacy
         ? batchPoolChannelPaths(pool, ref.sellerNodeId)
         : pool.legacy;
-    return reviewPayment((signal) =>
-      finalizedKeyCharge(
-        paths,
-        ref,
-        scope,
-        context.endpoint.id().toString(),
-        (terms, channelId) =>
-          options.observeSettlement
-            ? options.observeSettlement(channelId)
-            : batchSessionObserver({
-                paths,
-                terms,
-                rpcUrl: context.role.rpcUrl,
-              }).settlement(channelId, signal),
-      ),
+    return reviewPayment(
+      (signal) =>
+        finalizedKeyCharge(
+          paths,
+          ref,
+          scope,
+          context.endpoint.id().toString(),
+          (terms, channelId) =>
+            options.observeSettlement
+              ? options.observeSettlement(channelId)
+              : batchSessionObserver({
+                  paths,
+                  terms,
+                  rpcUrl: context.role.rpcUrl,
+                }).settlement(channelId, signal),
+        ),
+      deadline,
+    );
+  };
+}
+function pickerChannel(
+  context: Context,
+  options: Options,
+  state: SessionState,
+) {
+  const config = context.prepared.config;
+  return (choice: BuyerSellerChoice, signal: AbortSignal) => {
+    if (context.role.role !== P2P_ROLES.BUYER)
+      return sessionFail(SESSION_CODES.BINDING);
+    const known = config.sellers.find(
+      (seller) => seller.nodeId === choice.nodeId,
+    );
+    if (
+      (known && known.owner !== choice.owner) ||
+      (!known && !config.discovery?.open)
+    )
+      return Promise.resolve({
+        blocker: SESSION_CODES.BINDING,
+        channelRemainingAtomic: null,
+      });
+    return paidChannelEligibility(
+      process.env,
+      {
+        ...choice,
+        payer: context.role.buyer,
+        network: config.request.network,
+        mint: config.request.asset,
+        maxAtomic: config.request.maxAtomic,
+        pinnedNodeId: config.pinnedNodeId,
+        activeRequest: (id) => state.selections.has(id),
+      },
+      options.channelClock ?? Date.now,
+      options.observeChannel ?? observeChannelAt(context.role.rpcUrl),
+      signal,
     );
   };
 }
@@ -247,9 +288,22 @@ function checkSelectedChannel(
       observe,
       AbortSignal.any([signal, AbortSignal.timeout(PAYMENT_REVIEW.deadlineMs)]),
     );
+    if (result.blocker === BUYER_KEY_CODES.REVIEW)
+      return buyerKeyFail(result.blocker);
     if (result.blocker)
       throw new UnsentSellerChoiceError(result.blocker, quote.offer.nodeId);
   };
+}
+async function unresolvedPool(totalDepositAtomic: string | undefined) {
+  if (totalDepositAtomic !== undefined) return false;
+  return (
+    await inspectBatchPool(batchPoolPathsIn(process.env), {
+      includeLegacy: false,
+    })
+  ).some(
+    (entry) =>
+      !entry.stored || entry.uncertain || !batchSessionTerminal(entry.stored),
+  );
 }
 export function makeManager(
   context: Context,
@@ -282,19 +336,7 @@ export function makeManager(
       beforeExecute: (request) =>
         state.sending.get(request.quote.offer.requestId)?.(),
     },
-    unresolved: async () => {
-      if (policy.totalDepositAtomic !== undefined) return false;
-      return (
-        await inspectBatchPool(batchPoolPathsIn(process.env), {
-          includeLegacy: false,
-        })
-      ).some(
-        (entry) =>
-          !entry.stored ||
-          entry.uncertain ||
-          !batchSessionTerminal(entry.stored),
-      );
-    },
+    unresolved: () => unresolvedPool(policy.totalDepositAtomic),
     checkReusableChannel: (quote, signal) =>
       checkChannel(quote, signal, state.openingIntent?.getStore()),
     verify: trustedQuote(context, state),
@@ -319,6 +361,7 @@ export function makeManager(
   return {
     ...manager,
     checkChannel,
+    inspectChannel: pickerChannel(context, options, state),
     confirmKeyCharge: keyProof(context, options),
     previousSeller: () =>
       previousSeller(policy.totalDepositAtomic, common.inspect),

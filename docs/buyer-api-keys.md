@@ -169,16 +169,23 @@ configured client keeps working with the same key.
 An interrupted paid reservation, a failed write or an inconsistent state fails
 closed. Unknown reservations also block operator inference and the creation of
 new keys. Revocation stays available and does not clear an obligation. The buyer
-checks the matching channel for finalized settlement at startup and on the next
-request. Checks start immediately and again at two and six seconds, with a
-ten-second deadline. A single abandoned reservation can be released or charged
-its attributable amount when the settlement matches the private usage records.
-Older reservations without an execution digest require proof of zero charge.
-Missing or conflicting proof keeps spending paused for both Desktop and coding
-tools. The buyer operator can request another check from Payments. A status
-check cannot fund a replacement or resubmit the original prompt.
+checks the matching channel for finalized settlement after an interrupted
+request, at startup and on the next request. Checks start immediately and again
+at two and six seconds, with a ten-second deadline. Each abandoned reservation
+can be released or charged its attributable amount when the settlement matches
+the private usage records. Older reservations without an execution digest
+require proof of zero charge. Missing or conflicting proof keeps spending paused
+for both Desktop and coding tools. The buyer operator can request another check
+from Payments. A status check cannot fund a replacement or resubmit the original
+prompt.
 
 > **Warning:** Never delete the permission ledger or its lock to resume
 > spending, and never restore an older copy. Doing so erases recorded
 > obligations, and the buyer cannot tell that spending authority was rolled
 > back.
+
+Desktop queries the running buyer with an owner-authenticated, policy-bound POST
+to `/v1/gyblos/channel-eligibility` carrying the selected listing. It returns a
+refusal code and available escrow for that route. The lookup never reserves
+funds or dispatches a request. A verified response ceiling above the available
+escrow requires replacement authorization.

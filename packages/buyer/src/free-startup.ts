@@ -64,6 +64,7 @@ export type BuyerExecutionFactory = (context: {
   sellerChoice?: boolean;
   singlePaidChannel?: boolean;
   preparePaidChat?: () => Promise<void>;
+  inspectChannel?: import('./channel-eligibility-http').InspectBuyerChannel;
   reconcilePool?: () => Promise<void>;
   token?: string;
   apiKeys?: BuyerApiKeys;
@@ -234,6 +235,7 @@ function buyerHttp(
         classify: execution?.classify,
         preparePaidChat: execution?.preparePaidChat,
         reconcilePool: execution?.reconcilePool,
+        inspectChannel: execution?.inspectChannel,
       },
     ),
   );

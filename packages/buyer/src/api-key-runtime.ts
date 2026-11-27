@@ -1,5 +1,6 @@
 // Adds buyer-owned delegated credentials to automatic execution; the operator token stays private.
 import { openBuyerApiKeys } from '@gyblos/node/buyer-api-key-storage';
+import { BUYER_KEY_CODES } from '@gyblos/protocol/buyer-api-keys';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 
 import type { BuyerExecutionFactory } from './free-startup';
@@ -31,6 +32,16 @@ export async function withBuyerApiKeys(
     return {
       ...runtime,
       apiKeys,
+      inspectChannel: runtime.inspectChannel
+        ? async (choice, signal) => {
+            if ((await apiKeys.snapshot()).blocked)
+              return {
+                blocker: BUYER_KEY_CODES.REVIEW,
+                channelRemainingAtomic: null,
+              };
+            return runtime.inspectChannel!(choice, signal);
+          }
+        : undefined,
       reconcilePool: runtime.confirmKeyCharge
         ? async () => {
             await apiKeys.reconcileAbandoned(true);

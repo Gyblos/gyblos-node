@@ -36,6 +36,7 @@ interface Selection {
   mint: string;
   nodeId: string;
   owner: string;
+  maxAtomic?: string;
   requestId?: string;
   replacementAuthorized?: boolean;
   pinnedNodeId?: string;
@@ -43,6 +44,7 @@ interface Selection {
   activeRequest?(id: string): boolean;
 }
 export interface PaidChannelEligibility {
+  channelId?: string;
   blocker: ChannelBlocker | null;
   channelRemainingAtomic: string | null;
 }
@@ -131,9 +133,15 @@ export async function paidChannelEligibility(
       BigInt(terms.depositAtomic) -
       BigInt(snapshot.cumulativeAtomic) -
       BigInt(snapshot.reservedAtomic);
-    return remaining < 0n
-      ? unavailable(SESSION_CODES.STATUS_UNKNOWN)
-      : { blocker: null, channelRemainingAtomic: String(remaining) };
+    if (remaining < 0n) return unavailable(SESSION_CODES.STATUS_UNKNOWN);
+    return {
+      blocker:
+        selection.maxAtomic && remaining < BigInt(selection.maxAtomic)
+          ? SESSION_CODES.REPLACEMENT_REQUIRED
+          : null,
+      channelRemainingAtomic: String(remaining),
+      channelId: snapshot.channelId,
+    };
   } catch {
     return unavailable(SESSION_CODES.STATUS_UNKNOWN);
   }

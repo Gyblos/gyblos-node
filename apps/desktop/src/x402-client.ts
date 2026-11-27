@@ -4,7 +4,11 @@ import { randomUUID } from 'node:crypto';
 
 import { AGENT_SETUP_CODES, AgentSetupError } from '@gyblos/node/agent-setup';
 import { PAID_BUYER_CODES } from '@gyblos/node/constants';
-import { BUYER_API, type BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
+import {
+  BUYER_API,
+  type BuyerApiPolicy,
+  type BuyerSellerChoice,
+} from '@gyblos/protocol/buyer-api';
 import type { BuyerApiKeyCommand } from '@gyblos/protocol/buyer-api-keys';
 import {
   FREE_CHAT_ROLES,
@@ -13,6 +17,7 @@ import {
 
 import { requestAgentEndpoint } from './agent-endpoint';
 import { desktopBuyerFailure } from './buyer-error';
+import { inspectDesktopChannel } from './funding/client';
 import { requestBuyerApiKeys } from './usdc-api-client';
 import { X402Budget } from './x402-budget';
 import {
@@ -135,6 +140,15 @@ export class X402Client {
     if (!connection?.reconcilesPool) return;
     await reconcileBuyerPool(connection, expected, this.request);
     if (this.connection !== connection) throw new Error('Unconfirmed payment');
+  }
+  inspectChannel(seller: BuyerSellerChoice) {
+    const connection = this.connection;
+    return inspectDesktopChannel(
+      connection,
+      seller,
+      this.request,
+      () => !this.closed && connection === this.connection,
+    );
   }
   manageApiKeys(command?: BuyerApiKeyCommand) {
     if (!this.connection || this.closed || (command && this.busy))

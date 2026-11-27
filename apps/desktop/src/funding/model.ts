@@ -26,6 +26,7 @@ export interface BuyerFunding {
   lastBalanceAtomic?: string;
   lastBalanceAt?: number;
   faucetAvailable: boolean;
+  channelId?: string;
   channelRemainingAtomic: string | null;
   switchingAtomic?: string;
   replacementAtomic?: string;
@@ -90,6 +91,11 @@ export function parseBuyerFunding(value: unknown): BuyerFunding | null {
       'channelRemainingAtomic',
       ...(value &&
       typeof value === 'object' &&
+      Object.hasOwn(value, 'channelId')
+        ? ['channelId']
+        : []),
+      ...(value &&
+      typeof value === 'object' &&
       Object.hasOwn(value, 'lastBalanceAtomic')
         ? ['lastBalanceAtomic', 'lastBalanceAt']
         : []),
@@ -124,6 +130,9 @@ export function parseBuyerFunding(value: unknown): BuyerFunding | null {
       return null;
     return {
       network: DEVNET,
+      ...(row.channelId !== undefined && {
+        channelId: controlAddress(row.channelId),
+      }),
       ...(row.lastBalanceAtomic !== undefined && {
         lastBalanceAtomic: controlAtomic(row.lastBalanceAtomic),
         lastBalanceAt: controlInteger(row.lastBalanceAt, 1),

@@ -1,5 +1,6 @@
 // Public local-buyer API names; these do not change the signed inference protocol.
 export const BUYER_API = {
+  CHANNEL_ELIGIBILITY_PATH: '/v1/gyblos/channel-eligibility',
   STATUS_PATH: '/v1/gyblos/status',
   RECONCILE_POOL_HEADER: 'gyblos-pool-reconciliation',
   RECONCILE_POOL_PATH: '/v1/gyblos/reconcile-pool',

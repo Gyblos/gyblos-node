@@ -29,6 +29,8 @@ import {
   type BuyerKeyReservation,
   type BuyerKeyState,
 } from './buyer-api-key-state';
+import { bounded } from './buyer-operation';
+import { BUYER_KEY_REVIEW } from './constants';
 
 export interface BuyerApiKeyFiles {
   read(): Promise<string | undefined>;
@@ -40,10 +42,11 @@ const digest = (value: string) => createHash('sha256').update(value).digest();
 export type ConfirmKeyCharge = (
   reservation: BuyerApiKeyQuote,
   scope: BuyerKeyScope,
+  signal: AbortSignal,
 ) => Promise<string | undefined>;
 export class BuyerApiKeys {
   private proof?: Promise<void>;
-  private checked?: string;
+  private readonly checked = new Set<string>();
   private failed = false;
   private closed = false;
   private queue: Promise<unknown> = Promise.resolve();
@@ -218,6 +221,7 @@ export class BuyerApiKeys {
       pending: this.state.pending.filter((entry) => entry.id !== id),
     });
     this.active.delete(id);
+    this.checked.delete(id);
   }
   reconcileAbandoned(manual = false) {
     if (!this.proof)
@@ -228,28 +232,50 @@ export class BuyerApiKeys {
   }
   private async recoverCharge(manual: boolean) {
     const prove = this.confirmCharge;
-    const [orphan] = this.state.pending;
-    if (
-      !prove ||
-      this.state.pending.length !== 1 ||
-      !orphan ||
-      (!manual && this.checked === orphan.id) ||
-      this.active.size
-    )
-      return;
-    this.checked = orphan.id;
-    const charge = await prove(orphan, this.state.scope).catch(() => undefined);
-    if (!this.closed && charge !== undefined)
-      await this.serial(async () => {
-        if (
-          !this.closed &&
-          this.state.pending.length === 1 &&
-          this.state.pending[0]?.id === orphan.id &&
-          !this.active.size
-        )
-          await this.finish(orphan.id, charge, BUYER_KEY_CHARGE.SETTLED);
-      });
+    if (!prove || this.closed) return;
+    const pending = this.state.pending.filter(
+      (row) =>
+        !this.active.has(row.id) &&
+        !this.state.pending.some(
+          (other) =>
+            other.id !== row.id &&
+            other.requestId === row.requestId &&
+            other.sellerNodeId === row.sellerNodeId,
+        ),
+    );
+    const unchecked = pending.filter((row) => !this.checked.has(row.id));
+    const queue = manual
+      ? [...unchecked, ...pending.filter((row) => this.checked.has(row.id))]
+      : unchecked;
+    const deadline = AbortSignal.timeout(BUYER_KEY_REVIEW.deadlineMs);
+    const review = async () => {
+      while (!deadline.aborted && !this.closed) {
+        const item = queue.shift();
+        if (!item) return;
+        this.checked.add(item.id);
+        const charge = await bounded(
+          prove(item, this.state.scope, deadline),
+          deadline,
+        ).catch(() => undefined);
+        if (charge === undefined) continue;
+        await this.serial(async () => {
+          if (
+            !this.closed &&
+            !this.active.has(item.id) &&
+            this.state.pending.some((row) => row === item)
+          )
+            await this.finish(item.id, charge, BUYER_KEY_CHARGE.SETTLED);
+        });
+      }
+    };
+    await Promise.all(
+      Array.from(
+        { length: Math.min(queue.length, BUYER_KEY_REVIEW.concurrency) },
+        review,
+      ),
+    );
   }
+
   operation(keyId: string) {
     this.assertReady();
     if (this.key(keyId).revoked) return buyerKeyFail(BUYER_KEY_CODES.REVOKED);

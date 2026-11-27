@@ -6,8 +6,9 @@ import { PAYMENT_REVIEW } from './constants';
 
 export async function reviewPayment<T>(
   observe: (signal: AbortSignal) => Promise<T | undefined>,
+  external?: AbortSignal,
 ) {
-  const deadline = AbortSignal.timeout(PAYMENT_REVIEW.deadlineMs);
+  const deadline = external ?? AbortSignal.timeout(PAYMENT_REVIEW.deadlineMs);
   const started = performance.now();
   for (const offset of PAYMENT_REVIEW.offsetsMs) {
     const wait = offset - (performance.now() - started);

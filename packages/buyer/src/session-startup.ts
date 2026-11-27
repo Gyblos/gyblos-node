@@ -356,6 +356,7 @@ export async function startSessionQuoteRuntime(
   );
   return {
     confirmKeyCharge: manager.confirmKeyCharge,
+    inspectChannel: manager.inspectChannel,
     sellerChoice: true,
     singlePaidChannel: !router && prepared.config.request.maxAtomic !== '0',
     reconcilePool: router
