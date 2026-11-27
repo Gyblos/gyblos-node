@@ -4,18 +4,19 @@ import type { previewDesktopCatalog } from './seller-listings';
 
 export async function checkAutoSeller(
   catalog: ReturnType<typeof previewDesktopCatalog> | undefined,
+  model: string,
   inputAtomicPerMtok: string,
   outputAtomicPerMtok: string,
   affordable: boolean,
   replacement: ChannelBlocker,
   sendAction: string,
+  partial = false,
 ) {
   const funding = window.desktopFunding;
   const buyer = window.desktopX402;
   if (!catalog || !funding || !buyer)
     throw new Error('Missing synthetic buyer');
   const original = catalog.summary;
-  const model = 'qwen3-0.6b';
   const seller = async () => {
     const snapshot = await original();
     const listing = snapshot.models.find(
@@ -33,8 +34,24 @@ export async function checkAutoSeller(
       ],
     };
   };
-  catalog.summary = seller;
-  catalog.lookup = seller;
+  catalog.summary = async () => {
+    const snapshot = await seller();
+    return partial
+      ? {
+          ...snapshot,
+          truncated: true,
+          models: snapshot.models.map((row) => ({
+            ...row,
+            inputAtomicPerMtok: '100001',
+          })),
+        }
+      : snapshot;
+  };
+  catalog.lookup = async (query) => ({
+    ...(await seller()),
+    query: String(query),
+    truncated: partial && !affordable,
+  });
   let checked = 0;
   let sent = 0;
   const walletRead = funding.balance();
@@ -127,7 +144,9 @@ export async function checkAutoSeller(
   });
   if (!affordable) {
     if (
-      !decision.includes('Auto rates') ||
+      !(partial
+        ? decision.includes('partial')
+        : decision.includes('Auto rates')) ||
       checked ||
       sent ||
       draft.value !== 'Synthetic Auto turn'

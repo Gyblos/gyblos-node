@@ -294,7 +294,7 @@ export function DesktopApp() {
   async function chooseAuto(name: string) {
     const policy = x402.state.policy;
     if (!policy?.autoRoutes?.some((route) => route.modelId === name)) return;
-    const offers = networkModels.filter((item) => item.name === name);
+    let offers = networkModels.filter((item) => item.name === name);
     const listing = offers[0];
     if (!listing) return;
     const attempt = ++autoAttempt.current;
@@ -311,6 +311,14 @@ export function DesktopApp() {
       if (name === MODEL_IDS.QWEN3_0_6B) navigate(UI_VIEW.PAYMENTS);
       return;
     }
+    let partial = false;
+    if (paid && !offers.some((item) => item.free)) {
+      setToast('Checking seller listings…');
+      const current = await announcements.autoListings(name, offers);
+      if (attempt !== autoAttempt.current) return;
+      offers = current.offers;
+      partial = current.partial;
+    }
     if (!offers.some((item) => item.free)) {
       const eligible = offers.filter(
         (item) =>
@@ -319,7 +327,9 @@ export function DesktopApp() {
       );
       if (!eligible.length) {
         setToast(
-          'No listed seller fits your Auto rates and response limit. Review Payments.',
+          partial
+            ? 'The catalog is partial. No verified seller in these results fits your Auto rates. Try again.'
+            : 'No listed seller fits your Auto rates and response limit. Review Payments.',
         );
         return;
       }

@@ -104,7 +104,11 @@ appear when available.
 
 The Chat model picker checks paid Auto listings against the saved input and
 output rates and response maximum before using their reported switching credit.
-The buyer checks the signed offer again at dispatch.
+The buyer checks the signed offer again at dispatch. If the overview is partial,
+the picker checks the exact model across up to eight index pages within one
+request deadline. Results are capped at 64 listings. If no visible listing
+qualifies and the result is still partial, the draft stays available for a later
+check.
 
 The signed quote decides whether an answer is free or paid. Paid execution keeps
 the buyer's devnet, model, reasoning, identity, recount and journal checks; the

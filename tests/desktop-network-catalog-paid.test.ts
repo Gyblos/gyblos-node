@@ -35,6 +35,7 @@ async function priced(input: string, output: string) {
     })),
   };
   return {
+    modelId: catalog.models[0]!.modelId,
     signed: {
       catalog: await signPublicV2(catalog, source.signer),
       presence: await source.presenceFor(catalog),
@@ -230,4 +231,63 @@ void test('opening chat discovers free and paid sellers of the same model withou
   assert.deepEqual([...groups], [['qwen3:0.6b', listings]]);
   await session.browse();
   assert.deepEqual(requests, ['/v1/models', '/v1/sellers']);
+});
+
+void test('an exact-model lookup retains a verified paid seller from a later page and binds its funding inspection', async () => {
+  const { createCatalogSession } =
+    await import('@gyblos/desktop/network-catalog-session');
+  const expensive = await priced('100001', '200000');
+  const affordable = await priced('100000', '200000');
+  const controller = new AbortController();
+  const session = createCatalogSession(
+    async (url) => {
+      const cursor = new URL(url).searchParams.get('cursor');
+      return jsonResponse(
+        200,
+        cursor === null
+          ? sellersBody([expensive.signed], 'next-page')
+          : sellersBody([affordable.signed]),
+      );
+    },
+    () => DISCOVERY_NOW,
+    controller.signal,
+  );
+  try {
+    const result = await session.lookup(expensive.modelId);
+    const offer = result.models.find(
+      (item) => item.inputAtomicPerMtok === '100000',
+    );
+    assert.ok(offer?.offerId);
+    assert.equal(
+      session.resolve(offer.offerId)?.nodeId,
+      affordable.signed.catalog.record.nodeId,
+    );
+    assert.equal(result.truncated, false);
+  } finally {
+    controller.abort();
+  }
+});
+
+void test('a repeated cursor cannot discard or double-count a signed listing or allow an endless model lookup', async () => {
+  const { createCatalogSession } =
+    await import('@gyblos/desktop/network-catalog-session');
+  const free = await priced('0', '0');
+  let pages = 0;
+  const stop = new AbortController();
+  const session = createCatalogSession(
+    async () => {
+      pages++;
+      return jsonResponse(200, sellersBody([free.signed], 'unchanged'));
+    },
+    () => DISCOVERY_NOW,
+    stop.signal,
+  );
+  try {
+    const result = await session.lookup(free.modelId);
+    assert.equal(result.truncated, true);
+    assert.equal(result.models[0]?.announcements, 1);
+    assert.equal(pages, 2);
+  } finally {
+    stop.abort();
+  }
 });

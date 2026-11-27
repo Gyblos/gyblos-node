@@ -11,6 +11,7 @@ import { promisify } from 'node:util';
 import { DESKTOP } from '@gyblos/desktop/window-chrome';
 import { X402_ACTION } from '@gyblos/desktop/x402-model';
 import { BUYER_KEY_CODES } from '@gyblos/protocol/buyer-api-keys';
+import { MODEL_IDS } from '@gyblos/protocol/constants';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
 import { buildPreview } from './build';
@@ -163,18 +164,34 @@ void test('a free profile without session terms configures paid Chat before chec
   assert.equal(result.passed, 'verified');
 });
 
-for (const [description, input, output, affordable] of [
-  ['refuses input above the limit', '100001', '200000', false],
-  ['refuses output above the limit', '100000', '200001', false],
-  ['sends at both limits', '100000', '200000', true],
+for (const [description, input, output, affordable, partial] of [
+  ['refuses input above the limit', '100001', '200000', false, false],
+  ['refuses output above the limit', '100000', '200001', false, false],
+  ['sends at both limits', '100000', '200000', true, false],
+  [
+    'finds an affordable seller after a partial first page',
+    '100000',
+    '200000',
+    true,
+    true,
+  ],
+  [
+    'preserves the draft after a partial lookup',
+    '100001',
+    '200000',
+    false,
+    true,
+  ],
 ] as const)
   void test(`the desktop Auto picker ${description} with verified switching credit`, async () => {
     const args = [
+      MODEL_IDS.QWEN3_0_6B,
       input,
       output,
       affordable,
       SESSION_CODES.REPLACEMENT_REQUIRED,
       X402_ACTION.SEND,
+      partial,
     ];
     const result = await minimumLayout(
       '',

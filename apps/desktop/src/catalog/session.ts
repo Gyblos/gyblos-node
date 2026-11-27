@@ -52,7 +52,7 @@ function readCatalog(
   offers: Map<string, CatalogSellerChoice>,
 ) {
   return model
-    ? readAnnouncements(fetch, model, now, signal, offers)
+    ? readAnnouncements(fetch, model, now, signal, offers, true)
     : browseAnnouncements(fetch, now, signal, offers);
 }
 export function createCatalogSession(

@@ -5,6 +5,7 @@ import { DEVNET, DEVNET_USDC, DISCOVERY_INDEX_URL } from '@gyblos/config';
 import {
   fetchModels,
   fetchSellers,
+  supersedes,
   type DiscoveredSeller,
   type DiscoveryFetch,
 } from '@gyblos/discovery-http';
@@ -115,18 +116,46 @@ export async function readAnnouncements(
   now: () => number,
   signal: AbortSignal,
   choices?: Map<string, CatalogSellerChoice>,
+  followPages = false,
 ): Promise<NetworkCatalog> {
-  const page = await fetchSellers({
-    baseUrl: DISCOVERY_INDEX_URL,
-    model,
-    fetch,
-    now,
+  const deadline = AbortSignal.any([
     signal,
-    limit: NETWORK_CATALOG.MAX_ANNOUNCEMENTS,
-    timeoutMs: NETWORK_CATALOG.REQUEST_MS,
-  });
+    AbortSignal.timeout(NETWORK_CATALOG.REQUEST_MS),
+  ]);
+  const read = (cursor?: string) =>
+    fetchSellers({
+      baseUrl: DISCOVERY_INDEX_URL,
+      model,
+      fetch,
+      now,
+      signal: deadline,
+      limit: NETWORK_CATALOG.MAX_ANNOUNCEMENTS,
+      timeoutMs: NETWORK_CATALOG.REQUEST_MS,
+      cursor,
+    });
+  let page = await read();
+  const sellers = new Map(page.sellers.map((row) => [row.catalog.nodeId, row]));
+  const cursors = new Set<string>();
+  while (
+    page.next !== null &&
+    followPages &&
+    cursors.size + 1 < NETWORK_CATALOG.MAX_LOOKUP_PAGES &&
+    !cursors.has(page.next)
+  ) {
+    cursors.add(page.next);
+    try {
+      page = await read(page.next);
+    } catch {
+      signal.throwIfAborted();
+      break;
+    }
+    for (const row of page.sellers) {
+      const held = sellers.get(row.catalog.nodeId);
+      if (!held || supersedes(row, held)) sellers.set(row.catalog.nodeId, row);
+    }
+  }
   const checkedAt = now();
-  const result = project(page.sellers, model, checkedAt, choices);
+  const result = project([...sellers.values()], model, checkedAt, choices);
   return {
     state: result.models.length ? CATALOG_STATE.READY : CATALOG_STATE.EMPTY,
     query: model,

@@ -63,6 +63,28 @@ export function useNetworkCatalog() {
     };
   }, [read]);
   return {
+    async autoListings(
+      name: string,
+      offers: ReturnType<typeof announcedModels>,
+    ) {
+      const partial =
+        snapshot.truncated ||
+        (searchResult?.query === name && searchResult.truncated);
+      if (!partial) return { offers, partial: false };
+      const latest = parseNetworkCatalog(
+        await window.desktopCatalog?.lookup(name).catch(() => null),
+        name,
+      );
+      if (
+        latest.state === CATALOG_STATE.READY ||
+        latest.state === CATALOG_STATE.EMPTY
+      )
+        return {
+          offers: announcedModels(latest, Date.now()),
+          partial: latest.truncated,
+        };
+      return { offers, partial: true };
+    },
     snapshot,
     searchResult: searchResult ?? snapshot,
     lookup: (query: string) => {
@@ -256,7 +278,7 @@ export function NetworkCatalogPanel({
             </>
           )}
           {messages[snapshot.state] && <p>{messages[snapshot.state]}</p>}
-          {snapshot.truncated && <small>Showing the first page.</small>}
+          {snapshot.truncated && <small>Showing partial results.</small>}
         </section>
       )}
       <small>Signed listings · Availability is checked when you send.</small>
