@@ -91,7 +91,9 @@ async function call(
       reader.releaseLock();
     }
     const parsed: unknown = JSON.parse(
-      Buffer.concat(chunks, size).toString('utf8'),
+      new TextDecoder('utf-8', { fatal: true }).decode(
+        Buffer.concat(chunks, size),
+      ),
     );
     return record(parsed);
   } catch {

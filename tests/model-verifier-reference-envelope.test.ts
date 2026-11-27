@@ -11,14 +11,38 @@ import { openReference } from '@gyblos/model-verifier/reference';
 
 const DIGEST = 'cd'.repeat(32);
 
+function validEnvelope() {
+  const topLogprobs = Array.from(
+    { length: CHALLENGE_SET.rule.topLogprobs },
+    (_, index) => ({
+      token: ` token${index}`,
+      logprob: -0.1,
+      bytes: [32, 116],
+    }),
+  );
+  const entry = {
+    token: ' token0',
+    logprob: -0.1,
+    bytes: [32, 116],
+    top_logprobs: topLogprobs,
+  };
+  return {
+    response: ' token0',
+    done: true,
+    done_reason: 'stop',
+    logprobs: [entry],
+  };
+}
+
+function tagsResponse() {
+  return Response.json({ models: [{ name: 'qwen3:1.7b', digest: DIGEST }] });
+}
+
 void test('oversized reference responses are cancelled before decoding', async () => {
   const chunk = new Uint8Array(64 * 1024).fill(32);
-  let cancellations = 0;
+  const writtenAtCancel: number[] = [];
   const fetchImpl: typeof fetch = async (input) => {
-    if (String(input).endsWith('/api/tags'))
-      return Response.json({
-        models: [{ name: 'qwen3:1.7b', digest: DIGEST }],
-      });
+    if (String(input).endsWith('/api/tags')) return tagsResponse();
     let written = 0;
     const body = new ReadableStream({
       pull(controller) {
@@ -28,7 +52,7 @@ void test('oversized reference responses are cancelled before decoding', async (
         } else controller.close();
       },
       cancel() {
-        cancellations++;
+        writtenAtCancel.push(written);
       },
     });
     return new Response(body, {
@@ -48,30 +72,14 @@ void test('oversized reference responses are cancelled before decoding', async (
       error instanceof ModelVerifierError &&
       error.code === MODEL_VERIFIER_CODES.REFERENCE_UNAVAILABLE,
   );
-  assert.equal(cancellations, MODEL_VERIFIER.referenceAttempts);
+  assert.equal(writtenAtCancel.length, MODEL_VERIFIER.referenceAttempts);
+  for (const count of writtenAtCancel) assert.ok(count < 32, String(count));
 });
 
 void test('malformed reference response envelopes are rejected at the boundary', async () => {
-  const topLogprobs = Array.from(
-    { length: CHALLENGE_SET.rule.topLogprobs },
-    (_, index) => ({
-      token: ` token${index}`,
-      logprob: -0.1,
-      bytes: [32, 116],
-    }),
-  );
-  const entry = {
-    token: ' token0',
-    logprob: -0.1,
-    bytes: [32, 116],
-    top_logprobs: topLogprobs,
-  };
-  const valid = {
-    response: ' token0',
-    done: true,
-    done_reason: 'stop',
-    logprobs: [entry],
-  };
+  const valid = validEnvelope();
+  const entry = valid.logprobs[0];
+  const topLogprobs = entry.top_logprobs;
   const cases = [
     ['not done', { ...valid, done: false }],
     ['missing response', { ...valid, response: undefined }],
@@ -106,10 +114,7 @@ void test('malformed reference response envelopes are rejected at the boundary',
   for (const [name, body] of cases) {
     let calls = 0;
     const fetchImpl: typeof fetch = async (input) => {
-      if (String(input).endsWith('/api/tags'))
-        return Response.json({
-          models: [{ name: 'qwen3:1.7b', digest: DIGEST }],
-        });
+      if (String(input).endsWith('/api/tags')) return tagsResponse();
       calls++;
       return Response.json(body);
     };
@@ -127,5 +132,87 @@ void test('malformed reference response envelopes are rejected at the boundary',
       name,
     );
     assert.equal(calls, MODEL_VERIFIER.referenceAttempts, name);
+  }
+});
+
+void test('a full valid reference envelope is accepted', async () => {
+  const fetchImpl: typeof fetch = async (input) =>
+    String(input).endsWith('/api/tags')
+      ? tagsResponse()
+      : Response.json(validEnvelope());
+  const reference = await openReference(
+    'http://127.0.0.1:11434',
+    'qwen3-1.7b',
+    fetchImpl,
+    0,
+  );
+  const candidates = await reference.candidates(
+    'prompt',
+    CHALLENGE_SET.rule.topLogprobs,
+  );
+  assert.equal(candidates?.length, CHALLENGE_SET.rule.topLogprobs);
+  assert.equal(candidates?.[0]?.token, ' token0');
+  assert.equal(candidates?.[0]?.logprob, -0.1);
+});
+
+void test('reference responses with invalid UTF-8 bytes fail closed', async () => {
+  const json = JSON.stringify(validEnvelope());
+  const bytes = new TextEncoder().encode(json);
+  bytes[json.indexOf('token0')] = 0xff;
+  let calls = 0;
+  const fetchImpl: typeof fetch = async (input) => {
+    if (String(input).endsWith('/api/tags')) return tagsResponse();
+    calls++;
+    return new Response(bytes, {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+  const reference = await openReference(
+    'http://127.0.0.1:11434',
+    'qwen3-1.7b',
+    fetchImpl,
+    0,
+  );
+  await assert.rejects(
+    reference.candidates('prompt', CHALLENGE_SET.rule.topLogprobs),
+    (error: unknown) =>
+      error instanceof ModelVerifierError &&
+      error.code === MODEL_VERIFIER_CODES.REFERENCE_UNAVAILABLE,
+  );
+  assert.equal(calls, MODEL_VERIFIER.referenceAttempts);
+});
+
+void test('responses at the byte cap are read and larger ones rejected', async () => {
+  const json = JSON.stringify(validEnvelope());
+  const pad = (total: number) => json + ' '.repeat(total - json.length);
+  const bodies = [
+    [pad(MODEL_VERIFIER.referenceMaxResponseBytes), true],
+    [pad(MODEL_VERIFIER.referenceMaxResponseBytes + 1), false],
+  ] as const;
+  for (const [body, accepted] of bodies) {
+    const fetchImpl: typeof fetch = async (input) =>
+      String(input).endsWith('/api/tags') ? tagsResponse() : new Response(body);
+    const reference = await openReference(
+      'http://127.0.0.1:11434',
+      'qwen3-1.7b',
+      fetchImpl,
+      0,
+    );
+    const pending = reference.candidates(
+      'prompt',
+      CHALLENGE_SET.rule.topLogprobs,
+    );
+    if (accepted) {
+      const candidates = await pending;
+      assert.equal(candidates?.length, CHALLENGE_SET.rule.topLogprobs);
+    } else {
+      await assert.rejects(
+        pending,
+        (error: unknown) =>
+          error instanceof ModelVerifierError &&
+          error.code === MODEL_VERIFIER_CODES.REFERENCE_UNAVAILABLE,
+      );
+    }
   }
 });
