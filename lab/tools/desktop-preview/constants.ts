@@ -58,4 +58,6 @@ export const PREVIEW_FAILURE = {
   OTHER_TURN: 'unbound-review',
   REVIEW_ERROR: 'review-error',
   INTERRUPTED: 'uncertain-turn',
+  PARTIAL_LIMIT: 'partial-free-limit',
+  EMPTY_LIMIT: 'empty-free-limit',
 } as const;

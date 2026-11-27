@@ -83,7 +83,8 @@ export async function checkFailedTurn(
     const status = () =>
       document.querySelector('.chat-answer [role=status]')?.textContent ?? '';
     const correct = () =>
-      status().includes('earlier API key reservation') &&
+      status().includes('API key spending review') &&
+      !status().includes('earlier API key reservation') &&
       status().includes('Desktop and connected tools') &&
       status().includes('No charge was made for this turn.') &&
       !/unknown|unconfirmed/i.test(status());
@@ -106,23 +107,37 @@ export async function checkFailedTurn(
     await wait(
       () =>
         checks === 1 &&
-        status().includes('An API key reservation still needs review.'),
+        status().includes('The API key ledger still requires review.'),
       'Budget check did not report',
     );
-    keys.run = run;
-    check.click();
-    await wait(
-      () => status().includes('The key ledger reports no pending reservation.'),
-      'Missing cleared key status',
-    );
-    keys.run = async (input) => ({
-      ...(await run(input)),
-      policyId: 'f'.repeat(64),
-    });
+    keys.run = async (input) => {
+      const state = await run(input);
+      if (!state.snapshot?.keys.length)
+        throw new Error('Missing API key fixture');
+      return {
+        ...state,
+        snapshot: {
+          ...state.snapshot,
+          blocked: false,
+          keys: state.snapshot.keys.map((key, index) =>
+            index === 0 ? { ...key, reservedAtomic: '1' } : key,
+          ),
+        },
+      };
+    };
     check.click();
     await wait(
       () =>
-        status().includes('Could not confirm the API key reservation status.'),
+        status().includes('The API key ledger currently allows new requests.'),
+      'An active reservation can coexist with an available ledger',
+    );
+    keys.run = async (input) => ({
+      ...(await run(input)),
+      policyId: '00000000-0000-4000-8000-000000000099',
+    });
+    check.click();
+    await wait(
+      () => status().includes('Could not confirm the API key ledger status.'),
       'Accepted a different key ledger',
     );
     if (!correct())
@@ -177,6 +192,32 @@ export async function checkFailedTurn(
     )?.textContent;
     if (!text?.includes('The charge for this turn remains unconfirmed.'))
       throw new Error('Turn certainty was lost');
+  } else if (
+    example === examples.PARTIAL_LIMIT ||
+    example === examples.EMPTY_LIMIT
+  ) {
+    const turn = document.querySelector('.chat-answer');
+    const notice = turn?.querySelector('[role=status]')?.textContent;
+    if (!button('.chat-answer button', 'Edit in new chat'))
+      throw new Error('Missing editable free question');
+    if (example === examples.PARTIAL_LIMIT) {
+      if (
+        !turn?.textContent?.includes('const text =') ||
+        !turn.querySelector('[aria-label="Copy response"]') ||
+        !turn.querySelector('[aria-label="Response details"]')
+      )
+        throw new Error('Lost partial answer or controls');
+      if (
+        !notice?.includes('incomplete') ||
+        !notice.includes('output limit') ||
+        /Shorten the question/i.test(notice)
+      )
+        throw new Error('A partial reply needs output-limit guidance');
+    } else if (
+      !notice?.includes('Shorten the question') ||
+      !notice.includes('choose a model')
+    )
+      throw new Error('Missing recovery for a limit without output');
   } else if (example === examples.DECLINED || example === examples.EXPIRED) {
     if (example === examples.EXPIRED) {
       const status = document.querySelector(
@@ -277,6 +318,20 @@ export async function checkFailedTurn(
         document.body.innerText.includes('SYNTHETIC_PAYPAL_FAILURE_CANARY')
       )
         throw new Error('The new PayPal failure repeated outside its turn');
+    }
+    if (example === examples.SHARED) {
+      const check = button('.chat-answer button', 'Check status');
+      if (!check) throw new Error('Missing key ledger check');
+      check.click();
+      await wait(() => {
+        const text = document.querySelector(
+          '.chat-answer [role=status]',
+        )?.textContent;
+        return (
+          !!text?.includes('currently allows new requests') &&
+          text.includes('The final charge is unknown.')
+        );
+      }, 'Ledger availability must preserve historical charge uncertainty');
     }
     Object.defineProperty(navigator, 'clipboard', {
       value: {

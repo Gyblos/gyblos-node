@@ -25,7 +25,7 @@ import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
 import { desktopAgentFixture } from './support/desktop-agent';
-import { frame, policy } from './support/desktop-stream';
+import { chunk, frame, policy } from './support/desktop-stream';
 
 void test('free seller selection does not tell a free-only buyer to add funds', () => {
   const error = desktopBuyerFailure(
@@ -124,8 +124,10 @@ void test('HTTP and streaming failures reach the desktop as static guidance with
     [false, false],
     [true, false],
     [false, true],
+    [true, true],
   ] as const) {
     let posts = 0;
+    let partial = '';
     const budget = new X402Budget({
       read: async () => undefined,
       write: async () => {},
@@ -141,9 +143,17 @@ void test('HTTP and streaming failures reach the desktop as static guidance with
         message: 'PRIVATE_CANARY_DO_NOT_REFLECT',
       };
       return streaming
-        ? new Response(frame({ error }), {
-            headers: { 'content-type': 'text/event-stream' },
-          })
+        ? new Response(
+            limit
+              ? Buffer.concat([
+                  frame(chunk('Visible partial answer')),
+                  frame({ error }),
+                ])
+              : frame({ error }),
+            {
+              headers: { 'content-type': 'text/event-stream' },
+            },
+          )
         : Response.json({ error }, { status: 502 });
     });
     const contents = {};
@@ -155,7 +165,11 @@ void test('HTTP and streaming failures reach the desktop as static guidance with
       async () => {},
       undefined,
       undefined,
-      streaming ? () => {} : undefined,
+      streaming
+        ? (event) => {
+            partial += event.text;
+          }
+        : undefined,
     );
     try {
       await client.connect(
@@ -173,6 +187,7 @@ void test('HTTP and streaming failures reach the desktop as static guidance with
           },
         ],
       );
+      if (streaming && limit) assert.equal(partial, 'Visible partial answer');
       if (limit)
         assert.equal(
           parseX402Result(result).failureReason,

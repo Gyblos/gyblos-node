@@ -31,12 +31,12 @@ export async function keyReviewStatus(policyId: string | undefined) {
       !state.error
     )
       return state.snapshot.blocked
-        ? 'An API key reservation still needs review.'
-        : 'The key ledger reports no pending reservation.';
+        ? 'The API key ledger still requires review.'
+        : 'The API key ledger currently allows new requests.';
   } catch {
-    return 'Could not confirm the API key reservation status.';
+    return 'Could not confirm the API key ledger status.';
   }
-  return 'Could not confirm the API key reservation status.';
+  return 'Could not confirm the API key ledger status.';
 }
 
 function useKeyReveal(

@@ -41,7 +41,11 @@ export function seedFailedTurn(
   sessionId: string,
   example: string | null,
 ) {
+  const freeLimit =
+    example === PREVIEW_FAILURE.PARTIAL_LIMIT ||
+    example === PREVIEW_FAILURE.EMPTY_LIMIT;
   if (
+    !freeLimit &&
     example !== PREVIEW_FAILURE.INTERRUPTED &&
     example !== PREVIEW_FAILURE.SHARED &&
     example !== PREVIEW_FAILURE.STOP &&
@@ -55,13 +59,16 @@ export function seedFailedTurn(
   const paypal = example === PREVIEW_FAILURE.PAYPAL;
   const origin = chat.startPaypal(
     'How do I read a file in TypeScript?',
-    { ...model, free: false },
+    { ...model, free: freeLimit },
     id,
     paypal ? undefined : sessionId,
     paypal ? PAYMENT_METHOD.PAYPAL : PAYMENT_METHOD.USDC,
   );
   if (origin) {
-    if (example === PREVIEW_FAILURE.SHARED)
+    if (
+      example === PREVIEW_FAILURE.SHARED ||
+      example === PREVIEW_FAILURE.PARTIAL_LIMIT
+    )
       chat.appendBuyer(
         origin,
         id,
@@ -73,13 +80,15 @@ export function seedFailedTurn(
         origin,
         id,
         '',
-        example === PREVIEW_FAILURE.SHARED_UNSENT
-          ? CHAT_FAILURE.KEY_REVIEW_NOT_SENT
-          : example === PREVIEW_FAILURE.SHARED
-            ? sharedReviewFailure.failureReason
-            : example === PREVIEW_FAILURE.EXPIRED
-              ? PAID_EXECUTION_CODES.EXPIRED
-              : SESSION_CODES.REQUEST_DECLINED,
+        freeLimit
+          ? CHAT_FAILURE.FREE_LIMIT
+          : example === PREVIEW_FAILURE.SHARED_UNSENT
+            ? CHAT_FAILURE.KEY_REVIEW_NOT_SENT
+            : example === PREVIEW_FAILURE.SHARED
+              ? sharedReviewFailure.failureReason
+              : example === PREVIEW_FAILURE.EXPIRED
+                ? PAID_EXECUTION_CODES.EXPIRED
+                : SESSION_CODES.REQUEST_DECLINED,
       );
   }
   return true;

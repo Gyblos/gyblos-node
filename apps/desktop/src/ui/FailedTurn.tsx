@@ -36,11 +36,13 @@ function failureExplanation(
   switch (message.failureReason) {
     case CHAT_FAILURE.FREE_LIMIT:
       return (
-        'Shorten the question or choose a model with a higher limit.' +
+        (message.text
+          ? 'This response is incomplete because the stream reached an output limit. Ask for a shorter answer or choose a model with a higher limit.'
+          : 'Shorten the question or choose a model with a higher limit.') +
         (free ? '' : ' The final charge is unknown.')
       );
     case CHAT_FAILURE.KEY_REVIEW_NOT_SENT:
-      return 'An earlier API key reservation paused Desktop and connected tools before this question was sent. No charge was made for this turn.';
+      return 'An API key spending review paused Desktop and connected tools before this question was sent. No charge was made for this turn.';
     case CHAT_FAILURE.KEY_REVIEW:
       return 'An API key spending review paused Desktop and connected tools for this request. The final charge is unknown.';
     case CHAT_FAILURE.DECLINED:
