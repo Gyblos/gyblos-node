@@ -117,6 +117,40 @@ function attributable(record: BatchRecord, ref: KeyReservation) {
     return undefined;
   return total === BigInt(record.cumulativeAtomic) ? String(charge) : undefined;
 }
+function earlierKeyCharge(
+  record: BatchRecord,
+  ref: KeyReservation,
+  settled: bigint,
+) {
+  if (!ref.executionDigest || settled > BigInt(record.cumulativeAtomic))
+    return undefined;
+  const target = record.requests[ref.requestId];
+  const progress = record.blocks?.[ref.requestId];
+  if (!target) return undefined;
+  const approved = progress
+    ? blockCharge(progress)
+    : BigInt(target.bill?.chargedAtomic ?? '0');
+  const base = progress
+    ? BigInt(progress.baseAtomic)
+    : target.bill
+      ? BigInt(target.bill.cumulativeAtomic) - approved
+      : undefined;
+  if (base === undefined || base < 0n) return undefined;
+  const knownVoucher =
+    settled === 0n ||
+    Object.values(record.requests).some((item) => {
+      const blocks = record.blocks?.[item.requestId];
+      return (
+        item.bill?.cumulativeAtomic === String(settled) ||
+        blocks?.accepted?.bill.cumulativeAtomic === String(settled) ||
+        (blocks?.pending?.voucher &&
+          blocks.pending.intent.bill.cumulativeAtomic === String(settled))
+      );
+    });
+  if (!knownVoucher) return undefined;
+  const delta = settled - base;
+  return String(delta <= 0n ? 0n : delta < approved ? delta : approved);
+}
 export async function finalizedKeyCharge(
   paths: BatchPaths,
   ref: KeyReservation,
@@ -151,11 +185,8 @@ export async function finalizedKeyCharge(
   if (!settlement?.transaction || settlement.channelId !== initial.channelId)
     return undefined;
   const current = await read();
-  if (
-    !current ||
-    current.channelId !== initial.channelId ||
-    settlement.chargedAtomic !== current.cumulativeAtomic
-  )
-    return undefined;
-  return attributable(current, ref);
+  if (!current || current.channelId !== initial.channelId) return undefined;
+  return settlement.chargedAtomic === current.cumulativeAtomic
+    ? attributable(current, ref)
+    : earlierKeyCharge(current, ref, BigInt(settlement.chargedAtomic));
 }

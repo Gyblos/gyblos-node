@@ -145,3 +145,20 @@ void test('confirmed paid Chat keeps the draft during a fresh seller check and m
   );
   assert.equal(result.passed, 'verified');
 });
+
+void test('a free profile without session terms configures paid Chat before checking and confirming the seller', async () => {
+  const args = [
+    SESSION_CODES.CLOSED,
+    BUYER_KEY_CODES.REVIEW,
+    X402_ACTION.REVIEW,
+    X402_ACTION.SEND,
+    X402_ACTION.CONFIGURE_PAID,
+  ];
+  const result = await minimumLayout(
+    '',
+    'check-pinned-seller.ts',
+    'checkPinnedSeller(...' + JSON.stringify(args) + ')',
+    true,
+  );
+  assert.equal(result.passed, 'verified');
+});

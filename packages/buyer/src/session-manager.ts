@@ -13,6 +13,7 @@ import type {
 import { reviewPayment } from '@gyblos/node/buyer-payment-review';
 import {
   createBuyerSessionManager,
+  UnsentSellerChoiceError,
   type BuyerSessionOptions,
 } from '@gyblos/node/buyer-session';
 import {
@@ -42,6 +43,7 @@ import { SESSION_CODES, sessionFail } from '@gyblos/protocol/payment-session';
 import {
   observeChannelAt,
   paidChannelEligibility,
+  sellerReplacementAuthorized,
 } from './channel-eligibility';
 import { PAID_BUYER_HTTP_MS } from './constants';
 import {
@@ -53,7 +55,6 @@ import {
 import type { BuyerExecutionFactory } from './free-startup';
 import { verifyBuyerIdentity } from './identity';
 import { restoredSellerAddress } from './seller-address';
-import { UnsentSellerChoiceError } from './seller-choice-error';
 import {
   createSessionPreflight,
   prepareChosenMeter,
@@ -171,10 +172,12 @@ function desktopPermissions(
       const id = state.openingIntent?.getStore();
       return id ? desktopOpening(process.env).whileArmed(id, run) : run();
     },
-    switchingAllowed: async () => {
-      const intent = state.openingIntent?.getStore();
-      return intent ? desktopOpening(process.env).armed(intent) : paidAuto;
-    },
+    switchingAllowed: (requestId) =>
+      sellerReplacementAuthorized(
+        paidAuto,
+        state.keyOperations.has(requestId),
+        state.openingIntent?.getStore(),
+      ),
     onDeclined: async () => {
       const intent = state.openingIntent?.getStore();
       if (intent) await desktopOpening(process.env).declined(intent);
@@ -273,21 +276,30 @@ function checkSelectedChannel(
   options: Options,
   state: SessionState,
 ) {
+  const { config } = context.prepared;
   const observe =
     options.observeChannel ?? observeChannelAt(context.role.rpcUrl);
-  return async (quote: SignedOfferV2, signal: AbortSignal, intent?: string) => {
+  return async (
+    quote: SignedOfferV2,
+    signal: AbortSignal,
+    intent = state.openingIntent?.getStore(),
+    delegated = state.keyOperations.has(quote.offer.requestId),
+  ) => {
     const result = await paidChannelEligibility(
       process.env,
       {
         ...quote.offer,
         payer: quote.offer.buyer,
         pinnedNodeId:
-          context.prepared.config.session?.totalDepositAtomic !== undefined &&
-          context.prepared.config.routing?.allowPinnedFallback
+          config.session?.totalDepositAtomic !== undefined &&
+          config.routing?.allowPinnedFallback
             ? undefined
-            : context.prepared.config.pinnedNodeId,
-        replacementAuthorized:
-          !!intent && (await desktopOpening(process.env).armed(intent)),
+            : config.pinnedNodeId,
+        replacementAuthorized: await sellerReplacementAuthorized(
+          config.discovery?.paidAuto === true,
+          delegated,
+          intent,
+        ),
         activeRequest: state.activeRequest,
       },
       options.channelClock ?? Date.now,
@@ -346,8 +358,7 @@ export function makeManager(
         state.sending.get(request.quote.offer.requestId)?.(),
     },
     unresolved: () => unresolvedPool(policy.totalDepositAtomic),
-    checkReusableChannel: (quote, signal) =>
-      checkChannel(quote, signal, state.openingIntent?.getStore()),
+    checkReusableChannel: checkChannel,
     verify: trustedQuote(context, state),
     receipt: sessionReceipts(context, state),
   };

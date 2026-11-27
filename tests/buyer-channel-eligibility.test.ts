@@ -202,3 +202,118 @@ void test('the public channel-status contract rejects unrecognized reasons, arbi
   ])
     assert.throws(() => parsePaidChannelEligibility(value));
 });
+
+void test('a late finalized original deposit restores eligibility without replaying the opening', async (t) => {
+  const rig = await sessionRig();
+  t.after(rig.dispose);
+  const { createBatchBuyer } =
+    await import('@gyblos/payments-upto/batch-session');
+  const { OPENING_STATUS } = await import('@gyblos/protocol/payment-session');
+  await rig.buyer.dispose();
+  const buyer = await createBatchBuyer({
+    ...rig.buyerOptions,
+    openingStatus: async () => OPENING_STATUS.PRESENT,
+  });
+  t.after(buyer.dispose);
+  await buyer.open();
+  assert.equal(await buyer.openingRecovery?.claim(), true);
+  const selection = {
+    ...rig.terms,
+    payer: rig.terms.buyer,
+    nodeId: rig.terms.sellerNodeId,
+  };
+  const observe = (
+    read: () => Promise<
+      typeof SESSION_STATES.OPEN | typeof SESSION_STATES.CLOSED
+    >,
+  ) =>
+    paidChannelEligibility(
+      { GYBLOS_HOME: rig.root },
+      selection,
+      rig.now,
+      read,
+      new AbortController().signal,
+    );
+  assert.equal(
+    (
+      await observe(async () => {
+        throw new Error();
+      })
+    ).blocker,
+    SESSION_CODES.STATUS_UNKNOWN,
+  );
+  assert.equal(
+    (await observe(async () => SESSION_STATES.CLOSED)).blocker,
+    SESSION_CODES.CLOSED,
+  );
+  assert.equal((await observe(async () => SESSION_STATES.OPEN)).blocker, null);
+  assert.equal(buyer.openingRecovery?.pending(), true);
+  assert.deepEqual(rig.calls, []);
+});
+
+void test('switching authority respects owner paid Auto, a per-turn Desktop intent and delegated credentials', async () => {
+  const { sellerReplacementAuthorized } =
+    await import('@gyblos/buyer/channel-eligibility');
+  const armed = async (intent: string) => intent === 'armed';
+  assert.equal(
+    await sellerReplacementAuthorized(true, false, undefined, armed),
+    true,
+  );
+  assert.equal(
+    await sellerReplacementAuthorized(true, true, undefined, armed),
+    false,
+  );
+  assert.equal(
+    await sellerReplacementAuthorized(false, false, undefined, armed),
+    false,
+  );
+  assert.equal(
+    await sellerReplacementAuthorized(true, false, 'retired', armed),
+    false,
+  );
+  assert.equal(
+    await sellerReplacementAuthorized(false, false, 'armed', armed),
+    true,
+  );
+  assert.equal(
+    await sellerReplacementAuthorized(true, true, 'armed', armed),
+    false,
+  );
+});
+
+void test('an earlier finalized voucher attributes only its verified share to the bound request', async (t) => {
+  const rig = await sessionRig();
+  t.after(rig.dispose);
+  await rig.open();
+  await rig.serve(1, '40');
+  await rig.serve(2, '60');
+  const { finalizedKeyCharge } =
+    await import('@gyblos/payments-upto/batch-session');
+  const confirm = (id: number, charged: string) =>
+    finalizedKeyCharge(
+      rig.buyerOptions.paths,
+      {
+        ...rig.request(id),
+        executionDigest: rig.request(id).requestDigest,
+        sellerNodeId: rig.terms.sellerNodeId,
+      },
+      {
+        payer: rig.terms.buyer,
+        mint: rig.terms.mint,
+        network: rig.terms.network,
+      },
+      rig.terms.buyerNodeId,
+      async (_terms, channelId) => ({
+        channelId,
+        chargedAtomic: charged,
+        refundedAtomic: String(
+          BigInt(rig.terms.depositAtomic) - BigInt(charged),
+        ),
+        transaction: 'syntheticConfirmedClose',
+      }),
+    );
+  assert.equal(await confirm(1, '40'), '40');
+  assert.equal(await confirm(2, '40'), '0');
+  assert.equal(await confirm(2, '50'), undefined);
+  assert.equal(await confirm(2, '105'), undefined);
+});

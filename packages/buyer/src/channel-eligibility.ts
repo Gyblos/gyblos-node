@@ -5,6 +5,7 @@ import {
   type BatchPoolPaths,
 } from '@gyblos/config/home-payments';
 import { bounded } from '@gyblos/node/buyer-operation';
+import { desktopOpening } from '@gyblos/node/desktop-opening';
 import {
   batchSessionObserver,
   inspectBatchPool,
@@ -31,6 +32,15 @@ export type ObserveChannel = (
 export function observeChannelAt(rpcUrl: string): ObserveChannel {
   return (paths, terms, channelId, signal) =>
     batchSessionObserver({ paths, terms, rpcUrl }).status(channelId, signal);
+}
+export async function sellerReplacementAuthorized(
+  paidAuto: boolean,
+  delegated: boolean,
+  intent: string | undefined,
+  armed = (id: string) => desktopOpening(process.env).armed(id),
+) {
+  if (delegated) return false;
+  return intent ? armed(intent) : paidAuto;
 }
 interface Selection {
   payer: string;
@@ -129,7 +139,7 @@ export async function paidChannelEligibility(
           : SESSION_CODES.STATUS_UNKNOWN,
       );
     if (now() >= terms.expiresAt) return unavailable(SESSION_CODES.EXPIRED);
-    if (stored.openingPending || !snapshot.channelId)
+    if (!snapshot.channelId || (stored.openingPending && switching))
       return unavailable(SESSION_CODES.STATUS_UNKNOWN);
     const current = await bounded(
       observe(paths, terms, snapshot.channelId, signal),

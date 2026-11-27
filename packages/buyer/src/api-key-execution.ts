@@ -8,7 +8,10 @@ import type {
   BuyerApiKeys,
 } from '@gyblos/node/buyer-api-keys';
 import { UnsentSellerBusyError } from '@gyblos/node/buyer-routing';
-import { UnsentChannelRequestError } from '@gyblos/node/buyer-session';
+import {
+  UnsentChannelRequestError,
+  UnsentSellerChoiceError,
+} from '@gyblos/node/buyer-session';
 import { SESSION_VERDICTS } from '@gyblos/node/constants';
 import { sessionApproval } from '@gyblos/node/session-accounting';
 import { UnsentChannelLimitError } from '@gyblos/node/session-policy';
@@ -26,7 +29,6 @@ import type {
   FreeChatStreamExecutor,
 } from './free-sse';
 import type { RoutedModel } from './model-routes';
-import { UnsentSellerChoiceError } from './seller-choice-error';
 
 export async function reserveApiKey(
   operation: BuyerApiKeyOperation | undefined,

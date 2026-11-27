@@ -224,3 +224,33 @@ void test(
     assert.equal(host.engine.attempts(), attempts);
   },
 );
+
+void test(
+  'a pooled pre-dispatch status refusal releases only its own marker and allows a later request',
+  { skip: NATIVE_CAPABILITY.transportSkip },
+  async (t) => {
+    const request = globalThis.fetch;
+    const host = await sessionProductHost(undefined, '2000000');
+    t.after(host.close);
+    const { ask } = await buyerClient(host, request);
+    assert.equal((await ask(64)).status, 200);
+    const original = host.finance.observeChannel;
+    let reads = 0;
+    host.finance.observeChannel = async (...args) => {
+      if (++reads === 2) throw new Error('Synthetic transient observation');
+      return original(...args);
+    };
+    await host.restartBuyer();
+    const attempts = host.engine.attempts();
+    const calls = [...host.finance.calls];
+    const refused = await ask(64);
+    assert.equal(
+      (await refused.json()).error?.code,
+      SESSION_CODES.STATUS_UNKNOWN,
+    );
+    assert.equal(host.engine.attempts(), attempts);
+    assert.deepEqual(host.finance.calls, calls);
+    const resumed = await ask(64);
+    assert.equal(resumed.status, 200, await resumed.clone().text());
+  },
+);

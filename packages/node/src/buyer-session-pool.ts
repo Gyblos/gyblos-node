@@ -24,6 +24,7 @@ import {
 import {
   prepareNewChannel,
   UnsentChannelRequestError,
+  UnsentSellerChoiceError,
   verifyUnsentPoolQuote,
   type PreparedChannel,
 } from './buyer-channel-prepare';
@@ -323,7 +324,9 @@ async function run<Remote extends BatchDestination>(
         lease.running = false;
         if (lease.registered) {
           if (
-            error instanceof UnsentOpeningError &&
+            (error instanceof UnsentOpeningError ||
+              (error instanceof UnsentSellerChoiceError &&
+                error.nodeId === id)) &&
             !lease.sent &&
             (await state.admission.serial(async () =>
               (await catalog(state)).resolve(id, lease.requestId),

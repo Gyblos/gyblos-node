@@ -112,12 +112,11 @@ export function PaidSellerDialog(
   props: SellerDialogProps & { addFunds(): void },
 ) {
   const policy = props.buyer.state.policy;
-  const { funding, loading, refresh } = useBuyerFunding(
-    policy?.payer,
-    props.model.offerId,
-  );
+  const configured = !!policy?.depositAtomic && !!policy.lifetimeMs;
+  const check = useBuyerFunding(policy?.payer, props.model.offerId, configured);
+  const { funding, loading, refresh } = check;
   // A legacy profile must acquire valid channel settings before its payer can be verified.
-  if (!policy) return <SellerTerms {...props} confirm={refresh} />;
+  if (!configured) return <SellerTerms {...props} confirm={refresh} />;
   if (
     funding?.channelBlocker &&
     funding.channelBlocker !== SESSION_CODES.REPLACEMENT_REQUIRED

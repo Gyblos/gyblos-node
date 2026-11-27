@@ -5,6 +5,7 @@ export async function checkPinnedSeller(
   keyReview: ChannelBlocker,
   reviewAction: string,
   sendAction: string,
+  configureAction?: string,
 ) {
   if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches)
     throw new Error('Unexpected animated test environment');
@@ -53,8 +54,8 @@ export async function checkPinnedSeller(
   const funding = window.desktopFunding;
   const buyer = window.desktopX402;
   if (!funding || !buyer) throw new Error('Missing synthetic buyer');
-  const wallet = await funding.balance();
-  if (!wallet) throw new Error('Missing fixture');
+  const walletRead = funding.balance();
+  let configured = !configureAction;
   let blocker: ChannelBlocker | undefined;
   let hold: Promise<void> | undefined;
   let capacity: Partial<
@@ -62,21 +63,72 @@ export async function checkPinnedSeller(
   > = {};
   const actions: unknown[] = [];
   funding.balance = async (offer) => {
+    const wallet = await walletRead;
+    if (!wallet) throw new Error('Missing fixture');
     if (offer) await hold;
     return {
       ...wallet,
       balanceAtomic: blocker === keyReview ? null : '2000000',
-      ...(offer && { channelBlocker: blocker, ...capacity }),
+      ...(offer && {
+        channelBlocker: configured ? blocker : keyReview,
+        ...capacity,
+      }),
     };
   };
   const execute = buyer.run;
   buyer.run = async (input) => {
     if (input && typeof input === 'object' && 'action' in input) {
       actions.push(input.action);
+      if (input.action === configureAction) {
+        configured = true;
+        blocker = closed;
+      }
       if (input.action === reviewAction) blocker = closed;
     }
-    return execute(input);
+    const result = await execute(input);
+    if (configured || !result.policy) return result;
+    const {
+      depositAtomic: _deposit,
+      lifetimeMs: _lifetime,
+      ...previous
+    } = result.policy;
+    const policy = { ...previous, maxAtomic: '0' };
+    return { ...result, policy };
   };
+  if (configureAction) {
+    await until(() =>
+      document.querySelector('.pk-composer-tab [aria-busy="false"] .sr-only'),
+    );
+    await choosePaidSeller();
+    await click('Use this model');
+    const amount = await until(() =>
+      document.querySelector<HTMLInputElement>('#paid-response-maximum'),
+    );
+    Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      'value',
+    )?.set?.call(amount, '0.01');
+    amount.dispatchEvent(new Event('input', { bubbles: true }));
+    await click('Confirm seller');
+    await until(() =>
+      document.querySelector('dialog')?.textContent.includes('Settled'),
+    );
+    if (!configured || actions.includes(sendAction))
+      throw new Error(
+        'Initial configuration selected or dispatched the seller',
+      );
+    blocker = undefined;
+    await click('Check status');
+    await click('Confirm seller');
+    await until(() => !document.querySelector('dialog[open]'));
+    if (
+      actions.filter((action) => action === configureAction).length !== 1 ||
+      actions.includes(sendAction)
+    )
+      throw new Error('Unexpected legacy configuration action');
+    document.documentElement.dataset.layoutPassed = 'verified';
+    return;
+  }
   await until(() =>
     document
       .querySelector('.composer-note')

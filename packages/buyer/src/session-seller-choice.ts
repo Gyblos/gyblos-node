@@ -1,4 +1,5 @@
 // Restrict a single owner-authenticated chat to the verified seller and terms that were selected.
+import { UnsentSellerChoiceError } from '@gyblos/node/buyer-session';
 import type { BuyerSellerChoice } from '@gyblos/protocol/buyer-api';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 import { primaryRelayUrl } from '@gyblos/transport-iroh/endpoint';
@@ -6,7 +7,6 @@ import { primaryRelayUrl } from '@gyblos/transport-iroh/endpoint';
 import type { FreeWinner } from './free-execution';
 import type { SelectionRoute } from './free-route';
 import type { PreparedSelection } from './free-selection';
-import { UnsentSellerChoiceError } from './seller-choice-error';
 
 export function prepareChosenSeller(
   prepared: PreparedSelection,

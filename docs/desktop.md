@@ -90,6 +90,9 @@ from that environment are passed to the managed buyer.
 4. Finish the session to close this desktop's permission. Confirmed payment
    references stay in **Payments** and **Activity**.
 
+A legacy buyer profile without channel settings first accepts the spending
+maximum, then verifies the channel before the seller can be confirmed.
+
 In **Models**, select a paid offer and choose **Check payment channel** to see
 its verified status, remaining escrow and wallet balance. **Check status**
 refreshes the observation. When an API key reservation needs review, it first

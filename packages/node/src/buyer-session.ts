@@ -43,7 +43,10 @@ import {
   type BuyerSessionPolicy,
 } from './session-policy';
 
-export { UnsentChannelRequestError } from './buyer-channel-prepare';
+export {
+  UnsentSellerChoiceError,
+  UnsentChannelRequestError,
+} from './buyer-channel-prepare';
 
 export interface BuyerSessionOptions<Remote extends BatchDestination> {
   // Known capability of the financial adapter. Unspecified adapters negotiate after construction.
@@ -54,7 +57,7 @@ export interface BuyerSessionOptions<Remote extends BatchDestination> {
     quote: SignedOfferV2,
     signal: AbortSignal,
   ): Promise<void>;
-  switchingAllowed?(): Promise<boolean>;
+  switchingAllowed?(requestId: string): Promise<boolean>;
   openingSupportsBlocks?: boolean;
   preparation?: PreparedChannel;
   receipt?: BuyerBatchSessionOptions<Remote>['receipt'];
@@ -124,7 +127,7 @@ async function openCurrent<Remote extends BatchDestination>(
       replacement,
       options.policy.depositAtomic,
       stored.terms.sellerNodeId !== replacement.sellerNodeId &&
-        (await options.switchingAllowed?.()),
+        (await options.switchingAllowed?.(quote.offer.requestId)),
     );
     const renewed = await options.inspect();
     if (!renewed || renewed.notCreated || renewed.openingReturned)
@@ -214,7 +217,10 @@ async function run<Remote extends BatchDestination>(
   const switching =
     opened.terms.sellerNodeId !== quote.offer.nodeId ||
     opened.terms.owner !== quote.offer.owner;
-  if (switching && !(await state.options.switchingAllowed?.()))
+  if (
+    switching &&
+    !(await state.options.switchingAllowed?.(quote.offer.requestId))
+  )
     throw new UnsentSellerBusyError(quote.offer.nodeId);
   const renew = () => renewable(state, opened, quote, signal, switching);
   const ready =

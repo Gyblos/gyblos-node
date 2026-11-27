@@ -11,7 +11,10 @@ import { channelBlockerMessage } from '@gyblos/node/buyer-channel-message';
 import { bounded } from '@gyblos/node/buyer-operation';
 import { PaidBuyerError } from '@gyblos/node/buyer-paid-error';
 import { UnsentSellerBusyError } from '@gyblos/node/buyer-routing';
-import { UnsentChannelRequestError } from '@gyblos/node/buyer-session';
+import {
+  UnsentChannelRequestError,
+  UnsentSellerChoiceError,
+} from '@gyblos/node/buyer-session';
 import { UnsentChannelLimitError } from '@gyblos/node/session-policy';
 import { BatchChannelError } from '@gyblos/protocol/batch-channel';
 import { isChannelBlocker } from '@gyblos/protocol/buyer-api';
@@ -22,7 +25,6 @@ import { PaymentSessionError } from '@gyblos/protocol/payment-session';
 import { buyerApiKeyErrorView } from './api-key-http';
 import { FREE_BUYER_CODES, PAID_BUYER_CODES } from './constants';
 import type { ChatErrorView } from './free-http';
-import { UnsentSellerChoiceError } from './seller-choice-error';
 
 const unavailable = (
   code: ChatErrorView['code'],

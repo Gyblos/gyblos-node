@@ -65,13 +65,14 @@ async function executePaidSession(
   permission?: BuyerApiKeyOperation,
   openingIntent?: string,
 ): Promise<ChatResult> {
+  const { quote } = winner;
   current.throwIfAborted();
-  await manager.preflight(winner.quote, input, current);
+  await manager.preflight(quote, input, current);
   current.throwIfAborted();
-  await manager.checkChannel(winner.quote, current, openingIntent);
+  await manager.checkChannel(quote, current, openingIntent, !!permission);
   current.throwIfAborted();
-  await reserveApiKey(permission, winner.quote, current);
-  const id = winner.quote.offer.requestId;
+  await reserveApiKey(permission, quote, current);
+  const id = quote.offer.requestId;
   if (state.selections.has(id)) return sessionFail(SESSION_CODES.BINDING);
   const scope = (state.openingIntent ??= new AsyncLocalStorage<
     string | undefined
