@@ -102,6 +102,10 @@ seller, Chat checks the channel again and keeps the draft if spending is
 blocked. If the wallet observation fails, the last verified balance and its time
 appear when available.
 
+The Chat model picker checks paid Auto listings against the saved input and
+output rates and response maximum before using their reported switching credit.
+The buyer checks the signed offer again at dispatch.
+
 The signed quote decides whether an answer is free or paid. Paid execution keeps
 the buyer's devnet, model, reasoning, identity, recount and journal checks; the
 paid runtime supports the pinned Qwen3 0.6B with reasoning off. Finishing does

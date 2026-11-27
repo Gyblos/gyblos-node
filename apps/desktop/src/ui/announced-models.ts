@@ -1,5 +1,6 @@
 // Each paid listing shows that seller’s price per million tokens. Selection requires confirmation.
 import { MODEL_IDS } from '@gyblos/protocol/constants';
+import type { TokenPricesV2 } from '@gyblos/protocol/control-types';
 
 import {
   CATALOG_STATE,
@@ -39,7 +40,7 @@ export function modelArtwork(modelId: string): ModelArtwork {
 export function announcedModels(
   catalog: NetworkCatalog,
   now: number,
-): CatalogModel[] {
+): (CatalogModel & { prices: TokenPricesV2 })[] {
   if (
     catalog.state !== CATALOG_STATE.READY ||
     catalog.checkedAt === null ||
@@ -91,6 +92,10 @@ export function announcedModels(
         free,
         input,
         output,
+        prices: {
+          inputAtomicPerMtok: item.inputAtomicPerMtok,
+          outputAtomicPerMtok: item.outputAtomicPerMtok,
+        },
         source: MODEL_SOURCE.ANNOUNCED,
       };
     });

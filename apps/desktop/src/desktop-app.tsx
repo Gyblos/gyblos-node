@@ -3,6 +3,7 @@
 import { Check, CheckCircle, X } from '@phosphor-icons/react';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 
+import { listingFitsBudget } from '@gyblos/core/seller-selection';
 import { MODEL_IDS } from '@gyblos/protocol/constants';
 
 import manifest from '../package.json';
@@ -311,9 +312,20 @@ export function DesktopApp() {
       return;
     }
     if (!offers.some((item) => item.free)) {
+      const eligible = offers.filter(
+        (item) =>
+          policy.autoPrices &&
+          listingFitsBudget(item.prices, policy.autoPrices, policy.maxAtomic),
+      );
+      if (!eligible.length) {
+        setToast(
+          'No listed seller fits your Auto rates and response limit. Review Payments.',
+        );
+        return;
+      }
       setToast('Checking channel funds…');
       const funding = await Promise.all(
-        offers.map(async (item) =>
+        eligible.map(async (item) =>
           item.offerId
             ? ((await window.desktopFunding
                 ?.balance(item.offerId)

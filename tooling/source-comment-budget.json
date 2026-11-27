@@ -84,7 +84,6 @@
   "packages/buyer/src/selection-snapshots.ts": 20,
   "packages/buyer/src/selection-stats.ts": 9,
   "packages/buyer/src/selection.ts": 15,
-  "packages/buyer/src/seller-choice-error.ts": 1,
   "packages/buyer/src/seller-failures.ts": 11,
   "packages/buyer/src/session-errors.ts": 5,
   "packages/buyer/src/session-manager.ts": 2,

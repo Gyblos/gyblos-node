@@ -162,3 +162,25 @@ void test('a free profile without session terms configures paid Chat before chec
   );
   assert.equal(result.passed, 'verified');
 });
+
+for (const [description, input, output, affordable] of [
+  ['refuses input above the limit', '100001', '200000', false],
+  ['refuses output above the limit', '100000', '200001', false],
+  ['sends at both limits', '100000', '200000', true],
+] as const)
+  void test(`the desktop Auto picker ${description} with verified switching credit`, async () => {
+    const args = [
+      input,
+      output,
+      affordable,
+      SESSION_CODES.REPLACEMENT_REQUIRED,
+      X402_ACTION.SEND,
+    ];
+    const result = await minimumLayout(
+      '',
+      'check-auto-seller.ts',
+      'checkAutoSeller(window.desktopCatalog, ...' + JSON.stringify(args) + ')',
+      true,
+    );
+    assert.equal(result.passed, 'verified');
+  });

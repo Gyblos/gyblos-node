@@ -9,6 +9,7 @@ import type {
   ModelSelection,
   PublicCatalogV2,
   PublicModelV2,
+  TokenPricesV2,
 } from '@gyblos/protocol/control-types';
 
 import {
@@ -38,12 +39,7 @@ import {
   toCandidate,
   type SellerCandidate,
 } from './seller-selection-sample';
-import {
-  checkPolicy,
-  isFree,
-  weigh,
-  type Eligible,
-} from './seller-selection-weight';
+import { checkPolicy, weigh, type Eligible } from './seller-selection-weight';
 
 export type { SellerCandidate } from './seller-selection-sample';
 export type {
@@ -108,22 +104,22 @@ function passesListingFilters(listing: PublicModelV2, request: SellerRequest) {
   );
 }
 // A paid budget must cover at least one input plus one output token at the listed prices.
-function withinBudget(listing: PublicModelV2, request: SellerRequest) {
-  const { pricing } = listing;
-  const input = BigInt(pricing.inputAtomicPerMtok);
-  const output = BigInt(pricing.outputAtomicPerMtok);
+export function listingFitsBudget(
+  prices: TokenPricesV2,
+  ceilings: TokenPricesV2,
+  maxAtomic: string,
+) {
+  const { inputAtomicPerMtok, outputAtomicPerMtok } = prices;
   return (
-    input <= BigInt(request.priceCeilings.inputAtomicPerMtok) &&
-    output <= BigInt(request.priceCeilings.outputAtomicPerMtok) &&
-    (isFree(listing) ||
-      BigInt(request.maxAtomic) >=
-        chargeV2(
-          { input: 1, output: 1 },
-          {
-            inputAtomicPerMtok: pricing.inputAtomicPerMtok,
-            outputAtomicPerMtok: pricing.outputAtomicPerMtok,
-          },
-        ))
+    isAtomic(inputAtomicPerMtok) &&
+    isAtomic(outputAtomicPerMtok) &&
+    BigInt(inputAtomicPerMtok) <= BigInt(ceilings.inputAtomicPerMtok) &&
+    BigInt(outputAtomicPerMtok) <= BigInt(ceilings.outputAtomicPerMtok) &&
+    BigInt(maxAtomic) >=
+      chargeV2(
+        { input: 1, output: 1 },
+        { inputAtomicPerMtok, outputAtomicPerMtok },
+      )
   );
 }
 function findListing(catalog: PublicCatalogV2, selection: ModelSelection) {
@@ -156,7 +152,12 @@ function eligible(
   honorCooldown = true,
 ) {
   const entry = offersModel(input, seller, honorCooldown);
-  return entry && withinBudget(entry.listing, input.request)
+  return entry &&
+    listingFitsBudget(
+      entry.listing.pricing,
+      input.request.priceCeilings,
+      input.request.maxAtomic,
+    )
     ? entry
     : undefined;
 }
