@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
+import { homeLayout } from '@gyblos/config/home';
 import { CHALLENGE_SET } from '@gyblos/model-verifier/challenge-set';
 import {
   MODEL_VERIFIER_CODES,
@@ -39,6 +40,10 @@ const TARGET = {
 const SELECTION = { modelId: 'qwen3-1.7b', variant: null, quantization: null };
 const answer = (word: string) =>
   `Answer: ${Array.from({ length: 40 }, () => word).join(' ')}.`;
+const outputWords = (text: string) => {
+  const trimmed = text.trim();
+  return trimmed ? trimmed.split(/\s+/).length : 0;
+};
 const topCandidates = () => [
   { token: ' of', logprob: -0.1 },
   ...Array.from({ length: 19 }, (_, index) => ({
@@ -90,10 +95,7 @@ async function verifyWith(
     set: CHALLENGE_SET,
     key,
     now: () => 1_800_000_000_000,
-    outputTokens: (text) => {
-      const trimmed = text.trim();
-      return trimmed ? trimmed.split(/\s+/).length : 0;
-    },
+    outputTokens: outputWords,
     onAnswer: (_index, failure) => {
       if (failure) failures.push(failure);
     },
@@ -231,12 +233,52 @@ void test('a blank answer or one with nothing to check counts as unanswered', as
   });
 });
 
-void test('the pinned tokenizer artifacts are required for verification', async () => {
+void test('the pinned tokenizer artifacts are required for verification', async (t) => {
   await withHome(async (home) => {
+    const environment = { GYBLOS_HOME: home };
     await assert.rejects(
-      outputTokenCounter({ GYBLOS_HOME: home }),
+      outputTokenCounter(environment),
       isCode(MODEL_VERIFIER_CODES.TOKENIZER_UNAVAILABLE),
     );
+    const input = join(home, 'seller.json');
+    await writeFile(input, JSON.stringify(TARGET));
+    const previousHome = process.env.GYBLOS_HOME;
+    process.env.GYBLOS_HOME = home;
+    const stderr = t.mock.method(console, 'error', () => {});
+    const requests = t.mock.method(globalThis, 'fetch', () =>
+      Promise.reject(new Error('unexpected fetch')),
+    );
+    const verify = () =>
+      main([
+        'verify',
+        '--seller',
+        input,
+        '--model',
+        'qwen3-1.7b',
+        '--out',
+        join(home, 'out'),
+      ]);
+    const unavailable = [
+      JSON.stringify({
+        ok: false,
+        code: MODEL_VERIFIER_CODES.TOKENIZER_UNAVAILABLE,
+      }),
+    ];
+    try {
+      assert.equal(await verify(), 1);
+      assert.deepEqual(stderr.mock.calls.at(-1)?.arguments, unavailable);
+      assert.equal(requests.mock.calls.length, 0);
+      const { artifacts } = homeLayout(environment);
+      await mkdir(artifacts.tokenizer, { recursive: true });
+      await writeFile(artifacts.tokenizerFiles.tokenizer, '{}');
+      await writeFile(artifacts.tokenizerFiles.config, '{}');
+      assert.equal(await verify(), 1);
+      assert.deepEqual(stderr.mock.calls.at(-1)?.arguments, unavailable);
+      assert.equal(requests.mock.calls.length, 0);
+    } finally {
+      if (previousHome === undefined) delete process.env.GYBLOS_HOME;
+      else process.env.GYBLOS_HOME = previousHome;
+    }
   });
 });
 
@@ -430,9 +472,11 @@ void test('a point where the reference would end the answer is not counted', asy
       set: CHALLENGE_SET,
       key,
       now: () => 1_800_000_000_000,
-      outputTokens: (text) => text.length,
+      outputTokens: outputWords,
     });
     const { evidence } = outcome.signed.result;
+    assert.ok(calls > 0);
+    assert.equal(evidence.answers, CHALLENGE_SET.prompts.length);
     assert.equal(evidence.checks, calls / 2);
     assert.equal(evidence.deviations, 0);
   });
