@@ -46,8 +46,9 @@ Stop a Docker seller with Compose and a native seller through its service (see
 
 ### start [#start]
 
-`gyblos start` runs the seller node in the foreground with `GYBLOS_CONFIG`, or `./config.toml`. The
-Docker image and the background service run it for you. Don't start a second seller on the same home.
+`gyblos start` runs the seller node in the foreground. It reads `GYBLOS_CONFIG`; without it, the packaged
+release reads `config.toml` in its home and every other run reads `./config.toml`. The Docker image and
+the background service run it for you. Don't start a second seller on the same home.
 
 ### setup and tokenizer [#setup-and-tokenizer]
 
@@ -78,7 +79,7 @@ Each command picks its configuration file differently:
 | Command                                | Configuration file                                                  |
 | -------------------------------------- | ------------------------------------------------------------------- |
 | `config validate`                      | `--config PATH`, otherwise `./config.toml`; ignores `GYBLOS_CONFIG` |
-| `start`, `doctor`, `seller init`       | `GYBLOS_CONFIG`, otherwise `./config.toml`                          |
+| `start`, `doctor`, `seller init`       | `GYBLOS_CONFIG`, otherwise the file [`start`](#start) describes     |
 | `seller status`, `register`, `service` | Don't accept `--config`                                             |
 
 In the Docker container, pass `/config/config.toml` to `config validate` explicitly.
