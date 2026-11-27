@@ -71,17 +71,17 @@ export async function unsentSessionPreflight<T>(
 
 // Paid errors only; anything else is left to the free answer.
 export function classifyPaidError(error: unknown): ChatErrorView | undefined {
-  if (error instanceof UnsentChannelLimitError)
-    return {
-      ...unavailable(error.code, true),
-      detail:
-        'The available funds or spending limits cannot cover this request. Check the wallet balance, renewal budget and deposit cap before sending again.',
-    };
   if (error instanceof UnsentSellerChoiceError && isChannelBlocker(error.code))
     return {
       ...unavailable(error.code, true),
       status: HTTP_STATUS.badRequest,
       detail: channelBlockerMessage(error.code),
+    };
+  if (error instanceof UnsentChannelLimitError)
+    return {
+      ...unavailable(error.code, true),
+      detail:
+        'The available funds or spending limits cannot cover this request. Check the wallet balance, renewal budget and deposit cap before sending again.',
     };
   if (
     error instanceof UnsentOpeningError ||
