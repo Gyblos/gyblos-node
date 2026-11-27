@@ -281,7 +281,11 @@ function checkSelectedChannel(
       {
         ...quote.offer,
         payer: quote.offer.buyer,
-        pinnedNodeId: context.prepared.config.pinnedNodeId,
+        pinnedNodeId:
+          context.prepared.config.session?.totalDepositAtomic !== undefined &&
+          context.prepared.config.routing?.allowPinnedFallback
+            ? undefined
+            : context.prepared.config.pinnedNodeId,
         replacementAuthorized:
           !!intent && (await desktopOpening(process.env).armed(intent)),
         activeRequest: state.activeRequest,

@@ -26,7 +26,11 @@ import {
 import { matchBatchTerms } from '@gyblos/protocol/batch-channel';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 import { controlObject } from '@gyblos/protocol/control-validation';
-import type { SessionSettlement } from '@gyblos/protocol/payment-session';
+import {
+  SESSION_STATES,
+  type PaymentSessionTerms,
+  type SessionSettlement,
+} from '@gyblos/protocol/payment-session';
 
 import {
   HTTP_MULTI_METHODS,
@@ -44,6 +48,16 @@ export function httpMultiLedger(payer: KeyPairSigner) {
     calls,
     settled,
     observe,
+    observeChannel: async (
+      _paths: ReturnType<typeof batchSessionPathsIn>,
+      terms: PaymentSessionTerms,
+      id: string,
+    ) => {
+      const opening = opened.get(id);
+      assert.equal(opening?.seller, terms.sellerNodeId);
+      assert.equal(opening?.deposit, BigInt(terms.depositAtomic));
+      return settled.has(id) ? SESSION_STATES.CLOSED : SESSION_STATES.OPEN;
+    },
     async handle(method: HttpMultiMethod, params: unknown) {
       if (method === HTTP_MULTI_METHODS.OBSERVE) {
         assert.equal(typeof params, 'string');

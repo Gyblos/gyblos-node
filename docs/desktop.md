@@ -90,7 +90,11 @@ from that environment are passed to the managed buyer.
 4. Finish the session to close this desktop's permission. Confirmed payment
    references stay in **Payments** and **Activity**.
 
-In **Models**, select a paid offer and choose **Check payment channel** to see its verified status, remaining escrow and wallet balance. **Check status** refreshes the observation without sending a message or opening a channel. If the wallet observation fails, the last verified balance and its time appear when available.
+In **Models**, select a paid offer and choose **Check payment channel** to see
+its verified status, remaining escrow and wallet balance. **Check status**
+refreshes the observation without sending a message or opening a channel. If the
+wallet observation fails, the last verified balance and its time appear when
+available.
 
 The signed quote decides whether an answer is free or paid. Paid execution keeps
 the buyer's devnet, model, reasoning, identity, recount and journal checks; the
