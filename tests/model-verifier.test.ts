@@ -343,6 +343,9 @@ void test('the reference reads top candidates for the catalog alias of the decla
         models: [{ name: 'qwen3:1.7b', digest: DIGEST }],
       });
     return Response.json({
+      response: ' token',
+      done: true,
+      done_reason: 'stop',
       logprobs: [{ top_logprobs: topCandidates() }],
     });
   };
@@ -384,6 +387,9 @@ void test('the reference reads top candidates for the catalog alias of the decla
     String(input).endsWith('/api/tags')
       ? Response.json({ models: [{ name: 'qwen3:1.7b', digest: DIGEST }] })
       : Response.json({
+          response: ' token',
+          done: true,
+          done_reason: 'stop',
           logprobs: [
             { top_logprobs: [{ token: 1 }, ...topCandidates().slice(1)] },
           ],
@@ -410,6 +416,9 @@ void test('the reference retries a passing failure and gives up after a bounded 
     generates++;
     if (generates === 1) return new Response('busy', { status: 500 });
     return Response.json({
+      response: ' token',
+      done: true,
+      done_reason: 'stop',
       logprobs: [{ top_logprobs: topCandidates() }],
     });
   };
