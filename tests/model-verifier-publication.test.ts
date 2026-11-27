@@ -36,6 +36,8 @@ export async function openSeller() {
 }`;
 const endpoint =
   'export async function bindEndpoint() { return { async close() {} }; }';
+const tokenizer =
+  'export async function outputTokenCounter() { return (text) => text.trim() ? text.trim().split(/\\s+/).length : 0; }';
 const hooks = registerHooks({
   resolve(specifier, context, next) {
     const stub =
@@ -44,7 +46,10 @@ const hooks = registerHooks({
         ? seller
         : specifier === '@gyblos/transport-iroh/endpoint'
           ? endpoint
-          : undefined;
+          : specifier === './tokenizer' &&
+              context.parentURL?.endsWith('/model-verifier/src/main.ts')
+            ? tokenizer
+            : undefined;
     if (stub)
       return {
         url: `data:text/javascript,${encodeURIComponent(stub)}`,

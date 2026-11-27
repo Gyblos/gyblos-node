@@ -9,6 +9,7 @@
     "./scoring": "./src/scoring.ts",
     "./quotes": "./src/quotes.ts",
     "./reference": "./src/reference.ts",
+    "./tokenizer": "./src/tokenizer.ts",
     "./seller": "./src/seller.ts",
     "./verify": "./src/verify.ts",
     "./key": "./src/key.ts",

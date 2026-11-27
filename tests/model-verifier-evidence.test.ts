@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { registerHooks } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -42,6 +43,23 @@ import {
   NATIVE_CAPABILITY,
   NATIVE_TEST_OPTIONS,
 } from './support/native-runtime';
+
+const tokenizer =
+  'export async function outputTokenCounter() { return (text) => text.trim() ? text.trim().split(/\\s+/).length : 0; }';
+const hooks = registerHooks({
+  resolve(specifier, context, next) {
+    if (
+      specifier === './tokenizer' &&
+      context.parentURL?.endsWith('/model-verifier/src/main.ts')
+    )
+      return {
+        url: `data:text/javascript,${encodeURIComponent(tokenizer)}`,
+        shortCircuit: true,
+      };
+    return next(specifier, context);
+  },
+});
+test.after(() => hooks.deregister());
 
 const PRIVATE_TRANSPORT_DETAIL = 'verifier transport canary';
 

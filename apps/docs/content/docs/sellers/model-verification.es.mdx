@@ -12,10 +12,12 @@ configuración.
 1. Le hace a tu oferta gratis un conjunto fijo y público de 30 preguntas cortas, sin razonamiento y con un
    máximo de 200 tokens de respuesta cada una. Tu oferta gratis debe permitir al menos 200 tokens de respuesta
    por pedido; si no, rechaza todas las preguntas y la corrida queda inconclusive.
-2. Relee cada respuesta con el modelo declarado, que corre en la máquina del verificador. En hasta 24 puntos de
+2. Vuelve a contar cada respuesta con el tokenizador Qwen3 fijado. Una respuesta por encima del límite pedido de 200
+   tokens no se puntúa y cuenta como no respondida.
+3. Relee cada respuesta con el modelo declarado, que corre en la máquina del verificador. En hasta 24 puntos de
    cada respuesta comprueba que tus siguientes palabras estén entre las 20 que el modelo declarado considera más
    probables, con una probabilidad de al menos 0,1 %.
-3. Cuenta las respuestas con al menos un punto que no pasa esa comprobación y firma un resultado con su propia
+4. Cuenta las respuestas con al menos un punto que no pasa esa comprobación y firma un resultado con su propia
    llave. Los puntos se eligen con un secreto nuevo en cada corrida, después de recibir la respuesta, y cada
    corrida pregunta desde una dirección de comprador nueva. Una respuesta vacía, o sin ningún punto que
    comprobar, cuenta como no respondida.
@@ -36,7 +38,7 @@ verificador, no una sanción: hoy no cambia nada en el descubrimiento, la selecc
 
 En `evidence.json`, cada pregunta tiene un resultado numerado. Los resultados sin
 puntuación distinguen entre un fallo de cotización, un fallo de ejecución y una
-respuesta que no se pudo puntuar. Los fallos de cotización y ejecución registran
+respuesta que no se pudo puntuar, incluida una por encima del límite de tokens de salida. Los fallos de cotización y ejecución registran
 un código, no los detalles originales del error.
 
 Si el Ollama de referencia devuelve una lista de candidatos vacía, incompleta o malformada y los reintentos no lo resuelven, el comando
@@ -56,7 +58,8 @@ quedan bajo el umbral de 12. El umbral se mantiene en 12 entre 26 y 30 respuesta
 ## Repetir una verificación [#reproducir]
 
 El verificador es de código abierto, así que cualquiera con [Ollama](https://ollama.com) y el modelo declarado
-puede correr la misma verificación contra un vendedor y obtener un resultado comparable. Los pasos para correrlo
+puede correr la misma verificación contra un vendedor y obtener un resultado comparable. La primera corrida
+también necesita los artefactos del tokenizador fijado; la nota de diseño explica cómo prepararlos. Los pasos para correrlo
 están en la [nota de diseño del verificador](https://github.com/Gyblos/gyblos-node/blob/develop/docs/model-verifier.md#run-it) del repositorio.
 
 Cada corrida escribe el resultado firmado y el archivo de evidencia juntos en un directorio nuevo. La
