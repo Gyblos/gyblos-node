@@ -45,18 +45,11 @@ const randomStart = (random: () => number) =>
     .toString(radix)
     .padStart(digits, '0')
     .padEnd(nodeIdDigits, '0');
-const before = (nodeId: string) => {
-  const value = BigInt(`0x${nodeId}`);
-  return value === 0n
-    ? undefined
-    : (value - 1n).toString(radix).padStart(nodeIdDigits, '0');
-};
 
 export async function readIndexPages<T extends Listed>(
   read: ReadPage<T>,
   maxPages: number,
   random: () => number,
-  wanted: readonly string[] = [],
 ) {
   const first = await readPass(read, undefined, 1);
   if (first.next === null) return first.entries;
@@ -78,13 +71,6 @@ export async function readIndexPages<T extends Listed>(
         ...(await readPass(read, first.next, maxPages - tail.used, start))
           .entries,
       );
-  }
-  for (const nodeId of new Set(wanted)) {
-    if (entries.some((entry) => entry.catalog.nodeId === nodeId)) continue;
-    const page = await read(before(nodeId));
-    entries.push(
-      ...page.sellers.filter((entry) => entry.catalog.nodeId === nodeId),
-    );
   }
   return entries;
 }

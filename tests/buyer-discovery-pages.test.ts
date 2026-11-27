@@ -63,11 +63,13 @@ void test('past the page ceiling the window starts at a random NodeId and wraps'
   ]);
 });
 
-void test('a wanted seller outside the window is read from its own page', async () => {
+void test('reading never asks the index for a page chosen by a seller this buyer used', async () => {
   const index = pagedIndex(TWELVE, 2);
-  const seen = ids(await readIndexPages(index.read, 3, HALF, [TWELVE[2]!]));
-  assert.ok(seen.includes(TWELVE[2]!));
-  assert.equal(seen.filter((id) => id === TWELVE[2]).length, 1);
+  await readIndexPages(index.read, 3, HALF);
+  const seeks = index.cursors.filter(
+    (cursor) => cursor !== undefined && !TWELVE.includes(cursor),
+  );
+  assert.deepEqual(seeks, ['80000000'.padEnd(64, '0')]);
 });
 
 void test('a cursor cycle in any pass fails closed', async () => {

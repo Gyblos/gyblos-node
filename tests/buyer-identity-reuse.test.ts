@@ -1,13 +1,16 @@
 // Exercises public identity reuse with deterministic clocks, synthetic signed accounts and loopback RPC.
 // No real chain, funded keys, discovery trust or operator data is used.
 import assert from 'node:assert/strict';
-import { realpath } from 'node:fs/promises';
+import { readFile, realpath, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import test from 'node:test';
 
 import { getAddressEncoder } from '@solana/kit';
 
-import { BUYER_IDENTITY } from '@gyblos/node/constants';
+import { homeLayout, ROLE_FILES } from '@gyblos/config/home';
+import { BUYER_IDENTITY, IDENTITY_STATE } from '@gyblos/node/constants';
 import { openBuyerIdentityVerifier } from '@gyblos/node/identity-verifier';
+import { canonicalJson } from '@gyblos/protocol';
 
 import { discoveryHome } from './support/buyer-discovery';
 import { addClaimant, type SyntheticChain } from './support/identity-accounts';
@@ -167,6 +170,34 @@ void test('another verifier observing revocation immediately blocks a still-fres
     const reads = f.rpc.state.calls.length;
     assert.equal((await cached.verify(f.subject)).ok, false);
     assert.equal(f.rpc.state.calls.length, reads);
+  } finally {
+    await f.close();
+  }
+});
+void test('a reused binding whose row another process pruned is read from the registry again', async () => {
+  const f = await fixture();
+  try {
+    const verifier = await openBuyerIdentityVerifier(f.environment, f.rpc.rpc, {
+      configuredNodeIds: [],
+    });
+    assert.equal((await verifier.verify(f.subject)).ok, true);
+    const file = join(
+      homeLayout(f.environment).roles.buyer,
+      ROLE_FILES.identityState,
+    );
+    const saved = JSON.parse(await readFile(file, 'utf8'));
+    const [row] = saved.rows;
+    saved.rows = Array.from({ length: IDENTITY_STATE.maxRows }, (_, n) => ({
+      ...row,
+      binding: {
+        ...row.binding,
+        nodeId: (n + 1).toString(16).padStart(64, '0'),
+      },
+    }));
+    await writeFile(file, canonicalJson(saved), { mode: 0o600 });
+    const calls = f.rpc.state.calls.length;
+    assert.equal((await verifier.verify(f.subject)).ok, true);
+    assert.ok(f.rpc.state.calls.length > calls);
   } finally {
     await f.close();
   }

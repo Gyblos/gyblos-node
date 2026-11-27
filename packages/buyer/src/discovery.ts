@@ -167,10 +167,6 @@ async function readAllPages(
     read,
     config.discovery.maxPages,
     options.random ?? cryptoRandom,
-    [
-      ...conversationSellers(config),
-      ...(config.pinnedNodeId ? [config.pinnedNodeId] : []),
-    ],
   );
 }
 

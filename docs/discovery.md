@@ -115,10 +115,11 @@ reads the first page; when the index has more, it reads up to `maxPages` more
 pages starting from a random NodeId and wrapping around to the start (or in
 order, if the index's cursors are not NodeIds), so an index that fits is read
 whole and a larger one is sampled from a different point each time instead of
-failing. The page of the seller this conversation used, its warm seller and a
-pinned seller are read directly when they fall outside that window. A window is
-a run of consecutive NodeIds, so an operator that registers many NodeIds just
-below a seller can still crowd it out of most windows. A cursor cycle fails with
+failing. The buyer never asks the index for a page chosen by a seller it used,
+so past the ceiling a conversation's seller can fall outside the window and the
+conversation may move to another seller. A window is a run of consecutive
+NodeIds, so an operator that registers many NodeIds just below a seller can
+still crowd it out of most windows. A cursor cycle fails with
 `BUYER_DISCOVERY_LIMIT`, and no quotes are requested. An index error stops
 selection; it never switches the buyer to a different payment path. The rest of
 `selection.json` is described in
@@ -218,8 +219,8 @@ Open discovery has its own bounds:
   eligibility without deleting any replay floor. Ranking among eligible sellers
   is the selection's job, not admission's.
 - Identity and discovery histories each keep at most 1,024 rows, with room for
-  configured sellers. With open discovery a full history makes room instead of
-  refusing a newcomer:
+  configured sellers. With open discovery a full history makes room for a
+  newcomer when it can, and refuses it only when no row qualifies:
   - discovery rows of unconfigured sellers whose signed records expired more
     than an hour ago are removed, oldest first. Signed records live at most ten
     minutes, so no older record of that seller can still be replayed;

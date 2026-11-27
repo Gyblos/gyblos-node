@@ -66,6 +66,13 @@ export async function openBuyerIdentityState(
     let failed = false;
     let pending = Promise.resolve();
     return {
+      async known(nodeId: string) {
+        if (failed) identityStateUnavailable();
+        const bytes = await readIdentityFile(path);
+        return (
+          bytes !== undefined && parseIdentityStates(bytes, scope).has(nodeId)
+        );
+      },
       async evaluate(
         input: BuyerIdentityInput,
       ): Promise<IdentityPolicyDecision> {

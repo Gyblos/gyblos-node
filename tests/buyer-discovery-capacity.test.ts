@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { BUYER_DISCOVERY } from '@gyblos/buyer/constants';
+import { mergeDiscoveryRow } from '@gyblos/buyer/discovery-state';
 import { prepareConfiguredBuyerSelection } from '@gyblos/buyer/selection-runtime';
 import {
   CONTROL_LIMITS,
@@ -210,4 +211,20 @@ void test('the eviction grace outlasts every signed record lifetime', () => {
         PUBLIC_RECORD_LIMITS.withdrawalLifetimeMs +
         CONTROL_LIMITS.clockSkewMs,
   );
+});
+
+void test('a fork keeps its row from being pruned until the forked records expire', async (t) => {
+  const f = await discoveryCapacityFixture(t, 1);
+  const held = f.rows[0]!;
+  const later = 10 * BUYER_DISCOVERY.evictAfterMs;
+  const merged = mergeDiscoveryRow(held, {
+    ...held,
+    presenceDigest: 'f'.repeat(64),
+    catalogExpiresAt: held.catalogExpiresAt + later,
+    presenceExpiresAt: held.presenceExpiresAt + later,
+  });
+  assert.equal(merged.accepted, false);
+  assert.ok(merged.row.conflictedThrough > 0);
+  assert.equal(merged.row.presenceExpiresAt, held.presenceExpiresAt + later);
+  assert.equal(merged.row.catalogExpiresAt, held.catalogExpiresAt + later);
 });
