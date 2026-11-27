@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { FREE_BUYER_CODES } from '@gyblos/buyer/constants';
+import { FREE_BUYER_CODES, RESPONSES_CODES } from '@gyblos/buyer/constants';
 import { FreeBuyerError } from '@gyblos/buyer/free-chat';
 import {
   executeBuyerFree,
@@ -13,7 +13,12 @@ import { BYTES_PER_TOKEN, MIN_FITTED_ANSWER } from '@gyblos/buyer/input-size';
 import { fittingSelect } from '@gyblos/buyer/session-free';
 import { parseBuyerRoutingPolicy } from '@gyblos/core/buyer-routing';
 import { SELLER_SELECTION_CODES } from '@gyblos/core/constants';
+import {
+  DesktopBuyerFailure,
+  desktopBuyerFailure,
+} from '@gyblos/desktop/buyer-error';
 import { DECLARED_METER } from '@gyblos/node/free-meter';
+import { BUYER_API } from '@gyblos/protocol/buyer-api';
 import {
   CONTROL_METERING_MODES,
   ENGINE_DONE_REASONS,
@@ -23,6 +28,7 @@ import type { FreeExecutionRequest } from '@gyblos/protocol/free-execution';
 import { FreeClientError } from '@gyblos/transport-iroh/free-client';
 
 import { CODEX, host } from './support/buyer-responses';
+import { policy } from './support/desktop-stream';
 import { freeSellerFixture } from './support/free-seller';
 
 const QUOTE = (await (await freeSellerFixture()).request()).quote;
@@ -206,6 +212,7 @@ void test('a full context is reported with the OpenAI code coding agents compact
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         model: CODEX.model,
+        stream: true,
         messages: [{ role: 'user', content: 'a long conversation' }],
       }),
     });
@@ -215,6 +222,19 @@ void test('a full context is reported with the OpenAI code coding agents compact
     assert.equal(body.error.type, 'invalid_request_error');
     assert.match(body.error.message, /maximum context length/);
     assert.equal(body.error.gyblos_code, FREE_EXECUTION_CODES.LIMIT);
+    const failure = desktopBuyerFailure(body.error, policy);
+    assert.ok(failure instanceof DesktopBuyerFailure);
+    assert.equal(failure.code, FREE_EXECUTION_CODES.LIMIT);
+    assert.equal(failure.neverSent, false);
+    for (const invalid of [
+      { ...body.error, code: 'unrecognized' },
+      { ...body.error, [RESPONSES_CODES.field]: FREE_EXECUTION_CODES.BUSY },
+      { ...body.error, [BUYER_API.NEVER_SENT_FIELD]: 'true' },
+    ])
+      assert.equal(
+        desktopBuyerFailure(invalid, policy) instanceof DesktopBuyerFailure,
+        false,
+      );
   } finally {
     await server.close();
   }
@@ -260,6 +280,10 @@ void test('no seller fitting the conversation reaches the client as a full conte
     const body = await response.json();
     assert.equal(response.status, 400);
     assert.equal(body.error.code, 'context_length_exceeded');
+    const failure = desktopBuyerFailure(body.error, policy);
+    assert.ok(failure instanceof DesktopBuyerFailure);
+    assert.equal(failure.code, FREE_EXECUTION_CODES.LIMIT);
+    assert.equal(failure.neverSent, true);
   } finally {
     await server.close();
   }

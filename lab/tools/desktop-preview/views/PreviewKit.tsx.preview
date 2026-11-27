@@ -1,3 +1,5 @@
+import { Notice } from './Notice';
+export { Notice };
 // Preview-only shared components: every mockup view composes these instead of route-local markup.
 import { ArrowCircleUp, CaretRight, ChatCircle, Check, Copy, CreditCard, DotsThree, FunnelSimple, Info, MagnifyingGlass, Minus, PaypalLogo, PencilSimple, Plus, PushPin, Trash, Wallet, Warning, X, type Icon, type IconWeight } from '@phosphor-icons/react';
 import { createContext, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react';
@@ -42,17 +44,6 @@ export function Tag({ tone = TONE.NEUTRAL, dot = false, pill = false, children }
 
 export function PreviewInlineSpinner() {
   return <span className="ui-inline-spinner" aria-hidden="true" />;
-}
-
-/** One-line notice with a tone: replacement, fallback or limit messages that must stay visible. */
-export function Notice({ tone = TONE.WARNING, children }: { tone?: Tone; children: ReactNode }) {
-  const Glyph = tone === TONE.WARNING || tone === TONE.DANGER ? Warning : Info;
-  return (
-    <p className="pk-notice" data-tone={tone} role="status">
-      <Glyph size={15} weight="fill" aria-hidden="true" />
-      <span>{children}</span>
-    </p>
-  );
 }
 
 /** On/off control for a global setting; the row beside it carries the label and help. */

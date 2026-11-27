@@ -15,6 +15,7 @@ import {
   PaidSellerLimitError,
   paidSellerLimitNotice,
   x402Policy,
+  StaleSellerOffer,
 } from './x402-model';
 
 export type DesktopSellerChoice =
@@ -132,7 +133,7 @@ export async function waitForPaidBuyer(
   external.throwIfAborted();
   if (status === HTTP_STATUS.noContent) {
     if (expiresAt !== undefined && expiresAt <= Date.now())
-      throw new PaidSellerLimitError(
+      throw new StaleSellerOffer(
         'The selected seller or terms changed. Refresh the listing before sending.',
       );
     return;
@@ -191,7 +192,7 @@ export function validateChoice(
     if (choice === BUYER_API.AUTO && !policy.paidAuto)
       throw new PaidSellerLimitError('Enable paid Auto in Payments first.');
     if (typeof choice === 'object' && choice.expiresAt <= Date.now())
-      throw new Error('Seller listing expired');
+      throw new StaleSellerOffer('Seller listing expired');
     const notice = paidSellerLimitNotice(
       policy,
       current,

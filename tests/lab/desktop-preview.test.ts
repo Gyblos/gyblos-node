@@ -423,3 +423,20 @@ void test('ten example chats share one spending limit and have individually attr
     );
   }
 });
+
+void test('reviewing an uncertain turn leaves its reservation and response count unchanged', async () => {
+  const call = await fixture('?screen=chat&review=failed-turn');
+  const state = async (action: string) =>
+    parseX402Result(await call('desktopX402', 'run', { action }));
+  const initial = await state(X402_ACTION.STATUS);
+  assert.equal(initial.summary.blocked, true);
+  const reviewed = await state(X402_ACTION.REVIEW);
+  assert.deepEqual(reviewed.summary, initial.summary);
+  const send = await call('desktopX402', 'run', {
+    action: X402_ACTION.SEND,
+    id: 'blocked-question',
+    prompt: 'Synthetic duplicate',
+  });
+  assert.equal(parseX402Result(send).reply, undefined);
+  assert.deepEqual((await state(X402_ACTION.STATUS)).summary, initial.summary);
+});

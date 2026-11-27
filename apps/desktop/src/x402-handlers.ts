@@ -11,11 +11,13 @@ import { controlAtomic } from '@gyblos/protocol/control-validation';
 
 // Fixed main-frame actions; explorer destinations come only from confirmed stored records.
 import { BuyerSessionRequired, DesktopBuyerFailure } from './buyer-error';
+import { CHAT_FAILURE, chatFailureReason } from './constants';
 import { LegacyPaymentReview, type X402Budget } from './x402-budget';
 import type { DesktopSellerChoice, X402Client } from './x402-client';
 import {
   effectiveX402Policy,
   PaidSellerLimitError,
+  StaleSellerOffer,
   X402_ACTION,
   x402Explorer,
   x402Id,
@@ -43,6 +45,32 @@ function actionError(action: unknown, blocked: boolean, error: unknown) {
       ? `${error.message} The request was not retried.`
       : 'Response unavailable. The request was not retried.';
   return 'The action could not complete.';
+}
+function actionFailure(action: unknown, blocked: boolean, error: unknown) {
+  const failure = { error: actionError(action, blocked, error) };
+  if (action !== X402_ACTION.SEND) return failure;
+  if (error instanceof StaleSellerOffer)
+    return { ...failure, failureReason: CHAT_FAILURE.STALE_OFFER };
+  if (!(error instanceof DesktopBuyerFailure)) return failure;
+  if (error.code === CHAT_FAILURE.KEY_REVIEW)
+    return {
+      ...failure,
+      failureReason: error.neverSent
+        ? CHAT_FAILURE.KEY_REVIEW_NOT_SENT
+        : CHAT_FAILURE.KEY_REVIEW,
+    };
+  if (blocked) return failure;
+  if (
+    error.code === CHAT_FAILURE.DECLINED ||
+    error.code === CHAT_FAILURE.FREE_LIMIT
+  )
+    return { ...failure, failureReason: error.code };
+  if (error.neverSent)
+    return {
+      ...failure,
+      failureReason: chatFailureReason(error.code) ?? CHAT_FAILURE.NOT_SENT,
+    };
+  return failure;
 }
 async function referenceAction(
   input: Record<string, unknown>,
@@ -167,7 +195,7 @@ async function selectedOffer(
       ? await resolveOffer?.(input.offerId)
       : undefined;
   if ('offerId' in input && !selected)
-    throw new PaidSellerLimitError(
+    throw new StaleSellerOffer(
       'Refresh the model list to verify this seller and its current price.',
     );
   if (selected && (!input.policyId || input.policyId !== policy?.policyId))
@@ -333,7 +361,7 @@ export function createX402Handlers(
       const current = await summary();
       return {
         ...current,
-        error: actionError(input.action, current.summary.blocked, error),
+        ...actionFailure(input.action, current.summary.blocked, error),
       };
     }
   };

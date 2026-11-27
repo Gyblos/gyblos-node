@@ -52,6 +52,7 @@ export type BuyerExecutionFactory = (context: {
   endpoint: Awaited<ReturnType<typeof bindEndpoint>>;
   relayOnly: boolean;
   dependencies: FreeBuyerDependencies;
+  diagnostics?: DiagnosticSink;
 }) => Promise<{
   execute(
     input: FreeExecutionBuildInput,
@@ -354,6 +355,7 @@ async function startOwnedFreeBuyer(
       endpoint,
       relayOnly,
       dependencies,
+      diagnostics,
     });
     const run: Awaited<ReturnType<BuyerExecutionFactory>>['execute'] =
       execution?.execute ??

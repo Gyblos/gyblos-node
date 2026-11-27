@@ -86,6 +86,12 @@ newer version. The button opens a dialog; nothing is downloaded and no release
 page is opened. Open `review=system-status` to start with the checklist open,
 combined with `node-state=error` or `backup=needed`.
 
+Open `?screen=chat&review=failed-turn` for an interrupted USDC answer with a
+shared-key spending record under review, an unfinished code block and a newer
+draft. Use `review=declined-turn` to edit a refused question while keeping a
+newer draft in its conversation. Use `review=paypal-turn` for an interrupted
+PayPal response.
+
 The preview uses the compact density described in [DESIGN.md](DESIGN.md#density)
 with Inter unless `font` is set. Add `density=comfortable` to compare the
 previous density.

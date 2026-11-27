@@ -313,6 +313,9 @@ void test('an invalid prompt keeps the session usable and explains how to fix it
   assert.equal(chat.getSnapshot().draft, draft);
   assert.equal(chat.getSnapshot().status?.phase, 'active');
   assert.match(chat.getSnapshot().notice, /shorten|shorter/i);
+  assert.equal(chat.getSnapshot().noticeIsTurnFailure, true);
+  await chat.refresh();
+  assert.equal(chat.getSnapshot().noticeIsTurnFailure, true);
   assert.deepEqual(f.calls, ['create', 'authorize']);
 });
 

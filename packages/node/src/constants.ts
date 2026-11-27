@@ -475,6 +475,12 @@ export const SELLER_REGISTRATION_STATE = {
   secretBytes: 64,
 } as const;
 
+export const BUYER_KEY_LEDGER_DIAGNOSTICS = {
+  component: 'buyer-key-ledger',
+  operation: 'persist',
+  phase: 'write',
+  code: 'BUYER_KEY_LEDGER_WRITE_FAILED',
+} as const;
 // Bounded private delegated-key ledger; it never contains inference content or signed payments.
 export const BUYER_API_KEY_STORAGE = { MAX_BYTES: 262144 } as const;
 

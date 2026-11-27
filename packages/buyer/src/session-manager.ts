@@ -40,6 +40,7 @@ import type { ChatTokenizer } from '@gyblos/protocol/engine';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import { SESSION_CODES, sessionFail } from '@gyblos/protocol/payment-session';
 
+import { reserveApiKey } from './api-key-execution';
 import {
   observeChannelAt,
   paidChannelEligibility,
@@ -67,9 +68,8 @@ type Options = BuyerStartupOptions;
 type Winner = Awaited<ReturnType<typeof selectWinner>>;
 export interface SessionState {
   activeRequest?: (id: string, seller: string) => boolean;
-  keyOperations: Map<string, BuyerApiKeyOperation>;
   openingIntent?: AsyncLocalStorage<string | undefined>;
-  selections: Map<string, Winner>;
+  selections: Map<string, Winner & { permission?: BuyerApiKeyOperation }>;
   sending: Map<string, () => void>;
   meter?: ChatTokenizer;
 }
@@ -175,7 +175,7 @@ function desktopPermissions(
     switchingAllowed: (requestId) =>
       sellerReplacementAuthorized(
         paidAuto,
-        state.keyOperations.has(requestId),
+        !!state.selections.get(requestId)?.permission,
         state.openingIntent?.getStore(),
       ),
     onDeclined: async () => {
@@ -183,7 +183,9 @@ function desktopPermissions(
       if (intent) await desktopOpening(process.env).declined(intent);
     },
     beforeInference: async (id, ref, executionDigest) => {
-      await state.keyOperations.get(id)?.bindExecution(id, executionDigest);
+      await state.selections
+        .get(id)
+        ?.permission?.bindExecution(id, executionDigest);
       const intent = state.openingIntent?.getStore();
       if (intent) await desktopOpening(process.env).consume(intent, ref);
     },
@@ -283,7 +285,7 @@ function checkSelectedChannel(
     quote: SignedOfferV2,
     signal: AbortSignal,
     intent = state.openingIntent?.getStore(),
-    delegated = state.keyOperations.has(quote.offer.requestId),
+    delegated = !!state.selections.get(quote.offer.requestId)?.permission,
   ) => {
     const result = await paidChannelEligibility(
       process.env,
@@ -313,6 +315,15 @@ function checkSelectedChannel(
       return buyerKeyFail(result.blocker);
     if (result.blocker)
       throw new UnsentSellerChoiceError(result.blocker, quote.offer.nodeId);
+  };
+}
+function sessionAuthorization(
+  state: SessionState,
+): BuyerSessionOptions<ReturnType<typeof sellerAddress>>['authorizeRequest'] {
+  return async (quote, signal) => {
+    const permission = state.selections.get(quote.offer.requestId)?.permission;
+    await reserveApiKey(permission, quote, signal);
+    return permission?.releaseUnsent;
   };
 }
 async function unresolvedPool(totalDepositAtomic: string | undefined) {
@@ -359,6 +370,7 @@ export function makeManager(
     },
     unresolved: () => unresolvedPool(policy.totalDepositAtomic),
     checkReusableChannel: checkChannel,
+    authorizeRequest: sessionAuthorization(state),
     verify: trustedQuote(context, state),
     receipt: sessionReceipts(context, state),
   };

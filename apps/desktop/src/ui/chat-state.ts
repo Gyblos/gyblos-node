@@ -2,6 +2,7 @@
 // Never makes inference, tool, payment or persistence calls.
 import type { ReasoningLevel } from '@gyblos/protocol/constants';
 
+import { CHAT_FAILURE, type ChatFailureReason } from '../constants';
 import { PAYMENT_METHOD, type PaymentMethod } from '../paypal-model';
 import type { ResponseMetrics } from '../response-metrics';
 import { chatReasoningChoice } from './chat-reasoning';
@@ -24,6 +25,7 @@ export type MessageState = (typeof MESSAGE_STATE)[keyof typeof MESSAGE_STATE];
 export type TurnTiming = { started: number; first?: number; ended?: number };
 export type ChatMessage = {
   activity?: TurnTiming;
+  failureReason?: ChatFailureReason;
   id: string;
   role: (typeof CHAT_ROLE)[keyof typeof CHAT_ROLE];
   text: string;
@@ -56,6 +58,7 @@ export type ChatSession = {
   draft: string;
   draftRevision: number;
   notice: string;
+  noticeIsTurnFailure?: boolean;
   blocked: DemoAuthorizationStatus | null;
   messages: ChatMessage[];
   run: ChatRun | null;
@@ -195,4 +198,35 @@ export function toggleToolSelection(
   return enabled.includes(id)
     ? enabled.filter((item) => item !== id)
     : [...enabled, id];
+}
+
+export function failPaidRun(
+  session: ChatSession,
+  id: string,
+  notice: string,
+  failureReason: ChatFailureReason | undefined,
+  now: () => number,
+): ChatSession {
+  return {
+    ...session,
+    draft:
+      session.draftRevision === session.paypalRun?.draftRevision
+        ? session.paypalRun.prompt
+        : session.draft,
+    paypalRun: null,
+    notice,
+    noticeIsTurnFailure: true,
+    messages: session.messages.map((message) =>
+      message.id === `${id}-assistant`
+        ? {
+            ...message,
+            state: MESSAGE_STATE.FAILED,
+            failureReason: failureReason ?? CHAT_FAILURE.INTERRUPTED,
+            ...(message.activity && {
+              activity: { ...message.activity, ended: now() },
+            }),
+          }
+        : message,
+    ),
+  };
 }

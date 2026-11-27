@@ -71,14 +71,12 @@ async function executePaidSession(
   current.throwIfAborted();
   await manager.checkChannel(quote, current, openingIntent, !!permission);
   current.throwIfAborted();
-  await reserveApiKey(permission, quote, current);
   const id = quote.offer.requestId;
   if (state.selections.has(id)) return sessionFail(SESSION_CODES.BINDING);
   const scope = (state.openingIntent ??= new AsyncLocalStorage<
     string | undefined
   >());
-  state.selections.set(id, winner);
-  if (permission) state.keyOperations.set(id, permission);
+  state.selections.set(id, { ...winner, permission });
   if (sending) state.sending.set(id, sending);
   let result: Awaited<ReturnType<typeof manager.execute>>;
   try {
@@ -96,7 +94,6 @@ async function executePaidSession(
     );
   } finally {
     state.selections.delete(id);
-    state.keyOperations.delete(id);
     state.sending.delete(id);
   }
   const payment: ChatPayment = {
@@ -335,7 +332,6 @@ export async function startSessionQuoteRuntime(
   const state: SessionState = {
     selections: new Map(),
     sending: new Map(),
-    keyOperations: new Map(),
   };
   const manager = makeManager(context, options, policy, state);
   const router =

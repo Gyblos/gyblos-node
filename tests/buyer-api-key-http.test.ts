@@ -2,15 +2,25 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import { CHAT_ROUTES, FREE_BUYER } from '@gyblos/buyer/constants';
 import { startFreeBuyerHttp } from '@gyblos/buyer/free-http';
+import { ROUTES } from '@gyblos/config';
+import {
+  desktopBuyerFailure,
+  DesktopBuyerFailure,
+} from '@gyblos/desktop/buyer-error';
 import { createBuyerApiKeys } from '@gyblos/node/buyer-api-keys';
 import { SESSION_VERDICTS } from '@gyblos/node/constants';
 import { BUYER_API, parseBuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 import {
   BUYER_API_KEYS,
+  BUYER_KEY_CODES,
+  BuyerApiKeyError,
   parseBuyerApiKeysReply,
 } from '@gyblos/protocol/buyer-api-keys';
 import { ENGINE_DONE_REASONS, MODEL_IDS } from '@gyblos/protocol/constants';
+
+import { events, host, MODEL } from './support/buyer-responses';
 
 async function fixture() {
   const scope = {
@@ -39,7 +49,6 @@ async function fixture() {
         sellerNodeId: 'b'.repeat(64),
       });
       calls += 1;
-      if (uncertain) throw new Error('synthetic unknown financial outcome');
       const charged = calls === 1 ? '40' : '60';
       return {
         text: 'synthetic answer',
@@ -48,7 +57,7 @@ async function fixture() {
         payment: {
           verdict: SESSION_VERDICTS.APPROVED,
           maxAtomic: '60',
-          expectedAtomic: charged,
+          expectedAtomic: uncertain ? '39' : charged,
           chargedAtomic: null,
           sellerAtomic: null,
           feeAtomic: null,
@@ -220,26 +229,47 @@ void test('an uncertain delegated payment blocks operator Chat and new grants wi
   try {
     const key = await f.keys.create('Synthetic', '100');
     f.uncertain();
-    assert.equal(
-      (
-        await fetch(f.host.url, {
-          method: 'POST',
-          headers: {
-            authorization: 'Bearer ' + key.secret,
-            'content-type': 'application/json',
-          },
-          body,
-        })
-      ).status,
-      500,
-    );
+    const dispatched = await fetch(f.host.url, {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer ' + key.secret,
+        'content-type': 'application/json',
+      },
+      body,
+    });
+    assert.equal(dispatched.status, 503);
+    const result = await dispatched.json();
+    assert.equal(result.error.code, BUYER_KEY_CODES.REVIEW);
+    const dispatchedFailure = desktopBuyerFailure(result.error, f.policy);
+    assert.ok(dispatchedFailure instanceof DesktopBuyerFailure);
+    assert.equal(dispatchedFailure.neverSent, false);
     const root = await fetch(f.host.url, {
       method: 'POST',
       headers: { ...f.owner, 'content-type': 'application/json' },
       body,
     });
-    assert.equal(root.status, 503);
-    assert.match(await root.text(), /BUYER_KEY_NEEDS_REVIEW/);
+    const responses = await fetch(new URL(CHAT_ROUTES.responses, f.host.url), {
+      method: 'POST',
+      headers: { ...f.owner, 'content-type': 'application/json' },
+      body: JSON.stringify({ model: MODEL_IDS.QWEN3_0_6B, input: 'synthetic' }),
+    });
+    assert.deepEqual(
+      [
+        root.status,
+        root.headers.get(FREE_BUYER.noRetryHeader),
+        responses.status,
+        responses.headers.get(FREE_BUYER.noRetryHeader),
+      ],
+      [503, 'false', 400, 'false'],
+    );
+    const refused = await responses.json();
+    assert.equal(refused.error.code, BUYER_KEY_CODES.REVIEW);
+    assert.equal(refused.error[BUYER_API.NEVER_SENT_FIELD], true);
+    const rejection = await root.json();
+    assert.equal(rejection.error.code, BUYER_KEY_CODES.REVIEW);
+    const failure = desktopBuyerFailure(rejection.error, f.policy);
+    assert.ok(failure instanceof DesktopBuyerFailure);
+    assert.equal(failure.neverSent, true);
     assert.equal(f.calls(), 1);
     assert.equal((await f.keys.snapshot()).keys[0]?.reservedAtomic, '60');
     await assert.rejects(
@@ -249,5 +279,85 @@ void test('an uncertain delegated payment blocks operator Chat and new grants wi
   } finally {
     await f.host.close();
     await f.keys.close();
+  }
+});
+
+void test('the three APIs keep the HTTP stream status and expose the key review in their terminal event', async () => {
+  let started = false;
+  const server = await host(async (delta) => {
+    if (started) await delta('partial');
+    throw new BuyerApiKeyError(BUYER_KEY_CODES.REVIEW);
+  }, []);
+  try {
+    for (const sendDelta of [false, true]) {
+      started = sendDelta;
+      for (const path of [
+        ROUTES.inference,
+        CHAT_ROUTES.messages,
+        CHAT_ROUTES.responses,
+      ]) {
+        const responses = path === CHAT_ROUTES.responses;
+        const response = await fetch(new URL(path, server.url), {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            model: MODEL,
+            stream: true,
+            ...(responses
+              ? { input: 'synthetic' }
+              : {
+                  messages: [{ role: 'user', content: 'synthetic' }],
+                  max_tokens: 32,
+                }),
+          }),
+        });
+        assert.equal(response.headers.get(FREE_BUYER.noRetryHeader), 'false');
+        if (!started) {
+          assert.equal(response.status, responses ? 400 : 503);
+          const body = await response.json();
+          assert.equal(
+            responses
+              ? body.error[BUYER_API.ERROR_CODE_FIELD]
+              : body.error.code,
+            BUYER_KEY_CODES.REVIEW,
+          );
+          continue;
+        }
+        assert.equal(response.status, 200);
+        assert.match(
+          response.headers.get('content-type') ?? '',
+          /text\/event-stream/,
+        );
+        const stream = await response.text();
+        const frames = stream.split(/\r?\n\r?\n/);
+        assert.equal(
+          frames.pop(),
+          '',
+          'The terminal SSE frame must end with a blank line',
+        );
+        const terminal = frames.at(-1);
+        assert.ok(terminal);
+        const names = terminal
+          .split(/\r?\n/)
+          .filter((line) => line.startsWith('event:'));
+        const event = events(terminal)[0];
+        if (responses) {
+          assert.deepEqual(names, ['event: response.failed']);
+          assert.equal(event.type, 'response.failed');
+          assert.equal(
+            event.response.error[BUYER_API.ERROR_CODE_FIELD],
+            BUYER_KEY_CODES.REVIEW,
+          );
+        } else {
+          if (path === CHAT_ROUTES.messages) {
+            assert.deepEqual(names, ['event: error']);
+            assert.equal(event.type, 'error');
+          } else assert.deepEqual(names, []);
+          assert.equal(event.error.code, BUYER_KEY_CODES.REVIEW);
+        }
+      }
+    }
+  } finally {
+    await server.close();
   }
 });

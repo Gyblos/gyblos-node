@@ -21,6 +21,8 @@ import {
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
+import { CHAT_FAILURE } from './constants';
+
 export class BuyerSessionRequired extends Error {
   constructor(
     reason:
@@ -61,6 +63,8 @@ export class DesktopBuyerFailure extends Error {
   }
 }
 function explanation(code: BuyerCode, reason: unknown, free: boolean) {
+  if (code === CHAT_FAILURE.KEY_REVIEW)
+    return 'An API key reservation needs review. Desktop and connected tools are paused until its spending status is confirmed.';
   if (code === BUYER_ROUTING_CODES.BUSY)
     return 'The selected seller or channel is busy. If your buyer uses one channel, settle the existing channel before switching sellers.';
   if (code === SESSION_CODES.REQUEST_DECLINED)
@@ -154,7 +158,14 @@ export function desktopBuyerFailure(
       'The selected seller could not open a payment channel. Choose another seller.',
       true,
     );
+  const reportedCode =
+    row.code === BUYER_API.CONTEXT_LENGTH_EXCEEDED &&
+    row[BUYER_API.ERROR_CODE_FIELD] === FREE_EXECUTION_CODES.LIMIT &&
+    typeof row[BUYER_API.NEVER_SENT_FIELD] === 'boolean'
+      ? FREE_EXECUTION_CODES.LIMIT
+      : row.code;
   const code = [
+    CHAT_FAILURE.KEY_REVIEW,
     BUYER_ROUTING_CODES.BUSY,
     SESSION_CODES.REQUEST_DECLINED,
     SESSION_CODES.OPENING_ABSENT,
@@ -165,11 +176,12 @@ export function desktopBuyerFailure(
     SESSION_CODES.LIMIT,
     ...Object.values(FREE_EXECUTION_CODES),
     ...Object.values(SELLER_SELECTION_CODES),
-  ].find((code) => code === row.code);
+  ].find((code) => code === reportedCode);
   return code
     ? new DesktopBuyerFailure(
         code,
         explanation(code, row.reason, policy.maxAtomic === '0'),
+        row[BUYER_API.NEVER_SENT_FIELD] === true,
       )
     : new Error('Buyer did not complete the request');
 }

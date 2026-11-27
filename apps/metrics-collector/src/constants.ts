@@ -313,6 +313,8 @@ export const CHAIN_INDEX = {
   maxResponseBytes: 8_388_608,
   // Highest Solana transaction version asked for: devnet already carries version 1 transactions.
   maxTransactionVersion: 1,
+  maxSlot: 2 ** 32,
+  maxBlockTimeSec: 4_294_967_295,
   msPerSecond: 1000,
 } as const;
 // Keyed providers whose key serves every Solana cluster under a per-cluster host: a configured

@@ -14,6 +14,7 @@ import {
 } from '@gyblos/protocol/buyer-api';
 import { MODEL_IDS } from '@gyblos/protocol/constants';
 
+import { chatFailureReason, type ChatFailureReason } from './constants';
 import { parseResponseMetrics, type ResponseMetrics } from './response-metrics';
 import { DESKTOP_X402 } from './x402/constants';
 
@@ -100,6 +101,7 @@ export function paidSellerLimitNotice(
   return undefined;
 }
 export class PaidSellerLimitError extends Error {}
+export class StaleSellerOffer extends PaidSellerLimitError {}
 export function x402Id(value: unknown): value is string {
   return (
     typeof value === 'string' &&
@@ -286,6 +288,7 @@ export function x402BudgetInput(
   return String(atomic);
 }
 export interface X402Result {
+  failureReason?: ChatFailureReason;
   canCheckChannels?: true;
   summary: X402Summary;
   policy: BuyerApiPolicy | null;
@@ -323,6 +326,8 @@ export function parseX402Result(input: unknown): X402Result {
     )
       throw new Error('Invalid buyer error');
     result.error = value.error;
+    const reason = chatFailureReason(value.failureReason);
+    if (reason) result.failureReason = reason;
   }
   if (value.reply !== undefined) {
     if (!value.reply || typeof value.reply !== 'object')
