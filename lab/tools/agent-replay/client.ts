@@ -47,7 +47,7 @@ export function frameOf(line: string): { text?: string; error?: string } {
   };
 }
 
-async function readStream(
+export async function readStream(
   body: ReadableStream<Uint8Array>,
   began: number,
   timing: ReplayTiming,

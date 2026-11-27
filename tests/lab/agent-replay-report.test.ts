@@ -1,8 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { frameOf } from '../lab/tools/agent-replay/client';
-import { summarize, type ReplayRecord } from '../lab/tools/agent-replay/report';
+import {
+  frameOf,
+  readStream,
+  type ReplayTiming,
+} from '../../lab/tools/agent-replay/client';
+import {
+  summarize,
+  type ReplayRecord,
+} from '../../lab/tools/agent-replay/report';
 
 const base: ReplayRecord = {
   tag: 'replay-request-1',
@@ -43,4 +50,34 @@ void test('stream frames are validated before use', () => {
   assert.equal(frameOf('data: {"error":{"code":"BUSY"}}').error, 'BUSY');
   assert.equal(frameOf('data: {"error":{"code":3}}').error, 'gyblos_error');
   assert.deepEqual(frameOf('data: [DONE]'), {});
+});
+
+void test('a stream that sends text and then an error frame keeps its first token and records the error', async () => {
+  const frames = [
+    'data: {"choices":[{"delta":{"content":"partial"}}]}\n\n',
+    'data: {"error":{"code":"SELLER_FAILED"}}\n\n',
+  ];
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (const frame of frames)
+        controller.enqueue(new TextEncoder().encode(frame));
+      controller.close();
+    },
+  });
+  const timing: ReplayTiming = {
+    tag: 'replay-request-1',
+    role: 'main',
+    turn: 1,
+    startMs: 0,
+    headersMs: 0,
+    firstTokenMs: null,
+    totalMs: 0,
+    status: 200,
+    code: null,
+    text: '',
+  };
+  await readStream(body, 0, timing);
+  assert.equal(timing.text, 'partial');
+  assert.notEqual(timing.firstTokenMs, null);
+  assert.equal(timing.code, 'SELLER_FAILED');
 });
