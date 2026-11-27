@@ -5,7 +5,9 @@ export async function checkMinimumLayout() {
 
   async function visible(selector: string) {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      const element = document.querySelector<HTMLElement>(selector);
+      const element = Array.from(
+        document.querySelectorAll<HTMLElement>(selector),
+      ).find((match) => !match.closest('[inert]'));
       if (element?.getBoundingClientRect().width) return element;
       await new Promise((resolve) => setTimeout(resolve, pollMs));
     }
@@ -124,12 +126,14 @@ export async function checkMinimumLayout() {
   await iconOnly('Manage keys');
   (await visible('#preview-tab-overview')).click();
   await iconOnly('Spending limits');
-  const copies = Array.from(
-    document.querySelectorAll('.preview-method-copy'),
-    (copy) => copy.getBoundingClientRect().left,
-  )
-    .filter((left) => left < innerWidth)
-    .map(Math.round);
+  const rows = Array.from(document.querySelectorAll('.preview-method-copy'));
+  const copies = rows
+    .filter((copy) => !copy.closest('[inert]'))
+    .map((copy) => Math.round(copy.getBoundingClientRect().left));
+  document.documentElement.dataset.inertPaymentRows = String(
+    rows.length - copies.length,
+  );
+  if (copies.length < 2) throw new Error('Missing payment methods');
   if (new Set(copies).size > 1) throw new Error('Misaligned payment methods');
   (await visible('#preview-tab-history')).click();
   await visible('.ui-table-region tbody tr');

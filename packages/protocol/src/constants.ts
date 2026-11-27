@@ -211,6 +211,28 @@ export const CONTROL_METERING_MODES = {
 } as const;
 export type ControlMeteringMode =
   (typeof CONTROL_METERING_MODES)[keyof typeof CONTROL_METERING_MODES];
+export const MODEL_CATEGORIES = [
+  'general',
+  'coding',
+  'agentic',
+  'reasoning',
+  'classification',
+  'extraction',
+  'embedding',
+  'reranking',
+  'vision',
+  'speech-to-text',
+  'text-to-speech',
+  'translation',
+  'moderation',
+  'image-generation',
+  'image-editing',
+  'image-upscaling',
+  'video-generation',
+  'audio-generation',
+  'document-understanding',
+] as const;
+
 export const MODEL_IDENTITIES = {
   DIGEST: 'digest',
   NAME_ONLY: 'name-only',

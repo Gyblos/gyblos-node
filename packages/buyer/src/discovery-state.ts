@@ -88,6 +88,13 @@ export function discoveryRowLive(row: DiscoveryRow, now: number) {
     row.catalogExpiresAt > now && row.presenceExpiresAt > now && unblocked(row)
   );
 }
+const lastSeen = (held: DiscoveryRow, incoming: DiscoveryRow) => ({
+  catalogExpiresAt: Math.max(held.catalogExpiresAt, incoming.catalogExpiresAt),
+  presenceExpiresAt: Math.max(
+    held.presenceExpiresAt,
+    incoming.presenceExpiresAt,
+  ),
+});
 export function mergeDiscoveryRow(
   held: DiscoveryRow | undefined,
   incoming: DiscoveryRow,
@@ -106,6 +113,7 @@ export function mergeDiscoveryRow(
         incoming.highWater > held.highWater
           ? {
               ...held,
+              ...lastSeen(held, incoming),
               highWater: incoming.highWater,
               conflictedThrough: Math.max(
                 held.conflictedThrough,
@@ -126,6 +134,7 @@ export function mergeDiscoveryRow(
     return {
       row: {
         ...held,
+        ...lastSeen(held, incoming),
         highWater: Math.max(held.highWater, incoming.highWater),
         conflictedThrough: Math.max(
           held.conflictedThrough,
@@ -146,6 +155,7 @@ export function mergeDiscoveryRow(
     return {
       row: {
         ...held,
+        ...lastSeen(held, incoming),
         withdrawnThrough,
         highWater: Math.max(held.highWater, incoming.highWater),
         conflictedThrough: Math.max(held.conflictedThrough, incoming.highWater),

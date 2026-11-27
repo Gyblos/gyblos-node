@@ -70,7 +70,22 @@ function sources(state: State) {
   };
   const models = state === 'populated' ? [model] : [];
   const payloads = new Map<string, unknown>([
-    ['/models', { generatedAt, models: [{ id: modelId }] }],
+    [
+      '/models/catalog',
+      {
+        generatedAt,
+        models: [
+          {
+            id: modelId,
+            sellers: 1,
+            family: 'qwen',
+            lab: 'Alibaba · Qwen',
+            source: 'rules',
+            categories: [],
+          },
+        ],
+      },
+    ],
     [
       '/sellers',
       {

@@ -87,6 +87,7 @@ export function snapshotOf(
   if (!stored || !catalog) return unavailable('discovery not read yet');
   return {
     generatedAt: catalog.generatedAt,
+    models: catalog.models ?? {},
     sellers: catalog.sellers.map((seller) => ({
       ...seller,
       uptime: shownUptime(stored.uptimes[seller.nodeId], now),

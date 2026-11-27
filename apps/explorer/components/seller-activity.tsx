@@ -11,6 +11,7 @@ import type { SellerDay } from '../lib/collector-shape';
 import { DISPLAY, PAGING } from '../lib/constants';
 import { getDiscovery } from '../lib/discovery-render';
 import { count, pricePerMtok, usdcDecimal } from '../lib/format';
+import type { CatalogModels } from '../lib/model-catalog';
 import { rangeOf, tablePager, type ExplorerQuery } from '../lib/paging';
 import { displayRange } from '../lib/range';
 import {
@@ -121,11 +122,13 @@ function ModelsTable({
   rows,
   served,
   offersKnown,
+  models,
 }: {
   query: ExplorerQuery;
   rows: ReturnType<typeof sellerModelRows>;
   served: boolean;
   offersKnown: boolean;
+  models: CatalogModels;
 }) {
   const shown = pagedRows(query, 'models', rows);
   const figure = (row: (typeof rows)[number], name: Figure) => (
@@ -163,6 +166,7 @@ function ModelsTable({
                 modelId={row.modelId}
                 variant={row.variant}
                 quantization={row.quantization}
+                models={models}
               />
             </td>
             <td className={numberCell}>
@@ -343,6 +347,7 @@ export async function SellerActivity({
         rows={sellerModelRows(offers, stats.models)}
         served={!stats.error}
         offersKnown={!snapshot.error}
+        models={snapshot.models}
       />
       {stats.error ? null : <DailyTable query={query} days={totals.active} />}
     </>

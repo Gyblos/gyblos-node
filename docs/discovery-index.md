@@ -19,22 +19,23 @@ approval.
 Routes sit at the root of the index host. The client base URL is
 `https://discovery.gyblos.com/v1` (`DISCOVERY_INDEX_URL` in `@gyblos/config`).
 
-| Route                              | Purpose                                                                                         |
-| ---------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `POST /v1/records`                 | Publish one signed public v2 catalog, presence or withdrawal.                                   |
-| `GET /v1/sellers`                  | List live sellers of one model, paged by an opaque cursor.                                      |
-| `GET /v1/models`                   | List models from live sellers, ordered by seller count; no query parameters.                    |
-| `GET /v1/uptime?node=`             | Public uptime of one NodeId over the last day, week and month ([Uptime](#uptime)).              |
-| `GET /v1/versions[?node=<NodeId>]` | Active seller counts by release, or one active seller’s declared release.                       |
-| `GET /v1/network`                  | Every known seller, online, offline or unpublished, with counts ([Network](#network)).          |
-| `GET /v1/network/history`          | Average and peak sellers online per UTC day ([Network history](#network-history)).              |
-| `GET /v1/offers/history`           | Catalog periods and their exact prices, by NodeId or model ([Offer history](#offer-history)).   |
-| `GET /v1/health`                   | `{ ok: true, records, publish }`: unexpired record count and [publish mode](#publish-modes).    |
-| `POST /v1/registrations`           | Trade an invite code for publishing, once the NodeId is bound in the 8004 agent registry.       |
-| `POST /v1/identity/github`         | Submit a node-signed GitHub claim; the index checks its gist ([GitHub claims](#github-claims)). |
-| `GET /v1/identity/github/<NodeId>` | One seller's GitHub claim and the state of its last check.                                      |
-| `POST /v1/profile`                 | Set or clear a seller's node-signed display name ([Seller names](#seller-names)).               |
-| `GET /v1/profile/<NodeId>`         | One seller's display name, with its signed claim.                                               |
+| Route                              | Purpose                                                                                                       |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `POST /v1/records`                 | Publish one signed public v2 catalog, presence or withdrawal.                                                 |
+| `GET /v1/sellers`                  | List live sellers of one model, paged by an opaque cursor.                                                    |
+| `GET /v1/models`                   | List models from live sellers, ordered by seller count; no query parameters.                                  |
+| `GET /v1/models/catalog`           | The same list with each model's `family`, `lab`, `source` and `categories` ([Model catalog](#model-catalog)). |
+| `GET /v1/uptime?node=`             | Public uptime of one NodeId over the last day, week and month ([Uptime](#uptime)).                            |
+| `GET /v1/versions[?node=<NodeId>]` | Active seller counts by release, or one active seller’s declared release.                                     |
+| `GET /v1/network`                  | Every known seller, online, offline or unpublished, with counts ([Network](#network)).                        |
+| `GET /v1/network/history`          | Average and peak sellers online per UTC day ([Network history](#network-history)).                            |
+| `GET /v1/offers/history`           | Catalog periods and their exact prices, by NodeId or model ([Offer history](#offer-history)).                 |
+| `GET /v1/health`                   | `{ ok: true, records, publish }`: unexpired record count and [publish mode](#publish-modes).                  |
+| `POST /v1/registrations`           | Trade an invite code for publishing, once the NodeId is bound in the 8004 agent registry.                     |
+| `POST /v1/identity/github`         | Submit a node-signed GitHub claim; the index checks its gist ([GitHub claims](#github-claims)).               |
+| `GET /v1/identity/github/<NodeId>` | One seller's GitHub claim and the state of its last check.                                                    |
+| `POST /v1/profile`                 | Set or clear a seller's node-signed display name ([Seller names](#seller-names)).                             |
+| `GET /v1/profile/<NodeId>`         | One seller's display name, with its signed claim.                                                             |
 
 Common behavior:
 
@@ -46,14 +47,15 @@ Common behavior:
 - **Unknown routes** answer `404 {"error":"NOT_FOUND"}`.
 - **Headers.** Every response carries `X-Robots-Tag: noindex` and
   `X-Content-Type-Options: nosniff`. `GET` and `HEAD` on `/v1/sellers`,
-  `/v1/models`, `/v1/uptime`, `/v1/versions`, `/v1/network`,
-  `/v1/network/history`, `/v1/offers/history`, `/v1/health`,
+  `/v1/models`, `/v1/models/catalog`, `/v1/uptime`, `/v1/versions`,
+  `/v1/network`, `/v1/network/history`, `/v1/offers/history`, `/v1/health`,
   `/v1/identity/github/<NodeId>` and `/v1/profile/<NodeId>` carry
   `Access-Control-Allow-Origin: *` on every status, errors included. A `200`
-  from `/v1/sellers`, `/v1/models`, `/v1/uptime`, `/v1/versions`, `/v1/network`,
-  `/v1/network/history`, `/v1/offers/history`, `/v1/identity/github/<NodeId>` or
-  `/v1/profile/<NodeId>` carries `Cache-Control: public, max-age=10`; everything
-  else carries `Cache-Control: no-store`.
+  from `/v1/sellers`, `/v1/models`, `/v1/models/catalog`, `/v1/uptime`,
+  `/v1/versions`, `/v1/network`, `/v1/network/history`, `/v1/offers/history`,
+  `/v1/identity/github/<NodeId>` or `/v1/profile/<NodeId>` carries
+  `Cache-Control: public, max-age=10`; everything else carries
+  `Cache-Control: no-store`.
 
 ## Publish modes
 
@@ -208,12 +210,12 @@ signed a record; clients re-verify everything.
 
 Rate limits:
 
-| Limit                               | Key                                     | Budget                                   | Consumed by                                                                                                                                                                    |
-| ----------------------------------- | --------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `DISCOVERY_IP_LIMITER`              | client IPv4 address, or IPv6 /64 prefix | set in `wrangler.jsonc`                  | every request                                                                                                                                                                  |
-| `DISCOVERY_PUBLISH_LIMITER`         | client IPv4 address, or IPv6 /64 prefix | set in `wrangler.jsonc`                  | publishes and registrations                                                                                                                                                    |
-| `DISCOVERY_READ_LIMITER`            | constant key `global`                   | set in `wrangler.jsonc`                  | storage reads only: a `/v1/sellers`, `/v1/models`, `/v1/uptime`, `/v1/versions`, `/v1/network`, `/v1/network/history` or `/v1/offers/history` cache miss, a stale health count |
-| NodeId publish quota (stored in D1) | NodeId                                  | 10 accepted records per fixed UTC minute | accepted records only                                                                                                                                                          |
+| Limit                               | Key                                     | Budget                                   | Consumed by                                                                                                                                                                                          |
+| ----------------------------------- | --------------------------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DISCOVERY_IP_LIMITER`              | client IPv4 address, or IPv6 /64 prefix | set in `wrangler.jsonc`                  | every request                                                                                                                                                                                        |
+| `DISCOVERY_PUBLISH_LIMITER`         | client IPv4 address, or IPv6 /64 prefix | set in `wrangler.jsonc`                  | publishes and registrations                                                                                                                                                                          |
+| `DISCOVERY_READ_LIMITER`            | constant key `global`                   | set in `wrangler.jsonc`                  | storage reads only: a `/v1/sellers`, `/v1/models`, `/v1/models/catalog`, `/v1/uptime`, `/v1/versions`, `/v1/network`, `/v1/network/history` or `/v1/offers/history` cache miss, a stale health count |
+| NodeId publish quota (stored in D1) | NodeId                                  | 10 accepted records per fixed UTC minute | accepted records only                                                                                                                                                                                |
 
 - A Cloudflare limiter that refuses or fails gives `429 RATE_LIMITED` with
   `Retry-After: 60`. That `429` is `no-store` and never cached.
@@ -229,14 +231,15 @@ Rate limits:
 
 ## Caching
 
-- **Public reads.** `/v1/sellers`, `/v1/models`, `/v1/uptime`, `/v1/versions`,
-  `/v1/network`, `/v1/network/history`, `/v1/offers/history`,
-  `/v1/identity/github/<NodeId>` and `/v1/profile/<NodeId>` keep `200` answers
-  in the Workers Cache API (`caches.default`, per Cloudflare location) for 10
-  seconds, matching their `max-age`. Keys are normalized:
+- **Public reads.** `/v1/sellers`, `/v1/models`, `/v1/models/catalog`,
+  `/v1/uptime`, `/v1/versions`, `/v1/network`, `/v1/network/history`,
+  `/v1/offers/history`, `/v1/identity/github/<NodeId>` and
+  `/v1/profile/<NodeId>` keep `200` answers in the Workers Cache API
+  (`caches.default`, per Cloudflare location) for 10 seconds, matching their
+  `max-age`. Keys are normalized:
   - sellers: `cursor`, the effective `limit` (so `limit=5000` and `limit=200`
     share an entry) and `model`, in that order;
-  - models and network: the route alone;
+  - models, model catalog and network: the route alone;
   - uptime: `?node=<NodeId>`, however the query was spelled;
   - network history: the effective `days`;
   - offer history: `?node=<NodeId>` or `?model=<model>`, then the effective
@@ -407,6 +410,76 @@ is `400 INVALID_QUERY`):
 - In open mode (`DISCOVERY_PUBLISH_ALLOWLIST="*"`) anyone can add entries by
   publishing from new NodeIds, as with uptime; the caps bound them, but the
   public counts are not Sybil resistant.
+
+## Model catalog
+
+`GET /v1/models/catalog` takes no parameters and returns the `/v1/models` list
+(at most 500 models) with four more fields per model:
+
+```json
+{
+  "models": [
+    {
+      "id": "qwen3-0.6b",
+      "sellers": 2,
+      "family": "qwen",
+      "lab": "Alibaba · Qwen",
+      "source": "registry",
+      "categories": ["general", "reasoning"]
+    }
+  ],
+  "generatedAt": 1764028800000
+}
+```
+
+Without a registry entry, `family`, `lab` and `source` are read from the model
+id itself (`@gyblos/protocol/model-family`), never from a seller's claim; rules
+ignore case, and are never `null`. A known publisher (`meta-llama/Llama-3.1-8B`)
+decides the family (`google/gemma-…` is `gemma`); otherwise the name does, with
+or without a publisher (`unsloth/Qwen3-8B` and `qwen3-0.6b` are `qwen`). Those
+carry `source: "rules"`. An id no rule knows has `family: "other"`, its
+publisher as written as `lab` (`acme/foo-7b` gives `acme`, a bare id `Unknown`)
+and `source: "fallback"`. `/v1/models` keeps its two fields, because released
+buyers reject extra keys there.
+
+A model with an entry in the operator's registry (`discovery_model_registry`)
+takes its `family`, `lab` and `categories` from that entry instead, with
+`source: "registry"`. Without one, `categories` is `[]`. Categories come from
+one fixed list (`MODEL_CATEGORIES` in `@gyblos/protocol/constants`): `general`,
+`coding`, `agentic`, `reasoning`, `classification`, `extraction`, `embedding`,
+`reranking`, `vision`, `speech-to-text`, `text-to-speech`, `translation`,
+`moderation`, `image-generation`, `image-editing`, `image-upscaling`,
+`video-generation`, `audio-generation` and `document-understanding`. They
+describe the model, not a seller's offer: modalities, context, quantization and
+price stay with each offer. A cache miss reads the registry rows of the listed
+models once, by exact id (case matters, unlike the rules), so an edit shows
+after the response cache expires (up to 10 seconds per location). A registry
+that cannot be read (for example before migration `0012` is applied) or a stored
+row outside the taxonomy never fails the route: those models fall back to the
+rules with `categories: []`.
+
+### Model registry
+
+`pnpm index:models [--remote]`
+(`apps/discovery-index/scripts/model-registry.ts`) lists the registry by model
+id (columns `model`, `family`, `lab`, `categories`, `updatedAt`; it stops at
+1,000 rows and says so).
+`pnpm index:models --set <model> --family <family> --lab <lab> --categories <a,b> --local|--remote`
+adds or replaces an entry: the model is a protocol identifier (at most 128
+characters), `family` is one of the rule families or `other`, `lab` has 1 to 64
+characters with no surrounding spaces or control characters, and at least one
+category is required, each in the list above (spaces after commas are ignored,
+duplicates dropped). `pnpm index:models --remove <model> --local|--remote`
+deletes one. Like the other operator scripts, it compiles its SQL with Drizzle
+and runs it through Wrangler; the index has no admin route.
+
+`pnpm index:models --unclassified [--remote]` is the check for new models: it
+lists every model offered now (a live catalog with a matching live presence, not
+withdrawn; up to 1,000, and it says when it stops there) that has no valid
+registry entry, and exits with code 1 while any remain, so it can run on a
+schedule. A usage error or a failed D1 call exits with code 2, so a schedule can
+tell the two apart. A model the rules recognize still counts until it has an
+entry, because only the registry carries categories.
 
 ## Network history
 
@@ -812,11 +885,11 @@ stored or logged.
   and the migration is generated from it (see the migrations below); tests check
   its metadata against the migrations.
 - `storage-queries.ts`, `storage-writes.ts`, `registration-queries.ts`,
-  `uptime-d1.ts`, `github-claim-store-d1.ts` and `profile-store-d1.ts` build
-  every query through Drizzle. `d1-client.ts` runs only ORM-generated statements
-  and native transactional batches. The admin script uses the same schema and
-  mutation builders, rendered through Drizzle's SQLite dialect because the
-  Wrangler CLI takes SQL rather than bind parameters.
+  `uptime-d1.ts`, `github-claim-store-d1.ts`, `profile-store-d1.ts` and
+  `model-registry-d1.ts` build every query through Drizzle. `d1-client.ts` runs
+  only ORM-generated statements and native transactional batches. The admin
+  script uses the same schema and mutation builders, rendered through Drizzle's
+  SQLite dialect because the Wrangler CLI takes SQL rather than bind parameters.
 - A publish is one D1 batch (one transaction) that admits the high-water mark
   and NodeId quota together before writing the record. A failed batch rolls both
   back.
@@ -834,34 +907,37 @@ stored or logged.
 
 The only handwritten SQL expressions live in `src/sqlite-expressions.ts`:
 
-| Expression               | Why Drizzle can't express it                                                                                                    |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| `INDEXED BY`             | No index-hint builder. Without it SQLite reads tables holding signed JSON before pagination; a key-only `EXPLAIN` test pins it. |
-| `(VALUES (1))`           | The select builder needs a `FROM`; initial admission must still check capacity and references atomically on empty tables.       |
-| Two-argument `min`/`max` | Drizzle's versions are aggregates; retention, quota windows and uptime sightings need the scalar form inside atomic updates.    |
-| `coalesce`               | No builder; an inconclusive GitHub check moves `checked_at` forward from `NULL`, and a new offer period starts after the last.  |
-| `CASE`                   | No conditional builder; quota resets, uptime admission and closing an expired offer period use it atomically.                   |
-| `length`                 | No scalar builder; the schema keeps the database text-length checks.                                                            |
-| Bitwise OR               | No bitwise builder; concurrent uptime observations combine slot bits in one write.                                              |
-| `json_each`              | No builder; the network read matches names to the NodeIds it lists, and offer history rows come from one catalog JSON value.    |
-| `json_extract`, `cast`   | No builder; each offer row's fields and position are read from that catalog JSON value inside the guarded insert.               |
-| `NULL` select item       | The insert-select of a new offer period must name its still-empty end columns.                                                  |
-| Scalar subquery          | No correlated subquery in a SELECT list; the network read takes each NodeId's newest uptime row by primary key.                 |
+| Expression                | Why Drizzle can't express it                                                                                                                                                                       |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `INDEXED BY`              | No index-hint builder. Without it SQLite reads tables holding signed JSON before pagination; a key-only `EXPLAIN` test pins it.                                                                    |
+| `(VALUES (1))`            | The select builder needs a `FROM`; initial admission must still check capacity and references atomically on empty tables.                                                                          |
+| Two-argument `min`/`max`  | Drizzle's versions are aggregates; retention, quota windows and uptime sightings need the scalar form inside atomic updates.                                                                       |
+| `coalesce`                | No builder; an inconclusive GitHub check moves `checked_at` forward from `NULL`, and a new offer period starts after the last.                                                                     |
+| `CASE`                    | No conditional builder; quota resets, uptime admission and closing an expired offer period use it atomically.                                                                                      |
+| `length`                  | No scalar builder; the schema keeps the database text-length checks.                                                                                                                               |
+| Bitwise OR                | No bitwise builder; concurrent uptime observations combine slot bits in one write.                                                                                                                 |
+| `json_each`               | No builder; the network read matches names to the NodeIds it lists, the catalog reads registry rows for up to 500 ids in one bound value, and offer history rows come from one catalog JSON value. |
+| `json_valid`, `json_type` | No builder; the registry checks that its stored categories are a JSON array.                                                                                                                       |
+| `json_extract`, `cast`    | No builder; each offer row's fields and position are read from that catalog JSON value inside the guarded insert.                                                                                  |
+| `NULL` select item        | The insert-select of a new offer period must name its still-empty end columns.                                                                                                                     |
+| Scalar subquery           | No correlated subquery in a SELECT list; the network read takes each NodeId's newest uptime row by primary key.                                                                                    |
 
 Migrations, applied in order:
 
-| Migration                     | Adds                                                                                    |
-| ----------------------------- | --------------------------------------------------------------------------------------- |
-| `0001_discovery_index.sql`    | Record tables and their indexes.                                                        |
-| `0002_listing_indexes.sql`    | Covering listing indexes (index-only; listing answers `503` without them).              |
-| `0003_registrations.sql`      | Invite and registration tables.                                                         |
-| `0004_uptime.sql`             | Uptime tables.                                                                          |
-| `0005_node_publish_quota.sql` | The NodeId publish window and counter (publishing answers `503` without it).            |
-| `0006_presence_version.sql`   | Current presence release and attested sequence. Apply before rolling out the new index. |
-| `0007_github_claims.sql`      | Seller GitHub claims. Apply before deploying the claim routes and the cron trigger.     |
-| `0008_claim_signature.sql`    | The node signature of each GitHub claim, served by its GET route.                       |
-| `0009_seller_profiles.sql`    | Seller display names. Apply before deploying the profile routes.                        |
-| `0010_offer_history.sql`      | Offer history. Apply before deploying it, or catalog publishes fail with `503`.         |
+| Migration                     | Adds                                                                                     |
+| ----------------------------- | ---------------------------------------------------------------------------------------- |
+| `0001_discovery_index.sql`    | Record tables and their indexes.                                                         |
+| `0002_listing_indexes.sql`    | Covering listing indexes (index-only; listing answers `503` without them).               |
+| `0003_registrations.sql`      | Invite and registration tables.                                                          |
+| `0004_uptime.sql`             | Uptime tables.                                                                           |
+| `0005_node_publish_quota.sql` | The NodeId publish window and counter (publishing answers `503` without it).             |
+| `0006_presence_version.sql`   | Current presence release and attested sequence. Apply before rolling out the new index.  |
+| `0007_github_claims.sql`      | Seller GitHub claims. Apply before deploying the claim routes and the cron trigger.      |
+| `0008_claim_signature.sql`    | The node signature of each GitHub claim, served by its GET route.                        |
+| `0009_seller_profiles.sql`    | Seller display names. Apply before deploying the profile routes.                         |
+| `0010_offer_history.sql`      | Offer history. Apply before deploying it, or catalog publishes fail with `503`.          |
+| `0011_network_history.sql`    | The index heartbeat and daily network summaries. Apply before deploying network history. |
+| `0012_model_registry.sql`     | The model registry. Without it the catalog answers from the rules alone.                 |
 
 Migrations are generated with drizzle-kit from `src/schema.ts`
 (`pnpm index:db:generate --name <change>`, configured in

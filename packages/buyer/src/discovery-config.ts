@@ -57,7 +57,7 @@ export function parseBuyerDiscoveryConfig(
     ...(input.open ? { open: true as const } : {}),
     maxPages:
       input.maxPages === undefined
-        ? BUYER_DISCOVERY.defaultPages
+        ? BUYER_DISCOVERY.maxPages
         : controlInteger(input.maxPages, 1, BUYER_DISCOVERY.maxPages),
   };
 }

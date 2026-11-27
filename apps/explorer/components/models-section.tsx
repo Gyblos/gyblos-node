@@ -12,6 +12,7 @@ import {
   usdc,
   utc,
 } from '../lib/format';
+import { modelView, type CatalogModels } from '../lib/model-catalog';
 import {
   completion,
   modelRows,
@@ -20,6 +21,7 @@ import {
 } from '../lib/model-table';
 import { summarizeOffers } from '../lib/offers';
 import { rangeOf, tablePager, type ExplorerQuery } from '../lib/paging';
+import { ModelCategories } from './model-categories';
 import { pagedRows, Pager } from './pager';
 import {
   EmptyRow,
@@ -139,6 +141,7 @@ export async function ModelsSection({ query }: { query: ExplorerQuery }) {
             key={`${row.modelId}:${row.variant}:${row.quantization}`}
             row={row}
             offersKnown={offersKnown}
+            models={discovery.models}
           />
         ))}
       </Table>
@@ -168,11 +171,13 @@ function ModelRowView({
   closed,
   row,
   offersKnown,
+  models,
 }: {
   days: ExplorerQuery['days'];
   closed?: boolean;
   row: ModelRow;
   offersKnown: boolean;
+  models: CatalogModels;
 }) {
   return (
     <tr className="border-t border-line">
@@ -183,6 +188,10 @@ function ModelRowView({
           modelId={row.modelId}
           variant={row.variant}
           quantization={row.quantization}
+          models={models}
+        />
+        <ModelCategories
+          categories={modelView(models, row.modelId).categories}
         />
       </td>
       {row.now ? (

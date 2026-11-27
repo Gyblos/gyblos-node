@@ -23,9 +23,11 @@
     "./hash-target": "./lib/hash-target.ts",
     "./latency": "./lib/latency.ts",
     "./layout": "./lib/layout.ts",
-    "./model-family": "./lib/model-family.ts",
     "./model-table": "./lib/model-table.ts",
+    "./model-catalog": "./lib/model-catalog.ts",
     "./network-status": "./lib/network-status.ts",
+    "./model-page": "./lib/model-page.ts",
+    "./network-history": "./lib/network-history.ts",
     "./offer-price-history": "./lib/offer-price-history.ts",
     "./offers": "./lib/offers.ts",
     "./overview-activity": "./lib/overview-activity.ts",
@@ -35,6 +37,7 @@
     "./seller-identity": "./lib/seller-identity.ts",
     "./seller-page": "./lib/seller-page.ts",
     "./seller-profile": "./lib/seller-profile.ts",
+    "./sellers-online": "./lib/sellers-online.ts",
     "./usage": "./lib/usage.ts"
   },
   "scripts": {

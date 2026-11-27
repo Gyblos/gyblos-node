@@ -1,10 +1,19 @@
 // A fake discovery index and KV namespace for the explorer's discovery tests (tests/explorer-discovery*.test.ts):
 // the index answers over a shape the test sets, recording every request and the uptime reads in flight.
 import type { DiscoveryKv } from '@gyblos/explorer/discovery-snapshot';
+import {
+  MODEL_IDENTITY_SOURCE,
+  OTHER_FAMILY,
+  UNKNOWN_LAB,
+} from '@gyblos/protocol/model-family';
 
 export interface IndexShape {
   // Sellers per model, by model id.
   models: Record<string, string[]>;
+  catalog?: Record<
+    string,
+    { family: string; lab: string; source: string; categories: string[] }
+  >;
   // Node ids /network calls offline; null for no /network answer, 'malformed' for a bad one.
   offline?: string[] | null | 'malformed';
   down?: boolean;
@@ -57,10 +66,19 @@ export function fakeIndex(shape: IndexShape) {
     requests.push(`${url.pathname}${url.search}`);
     if (shape.down) return new Response('{}', { status: 503 });
     const json = (body: unknown) => Response.json(body);
-    if (url.pathname.endsWith('/models'))
+    if (url.pathname.endsWith('/models/catalog'))
       return json({
         generatedAt: 7,
-        models: Object.keys(shape.models).map((id) => ({ id })),
+        models: Object.keys(shape.models).map((id) => ({
+          id,
+          sellers: shape.models[id]?.length ?? 0,
+          ...(shape.catalog?.[id] ?? {
+            family: OTHER_FAMILY,
+            lab: UNKNOWN_LAB,
+            source: MODEL_IDENTITY_SOURCE.FALLBACK,
+            categories: [],
+          }),
+        })),
       });
     if (url.pathname.endsWith('/sellers')) {
       const model = url.searchParams.get('model') ?? '';

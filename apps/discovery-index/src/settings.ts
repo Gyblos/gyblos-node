@@ -8,6 +8,7 @@ import {
   type DiscoveryLimiters,
   type ResolvedLimiters,
 } from './limits';
+import type { ModelRegistryStore } from './model-registry';
 import type { SellerProfileStore } from './profile-store';
 import type { DiscoveryPublishers } from './publishers';
 import type { RegistrationStore } from './registration-store';
@@ -32,6 +33,7 @@ export interface DiscoveryIndexOptions {
   claims?: GithubClaimStore;
   gistFetch?: GistFetch;
   profiles?: SellerProfileStore;
+  modelRegistry?: ModelRegistryStore;
   // Response cache for GET /v1/sellers (the Worker passes caches.default). Missing means none.
   cache?: ResponseCache;
   now?: () => number;
@@ -66,6 +68,7 @@ export interface IndexSettings {
   claims: GithubClaimStore | undefined;
   gistFetch: GistFetch | undefined;
   profiles: SellerProfileStore | undefined;
+  modelRegistry: ModelRegistryStore | undefined;
   cache: ResponseCache | undefined;
   records: RecordCounter;
   resolve: (url: string) => ResolvedLimiters | null;
@@ -89,6 +92,7 @@ export function settingsOf(options: DiscoveryIndexOptions): IndexSettings {
     claims: options.claims,
     gistFetch: options.gistFetch,
     profiles: options.profiles,
+    modelRegistry: options.modelRegistry,
     cache: options.cache,
     records: recordCounter(),
     resolve: limiterResolver(options.limiters ?? {}, development, now),
