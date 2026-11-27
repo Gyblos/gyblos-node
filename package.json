@@ -34,6 +34,7 @@
     "index:revoke": "node --import tsx apps/discovery-index/scripts/admin.ts revoke",
     "index:restore": "node --import tsx apps/discovery-index/scripts/admin.ts restore",
     "index:github-claims": "node --import tsx apps/discovery-index/scripts/github-claims.ts",
+    "index:models": "node --import tsx apps/discovery-index/scripts/model-registry.ts",
     "index:seller-profiles": "node --import tsx apps/discovery-index/scripts/seller-profiles.ts",
     "index:db:generate": "pnpm --filter @gyblos/discovery-index db:generate",
     "collector:db:generate": "pnpm --filter @gyblos/metrics-collector db:generate",

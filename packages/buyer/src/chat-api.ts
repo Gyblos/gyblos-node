@@ -13,7 +13,13 @@ import {
   parseAnthropicChat,
 } from './anthropic-chat';
 import { openAiCallsOut } from './chat-tools';
-import { CHAT_ROUTES, FREE_BUYER } from './constants';
+import {
+  CHAT_ROUTES,
+  CONTEXT_FULL_ERRORS,
+  FREE_BUYER,
+  RESPONSES_CODES,
+} from './constants';
+import { contextFull } from './context-full';
 import { parseFreeChat, type FreeChatInput } from './free-chat';
 import {
   executionFields,
@@ -93,16 +99,20 @@ const openAi: ChatApi = {
     ...executionFields(result),
   }),
   stream: openAiStream,
-  error: (body) => ({
-    error: {
-      message: body.message,
-      type: FREE_BUYER.errorType,
-      param: body.param,
-      code: body.code,
-      ...body.extra,
-      ...paymentFields(body.payment),
-    },
-  }),
+  error: (body) => {
+    const full = contextFull(body);
+    return {
+      error: {
+        message: full ? CONTEXT_FULL_ERRORS.openAi(body.message) : body.message,
+        type: full ? anthropicErrorKind(body.status) : FREE_BUYER.errorType,
+        param: body.param,
+        code: full ? RESPONSES_CODES.contextFull : body.code,
+        ...(full ? { [RESPONSES_CODES.field]: body.code } : {}),
+        ...body.extra,
+        ...paymentFields(body.payment),
+      },
+    };
+  },
 };
 
 const anthropic: ChatApi = {
@@ -113,7 +123,9 @@ const anthropic: ChatApi = {
     type: 'error',
     error: {
       type: anthropicErrorKind(body.status),
-      message: body.message,
+      message: contextFull(body)
+        ? CONTEXT_FULL_ERRORS.anthropic(body.message)
+        : body.message,
       code: body.code,
       ...(body.param ? { param: body.param } : {}),
       ...body.extra,

@@ -8,6 +8,7 @@ import {
 } from '../components/overview-evidence';
 import { PageFrame } from '../components/page-frame';
 import { QueryRegion } from '../components/query-region';
+import { SellersOnlineHistory } from '../components/sellers-online';
 import { Loading } from '../components/ui';
 import { canonicalPageHref, movedHomeHref, readQuery } from '../lib/paging';
 
@@ -33,6 +34,9 @@ export default async function Home({
           <Overview query={query} />
         </Suspense>
       </QueryRegion>
+      <Suspense fallback={<Loading />}>
+        <SellersOnlineHistory />
+      </Suspense>
       <div>
         <Suspense fallback={<Loading />}>
           <OverviewOffers query={query} />

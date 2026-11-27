@@ -45,14 +45,19 @@ export async function collectorBody(
     return collectorFail(LOCAL_COLLECTOR_CODES.LIMIT);
   const chunks: Buffer[] = [];
   let bytes = 0;
+  let failed: LocalCollectorCode | undefined;
   for await (const part of request) {
     if (signal.aborted) return collectorFail(LOCAL_COLLECTOR_CODES.TIMEOUT);
+    if (failed) continue;
     bytes += part.length;
-    if (bytes > RECEIPT_COLLECTOR_LIMITS.bytes)
-      return collectorFail(LOCAL_COLLECTOR_CODES.LIMIT);
+    if (bytes > RECEIPT_COLLECTOR_LIMITS.bytes) {
+      failed = LOCAL_COLLECTOR_CODES.LIMIT;
+      continue;
+    }
     chunks.push(Buffer.from(part));
   }
   if (signal.aborted) return collectorFail(LOCAL_COLLECTOR_CODES.TIMEOUT);
+  if (failed) return collectorFail(failed);
   return Buffer.concat(chunks);
 }
 export function collectorFailure(

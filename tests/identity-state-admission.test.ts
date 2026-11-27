@@ -155,3 +155,42 @@ void test('a capacity refusal remembers observed floors and genuine rollback rem
     code: NODE_ERROR_CODES.IDENTITY_STATE_UNAVAILABLE,
   });
 });
+
+void test('a verified identity on a full history evicts the oldest open identity, never a configured or revoked one', async (t) => {
+  const f = await fixture(t, IDENTITY_STATE.maxRows);
+  const saved = JSON.parse(await readFile(f.file, 'utf8'));
+  saved.rows[1].revoked = true;
+  await writeFile(f.file, canonicalJson(saved), { mode: 0o600 });
+  const policy = { configuredNodeIds: [id(0)] };
+  const a = await openBuyerIdentityState(f.environment, SCOPE, policy);
+  const b = await openBuyerIdentityState(f.environment, SCOPE, policy);
+  const before = await readFile(f.file, 'utf8');
+  const denied = await a.evaluate(input(5000));
+  assert.equal(!denied.ok && denied.code, IDENTITY_POLICY_CODES.LIMIT);
+  assert.equal(await readFile(f.file, 'utf8'), before);
+  assert.equal((await a.evaluate({ ...input(5000), owner: OWNER })).ok, true);
+  const rows = JSON.parse(await readFile(f.file, 'utf8')).rows as {
+    binding: { nodeId: string };
+  }[];
+  const ids = new Set(rows.map((row) => row.binding.nodeId));
+  assert.equal(rows.length, IDENTITY_STATE.maxRows);
+  assert.ok(ids.has(id(0)) && ids.has(id(1)) && ids.has(id(5000)));
+  assert.equal(ids.has(id(2)), false);
+  assert.equal((await b.evaluate({ ...input(3), owner: OWNER })).ok, true);
+});
+
+void test('a revoked identity that disappears outside the eviction rule still fails closed', async (t) => {
+  const f = await fixture(t, 3);
+  const saved = JSON.parse(await readFile(f.file, 'utf8'));
+  saved.rows[1].revoked = true;
+  await writeFile(f.file, canonicalJson(saved), { mode: 0o600 });
+  const store = await openBuyerIdentityState(f.environment, SCOPE, {
+    configuredNodeIds: [],
+  });
+  await store.evaluate({ ...input(0), owner: OWNER });
+  saved.rows.splice(1, 1);
+  await writeFile(f.file, canonicalJson(saved), { mode: 0o600 });
+  await assert.rejects(store.evaluate({ ...input(1), owner: OWNER }), {
+    code: NODE_ERROR_CODES.IDENTITY_STATE_UNAVAILABLE,
+  });
+});

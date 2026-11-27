@@ -69,6 +69,7 @@ export interface ModelObserved {
   engineSpeed: Speed;
 }
 export type ModelSide = Totals & {
+  sellers: number | null;
   // null without any observation joined to a receipt on that side: no data, never zero.
   observed: ModelObserved | null;
 };
@@ -254,6 +255,9 @@ function modelSide(value: unknown, where: string): ModelSide {
   const source = record(value, where);
   return {
     ...totals(source, where),
+    sellers: nullable(source.sellers, (present) =>
+      num(present, `${where}.sellers`),
+    ),
     observed: nullable(source.observed, (present) => {
       const at = `${where}.observed`;
       const observed = record(present, at);

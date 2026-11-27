@@ -109,12 +109,20 @@ To use the default index, add `discovery` to the buyer's `selection.json`:
 ```
 
 Inside `discovery` you can set `baseUrl` (same URL policy as the client) and
-`maxPages` (1 to 8, default 3). Each page asks for 200 entries, the index's
-largest page, and the whole discovery step has a 10-second deadline. A cursor
-cycle, or a non-final page at the page cap, fails with `BUYER_DISCOVERY_LIMIT`,
-and no quotes are requested. An index error stops selection; it never switches
-the buyer to a different payment path. The rest of `selection.json` is described
-in
+`maxPages` (1 to 8, default 8). Each page asks for 200 entries, the index's
+largest page, and the whole discovery step has a 10-second deadline. The buyer
+reads the first page; when the index has more, it reads up to `maxPages` more
+pages starting from a random NodeId and wrapping around to the start (or in
+order, if the index's cursors are not NodeIds), so an index that fits is read
+whole and a larger one is sampled from a different point each time instead of
+failing. The buyer never asks the index for a page chosen by a seller it used,
+so past the ceiling a conversation's seller can fall outside the window and the
+conversation may move to another seller. A window is a run of consecutive
+NodeIds, so an operator that registers many NodeIds just below a seller can
+still crowd it out of most windows. A cursor cycle fails with
+`BUYER_DISCOVERY_LIMIT`, and no quotes are requested. An index error stops
+selection; it never switches the buyer to a different payment path. The rest of
+`selection.json` is described in
 [running-a-node.md](running-a-node.md#optional-buyer-selection-and-discovery).
 
 The index only supplies candidate NodeIds. The `sellers` list in
@@ -143,8 +151,8 @@ anything on its own, when:
 
 - the lock exists (the buyer never breaks it, even after a crash);
 - the state is malformed, has unsafe permissions, or cannot be persisted;
-- the state reaches 1,024 identities or 1 MiB (tombstones and high-water marks
-  are never pruned).
+- the state reaches 1 MiB, or 1,024 identities outside open discovery
+  (tombstones and high-water marks are never pruned there).
 
 Repair is a deliberate operator step: stop every buyer that uses this home
 before you remove a leftover lock. Never delete the state file to clear an
@@ -200,23 +208,29 @@ Open discovery has its own bounds:
   `declared-usage` badge, live records). It looks up the seller that served the
   conversation before and the one still holding it warm first, then the rest in
   a random order, so which sellers get a lookup never depends on the index's
-  order. With more than 64 such sellers, lookups can reach sellers the
-  64-candidate bound below then refuses until earlier ones expire.
+  order.
 - Each selection makes at most 16 identity lookups of index-only sellers.
   Configured sellers are checked on every selection besides. A failed check of
   an index-only seller (a registry refusal, an RPC failure, or a full identity
   history) skips that NodeId and owner for five minutes in this process, for at
   most 1,024 pairs.
-- At most 64 live unconfigured candidates are eligible at once, counted under
-  the discovery lock from signed expiry and withdrawal or conflict state.
-  Expiry, withdrawal or conflict frees a slot without deleting any replay floor.
-  Registry refusals take no slot.
-- Configured sellers never count toward the 64. If the state already holds more
-  than 64 live unconfigured rows, eligibility is limited by NodeId order until
-  rows expire.
+- Every looked-up seller with a verified identity and live signed records is
+  eligible; there is no cap on how many. Expiry, withdrawal or conflict ends
+  eligibility without deleting any replay floor. Ranking among eligible sellers
+  is the selection's job, not admission's.
 - Identity and discovery histories each keep at most 1,024 rows, with room for
-  configured sellers. A full history refuses new identities without affecting
-  known ones.
+  configured sellers. With open discovery a full history makes room for a
+  newcomer when it can, and refuses it only when no row qualifies:
+  - discovery rows of unconfigured sellers whose signed records expired more
+    than an hour ago are removed, oldest first. Signed records live at most ten
+    minutes, so no older record of that seller can still be replayed;
+  - identity rows of unconfigured sellers are removed, earliest admitted first
+    and revoked ones last, only to record a newly verified identity. A denied
+    lookup removes nothing. A removed identity is checked again like a new one.
+    Configured sellers are never removed. Another buyer process forgets a
+    discovery row only once it met the same rule, and accepts a missing identity
+    only when the table is full and that identity is one the rule could have
+    removed; any other disappearance or rollback still stops the buyer.
 
 ## Seller duties
 

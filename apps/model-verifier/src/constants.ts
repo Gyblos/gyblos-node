@@ -10,6 +10,7 @@ export const MODEL_VERIFIER = {
   referenceRetryMs: 3_000,
   answerTimeoutMs: 180_000,
   directoryMode: 0o700,
+  stagingPrefix: '.verification-',
   resultFile: 'result.json',
   evidenceFile: 'evidence.json',
   maxSellerFileBytes: 16_384,
@@ -20,6 +21,12 @@ export const MODEL_VERIFIER_COMMANDS = {
   VERIFY: 'verify',
   ADDRESS: 'address',
   CHECK: 'check',
+} as const;
+
+export const MODEL_VERIFIER_OUTPUT_DIAGNOSTICS = {
+  component: 'model-verifier',
+  operation: 'publish-output',
+  phases: { cleanup: 'cleanup' },
 } as const;
 
 export const MODEL_VERIFIER_CODES = {
@@ -35,6 +42,8 @@ export const MODEL_VERIFIER_CODES = {
   EMPTY_ANSWER: 'EMPTY_ANSWER',
   UNKNOWN: 'UNKNOWN',
   INTERNAL: 'INTERNAL',
+  OUTPUT_EXISTS: 'OUTPUT_EXISTS',
+  OUTPUT_CLEANUP_FAILED: 'OUTPUT_CLEANUP_FAILED',
 } as const;
 
 export type ModelVerifierCode =

@@ -103,6 +103,7 @@ eachStorage(
         family: 'qwen',
         lab: 'Alibaba · Qwen',
         source: MODEL_IDENTITY_SOURCE.RULES,
+        categories: [],
       },
       'meta-llama/Llama-3.1-8B': {
         id: 'meta-llama/Llama-3.1-8B',
@@ -110,6 +111,7 @@ eachStorage(
         family: 'meta',
         lab: 'Meta',
         source: MODEL_IDENTITY_SOURCE.RULES,
+        categories: [],
       },
       'google/gemma-3-4b': {
         id: 'google/gemma-3-4b',
@@ -117,6 +119,7 @@ eachStorage(
         family: 'gemma',
         lab: 'Google DeepMind',
         source: MODEL_IDENTITY_SOURCE.RULES,
+        categories: [],
       },
       'unsloth/Qwen3-8B-GGUF': {
         id: 'unsloth/Qwen3-8B-GGUF',
@@ -124,6 +127,7 @@ eachStorage(
         family: 'qwen',
         lab: 'Alibaba · Qwen',
         source: MODEL_IDENTITY_SOURCE.RULES,
+        categories: [],
       },
       'acme/mystery-7b': {
         id: 'acme/mystery-7b',
@@ -131,6 +135,7 @@ eachStorage(
         family: OTHER_FAMILY,
         lab: 'acme',
         source: MODEL_IDENTITY_SOURCE.FALLBACK,
+        categories: [],
       },
       'mystery-7b': {
         id: 'mystery-7b',
@@ -138,6 +143,7 @@ eachStorage(
         family: OTHER_FAMILY,
         lab: UNKNOWN_LAB,
         source: MODEL_IDENTITY_SOURCE.FALLBACK,
+        categories: [],
       },
     });
     assert.equal(typeof body.generatedAt, 'number');
@@ -156,6 +162,7 @@ void test('the model catalog wire values stay as documented', () => {
   assert.deepEqual(MODEL_IDENTITY_SOURCE, {
     RULES: 'rules',
     FALLBACK: 'fallback',
+    REGISTRY: 'registry',
   });
   assert.equal(OTHER_FAMILY, 'other');
   assert.equal(UNKNOWN_LAB, 'Unknown');
