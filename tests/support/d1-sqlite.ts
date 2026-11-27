@@ -27,6 +27,14 @@ export interface SqliteD1 extends D1Database {
   raw: Sqlite;
   prepare(query: string): SqliteStatement;
   dump(): string;
+  log: D1LogEntry[];
+}
+
+export interface D1LogEntry {
+  kind: 'direct' | 'batch';
+  batch: number;
+  sql: string;
+  params: D1Value[];
 }
 
 export interface SqliteStatement extends D1PreparedStatement {
@@ -41,7 +49,7 @@ export interface SqliteQueryPlanRow {
 }
 
 export function explainD1Statement(
-  database: SqliteD1,
+  database: Pick<SqliteD1, 'raw'>,
   statement: Pick<SqliteStatement, 'sql' | 'params'>,
 ): SqliteQueryPlanRow[] {
   return database.raw
@@ -70,6 +78,8 @@ export async function createSqliteD1(): Promise<SqliteD1 | null> {
     .filter((name) => name.endsWith('.sql'))
     .sort())
     db.exec(readFileSync(new URL(file, MIGRATIONS), 'utf8'));
+  const log: D1LogEntry[] = [];
+  let batches = 0;
   const run = (sql: string, params: D1Value[]) => {
     const results = db
       .prepare(sql)
@@ -82,22 +92,31 @@ export async function createSqliteD1(): Promise<SqliteD1 | null> {
     sql,
     params,
     bind: (...values) => statement(sql, values),
-    all: async () => ({
-      results: db
-        .prepare(sql)
-        .all(...params)
-        .map(row),
-    }),
-    run: async () => run(sql, params),
+    all: async () => {
+      log.push({ kind: 'direct', batch: 0, sql, params });
+      return {
+        results: db
+          .prepare(sql)
+          .all(...params)
+          .map(row),
+      };
+    },
+    run: async () => {
+      log.push({ kind: 'direct', batch: 0, sql, params });
+      return run(sql, params);
+    },
   });
   return {
     raw: db,
+    log,
     prepare: (sql) => statement(sql),
     async batch(statements) {
+      batches += 1;
       db.exec('BEGIN');
       try {
         const results = statements.map((item) => {
           const { sql, params } = item as SqliteStatement;
+          log.push({ kind: 'batch', batch: batches, sql, params });
           return run(sql, params);
         });
         db.exec('COMMIT');

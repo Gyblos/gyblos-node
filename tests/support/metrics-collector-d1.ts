@@ -29,7 +29,7 @@ export interface SqliteD1 extends D1Database {
 }
 
 // D1 refuses a statement with more bound parameters than this; node:sqlite would not.
-const D1_MAX_BOUND_PARAMETERS = 100;
+export const D1_MAX_BOUND_PARAMETERS = 100;
 function checkParameters(params: D1Value[]) {
   if (params.length > D1_MAX_BOUND_PARAMETERS)
     throw new Error('too many SQL variables');
