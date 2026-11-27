@@ -1,8 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { parseModel } from '@gyblos/explorer/collector-shape';
-import { COVERAGE_STATES, DISPLAY, UNITS } from '@gyblos/explorer/constants';
+import { parseModel, type NetworkDay } from '@gyblos/explorer/collector-shape';
+import {
+  COVERAGE_STATES,
+  DISPLAY,
+  UNITS,
+  type CoverageState,
+} from '@gyblos/explorer/constants';
 import {
   demandPoints,
   latencyBars,
@@ -62,8 +67,8 @@ void test('the now summary counts sellers, free and paid offers, lowest prices, 
 const networkDay = (
   day: string,
   demand: { modelId: string; requests: number }[],
-  coverage: string | null = COVERAGE_STATES.FINAL,
-) => ({
+  coverage: CoverageState | null = COVERAGE_STATES.FINAL,
+): NetworkDay => ({
   day,
   coverage,
   free: null,
@@ -83,7 +88,13 @@ void test('unserved demand per day is a zero only when the day is final and its 
       networkDay('2026-11-21', []),
       networkDay('2026-11-22', full),
       networkDay('2026-11-23', [], COVERAGE_STATES.PENDING),
-    ] as never,
+      networkDay('2026-11-24', [], null),
+      networkDay(
+        '2026-11-25',
+        [{ modelId: 'qwen3-0.6b', requests: 3 }],
+        COVERAGE_STATES.PARTIAL,
+      ),
+    ],
     'qwen3-0.6b',
   );
   assert.deepEqual(
@@ -93,8 +104,12 @@ void test('unserved demand per day is a zero only when the day is final and its 
       ['2026-11-21', 0],
       ['2026-11-22', null],
       ['2026-11-23', null],
+      ['2026-11-24', null],
+      ['2026-11-25', 3],
     ],
   );
+  assert.equal(points[4]?.detail, 'not captured');
+  assert.equal(points[5]?.detail, 'so far');
   assert.equal(points[2]?.detail, 'not among the day’s top 20');
   assert.equal(points[3]?.detail, 'pending');
 });
@@ -122,6 +137,16 @@ void test('latency bars name each bucket and its share of samples', () => {
       counts: [0, 1, 0, 1, 0],
     }).map((bar) => bar.label),
     ['< 500 ms', '< 2 s', '< 5 s'],
+  );
+  assert.deepEqual(
+    latencyBars({
+      samples: 3,
+      p50Ms: null,
+      p95Ms: null,
+      bucketsMs: [500],
+      counts: [0, 0],
+    }),
+    [],
   );
   assert.deepEqual(latencyBars(null), []);
   assert.deepEqual(
@@ -194,6 +219,42 @@ void test('price days give each day the lowest, median and highest price across 
   assert.deepEqual(empty, [
     { day: '2026-11-20', sellers: 0, input: null, output: null },
   ]);
+});
+
+void test('price days count each seller once at its latest price and take the spread over paid offers', () => {
+  const contexts = series('a', [[START, START + DAY / 2, 10n, 40n]]);
+  const larger = {
+    ...series('a', [[START + DAY / 2, START + DAY, 20n, 80n]]),
+    key: 'a-larger',
+    contextTokens: 16384,
+  };
+  const free = series('f', [[START, START + DAY, 0n, 0n]]);
+  const paid = series('b', [[START, START + DAY, 30n, 60n]]);
+  const [day] = priceDays([contexts, larger, free, paid], START, START + DAY);
+  assert.deepEqual(day, {
+    day: '2026-11-20',
+    sellers: 3,
+    input: { min: 20n, median: 25n, max: 30n },
+    output: { min: 60n, median: 70n, max: 80n },
+  });
+  const [onlyFree] = priceDays([free], START, START + DAY);
+  assert.deepEqual([onlyFree?.sellers, onlyFree?.input], [1, null]);
+});
+
+void test('days before a truncated history begins are unknown, not empty', () => {
+  const days = priceDays(
+    [series('a', [[START + DAY, START + 2 * DAY, 10n, 40n]])],
+    START,
+    START + 2 * DAY,
+    START + DAY,
+  );
+  assert.deepEqual(
+    days.map((day) => [day.day, day.sellers]),
+    [
+      ['2026-11-20', null],
+      ['2026-11-21', 1],
+    ],
+  );
 });
 
 void test('a model side keeps how many distinct sellers served it', () => {

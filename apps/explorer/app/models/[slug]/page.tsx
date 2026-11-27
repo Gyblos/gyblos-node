@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { ModelActivity } from '../../../components/model-activity';
-import { ModelHero } from '../../../components/model-hero';
+import { ModelHero, ModelTitle } from '../../../components/model-hero';
 import { ModelPrices } from '../../../components/model-prices';
 import { OfferPriceHistory } from '../../../components/offer-price-history';
 import { PageFrame } from '../../../components/page-frame';
@@ -30,7 +30,10 @@ import { getDiscovery } from '../../../lib/discovery-render';
 import { count, percent, pricePerMtok, utc } from '../../../lib/format';
 import { modelView } from '../../../lib/model-catalog';
 import { modelNow } from '../../../lib/model-page';
-import { getOfferPriceHistory } from '../../../lib/offer-price-history';
+import {
+  getOfferPriceHistory,
+  type OfferPriceHistory as PriceHistory,
+} from '../../../lib/offer-price-history';
 import {
   modelFromSlug,
   modelHref,
@@ -172,15 +175,16 @@ function OffersTable({
   );
 }
 
-function sellerIdentities(discovery: DiscoverySnapshot, offers: Offer[]) {
+function sellerIdentities(discovery: DiscoverySnapshot, history: PriceHistory) {
+  const nodeIds = history.series.map((item) => item.nodeId);
   const accounts = githubByNode(discovery.network);
   const names = namesByNode(discovery.network);
   return Object.fromEntries(
-    offers.map(({ seller }) => [
-      seller.nodeId,
+    nodeIds.map((nodeId) => [
+      nodeId,
       {
-        name: names.get(seller.nodeId) ?? null,
-        github: accounts.get(seller.nodeId) ?? null,
+        name: names.get(nodeId) ?? null,
+        github: accounts.get(nodeId) ?? null,
       },
     ]),
   );
@@ -227,6 +231,7 @@ export default async function ModelPage({
     getOfferPriceHistory({ model, days, closed: query.closed }),
   ]);
   const key = modelKey(model);
+  const view = modelView(discovery.models, model.modelId);
   const offers = discovery.sellers.flatMap((seller) =>
     seller.models
       .filter((offer) => modelKey(offer) === key)
@@ -239,13 +244,14 @@ export default async function ModelPage({
       : earlier.models.find((item) => modelKey(item) === key);
   return (
     <PageFrame
-      title={<span className="break-all">{model.modelId}</span>}
+      title={<ModelTitle modelId={model.modelId} view={view} />}
       crumb="Model"
     >
       <ModelHero
         model={model}
-        view={modelView(discovery.models, model.modelId)}
+        view={view}
         now={modelNow(offers)}
+        known={!discovery.error}
         variants={otherVariants(model, [
           ...discovery.sellers.flatMap((seller) => seller.models),
           ...collector.models,
@@ -280,7 +286,7 @@ export default async function ModelPage({
       <OfferPriceHistory
         history={history}
         bySeller
-        sellers={sellerIdentities(discovery, offers)}
+        sellers={sellerIdentities(discovery, history)}
         overview={<ModelPrices history={history} />}
       />
     </PageFrame>

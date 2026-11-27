@@ -14,11 +14,11 @@ interface ShareRow {
 
 const SIDES = ['free', 'paid'] as const;
 
-function ShareBars({ rows }: { rows: ShareRow[] }) {
+function ShareBars({ rows, label }: { rows: ShareRow[]; label: string }) {
   if (!rows.length)
     return <p className="mt-3 text-sm text-muted">No samples in this range.</p>;
   return (
-    <ul className="mt-3 grid gap-1.5">
+    <ul role="list" aria-labelledby={label} className="mt-3 grid gap-1.5">
       {rows.map((row) => (
         <li
           key={row.label}
@@ -29,11 +29,16 @@ function ShareBars({ rows }: { rows: ShareRow[] }) {
           <span className="h-2 overflow-hidden rounded-full bg-raised">
             <span
               className="block h-full rounded-full bg-chart"
-              style={{ width: `${row.share * UNITS.percent}%` }}
+              style={{
+                width: row.count
+                  ? `max(2px, ${row.share * UNITS.percent}%)`
+                  : 0,
+              }}
             />
           </span>
           <span className="text-right font-mono text-dim tabular-nums">
             {percent(row.share)}
+            <span className="sr-only"> · {count(row.count)}</span>
           </span>
         </li>
       ))}
@@ -57,8 +62,16 @@ function SideCard({
       <div className="mt-2 grid gap-x-8 gap-y-4 sm:grid-cols-2">
         {SIDES.map((side) => (
           <div key={side} className="min-w-0">
-            <div className="font-mono text-xs text-dim uppercase">{side}</div>
-            <ShareBars rows={rows[side]} />
+            <div
+              id={`${title}-${side}`.replaceAll(' ', '-')}
+              className="font-mono text-xs text-dim uppercase"
+            >
+              {title} · {side}
+            </div>
+            <ShareBars
+              rows={rows[side]}
+              label={`${title}-${side}`.replaceAll(' ', '-')}
+            />
           </div>
         ))}
       </div>
@@ -94,7 +107,7 @@ export function ModelCharts({
             ? observed.reduce((sum, value) => sum + value, 0)
             : null
         }
-        summary="Requests no seller of this model answered"
+        summary="Requests for this model that no seller answered, summed over days with data"
         points={demand.map((point) => ({
           day: point.day,
           value: point.value,
@@ -103,7 +116,7 @@ export function ModelCharts({
         }))}
         startAtEnd
       />
-      <div className="grid gap-3 lg:grid-cols-2">
+      <div className="grid gap-3 xl:grid-cols-2">
         <SideCard
           title="Seller first token"
           caption="Share of requests by time to the first token"

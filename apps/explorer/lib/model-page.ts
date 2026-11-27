@@ -28,7 +28,7 @@ export interface PriceSpread {
 }
 export interface PriceDay {
   day: string;
-  sellers: number;
+  sellers: number | null;
   input: PriceSpread | null;
   output: PriceSpread | null;
 }
@@ -71,15 +71,21 @@ export function modelNow(
 export function demandPoints(days: readonly NetworkDay[], modelId: string) {
   return days.map((row) => {
     const listed = row.demand.find((entry) => entry.modelId === modelId);
-    if (listed) return { day: row.day, value: listed.requests };
+    const partial =
+      row.coverage && row.coverage !== COVERAGE_STATES.FINAL
+        ? COVERAGE_NOTES[row.coverage]
+        : undefined;
+    if (listed)
+      return { day: row.day, value: listed.requests, detail: partial };
     const whole =
       row.coverage === COVERAGE_STATES.FINAL &&
       row.demand.length < DISPLAY.demandModelsPerDay;
     if (whole) return { day: row.day, value: 0 };
     const note =
-      row.coverage && row.coverage !== COVERAGE_STATES.FINAL
-        ? COVERAGE_NOTES[row.coverage]
-        : `not among the day’s top ${DISPLAY.demandModelsPerDay}`;
+      partial ??
+      (row.coverage
+        ? `not among the day’s top ${DISPLAY.demandModelsPerDay}`
+        : COVERAGE_NOTES[COVERAGE_STATES.UNKNOWN]);
     return { day: row.day, value: null, detail: note };
   });
 }
@@ -96,6 +102,7 @@ export function latencyBars(latency: Latency | null | undefined) {
     return { label, count, share: count / latency.samples };
   });
   const first = bars.findIndex((bar) => bar.count > 0);
+  if (first < 0) return [];
   const end =
     bars.length - [...bars].reverse().findIndex((bar) => bar.count > 0);
   return bars.slice(first, end);
@@ -116,24 +123,51 @@ function spread(values: bigint[]): PriceSpread | null {
   };
 }
 
+function latestBySeller(
+  series: readonly OfferPriceSeries[],
+  day: number,
+  end: number,
+) {
+  const latest = new Map<string, OfferPriceSeries['points'][number]>();
+  for (const item of series)
+    for (const point of item.points) {
+      const current = latest.get(item.nodeId);
+      if (
+        point.at < end &&
+        point.end > day &&
+        (!current || point.at >= current.at)
+      )
+        latest.set(item.nodeId, point);
+    }
+  return [...latest.values()];
+}
+
 export function priceDays(
   series: readonly OfferPriceSeries[],
   from: number,
   to: number,
+  knownFrom = from,
 ): PriceDay[] {
   const result: PriceDay[] = [];
   const start = Math.floor(from / UNITS.msPerDay) * UNITS.msPerDay;
   for (let day = start; day < to; day += UNITS.msPerDay) {
     const end = day + UNITS.msPerDay;
-    const quotes = series.flatMap((item) => {
-      const point = item.points.filter((p) => p.at < end && p.end > day).at(-1);
-      return point ? [point] : [];
-    });
+    if (end <= knownFrom) {
+      result.push({
+        day: isoDay(day),
+        sellers: null,
+        input: null,
+        output: null,
+      });
+      continue;
+    }
+    const quotes = latestBySeller(series, day, end);
+    const paid = quotes.filter((quote) => quote.input || quote.output);
     result.push({
       day: isoDay(day),
       sellers: quotes.length,
-      input: spread(quotes.map((quote) => quote.input)),
-      output: spread(quotes.map((quote) => quote.output)),
+      input: spread(paid.map((quote) => quote.input)),
+      output: spread(paid.map((quote) => quote.output)),
     });
   }
   return result;
