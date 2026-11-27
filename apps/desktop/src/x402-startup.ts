@@ -124,6 +124,39 @@ async function connectManaged(
     throw error;
   }
 }
+async function changeRenewal(
+  service: Service,
+  client: X402Client,
+  budget: X402Budget,
+  owner: Awaited<ReturnType<Service['start']>> | undefined,
+  policyId: string,
+  amount: string | null,
+  check: () => void,
+  reconnect: () => Promise<void>,
+) {
+  if (!owner || !service.stopWhenIdle || !service.setRenewalBudget)
+    throw new PaidSellerLimitError(
+      'Only an idle buyer managed by this app can change renewal settings.',
+    );
+  if ((await budget.summary()).blocked)
+    throw new PaidSellerLimitError(
+      'Review unfinished payments before changing the renewal budget.',
+    );
+  check();
+  client.assertPolicyChange(owner, policyId);
+  if (!(await service.stopWhenIdle()))
+    throw new PaidSellerLimitError(
+      'Wait for the current buyer request to finish.',
+    );
+  check();
+  try {
+    await service.setRenewalBudget(amount);
+  } catch (error) {
+    await reconnect().catch(() => {});
+    throw error;
+  }
+  await reconnect();
+}
 export function automaticBuyer(
   service: Service,
   client: X402Client,
@@ -157,34 +190,27 @@ export function automaticBuyer(
     changing: () => change !== null,
     configureRenewal(amount: string | null, policyId: string) {
       check();
-      if (
-        change ||
-        !owned ||
-        !service.setRenewalBudget ||
-        !service.stopWhenIdle
-      )
+      if (change)
         throw new PaidSellerLimitError(
-          'Only an idle buyer managed by this app can change renewal settings.',
+          'Wait for the buyer settings to finish updating.',
         );
-      const persist = service.setRenewalBudget;
-      const stopWhenIdle = service.stopWhenIdle;
-      const update = async () => {
-        client.assertPolicyChange(owned, policyId);
-        if (!(await stopWhenIdle()))
-          throw new PaidSellerLimitError(
-            'Wait for the current buyer request to finish.',
-          );
-        ready = null;
-        owned = undefined;
-        check();
-        try {
-          await persist(amount);
-        } finally {
-          check();
-          owned = await connectManaged(service, client, budget, check);
-          ready = Promise.resolve();
-        }
-      };
+      const update = () =>
+        changeRenewal(
+          service,
+          client,
+          budget,
+          owned,
+          policyId,
+          amount,
+          check,
+          async () => {
+            ready = null;
+            owned = undefined;
+            check();
+            owned = await connectManaged(service, client, budget, check);
+            ready = Promise.resolve();
+          },
+        );
       change = update().finally(() => {
         change = null;
       });

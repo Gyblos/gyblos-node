@@ -90,3 +90,36 @@ void test('malformed sidecar messages fail without releasing a running process e
   worker.emit('exit', 1);
   await buyer.close();
 });
+void test('an idle acknowledgement without worker exit times out without killing the buyer', async () => {
+  const worker = new Worker();
+  const buyer = new ManagedBuyer(
+    () => worker,
+    () => {},
+    1000,
+    15,
+  );
+  const opening = buyer.start('/tmp/synthetic-buyer-home');
+  worker.emit('message', {
+    kind: BUYER_SIDECAR.READY,
+    url: 'http://127.0.0.1:8090',
+    token: 'synthetic',
+  });
+  await opening;
+  const idle = buyer.stopWhenIdle();
+  worker.emit('message', { kind: BUYER_SIDECAR.IDLE });
+  try {
+    assert.equal(
+      await Promise.race([
+        idle,
+        new Promise<string>((resolve) =>
+          setTimeout(() => resolve('hung'), 120),
+        ),
+      ]),
+      false,
+    );
+    assert.equal(worker.killed, 0);
+  } finally {
+    worker.emit('exit', 0);
+    await buyer.close();
+  }
+});

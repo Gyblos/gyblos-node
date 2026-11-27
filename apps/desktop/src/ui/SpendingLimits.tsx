@@ -250,27 +250,7 @@ export function SpendingLimits({
           </div>
           <SpendingBar segments={segments} total={total} />
         </section>
-        <section className="preview-panel" aria-label="Spending breakdown">
-          <h3>Spending</h3>
-          <div className="preview-panel-row">
-            <span>Chat · current session</span>
-            <strong>{money(chat)}</strong>
-          </div>
-          <div className="preview-panel-row">
-            <span>API keys · lifetime</span>
-            <strong>{money(keySpent)}</strong>
-          </div>
-          <div className="preview-panel-row">
-            <span>Remaining · chat</span>
-            <strong>
-              {sameChat && summary.active && chat !== null
-                ? money(BigInt(summary.limitAtomic) - chat)
-                : sameChat
-                  ? 'No active limit'
-                  : 'Unavailable'}
-            </strong>
-          </div>
-        </section>
+        <SpendingBreakdown {...{ chat, keySpent, sameChat, summary }} />
       </div>
       <LimitControl
         key={policy?.policyId}
@@ -367,4 +347,38 @@ function parseLimit(policy: BuyerApiPolicy | null, value: string) {
   } catch {
     return null;
   }
+}
+
+function SpendingBreakdown({
+  chat,
+  keySpent,
+  sameChat,
+  summary,
+}: Pick<
+  ReturnType<typeof spendingBySource>,
+  'chat' | 'keySpent' | 'sameChat' | 'summary'
+>) {
+  return (
+    <section className="preview-panel" aria-label="Spending breakdown">
+      <h3>Spending</h3>
+      <div className="preview-panel-row">
+        <span>Chat · current session</span>
+        <strong>{money(chat)}</strong>
+      </div>
+      <div className="preview-panel-row">
+        <span>API keys · lifetime</span>
+        <strong>{money(keySpent)}</strong>
+      </div>
+      <div className="preview-panel-row">
+        <span>Remaining · chat</span>
+        <strong>
+          {sameChat && summary.active && chat !== null
+            ? money(BigInt(summary.limitAtomic) - chat)
+            : sameChat
+              ? 'No active limit'
+              : 'Unavailable'}
+        </strong>
+      </div>
+    </section>
+  );
 }

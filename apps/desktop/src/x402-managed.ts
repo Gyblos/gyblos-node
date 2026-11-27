@@ -105,7 +105,7 @@ function idleStop(worker: BuyerWorker, exit: Promise<void>, timeout: number) {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const answered = new Promise<boolean>((resolve, reject) => {
       pending = resolve;
-      timer = setTimeout(() => resolve(false), timeout);
+
       try {
         worker.postMessage(BUYER_SIDECAR.STOP_IF_IDLE);
       } catch (error) {
@@ -114,10 +114,14 @@ function idleStop(worker: BuyerWorker, exit: Promise<void>, timeout: number) {
       }
     });
     try {
-      if (!(await Promise.race([answered, exit.then(() => false)])))
-        return false;
-      await exit;
-      return true;
+      const stopped = answered.then(async (idle) => {
+        if (idle) await exit;
+        return idle;
+      });
+      const deadline = new Promise<false>((resolve) => {
+        timer = setTimeout(() => resolve(false), timeout);
+      });
+      return await Promise.race([stopped, deadline]);
     } finally {
       clearTimeout(timer);
     }
@@ -133,12 +137,9 @@ function supervise(
   let stopping = false;
   let exited = false;
   let accepted = false;
-  let finish = () => {};
+  const { promise: exit, resolve: finish } = Promise.withResolvers<void>();
   let resolveReady = (_connection: Connection) => {};
   let rejectReady = (_reason: Error) => {};
-  const exit = new Promise<void>((resolve) => {
-    finish = resolve;
-  });
   const ready = new Promise<Connection>((resolve, reject) => {
     resolveReady = resolve;
     rejectReady = reject;
