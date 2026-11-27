@@ -125,6 +125,10 @@ void test('preview refreshes the observed balance after a simulated top-up and w
   );
   const kit = await view('PreviewKit.tsx.preview');
   assert.match(kit, /refreshFunding\?\(\): void/);
+  assert.match(
+    kit,
+    /<PreviewFundsDialog[\s\S]*?refreshFunding=\{refreshFunding\}/,
+  );
   const dialog = kit.slice(kit.indexOf('export function PreviewFundsDialog'));
   assert.match(dialog, /refreshFunding\?\.\(\)/);
   assert.ok(

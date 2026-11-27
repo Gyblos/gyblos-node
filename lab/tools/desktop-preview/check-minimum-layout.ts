@@ -212,6 +212,23 @@ export async function checkMinimumLayout() {
     !refreshed.textContent.includes('3 USDC')
   )
     throw new Error('Missing accessible refreshed balance');
+  window.previewFunds = {
+    atomic: 4_000_000,
+    open: false,
+  };
+  (await visible('.ui-model-trigger')).click();
+  let toppedUp: HTMLElement | undefined;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const settledTab = liveElement(
+      '.pk-composer-tab .pk-tab-item[aria-busy="false"]',
+    );
+    if (settledTab?.textContent?.includes('4 USDC')) {
+      toppedUp = settledTab;
+      break;
+    }
+    await new Promise((resolve) => setTimeout(resolve, pollMs));
+  }
+  if (!toppedUp) throw new Error('Missing topped-up balance');
   const expand = document.querySelector<HTMLButtonElement>(
     'button[aria-label="Expand sidebar"]',
   );
