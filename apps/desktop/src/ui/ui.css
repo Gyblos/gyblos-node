@@ -760,15 +760,6 @@
 .desktop-frame .output-scroll > .ui-empty {
   min-height: 100%;
 }
-.desktop-frame .sidebar-meta .ui-icon-button {
-  width: var(--control-size);
-  height: var(--control-size);
-}
-.desktop-frame .sidebar-toggle > svg {
-  animation: none;
-  transition: none;
-  transform: none;
-}
 @media (max-width: 700px) {
   .desktop-frame {
     --page-gutter: 12px;

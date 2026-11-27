@@ -186,14 +186,6 @@ nav {
 .dot.off {
   background: var(--dim);
 }
-.sidebar-meta {
-  padding: 5px 8px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  color: var(--dim);
-  font-size: 10px;
-}
 .app-body {
   flex: 1;
   min-width: 0;
@@ -926,7 +918,6 @@ nav {
     object-position: left;
   }
   .workspace,
-  .sidebar-meta > span,
   .connection > span:not(.dot),
   .connection > svg {
     display: none;
@@ -948,9 +939,6 @@ nav {
   }
   .connection {
     justify-content: center;
-  }
-  .sidebar-meta {
-    padding: 0;
   }
   .top-actions {
     gap: 7px;
@@ -1575,9 +1563,6 @@ nav {
   width: 18px;
   height: 18px;
 }
-.desktop-frame .sidebar-meta {
-  font-size: 9px;
-}
 .desktop-frame .topbar {
   height: 42px;
   min-height: 42px;
@@ -2071,9 +2056,6 @@ kbd {
   .desktop-frame .balance-button {
     padding: 5px 7px;
   }
-  .desktop-frame .sidebar-meta {
-    padding: 0;
-  }
   .desktop-status {
     font-size: 9px;
     padding: 0 8px;
@@ -2365,13 +2347,6 @@ kbd {
 }
 .desktop-frame .connection > span:not(.dot) {
   display: block;
-}
-.desktop-frame .sidebar-meta {
-  justify-content: center;
-  padding: 0;
-}
-.desktop-frame .sidebar-meta > span {
-  display: none;
 }
 @media (max-width: 700px) {
   .desktop-frame .sidebar {

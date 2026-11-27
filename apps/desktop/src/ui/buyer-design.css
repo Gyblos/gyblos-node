@@ -447,12 +447,7 @@
 .desktop-frame.sidebar-collapsed .ui-sidebar-footer {
   margin-top: auto;
 }
-.desktop-frame.sidebar-collapsed
-  :is(
-    .navigation-resizer,
-    .topbar .sidebar-toggle,
-    .topbar .sidebar-toggle + .ui-tooltip
-  ) {
+.desktop-frame.sidebar-collapsed .navigation-resizer {
   display: none;
 }
 
