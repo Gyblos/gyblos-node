@@ -138,10 +138,7 @@ async function changeRenewal(
     throw new PaidSellerLimitError(
       'Only an idle buyer managed by this app can change renewal settings.',
     );
-  if ((await budget.summary()).blocked)
-    throw new PaidSellerLimitError(
-      'Review unfinished payments before changing the renewal budget.',
-    );
+  assertConfigurableBudget(await budget.summary());
   check();
   client.assertPolicyChange(owner, policyId);
   if (!(await service.stopWhenIdle()))
