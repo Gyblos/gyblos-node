@@ -207,7 +207,10 @@ void test('preview free fallback applies only when a free model exists', async (
 void test('preview settings read review states from the URL and write them to the buyer config sample', async () => {
   const kit = await view('PreviewKit.tsx.preview');
   assert.match(kit, /freeFallback: query\.get\('fallback'\) === 'on'/);
-  assert.match(kit, /showTestnet: query\.get\(PREVIEW_QUERY\.TESTNET\) !==\s*PREVIEW_QUERY\.TESTNET_HIDDEN/);
+  assert.match(
+    kit,
+    /showTestnet: query\.get\(PREVIEW_QUERY\.TESTNET\) !==\s*PREVIEW_QUERY\.TESTNET_HIDDEN/,
+  );
   assert.match(kit, /PREVIEW_COPY\.fallbackNext\(free\.name\)/);
   const settings = await view('Settings.tsx.preview');
   for (const key of ['show_testnet = ', 'free_fallback = ', 'mode = "'])
