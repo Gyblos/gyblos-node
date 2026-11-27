@@ -446,3 +446,33 @@ void test('a page spanning more days than one count statement holds stays counta
   await runChainIndex(database, endpoints(rpc), 1000);
   assert.equal(counted(database), 27);
 });
+
+void test('a run that lost its lease writes no transaction or channel rows', async () => {
+  const database = createCollectorD1();
+  const history = lifecycle();
+  const { rpc } = fakeChainRpc(history, { [CHANNEL]: null });
+  const takeover: ChainRpc = {
+    ...rpc,
+    signatures(address, range) {
+      database.raw
+        .prepare(
+          'UPDATE collector_chain_cursor SET lease_until = ? WHERE id = ?',
+        )
+        .run(2000, CHAIN_CURSOR_ID);
+      return rpc.signatures(address, range);
+    },
+  };
+  await runChainIndex(database, endpoints(takeover), 1000);
+  assert.deepEqual(
+    rows(database, 'SELECT count(*) AS c FROM collector_chain_txs'),
+    [{ c: 0 }],
+  );
+  assert.deepEqual(
+    rows(database, 'SELECT count(*) AS c FROM collector_chain_channels'),
+    [{ c: 0 }],
+  );
+  assert.deepEqual(
+    rows(database, 'SELECT count(*) AS c FROM collector_chain_instructions'),
+    [{ c: 0 }],
+  );
+});

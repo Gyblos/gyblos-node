@@ -83,9 +83,7 @@ const ownedInsert = <T extends SQLiteTable>(
 ) =>
   orm
     .insert(table)
-    .select(
-      sql`select * from (values ${tuples(chunk)}) where ${owned(lease)}`,
-    );
+    .select(sql`select * from (values ${tuples(chunk)}) where ${owned(lease)}`);
 export function cursorUpdate(
   orm: CollectorDatabase,
   id: number,
