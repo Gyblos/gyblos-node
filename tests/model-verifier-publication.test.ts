@@ -79,9 +79,7 @@ async function withVerifier(
       Promise.resolve(
         String(input).endsWith('/api/generate')
           ? Response.json({
-              response: ' token',
-              done: true,
-              done_reason: 'stop',
+              ...{ response: ' token', done: true },
               logprobs: [
                 {
                   top_logprobs: Array.from(

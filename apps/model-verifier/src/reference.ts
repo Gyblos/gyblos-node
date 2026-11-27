@@ -18,6 +18,8 @@ export interface ReferenceModel {
   confirm(): Promise<void>;
 }
 
+const MAX_BYTE_VALUE = 255;
+
 const unavailable = () =>
   new ModelVerifierError(MODEL_VERIFIER_CODES.REFERENCE_UNAVAILABLE);
 const record = (value: unknown): Record<string, unknown> =>
@@ -101,7 +103,9 @@ function validBytes(value: unknown) {
   return (
     value === undefined ||
     (Array.isArray(value) &&
-      value.every((byte) => Number.isInteger(byte) && byte >= 0 && byte <= 255))
+      value.every(
+        (byte) => Number.isInteger(byte) && byte >= 0 && byte <= MAX_BYTE_VALUE,
+      ))
   );
 }
 

@@ -196,9 +196,7 @@ void test(
         });
       if (url.pathname === ROUTES.ollamaGenerate)
         return Response.json({
-          response: ' token',
-          done: true,
-          done_reason: 'stop',
+          ...{ response: ' token', done: true },
           logprobs: [
             {
               top_logprobs: Array.from({ length: 20 }, (_, index) => ({
