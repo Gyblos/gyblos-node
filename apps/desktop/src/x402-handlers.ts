@@ -24,6 +24,7 @@ import {
   type X402Progress,
   type X402Result,
 } from './x402-model';
+import { canConfigureRenewal } from './x402-startup';
 
 type Owner = { contents: unknown; mainFrame(): unknown; destroyed(): boolean };
 type Sender = { sender: unknown; senderFrame: unknown };
@@ -278,7 +279,7 @@ async function checkPayment(
 }
 async function buyerStatus(client: X402Client, budget: X402Budget) {
   return {
-    ...(client.canConfigureRenewal() && { canConfigureRenewal: true as const }),
+    ...(canConfigureRenewal(client) && { canConfigureRenewal: true as const }),
     ...(client.canCheckChannels() && { canCheckChannels: true as const }),
     summary: await budget.summary(),
     policy: client.policy(),

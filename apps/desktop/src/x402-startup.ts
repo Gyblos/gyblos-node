@@ -127,6 +127,14 @@ async function connectManaged(
     throw error;
   }
 }
+export function canConfigureRenewal(client: X402Client) {
+  const policy = client.policy();
+  return (
+    client.managed() &&
+    !!policy?.depositAtomic &&
+    policy.totalDepositAtomic === undefined
+  );
+}
 async function changeRenewal(
   { service, client, budget, check }: ManagedPorts,
   owner: Awaited<ReturnType<Service['start']>> | undefined,
@@ -141,7 +149,7 @@ async function changeRenewal(
   assertConfigurableBudget(await budget.summary());
   check();
   client.assertPolicyChange(owner, policyId);
-  if (!client.canConfigureRenewal())
+  if (!canConfigureRenewal(client))
     throw new PaidSellerLimitError(
       'Channel renewal requires a managed single-channel buyer.',
     );
