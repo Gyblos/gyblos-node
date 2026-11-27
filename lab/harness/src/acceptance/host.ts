@@ -5,6 +5,7 @@ import type { KeyPairSigner } from '@solana/kit';
 import { DEVNET_USDC, SELLER_READINESS } from '@gyblos/config';
 import { FreeSellerLedger } from '@gyblos/core/free-admission';
 import { publishRecord } from '@gyblos/discovery-http';
+import { SELLER_PUBLIC_RECORDS } from '@gyblos/node/constants';
 import { singleControlOffer } from '@gyblos/node/control-offers';
 import { observeControlReadiness } from '@gyblos/node/control-readiness';
 import { prepareSellerControl } from '@gyblos/node/control-startup';
@@ -23,6 +24,7 @@ import { SellerOfferSet } from '@gyblos/node/seller-offer-set';
 import {
   CONTROL_CODES,
   CONTROL_METERING_MODES,
+  type ControlCode,
 } from '@gyblos/protocol/constants';
 import type { SignedPublicV2 } from '@gyblos/protocol/control-types';
 import { ControlError } from '@gyblos/protocol/control-validation';
@@ -37,14 +39,14 @@ import type { AcceptanceWire } from './native';
 import { pocPaidListing } from './paid-listing';
 import type { AcceptanceWorkspace } from './workspace';
 
-const TRANSIENT_REFRESH = new Set<string>([
+const TRANSIENT_REFRESH = new Set<ControlCode>([
   CONTROL_CODES.STALE,
   CONTROL_CODES.EXPIRED,
   CONTROL_CODES.BUSY,
   CONTROL_CODES.CANCELLED,
 ]);
 
-function refreshLikeDaemon(refresh: () => Promise<unknown>) {
+export function refreshLikeDaemon(refresh: () => Promise<unknown>) {
   return () =>
     refresh().catch((error: unknown) => {
       if (!(error instanceof ControlError && TRANSIENT_REFRESH.has(error.code)))
@@ -146,6 +148,7 @@ export async function startAcceptanceHost(options: AcceptanceHostOptions) {
       observation: current,
     });
     const control = await prepareSellerControl({
+      catalogMs: options.offerSet ? SELLER_PUBLIC_RECORDS.catalogMs : undefined,
       offers: offerSet ?? singleControlOffer(controlOffer),
       owner: identity.owner,
       nodeId: wire.nodeId,

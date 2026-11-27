@@ -42,7 +42,8 @@
     "./acceptance/tools-constants": "./src/acceptance/tools-constants.ts",
     "./acceptance/free-session": "./src/acceptance/free-session.ts",
     "./acceptance/native": "./src/acceptance/native.ts",
-    "./acceptance/clock": "./src/acceptance/clock.ts"
+    "./acceptance/clock": "./src/acceptance/clock.ts",
+    "./acceptance/host": "./src/acceptance/host.ts"
   },
   "dependencies": {
     "@gyblos/config": "workspace:*",
