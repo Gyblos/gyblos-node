@@ -7,7 +7,7 @@ import {
 import { startFreeBuyerHttp } from '@gyblos/buyer/free-http';
 import { freeBuyerDependencies } from '@gyblos/buyer/free-selection';
 import { selectionStats } from '@gyblos/buyer/selection-stats';
-import { SELLER_READINESS, TRANSPORT_LIMITS } from '@gyblos/config';
+import { TRANSPORT_LIMITS } from '@gyblos/config';
 import { acceptanceSelection } from '@gyblos/lab-harness/acceptance/buyer';
 import { createAcceptanceClock } from '@gyblos/lab-harness/acceptance/clock';
 import {
@@ -46,27 +46,17 @@ function requestTag(input: Parameters<FreeChatStreamExecutor>[0]) {
   return start < 0 ? '' : text.slice(start).split(/\s/)[0]!;
 }
 
-function renewLikeProduction(sellers: AcceptanceSession[]) {
-  const renew = async (seller: AcceptanceSession) => {
-    const host = seller.host();
-    await host.observation.tick();
-    const state = host.observation.readiness();
-    if (!state.busy && state.validUntil > Date.now())
-      await host.control.records.refresh().catch(() => {});
-    await host.publisher.tick();
-  };
-  const timer = setInterval(() => {
-    for (const seller of sellers) void renew(seller).catch(() => {});
-  }, SELLER_READINESS.tickMs);
-  return () => clearInterval(timer);
-}
-
 async function startSellers(
   count: number,
   signal: AbortSignal,
   mode?: AcceptanceMode,
 ) {
-  const engine = { mode, pace: AGENT_REPLAY.pace, caps: AGENT_REPLAY.caps };
+  const engine = {
+    mode,
+    pace: AGENT_REPLAY.pace,
+    caps: AGENT_REPLAY.caps,
+    offerSet: true,
+  };
   const sellers: AcceptanceSession[] = [];
   try {
     for (let index = 0; index < count; index++) {
@@ -146,7 +136,7 @@ export async function startReplayNetwork(
   mode?: AcceptanceMode,
 ) {
   const sellers = await startSellers(count, signal, mode);
-  const stopRenewal = renewLikeProduction(sellers);
+  for (const seller of sellers) seller.host().startRenewal();
   const [first] = sellers;
   let endpoint:
     Awaited<ReturnType<typeof createAcceptanceBuyerEndpoint>> | undefined;
@@ -197,7 +187,6 @@ export async function startReplayNetwork(
       traces,
       cooldowns,
       async close() {
-        stopRenewal();
         try {
           await host.close();
         } finally {
@@ -210,7 +199,6 @@ export async function startReplayNetwork(
       },
     };
   } catch (error) {
-    stopRenewal();
     await endpoint?.close();
     await Promise.allSettled(sellers.map((seller) => seller.close()));
     throw error;

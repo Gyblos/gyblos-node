@@ -5,6 +5,7 @@ import type { KeyPairSigner } from '@solana/kit';
 import { DEVNET_USDC, SELLER_READINESS } from '@gyblos/config';
 import { FreeSellerLedger } from '@gyblos/core/free-admission';
 import { publishRecord } from '@gyblos/discovery-http';
+import { SELLER_PUBLIC_RECORDS } from '@gyblos/node/constants';
 import { singleControlOffer } from '@gyblos/node/control-offers';
 import { observeControlReadiness } from '@gyblos/node/control-readiness';
 import { prepareSellerControl } from '@gyblos/node/control-startup';
@@ -14,13 +15,19 @@ import {
   ollamaSelection,
 } from '@gyblos/node/engine-registry-ollama';
 import { prepareSellerFreeExecution } from '@gyblos/node/free-execution';
-import { recountedMeter } from '@gyblos/node/free-meter';
+import { DECLARED_METER, recountedMeter } from '@gyblos/node/free-meter';
 import { sellerLimits } from '@gyblos/node/node-config-limits';
 import { openSellerSequence } from '@gyblos/node/public-sequence';
 import { createSellerPublisher } from '@gyblos/node/publisher';
 import type { SellerCatalogOffer } from '@gyblos/node/seller-offer';
-import { CONTROL_METERING_MODES } from '@gyblos/protocol/constants';
+import { SellerOfferSet } from '@gyblos/node/seller-offer-set';
+import {
+  CONTROL_CODES,
+  CONTROL_METERING_MODES,
+  type ControlCode,
+} from '@gyblos/protocol/constants';
 import type { SignedPublicV2 } from '@gyblos/protocol/control-types';
+import { ControlError } from '@gyblos/protocol/control-validation';
 import type { ChatTokenizer } from '@gyblos/protocol/engine';
 import { controlDeadline } from '@gyblos/transport-iroh/control-io';
 
@@ -31,6 +38,21 @@ import type { AcceptanceIndex } from './index';
 import type { AcceptanceWire } from './native';
 import { pocPaidListing } from './paid-listing';
 import type { AcceptanceWorkspace } from './workspace';
+
+const TRANSIENT_REFRESH = new Set<ControlCode>([
+  CONTROL_CODES.STALE,
+  CONTROL_CODES.EXPIRED,
+  CONTROL_CODES.BUSY,
+  CONTROL_CODES.CANCELLED,
+]);
+
+export function refreshLikeDaemon(refresh: () => Promise<unknown>) {
+  return () =>
+    refresh().catch((error: unknown) => {
+      if (!(error instanceof ControlError && TRANSIENT_REFRESH.has(error.code)))
+        throw error;
+    });
+}
 
 export interface AcceptanceIdentity {
   owner: KeyPairSigner;
@@ -50,6 +72,7 @@ export interface AcceptanceHostOptions {
   workspace: AcceptanceWorkspace;
   index: AcceptanceIndex;
   signal: AbortSignal;
+  offerSet?: boolean;
 }
 export async function startAcceptanceHost(options: AcceptanceHostOptions) {
   const { clock, engine, identity, signal } = options;
@@ -104,15 +127,29 @@ export async function startAcceptanceHost(options: AcceptanceHostOptions) {
     });
     // Paid acceptance still quotes the v1 PoC listing, which the daemon no longer serves.
     const offer = options.offer ?? pocPaidListing();
+    const controlOffer = {
+      offer,
+      selection: ollamaSelection(offer.modelId),
+      meteringMode: CONTROL_METERING_MODES.RECOUNTED,
+      model: initial.model,
+      capabilities: engine.engine.capabilities(),
+      readiness: current.readiness,
+    };
+    const offerSet = options.offerSet
+      ? new SellerOfferSet(clock.now)
+      : undefined;
+    offerSet?.add({
+      ...controlOffer,
+      index: 0,
+      engine: current.engine,
+      meter: options.tokenizer
+        ? recountedMeter(options.tokenizer)
+        : DECLARED_METER,
+      observation: current,
+    });
     const control = await prepareSellerControl({
-      offers: singleControlOffer({
-        offer,
-        selection: ollamaSelection(offer.modelId),
-        meteringMode: CONTROL_METERING_MODES.RECOUNTED,
-        model: initial.model,
-        capabilities: engine.engine.capabilities(),
-        readiness: current.readiness,
-      }),
+      catalogMs: options.offerSet ? SELLER_PUBLIC_RECORDS.catalogMs : undefined,
+      offers: offerSet ?? singleControlOffer(controlOffer),
       owner: identity.owner,
       nodeId: wire.nodeId,
       nodeSigner: wire.nodeSigner,
@@ -173,13 +210,18 @@ export async function startAcceptanceHost(options: AcceptanceHostOptions) {
     return {
       wire,
       observation: current,
+      startRenewal() {
+        if (!offerSet) throw new Error('startRenewal needs offerSet');
+        offerSet.start(refreshLikeDaemon(() => control.records.refresh()));
+        publisher.start();
+      },
       publisher,
       control,
       sent,
       async close() {
         detach();
         engine.release();
-        await current.stop();
+        await (offerSet ?? current).stop();
         try {
           await publisher.stop();
         } finally {

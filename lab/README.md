@@ -27,8 +27,9 @@ offline suites report counts.
 
 `pnpm lab:agent-replay` measures what a coding agent waits for. It starts 1, 2
 and 3 local free sellers and the real free buyer HTTP, all offline and on a real
-clock. The sellers use a paced synthetic engine and renew on the production
-tick. It then replays an OpenCode turn (3 parallel requests) and a 10-turn tool
+clock. The sellers use a paced synthetic engine and, like the seller daemon,
+list their offer through a `SellerOfferSet` and run its renewal and publication
+loops. It then replays an OpenCode turn (3 parallel requests) and a 10-turn tool
 loop.
 
 For each request it writes a JSONL line with time to headers, time to first
