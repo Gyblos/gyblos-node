@@ -1,6 +1,7 @@
 // Activates the shared session manager for explicit buyer policy; free quotes never build financial services.
 import { AsyncLocalStorage } from 'node:async_hooks';
 
+import { parseBuyerRoutingPolicy } from '@gyblos/core/buyer-routing';
 import type { BuyerApiKeyOperation } from '@gyblos/node/buyer-api-keys';
 import { executeBuyerQuote } from '@gyblos/node/buyer-quote-execution';
 import type { BuyerRoutePorts } from '@gyblos/node/buyer-routing';
@@ -20,7 +21,7 @@ import {
 import { ownedChat } from './chat-owned';
 import { PAID_BUYER_HTTP_MS } from './constants';
 import { observeBuyerExecution } from './execution-observation';
-import { executeSelectedBuyerFree } from './free-execution';
+import { unfitOutcome } from './free-execution';
 import type { SelectionRoute } from './free-route';
 import { selectWinner } from './free-selection';
 import type { ChatPayment, ChatResult } from './free-sse';
@@ -35,6 +36,7 @@ import {
   selectConfiguredThenOpen,
 } from './quote-selection';
 import { classifyPaidError } from './session-errors';
+import { fittingSelect, freeSessionExecution } from './session-free';
 import { makeManager, type SessionState } from './session-manager';
 import {
   checkDesktopPool,
@@ -193,29 +195,6 @@ function sessionSelection(
     return selectConfiguredThenOpen(prepared.config, policy, current, select);
   };
 }
-function freeSessionExecution(
-  context: Context,
-  manager: ReturnType<typeof makeManager>,
-  input: Parameters<Awaited<ReturnType<BuyerExecutionFactory>>['execute']>[0],
-  permission: Parameters<typeof reserveApiKey>[0],
-  onDelta: Parameters<Awaited<ReturnType<BuyerExecutionFactory>>['execute']>[2],
-): BuyerRoutePorts<ChatResult>['free'] {
-  return (winner, current, sending) =>
-    executeApiKeyFree(permission, winner.quote, current, () =>
-      executeSelectedBuyerFree(
-        input,
-        context.dependencies,
-        winner,
-        current,
-        onDelta,
-        () => {
-          if ('checkBeforeExternalExecution' in manager)
-            manager.checkBeforeExternalExecution();
-          sending?.();
-        },
-      ),
-    );
-}
 function executeSingleRoute(
   ports: BuyerRoutePorts<ChatResult>,
   dependencies: Context['dependencies'],
@@ -273,9 +252,10 @@ function sessionExecutor(
       manager.previousSeller,
       model?.sellerChoice,
     );
+    let unfit = false;
     const paidInput = withBatchOutputLimit(input);
     const ports: BuyerRoutePorts<ChatResult> = {
-      select:
+      select: fittingSelect(
         config.discovery?.paidAuto && !model?.sellerChoice
           ? (excluded, current, route) =>
               selectAffordableAutoQuote(
@@ -285,7 +265,22 @@ function sessionExecutor(
                 (quote) => manager.preflight(quote, paidInput, current),
               )
           : select,
-      free: freeSessionExecution(context, manager, input, permission, onDelta),
+        input,
+        () => {
+          unfit = true;
+        },
+        parseBuyerRoutingPolicy(config.routing),
+      ),
+      free: freeSessionExecution(
+        context,
+        manager,
+        input,
+        permission,
+        onDelta,
+        () => {
+          unfit = true;
+        },
+      ),
       paid: (winner, current, sending) => {
         if (model?.freeOnly) return sessionFail(SESSION_CODES.LIMIT);
         return observeBuyerExecution(
@@ -311,10 +306,10 @@ function sessionExecutor(
         );
       },
     };
-    const routed =
+    const routed = await (
       router && !model?.sellerChoice
-        ? await router.execute(ports, signal, routeScope(request))
-        : await executeSingleRoute(
+        ? router.execute(ports, signal, routeScope(request))
+        : executeSingleRoute(
             ports,
             context.dependencies,
             manager.unresolved,
@@ -323,7 +318,10 @@ function sessionExecutor(
             Boolean(onDelta),
             model?.selection,
             signal,
-          );
+          )
+    ).catch((error: unknown) => {
+      throw unfit ? unfitOutcome(error) : error;
+    });
     return { ...routed.result, execution: routed.kind };
   };
 }
