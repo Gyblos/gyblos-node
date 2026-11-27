@@ -1033,6 +1033,15 @@ details matter when you change or debug the endpoint:
   text. A body declared larger than 384 KiB gets 413 before it is read; a larger
   streamed body gets the same 413 once it passes the limit. Both close the
   connection. Requests must send `Content-Type: application/json`.
+- **History tolerance.** In the OpenAI format, prompt-cache marks
+  (`cache_control`) on messages and text parts, and another provider's reasoning
+  (`reasoning`, `reasoning_content`, `reasoning_details`) on a message are
+  ignored, never sent to a seller. A `system` message later in the conversation
+  is added to the leading instructions instead of being refused.
+- **Tool limits.** At most 128 tools; a name is 1 to 64 letters, digits, `_` or
+  `-` and unique; an input schema is at most 64 KiB. A refusal names the tool by
+  its index (`tools[3]: ...`). A description longer than 8 KiB is shortened to
+  fit rather than refused.
 - **Browser isolation.** Invalid UTF-8, requests with an `Origin` header and
   other content types get 400, and a foreign `Host` gets 421, so a web page
   cannot reach the endpoint. There is no CORS.

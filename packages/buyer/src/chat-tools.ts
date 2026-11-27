@@ -5,7 +5,9 @@ import {
   parseToolCalls,
   parseTools,
   TOOL_CHOICES,
+  TOOL_LIMITS,
   TOOL_ROLE,
+  toolName,
   type ToolCall,
   type ToolChoice,
   type ToolDefinition,
@@ -38,20 +40,44 @@ function only(
   if (Object.keys(row).some((key) => !keys.includes(key)))
     throw invalidChat(field, detail);
 }
+function shortened(description: string) {
+  const bytes = Buffer.from(description);
+  if (bytes.length <= TOOL_LIMITS.descriptionBytes) return description;
+  const text = bytes.subarray(0, TOOL_LIMITS.descriptionBytes).toString('utf8');
+  return text.endsWith('\uFFFD') ? text.slice(0, -1) : text;
+}
+function toolProblem(
+  entries: { name: unknown; parameters: string }[],
+): string | undefined {
+  if (entries.length > TOOL_LIMITS.maxTools)
+    return FREE_CHAT_DETAILS.tooManyTools;
+  const names = new Set<unknown>();
+  for (const [index, { name, parameters }] of entries.entries()) {
+    try {
+      toolName(name);
+    } catch {
+      return FREE_CHAT_DETAILS.toolName(index);
+    }
+    if (names.has(name)) return FREE_CHAT_DETAILS.duplicateTool(index);
+    names.add(name);
+    if (Buffer.byteLength(parameters) > TOOL_LIMITS.jsonBytes)
+      return FREE_CHAT_DETAILS.toolSchema(index);
+  }
+  return undefined;
+}
 function definitions(
   entries: { name: unknown; description: unknown; schema: unknown }[],
 ): ToolDefinition[] {
-  return checked('tools', FREE_CHAT_DETAILS.tools, () =>
-    parseTools(
-      entries.map(({ name, description, schema }) => ({
-        name,
-        ...(typeof description === 'string' && description
-          ? { description }
-          : {}),
-        parameters: JSON.stringify(schema ?? EMPTY_SCHEMA),
-      })),
-    ),
-  );
+  const tools = entries.map(({ name, description, schema }) => ({
+    name,
+    ...(typeof description === 'string' && description
+      ? { description: shortened(description) }
+      : {}),
+    parameters: JSON.stringify(schema ?? EMPTY_SCHEMA),
+  }));
+  const problem = toolProblem(tools);
+  if (problem) throw invalidChat('tools', problem);
+  return checked('tools', FREE_CHAT_DETAILS.tools, () => parseTools(tools));
 }
 
 // OpenAI: [{type: 'function', function: {name, description?, parameters?, strict?}}].
