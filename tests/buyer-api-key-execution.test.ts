@@ -170,7 +170,24 @@ void test('a cancelled durable reservation never reaches inference or financial 
       ),
     );
     assert.equal(dispatched, false);
-    assert.equal((await f.keys.snapshot()).blocked, true);
+    const snapshot = await f.keys.snapshot();
+    assert.equal(snapshot.blocked, false);
+    assert.equal(snapshot.keys[0]?.reservedAtomic, '0');
+    assert.equal(snapshot.keys[0]?.spentAtomic, '0');
+    await f.keys.close();
+    const reopened = await createBuyerApiKeys({
+      files: f.files,
+      scope: snapshot.scope,
+    });
+    try {
+      const next = reopened.operation(f.key.id);
+      assert.equal(next.ceiling('100'), '100');
+      await reserveApiKey(next, signed);
+      await next.releaseUnsent();
+      assert.equal((await reopened.snapshot()).blocked, false);
+    } finally {
+      await reopened.close();
+    }
   } finally {
     await f.keys.close();
   }
