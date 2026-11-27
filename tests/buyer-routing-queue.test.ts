@@ -313,3 +313,43 @@ void test('after waiting for a busy free seller, its temporary pin does not surv
   assert.equal(result.result, 'answer');
   assert.equal(sends, 3);
 });
+
+void test('a pooled quote waiting on catalog renewal leaves another listing available', async () => {
+  const host = await fixture();
+  const waiting = batchDeferred<void>();
+  const renewed = batchDeferred<void>();
+  let otherSelected = false;
+  const signal = AbortSignal.timeout(5000);
+  const first = host.router.execute(
+    {
+      ...host.ports,
+      select: async (...args) => {
+        waiting.resolve();
+        await renewed.promise;
+        return host.ports.select(...args);
+      },
+    },
+    signal,
+    { key: 'renewing-model' },
+  );
+  await waiting.promise;
+  const second = host.router.execute(
+    {
+      ...host.ports,
+      select: async (...args) => {
+        otherSelected = true;
+        return host.ports.select(...args);
+      },
+    },
+    signal,
+    { key: 'healthy-model' },
+  );
+  try {
+    await setImmediate();
+    assert.equal(otherSelected, true);
+  } finally {
+    renewed.resolve();
+    await Promise.allSettled([first, second]);
+    await host.close();
+  }
+});

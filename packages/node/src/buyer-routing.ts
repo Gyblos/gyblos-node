@@ -26,7 +26,11 @@ import {
   type BuyerQuoteDependencies,
   type BuyerQuoteWinner,
 } from './buyer-quote-execution';
-import { createBuyerQueue, type BuyerWaitScope } from './buyer-routing-queue';
+import {
+  createBuyerQueue,
+  createQuoteQueue,
+  type BuyerWaitScope,
+} from './buyer-routing-queue';
 import {
   createRoutingReferences,
   nextQuoteCeilings,
@@ -89,7 +93,7 @@ interface State {
   requests: Set<symbol>;
   pending: Set<Promise<unknown>>;
   lifetime: AbortController;
-  selection: Promise<unknown>;
+  selection: ReturnType<typeof createQuoteQueue>;
   queue: ReturnType<typeof createBuyerQueue>;
 }
 interface Request<T> extends BuyerRouteSelection {
@@ -191,7 +195,7 @@ async function select<T>(
         );
     }
     const checking = request.wait?.signal ?? signal;
-    const running = state.selection.then(() => {
+    const running = state.selection.run(request.scope?.key, () => {
       checking.throwIfAborted();
       return request.ports.select(
         new Set([...excluded, ...request.excluded]),
@@ -203,10 +207,6 @@ async function select<T>(
         },
       );
     });
-    state.selection = running.then(
-      () => undefined,
-      () => undefined,
-    );
     try {
       return await bounded(running, checking);
     } catch (error) {
@@ -383,7 +383,7 @@ export function createBuyerRouter<S extends BuyerRouteScope = BuyerRouteScope>(
     requests: new Set(),
     pending: new Set(),
     lifetime: new AbortController(),
-    selection: Promise.resolve(),
+    selection: createQuoteQueue(),
   };
   return {
     activeRequests: () => state.requests.size,
@@ -393,7 +393,7 @@ export function createBuyerRouter<S extends BuyerRouteScope = BuyerRouteScope>(
       state.lifetime.abort();
       state.queue.cancel(state.lifetime.signal.reason);
       while (state.pending.size) await Promise.allSettled([...state.pending]);
-      await state.selection;
+      await state.selection.drain();
       state.queue.dispose();
     },
   };
