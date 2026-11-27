@@ -972,6 +972,57 @@ D1 double that applies every real migration in order
 (`tests/support/d1-sqlite.ts`). They also check the listing query plan and count
 written rows, so CI needs no Cloudflare account.
 
+## Cost
+
+D1 bills read and write queries and rows read and written. Two root scripts
+measure them; neither stores anything.
+
+`pnpm d1:analytics` reads seven complete UTC days of account-level D1 analytics
+(Cloudflare GraphQL `d1AnalyticsAdaptiveGroups`) and the size of both databases
+(`wrangler d1 info`). It takes `CLOUDFLARE_API_TOKEN` and
+`CLOUDFLARE_ACCOUNT_ID` from the environment, or Wrangler's own login, and
+prints only the table or a static error code. Baseline for `gyblos-discovery`,
+2026-11-20 to 2026-11-26:
+
+```text
+database          size MB  read queries  write queries  rows read  rows written  p50 ms  p95 ms
+----------------  -------  ------------  -------------  ---------  ------------  ------  ------
+gyblos-discovery  0.29     403574        320358         2566597    712950        0.22    0.88
+```
+
+`pnpm d1:bench` runs each operation once against the SQLite-backed D1 test
+harness and counts what it sends: statements (each one a billed query), round
+trips (direct statements plus batches), batches, the most bound parameters in
+one statement (D1 refuses more than 100) and full scans:
+
+```text
+operation            statements  round trips  batches  max params  full scans
+-------------------  ----------  -----------  -------  ----------  ----------
+publish.catalog1     10          2            1        18          3
+publish.catalog64    10          2            1        68          3
+read.network         3           3            0        5           3
+read.models          1           1            0        5           1
+read.offerHistory    2           2            0        4           1
+read.networkHistory  3           3            0        14          0
+cron.rollup          13          13           0        14          0
+```
+
+`publish.catalog1` and `publish.catalog64` are a new NodeId publishing a catalog
+of 1 and 64 models (the most a record allows); the 64-model catalog still writes
+in one batch. The prune of expired rows adds one batch of 7 statements to the
+first new NodeId per minute per instance and is not counted above. The read rows
+bypass the response cache, `read.offerHistory` asks for the longest window of
+one node and `read.networkHistory` for 90 days. `cron.rollup` is one scheduled
+run that rolls up the most days a run allows. The counts come from a small
+synthetic dataset; rows read grow with the data. A full scan is a statement
+whose local SQLite plan has a `SCAN` step, which includes small tables and
+intermediate results such as a `WITH` clause, so the count flags a plan change
+rather than a cost by itself.
+
+`tests/d1-load.test.ts` caps every operation at these counts, so a change that
+sends more statements, round trips, batches or full scans fails until the cap is
+raised on purpose.
+
 ## Operations
 
 Deploying, applying remote migrations, changing secrets, rolling back and
