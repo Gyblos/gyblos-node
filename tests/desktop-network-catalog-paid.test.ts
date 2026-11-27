@@ -8,7 +8,10 @@ import {
   CATALOG_STATE,
   parseNetworkCatalog,
 } from '@gyblos/desktop/network-catalog';
-import { readAnnouncements } from '@gyblos/desktop/network-catalog-reader';
+import {
+  CATALOG_DIAGNOSTICS,
+  readAnnouncements,
+} from '@gyblos/desktop/network-catalog-reader';
 import { signPublicV2 } from '@gyblos/protocol/public-v2';
 
 import {
@@ -19,8 +22,8 @@ import {
 } from './support/discovery-fixture';
 
 // One seller of qwen3:0.6b at this price, in atomic devnet USDC per million tokens.
-async function priced(input: string, output: string) {
-  const source = await discoverySeller({ modelId: 'qwen3:0.6b' });
+async function priced(input: string, output: string, modelId = 'qwen3:0.6b') {
+  const source = await discoverySeller({ modelId });
   const catalog = {
     ...source.catalog,
     models: source.catalog.models.map((model) => ({
@@ -287,6 +290,78 @@ void test('a repeated cursor cannot discard or double-count a signed listing or 
     assert.equal(result.truncated, true);
     assert.equal(result.models[0]?.announcements, 1);
     assert.equal(pages, 2);
+  } finally {
+    stop.abort();
+  }
+});
+
+void test('Auto model lookup retains the signed binding of a visible manual search offer for a different model', async () => {
+  const { createCatalogSession } =
+    await import('@gyblos/desktop/network-catalog-session');
+  const manual = await priced('1', '2', 'synthetic-manual-model');
+  const automatic = await priced('3', '4');
+  const stop = new AbortController();
+  const search = createCatalogSession(
+    async (url) =>
+      jsonResponse(
+        200,
+        sellersBody([
+          new URL(url).searchParams.get('model') === manual.modelId
+            ? manual.signed
+            : automatic.signed,
+        ]),
+      ),
+    () => DISCOVERY_NOW,
+    stop.signal,
+  );
+  try {
+    const manualId = (await search.lookup(manual.modelId)).models[0]?.offerId;
+    assert.ok(manualId);
+    const autoId = (await search.lookup(automatic.modelId, true)).models[0]
+      ?.offerId;
+    assert.ok(autoId);
+    assert.equal(
+      search.resolve(manualId)?.nodeId,
+      manual.signed.catalog.record.nodeId,
+    );
+    assert.equal(
+      search.resolve(autoId)?.nodeId,
+      automatic.signed.catalog.record.nodeId,
+    );
+  } finally {
+    stop.abort();
+  }
+});
+
+void test('failed continuation pages keep verified listings and emit one content-free failure even if the sink fails', async () => {
+  const { createCatalogSession } =
+    await import('@gyblos/desktop/network-catalog-session');
+  const found = await priced('1', '2');
+  const stop = new AbortController();
+  const records: string[] = [];
+  const canary = 'SECRET-synthetic-catalog';
+  const session = createCatalogSession(
+    async (url) => {
+      if (new URL(url).searchParams.has('cursor')) throw new Error(canary);
+      return jsonResponse(200, sellersBody([found.signed], canary));
+    },
+    () => DISCOVERY_NOW,
+    stop.signal,
+    (record) => {
+      assert.equal(record.code, CATALOG_DIAGNOSTICS.code);
+      assert.equal(record.phase, CATALOG_DIAGNOSTICS.phase);
+      records.push(JSON.stringify(record));
+      throw new Error(canary);
+    },
+  );
+  try {
+    const result = await session.lookup(found.modelId, true);
+    assert.equal(result.truncated, true);
+    assert.equal(result.models.length, 1);
+    assert.equal(records.length, 1);
+    assert.ok(
+      !records[0]?.includes(canary) && !records[0]?.includes(found.modelId),
+    );
   } finally {
     stop.abort();
   }

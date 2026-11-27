@@ -166,8 +166,15 @@ export function pinnedFundingNotice(
 }
 export function autoFundingNotice(
   available: Exclude<ReturnType<typeof autoFundingAvailable>, true>,
+  partial = false,
 ) {
-  if (isChannelBlocker(available)) return channelBlockerMessage(available);
+  if (isChannelBlocker(available))
+    return (
+      channelBlockerMessage(available) +
+      (partial ? ' The catalog is partial. Try again.' : '')
+    );
+  if (partial)
+    return 'The catalog is partial. No seller in these results has verified funding for this response. Try again.';
   if (available === false) return 'Add devnet USDC to open a channel.';
   if (available === FUNDING.channelLimit)
     return 'Channel capacity cannot cover this response. Review Payments.';

@@ -11,18 +11,21 @@ export async function checkAutoSeller(
   replacement: ChannelBlocker,
   sendAction: string,
   partial = false,
+  evidence?: 'zero' | 'unknown' | 'free',
 ) {
   const funding = window.desktopFunding;
   const buyer = window.desktopX402;
   if (!catalog || !funding || !buyer)
     throw new Error('Missing synthetic buyer');
   const original = catalog.summary;
+  let expectedOffer: string | undefined;
   const seller = async () => {
     const snapshot = await original();
     const listing = snapshot.models.find(
       (item) => item.modelId === model && item.offerId,
     );
     if (!listing) throw new Error('Missing paid listing');
+    expectedOffer = listing.offerId;
     return {
       ...snapshot,
       models: [
@@ -35,30 +38,53 @@ export async function checkAutoSeller(
     };
   };
   catalog.summary = async () => {
-    const snapshot = await seller();
-    return partial
-      ? {
-          ...snapshot,
-          truncated: true,
-          models: snapshot.models.map((row) => ({
-            ...row,
-            inputAtomicPerMtok: '100001',
-          })),
-        }
-      : snapshot;
+    if (!partial) return seller();
+    const snapshot = await original();
+    const paid = snapshot.models.filter(
+      (row) => row.modelId === model && row.offerId,
+    );
+    const first = paid.at(-1);
+    if (!first || first.offerId === paid[0]?.offerId)
+      throw new Error('Missing distinct overview seller');
+    return {
+      ...snapshot,
+      truncated: true,
+      models: [{ ...first, inputAtomicPerMtok: '100001' }],
+    };
   };
-  catalog.lookup = async (query) => ({
-    ...(await seller()),
-    query: String(query),
-    truncated: partial && !affordable,
-  });
+  catalog.lookupAuto = async (query) => {
+    const snapshot = await seller();
+    const free =
+      evidence === 'free' &&
+      (await original()).models.find(
+        (item) => item.modelId === model && item.free,
+      );
+    return {
+      ...snapshot,
+      query: String(query),
+      models: free ? [free, ...snapshot.models] : snapshot.models,
+      truncated: partial && (!affordable || !!evidence),
+    };
+  };
   let checked = 0;
   let sent = 0;
   const walletRead = funding.balance();
   funding.balance = async (offer) => {
     const wallet = await walletRead;
     if (!wallet) throw new Error('Missing wallet');
-    if (offer) checked++;
+    if (offer) {
+      if (offer !== expectedOffer)
+        throw new Error('Funding read for the wrong signed listing');
+      checked++;
+    }
+    if (offer && (evidence === 'zero' || evidence === 'unknown'))
+      return {
+        ...wallet,
+        balanceAtomic: evidence === 'zero' ? '0' : null,
+        faucetAvailable: evidence === 'zero',
+        channelRemainingAtomic: null,
+      };
+
     return {
       ...wallet,
       channelRemainingAtomic: null,
@@ -131,18 +157,49 @@ export async function checkAutoSeller(
   const trigger = await until('model menu', () =>
     form.querySelector<HTMLButtonElement>('.ui-model-trigger'),
   );
-  trigger.click();
-  const auto = await until('Auto seller', () =>
-    Array.from(
-      document.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'),
-    ).find((row) => row.textContent.includes('Auto · ' + model)),
-  );
-  auto.click();
-  const decision = await until('selection result', () => {
-    const notice = document.querySelector('.toast')?.textContent;
-    return notice && !notice.includes('Checking') && notice;
-  });
-  if (!affordable) {
+  async function selectAuto() {
+    const previous = document.querySelector('.toast')?.textContent;
+    trigger.click();
+    const auto = await until('Auto seller', () =>
+      Array.from(
+        document.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'),
+      ).find((row) => row.textContent.includes('Auto · ' + model)),
+    );
+    auto.click();
+    return until('selection result', () => {
+      const notice = document.querySelector('.toast')?.textContent;
+      return (
+        notice && notice !== previous && !notice.includes('Checking') && notice
+      );
+    });
+  }
+  const decision = await selectAuto();
+  if (evidence === 'zero' || evidence === 'unknown') {
+    if (
+      !decision.includes('partial') ||
+      !decision.includes('Try again') ||
+      checked !== 1 ||
+      sent ||
+      draft.value !== 'Synthetic Auto turn' ||
+      document.querySelector('dialog[open]') ||
+      !form.isConnected
+    )
+      throw new Error(
+        'Incomplete funding evidence did not retain Chat for another lookup',
+      );
+    const beforeRetry = checked;
+    evidence = undefined;
+    const retried = await selectAuto();
+    if (
+      !retried.includes('Auto selected') ||
+      checked !== beforeRetry + 1 ||
+      sent ||
+      draft.value !== 'Synthetic Auto turn'
+    )
+      throw new Error(
+        'The same draft could not recheck newly verified funding',
+      );
+  } else if (!affordable) {
     if (
       !(partial
         ? decision.includes('partial')
@@ -155,7 +212,10 @@ export async function checkAutoSeller(
         'Overpriced seller used switching credit or consumed the draft',
       );
   } else {
-    if (!decision.includes('Auto selected') || checked !== 1)
+    if (
+      !decision.includes('Auto selected') ||
+      checked !== (evidence === 'free' ? 0 : 1)
+    )
       throw new Error('Affordable switch rejected: ' + decision);
     const submit = await until('enabled send', () =>
       form.querySelector<HTMLButtonElement>(

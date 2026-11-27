@@ -10,8 +10,17 @@ import {
   type DiscoveryFetch,
 } from '@gyblos/discovery-http';
 import type { BuyerSellerChoice as CatalogSellerChoice } from '@gyblos/protocol/buyer-api';
+import { DIAGNOSTIC_LEVELS } from '@gyblos/runtime/constants';
+import {
+  createDiagnostics,
+  type DiagnosticSink,
+} from '@gyblos/runtime/diagnostics';
 
-import { CATALOG_STATE, NETWORK_CATALOG } from './constants';
+import {
+  CATALOG_DIAGNOSTICS,
+  CATALOG_STATE,
+  NETWORK_CATALOG,
+} from './constants';
 import {
   emptyCatalog,
   type AnnouncedModel,
@@ -28,6 +37,7 @@ const isShown = (pricing: Pricing) =>
   isFree(pricing) ||
   (pricing.network === DEVNET && pricing.asset === DEVNET_USDC);
 
+export { CATALOG_DIAGNOSTICS } from './constants';
 export type { BuyerSellerChoice as CatalogSellerChoice } from '@gyblos/protocol/buyer-api';
 
 function project(
@@ -117,7 +127,15 @@ export async function readAnnouncements(
   signal: AbortSignal,
   choices?: Map<string, CatalogSellerChoice>,
   followPages = false,
+  sink?: DiagnosticSink,
 ): Promise<NetworkCatalog> {
+  const operation = createDiagnostics({
+    component: CATALOG_DIAGNOSTICS.component,
+    operation: CATALOG_DIAGNOSTICS.operation,
+    phases: [CATALOG_DIAGNOSTICS.phase],
+    codes: [CATALOG_DIAGNOSTICS.code],
+    sink,
+  }).start();
   const deadline = AbortSignal.any([
     signal,
     AbortSignal.timeout(NETWORK_CATALOG.REQUEST_MS),
@@ -147,6 +165,11 @@ export async function readAnnouncements(
       page = await read(page.next);
     } catch {
       signal.throwIfAborted();
+      operation.report({
+        phase: CATALOG_DIAGNOSTICS.phase,
+        code: CATALOG_DIAGNOSTICS.code,
+        level: DIAGNOSTIC_LEVELS.WARN,
+      });
       break;
     }
     for (const row of page.sellers) {

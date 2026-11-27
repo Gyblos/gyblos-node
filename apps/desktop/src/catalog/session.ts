@@ -1,5 +1,6 @@
 // Owns lazy in-memory lookup, replacement cancellation and signed expiry; never touches custody.
 import type { DiscoveryFetch } from '@gyblos/discovery-http';
+import type { DiagnosticSink } from '@gyblos/runtime/diagnostics';
 
 import {
   CATALOG_STATE,
@@ -50,15 +51,17 @@ function readCatalog(
   now: () => number,
   signal: AbortSignal,
   offers: Map<string, CatalogSellerChoice>,
+  sink?: DiagnosticSink,
 ) {
   return model
-    ? readAnnouncements(fetch, model, now, signal, offers, true)
+    ? readAnnouncements(fetch, model, now, signal, offers, true, sink)
     : browseAnnouncements(fetch, now, signal, offers);
 }
-export function createCatalogSession(
+function createCatalogView(
   fetch: DiscoveryFetch,
   now: () => number,
   signal: AbortSignal,
+  sink?: DiagnosticSink,
 ) {
   let snapshot = emptyCatalog();
   let choices = new Map<string, CatalogSellerChoice>();
@@ -71,7 +74,6 @@ export function createCatalogSession(
   }
   function close() {
     closed = true;
-    sequence += 1;
     pending?.controller.abort();
     snapshot = emptyCatalog(CATALOG_STATE.ERROR);
   }
@@ -93,6 +95,7 @@ export function createCatalogSession(
           now,
           controller.signal,
           offers,
+          sink,
         );
         if (!closed && sequence === current) {
           choices = offers;
@@ -132,5 +135,24 @@ export function createCatalogSession(
         ? load(model)
         : Promise.resolve(emptyCatalog(CATALOG_STATE.ERROR));
     },
+  };
+}
+
+export function createCatalogSession(
+  fetch: DiscoveryFetch,
+  now: () => number,
+  signal: AbortSignal,
+  sink?: DiagnosticSink,
+) {
+  const visible = createCatalogView(fetch, now, signal, sink);
+  let auto: ReturnType<typeof createCatalogView> | undefined;
+  return {
+    ...visible,
+    lookup(model: string, automatic = false) {
+      if (!automatic) return visible.lookup(model);
+      auto ??= createCatalogView(fetch, now, signal, sink);
+      return auto.lookup(model);
+    },
+    resolve: (id: string) => visible.resolve(id) ?? auto?.resolve(id),
   };
 }

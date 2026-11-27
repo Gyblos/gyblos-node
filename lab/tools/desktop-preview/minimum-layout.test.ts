@@ -164,7 +164,7 @@ void test('a free profile without session terms configures paid Chat before chec
   assert.equal(result.passed, 'verified');
 });
 
-for (const [description, input, output, affordable, partial] of [
+for (const [description, input, output, affordable, partial, evidence] of [
   ['refuses input above the limit', '100001', '200000', false, false],
   ['refuses output above the limit', '100000', '200001', false, false],
   ['sends at both limits', '100000', '200000', true, false],
@@ -182,6 +182,30 @@ for (const [description, input, output, affordable, partial] of [
     false,
     true,
   ],
+  [
+    'keeps Chat available with zero wallet funds and partial listings',
+    '100000',
+    '200000',
+    true,
+    true,
+    'zero',
+  ],
+  [
+    'keeps Chat available with unknown funds and partial listings',
+    '100000',
+    '200000',
+    true,
+    true,
+    'unknown',
+  ],
+  [
+    'uses a free later listing without a funding read',
+    '100000',
+    '200000',
+    true,
+    true,
+    'free',
+  ],
 ] as const)
   void test(`the desktop Auto picker ${description} with verified switching credit`, async () => {
     const args = [
@@ -192,6 +216,7 @@ for (const [description, input, output, affordable, partial] of [
       SESSION_CODES.REPLACEMENT_REQUIRED,
       X402_ACTION.SEND,
       partial,
+      evidence,
     ];
     const result = await minimumLayout(
       '',

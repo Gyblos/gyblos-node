@@ -346,7 +346,8 @@ export function DesktopApp() {
       if (attempt !== autoAttempt.current) return;
       const available = autoFundingAvailable(policy, funding, !!paid);
       if (available !== true) {
-        setToast(autoFundingNotice(available));
+        setToast(autoFundingNotice(available, partial));
+        if (partial) return;
         navigate(UI_VIEW.PAYMENTS);
         if (available === false) setModal(UI_DIALOG.ADD_FUNDS);
         return;

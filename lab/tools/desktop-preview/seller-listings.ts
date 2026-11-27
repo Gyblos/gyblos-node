@@ -63,8 +63,7 @@ export function previewCatalog(
 
 // Desktop catalog bridge: an exact-model lookup returns only that model.
 export function previewDesktopCatalog(model: string, now: number) {
-  let catalogQuery = '';
-  const catalogResult = () => {
+  const catalogResult = (catalogQuery: string) => {
     const result = previewCatalog(model, now, catalogQuery);
     if (!catalogQuery) return result;
     const models = result.models.filter(
@@ -76,10 +75,9 @@ export function previewDesktopCatalog(model: string, now: number) {
   };
   return {
     summary: async () => previewCatalog(model, now, ''),
-    lookup: async (value: unknown) => {
-      catalogQuery = typeof value === 'string' ? value.trim() : '';
-      return catalogResult();
-    },
+    lookup: async (value: unknown) =>
+      catalogResult(typeof value === 'string' ? value.trim() : ''),
+    lookupAuto: async (modelId: string) => catalogResult(modelId),
   };
 }
 

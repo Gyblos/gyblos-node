@@ -89,6 +89,12 @@ settings for its local payment-channel records.
   not establish the outcome of earlier attempts. Check confirmed chain state and
   local recovery status before considering a retry.
 
+- **Desktop catalog lookup.** If a signed search result has more pages and the
+  next page fails, the main process writes one local warning to stderr. The code
+  is `CATALOG_PAGE_FAILED`, operation `lookup`, phase `continuation`. The record
+  omits model and seller identifiers, URLs, cursors and error text. The picker
+  can still use verified listings from pages it received.
+
 - **Model verifier output publication.** Component `model-verifier`, operation
   `publish-output`, phase `cleanup`: failure to remove the temporary staging
   directory after output publication fails. The only code is

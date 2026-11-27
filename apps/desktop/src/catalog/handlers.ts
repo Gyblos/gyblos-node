@@ -8,7 +8,7 @@ import {
 
 interface CatalogSession {
   summary(): NetworkCatalog | Promise<NetworkCatalog>;
-  lookup(model: string): Promise<NetworkCatalog>;
+  lookup(model: string, automatic?: boolean): Promise<NetworkCatalog>;
 }
 interface CatalogWindow {
   contents: unknown;
@@ -33,12 +33,16 @@ export function createCatalogHandlers(
       accepts(event) && args.length === 0 && session
         ? session.summary()
         : emptyCatalog(CATALOG_STATE.ERROR),
-    lookup: async (event: CatalogSender, args: readonly unknown[]) =>
+    lookup: async (
+      event: CatalogSender,
+      args: readonly unknown[],
+      automatic = false,
+    ) =>
       accepts(event) &&
       args.length === 1 &&
       validCatalogQuery(args[0]) &&
       session
-        ? session.lookup(args[0])
+        ? session.lookup(args[0], automatic)
         : emptyCatalog(CATALOG_STATE.ERROR),
   };
 }

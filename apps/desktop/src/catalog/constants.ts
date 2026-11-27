@@ -10,6 +10,7 @@ export const CATALOG_STATE = {
 export const NETWORK_CATALOG = {
   STATUS_CHANNEL: 'desktop:catalog-status',
   LOOKUP_CHANNEL: 'desktop:catalog-lookup',
+  AUTO_LOOKUP_CHANNEL: 'desktop:catalog-auto-lookup',
   PARTITION: 'desktop-announcements',
   MAX_SUGGESTIONS: 6,
   OFFER_LABEL_DIGITS: 4,
@@ -22,4 +23,11 @@ export const NETWORK_CATALOG = {
   POLL_MS: 1000,
   MODEL_PATTERN:
     /^[a-zA-Z0-9][a-zA-Z0-9._:-]*(?:\/[a-zA-Z0-9][a-zA-Z0-9._:-]*)*$/,
+} as const;
+
+export const CATALOG_DIAGNOSTICS = {
+  component: 'desktop-catalog',
+  operation: 'lookup',
+  phase: 'continuation',
+  code: 'CATALOG_PAGE_FAILED',
 } as const;

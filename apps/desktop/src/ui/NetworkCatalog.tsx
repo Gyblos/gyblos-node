@@ -20,6 +20,7 @@ declare global {
     desktopCatalog?: {
       summary(): Promise<NetworkCatalog>;
       lookup(model: string): Promise<NetworkCatalog>;
+      lookupAuto(model: string): Promise<NetworkCatalog>;
     };
   }
 }
@@ -72,7 +73,7 @@ export function useNetworkCatalog() {
         (searchResult?.query === name && searchResult.truncated);
       if (!partial) return { offers, partial: false };
       const latest = parseNetworkCatalog(
-        await window.desktopCatalog?.lookup(name).catch(() => null),
+        await window.desktopCatalog?.lookupAuto(name).catch(() => null),
         name,
       );
       if (

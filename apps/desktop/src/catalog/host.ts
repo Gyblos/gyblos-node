@@ -42,6 +42,7 @@ export function registerNetworkCatalog(
         }),
       Date.now,
       signal,
+      (record) => console.error(JSON.stringify(record)),
     );
   const catalog = createSession();
   const search = createSession();
@@ -58,6 +59,10 @@ export function registerNetworkCatalog(
   );
   ipcMain.handle(NETWORK_CATALOG.LOOKUP_CHANNEL, (event, ...args: unknown[]) =>
     handlers.lookup(event, args),
+  );
+  ipcMain.handle(
+    NETWORK_CATALOG.AUTO_LOOKUP_CHANNEL,
+    (event, ...args: unknown[]) => handlers.lookup(event, args, true),
   );
   const resolve = (offerId: string) =>
     catalog.resolve(offerId) ?? search.resolve(offerId);
