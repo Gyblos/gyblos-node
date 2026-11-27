@@ -169,6 +169,32 @@ export function automaticBuyer(
   const check = () => {
     if (closed) throw new Error('Local buyer is stopping');
   };
+  const reconnect = async (
+    maxAtomic?: string,
+    autoPrices?: TokenPricesV2 | null,
+  ) => {
+    check();
+    owned = await connectManaged(
+      service,
+      client,
+      budget,
+      check,
+      maxAtomic,
+      autoPrices,
+    );
+    ready = Promise.resolve();
+  };
+  const update = (operation: () => Promise<void>) => {
+    check();
+    if (change)
+      throw new PaidSellerLimitError(
+        'Wait for the buyer settings to finish updating.',
+      );
+    change = operation().finally(() => {
+      change = null;
+    });
+    return change;
+  };
   return {
     start(): Promise<void> {
       if (closed) return Promise.reject(new Error('Local buyer is stopping'));
@@ -189,12 +215,7 @@ export function automaticBuyer(
     },
     changing: () => change !== null,
     configureRenewal(amount: string | null, policyId: string) {
-      check();
-      if (change)
-        throw new PaidSellerLimitError(
-          'Wait for the buyer settings to finish updating.',
-        );
-      const update = () =>
+      return update(() =>
         changeRenewal(
           service,
           client,
@@ -203,30 +224,16 @@ export function automaticBuyer(
           policyId,
           amount,
           check,
-          async () => {
-            ready = null;
-            owned = undefined;
-            check();
-            owned = await connectManaged(service, client, budget, check);
-            ready = Promise.resolve();
-          },
-        );
-      change = update().finally(() => {
-        change = null;
-      });
-      return change;
+          reconnect,
+        ),
+      );
     },
     configure(
       maxAtomic: string,
       policyId?: string,
       autoPrices?: TokenPricesV2 | null,
     ) {
-      check();
-      if (change)
-        throw new PaidSellerLimitError(
-          'Wait for the buyer settings to finish updating.',
-        );
-      const update = async () => {
+      return update(async () => {
         await ready?.catch(() => {});
         check();
         assertConfigurableBudget(await budget.summary());
@@ -236,21 +243,8 @@ export function automaticBuyer(
         ready = null;
         owned = undefined;
         await service.stop();
-        check();
-        owned = await connectManaged(
-          service,
-          client,
-          budget,
-          check,
-          maxAtomic,
-          autoPrices,
-        );
-        ready = Promise.resolve();
-      };
-      change = update().finally(() => {
-        change = null;
+        await reconnect(maxAtomic, autoPrices);
       });
-      return change;
     },
     async close() {
       closed = true;

@@ -66,13 +66,7 @@ function RenewalDialog({
   );
   const [error, setError] = useState('');
   const format = (value: bigint) => x402ShortAmount(String(value), policy);
-  const parse = (value: string) => {
-    try {
-      return BigInt(x402BudgetInput(value, policy));
-    } catch {
-      return null;
-    }
-  };
+  const parse = (value: string) => parseBudget(value, policy);
   const minimum = BigInt(policy.depositAtomic!);
   const atomic = parse(amount);
   const valid = atomic !== null && atomic >= minimum;
@@ -157,4 +151,12 @@ async function saveRenewal(
     setError(
       result?.error ?? 'Could not verify the renewal budget. Check Payments.',
     );
+}
+
+function parseBudget(value: string, policy: BuyerApiPolicy) {
+  try {
+    return BigInt(x402BudgetInput(value, policy));
+  } catch {
+    return null;
+  }
 }
