@@ -64,6 +64,7 @@ type Context = Parameters<BuyerExecutionFactory>[0];
 type Options = BuyerStartupOptions;
 type Winner = Awaited<ReturnType<typeof selectWinner>>;
 export interface SessionState {
+  activeRequest?: (id: string, seller: string) => boolean;
   keyOperations: Map<string, BuyerApiKeyOperation>;
   openingIntent?: AsyncLocalStorage<string | undefined>;
   selections: Map<string, Winner>;
@@ -258,7 +259,7 @@ function pickerChannel(
         mint: config.request.asset,
         maxAtomic: config.request.maxAtomic,
         pinnedNodeId: config.pinnedNodeId,
-        activeRequest: (id) => state.selections.has(id),
+        activeRequest: state.activeRequest,
       },
       options.channelClock ?? Date.now,
       options.observeChannel ?? observeChannelAt(context.role.rpcUrl),
@@ -282,7 +283,7 @@ function checkSelectedChannel(
         pinnedNodeId: context.prepared.config.pinnedNodeId,
         replacementAuthorized:
           !!intent && (await desktopOpening(process.env).armed(intent)),
-        activeRequest: (id) => state.selections.has(id),
+        activeRequest: state.activeRequest,
       },
       options.channelClock ?? Date.now,
       observe,
@@ -354,6 +355,7 @@ export function makeManager(
             ),
         })
       : createBuyerSessionManager(common);
+  if ('ownsRequest' in manager) state.activeRequest = manager.ownsRequest;
   const loadMeter = sessionMeter(prepared.config.request.maxAtomic, options);
   const check = createSessionPreflight(loadMeter, policy, () =>
     context.endpoint.id().toString(),

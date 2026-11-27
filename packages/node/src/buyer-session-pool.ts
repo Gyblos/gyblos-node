@@ -100,6 +100,14 @@ function manager<Remote extends BatchDestination>(
   }
   return found;
 }
+function ownsRequest<Remote extends BatchDestination>(
+  state: State<Remote>,
+  requestId: string | null,
+  seller: string,
+) {
+  const lease = state.admission.leases.get(seller);
+  return !!lease?.registered && lease.running && requestId === lease.requestId;
+}
 async function unresolved<Remote extends BatchDestination>(
   state: State<Remote>,
 ) {
@@ -119,12 +127,7 @@ async function unresolved<Remote extends BatchDestination>(
   for (const entry of await pool.list()) {
     signal.throwIfAborted();
     const owned = state.admission.leases.get(entry.terms.sellerNodeId);
-    if (
-      owned?.registered &&
-      owned.running &&
-      entry.requestId === owned.requestId
-    )
-      continue;
+    if (ownsRequest(state, entry.requestId, entry.terms.sellerNodeId)) continue;
     if (owned?.registered && !owned.running) {
       pending = true;
       continue;
@@ -384,6 +387,7 @@ export function createBuyerSessionPool<Remote extends BatchDestination>(
   return {
     busyNodeIds: () => new Set(state.admission.leases.keys()),
     checkBeforeExternalExecution: state.admission.check,
+    ownsRequest: (id: string, seller: string) => ownsRequest(state, id, seller),
     unresolved: () => state.admission.serial(() => unresolved(state)),
     execute: (
       quote: SignedOfferV2,

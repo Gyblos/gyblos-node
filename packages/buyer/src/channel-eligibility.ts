@@ -41,7 +41,7 @@ interface Selection {
   replacementAuthorized?: boolean;
   pinnedNodeId?: string;
   credentialBlocked?: boolean;
-  activeRequest?(id: string): boolean;
+  activeRequest?(id: string, sellerNodeId: string): boolean;
 }
 export interface PaidChannelEligibility {
   channelId?: string;
@@ -57,9 +57,8 @@ function blocksPoolRequest(
 ) {
   if (!poolFundingPending(row)) return false;
   return (
-    row.uncertain ||
     !row.requestId ||
-    !selection.activeRequest?.(row.requestId) ||
+    !selection.activeRequest?.(row.requestId, row.terms.sellerNodeId) ||
     (row.terms.sellerNodeId === selection.nodeId &&
       row.requestId !== selection.requestId)
   );
