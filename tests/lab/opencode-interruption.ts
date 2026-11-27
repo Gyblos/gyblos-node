@@ -31,6 +31,7 @@ import { sessionProductHost } from '../support/session-product-host';
 
 const binary = process.env.OPENCODE_BIN;
 assert.ok(binary?.startsWith('/') && process.platform === 'darwin');
+const clientTimeoutMs = 55000;
 const home = await mkdtemp(join(tmpdir(), 'opencode-586-'));
 const config = join(home, 'opencode.json');
 const originalFetch = fetch;
@@ -198,10 +199,13 @@ try {
       env,
       cwd: home,
       encoding: 'utf8',
+      timeout: clientTimeoutMs,
+      killSignal: 'SIGKILL',
     }).trim(),
   );
   for (const turn of ['warmup', 'interrupt', 'next', 'restarted', 'free']) {
     phase = turn;
+    statusCode = undefined;
     console.log('SEND', turn, now());
     const proc = spawn(
       '/usr/bin/sandbox-exec',
@@ -220,7 +224,7 @@ try {
     );
     const done = once(proc, 'close');
     proc.stderr.resume();
-    const timer = setTimeout(() => proc.kill('SIGKILL'), 55000);
+    const timer = setTimeout(() => proc.kill('SIGKILL'), clientTimeoutMs);
     let complete = false;
     try {
       for await (const line of createInterface({ input: proc.stdout })) {
@@ -327,11 +331,18 @@ try {
       }
     } finally {
       clearTimeout(timer);
+      if (proc.exitCode === null && proc.signalCode === null) {
+        proc.kill('SIGKILL');
+        await done;
+      }
     }
   }
 } finally {
   proxy.closeAllConnections();
   proxy.close();
-  await host.close();
-  await rm(home, { recursive: true, force: true });
+  try {
+    await host.close();
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
 }
