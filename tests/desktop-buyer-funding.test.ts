@@ -16,6 +16,7 @@ import {
   autoFundingAvailable,
   depositShortfall,
   FUNDING,
+  sellerChannelStatus,
   sellerResponseLimit,
 } from '@gyblos/desktop/funding-model';
 import { switchingCredit } from '@gyblos/node/buyer-funding';
@@ -26,7 +27,10 @@ import {
   type BuyerApiPolicy,
   type BuyerSellerChoice,
 } from '@gyblos/protocol/buyer-api';
-import { SESSION_STATES } from '@gyblos/protocol/payment-session';
+import {
+  SESSION_CODES,
+  SESSION_STATES,
+} from '@gyblos/protocol/payment-session';
 
 import { sessionRig } from './support/batch-session';
 
@@ -384,4 +388,40 @@ void test('a subminimum replacement is exposed as a reduced ceiling, never as av
     ),
     { replacementAtomic: '960' },
   );
+});
+
+void test('seller channel review keeps wallet evidence separate from verified reusable escrow', () => {
+  const snapshot = {
+    network: DEVNET,
+    payer,
+    balanceAtomic: '0',
+    faucetAvailable: true,
+    channelId: payer,
+    channelRemainingAtomic: '1000',
+  };
+  assert.equal(sellerChannelStatus(snapshot).label, 'Ready');
+  assert.equal(
+    sellerChannelStatus({ ...snapshot, balanceAtomic: null }).label,
+    'Ready',
+  );
+  assert.equal(sellerChannelStatus(null).label, 'Needs review');
+  assert.equal(
+    sellerChannelStatus({
+      ...snapshot,
+      channelId: undefined,
+      channelRemainingAtomic: null,
+    }).label,
+    'No verified channel',
+  );
+  for (const [channelBlocker, label] of [
+    [SESSION_CODES.EXPIRED, 'Expired'],
+    [SESSION_CODES.CLOSED, 'Settled'],
+    [SESSION_CODES.STATUS_UNKNOWN, 'Needs review'],
+    [SESSION_CODES.REPLACEMENT_REQUIRED, 'Needs review'],
+  ] as const) {
+    assert.equal(
+      sellerChannelStatus({ ...snapshot, channelBlocker }).label,
+      label,
+    );
+  }
 });

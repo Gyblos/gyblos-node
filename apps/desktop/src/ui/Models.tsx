@@ -15,6 +15,10 @@ import { NetworkCatalogPanel, useNetworkCatalog } from './NetworkCatalog';
 import { Badge, List, ListRow, PagePanel, RowCopy, SearchField } from './UI';
 
 type ModelsProps = {
+  policy?: Pick<
+    import('@gyblos/protocol/buyer-api').BuyerApiPolicy,
+    'payer' | 'maxAtomic'
+  > | null;
   networkModels: readonly CatalogModel[];
   auto: {
     buyerModels: readonly string[];
@@ -32,6 +36,7 @@ export function Models({
   canSelect,
   onSelect,
   catalog,
+  policy,
   networkModels,
   auto,
 }: ModelsProps) {
@@ -64,6 +69,7 @@ export function Models({
       </div>
       {canSelect ? (
         <CatalogOffers
+          policy={policy}
           models={offers}
           selected={selected}
           automatic={!!auto?.selected}

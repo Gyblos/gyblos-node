@@ -3043,3 +3043,17 @@ html .app.desktop-frame .pk-empty-line svg {
   margin-left: auto;
   font-size: 12px;
 }
+
+.desktop-frame .pk-notice {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--pk-tone) 35%, var(--line));
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--pk-tone) 10%, var(--panel));
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 18px;
+}

@@ -80,6 +80,7 @@ function CatalogRows({
 }
 export function CatalogOffers(
   props: Omit<ComponentProps<typeof NetworkSellerMenu>, 'models'> & {
+    policy?: ComponentProps<typeof CatalogSellerDialog>['policy'];
     models: readonly CatalogModel[];
   },
 ) {
@@ -134,6 +135,7 @@ export function CatalogOffers(
           <CatalogSellerDialog
             key={name}
             name={name}
+            policy={props.policy}
             offers={offers}
             selected={props.selected}
             automatic={props.automatic}

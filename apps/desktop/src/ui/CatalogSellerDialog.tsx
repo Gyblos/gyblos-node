@@ -6,6 +6,7 @@ import { ChoiceMenu } from './Management';
 import { Modal } from './Modal';
 import type { ModelOption } from './model-types';
 import { OfferTable } from './OfferTable';
+import { SellerChannelReview } from './SellerChannelReview';
 import { lowestRate } from './SellerStrategies';
 import { TONE } from './status-tone';
 import { Tag } from './Tag';
@@ -13,6 +14,10 @@ import { Button, SearchField } from './UI';
 
 type Props = {
   name: string;
+  policy?: Pick<
+    import('@gyblos/protocol/buyer-api').BuyerApiPolicy,
+    'payer' | 'maxAtomic'
+  > | null;
   offers: readonly ModelOption[];
   selected: string;
   automatic: boolean;
@@ -23,6 +28,7 @@ type Props = {
 export function CatalogSellerDialog({
   name,
   offers,
+  policy,
   selected,
   automatic,
   auto,
@@ -35,6 +41,7 @@ export function CatalogSellerDialog({
   const [strategy, setStrategy] = useState<'Auto' | 'Cheapest'>(() =>
     auto ? 'Auto' : 'Cheapest',
   );
+  const [reviewId, setReviewId] = useState<string>();
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<'Price' | 'Seller'>('Price');
   const manual = offers.find((o) => o.id === offerId);
@@ -42,10 +49,24 @@ export function CatalogSellerDialog({
   const cheapest = lowestRate(offers);
   const choice = manual ?? (strategy === 'Cheapest' ? cheapest : undefined);
   const filtered = matchingOffers(offers, name, sort, query);
+  const review = reviewId
+    ? offers.find((offer) => offer.offerId === reviewId && !offer.free)
+    : undefined;
+  const target = choice ?? (offers.length === 1 ? offers[0] : undefined);
+  if (review)
+    return <SellerChannelReview model={review} policy={policy} close={close} />;
   return (
     <Modal title={name} size="lg" close={close}>
       <div className="preview-seller-drawer">
         <div className="preview-model-head-line">
+          {offers.some((offer) => !offer.free && offer.offerId) && (
+            <Button
+              disabled={!target?.offerId || target.free || expired}
+              onClick={() => setReviewId(target?.offerId)}
+            >
+              Check payment channel
+            </Button>
+          )}
           <span className="ui-help-text">
             {offers.length} offers · advertised input / output per million
             tokens

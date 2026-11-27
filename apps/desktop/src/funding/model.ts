@@ -2,6 +2,7 @@
 import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
 import { DEVNET } from '@gyblos/config/network';
 import {
+  channelBlockerMessage,
   isChannelBlocker,
   type ChannelBlocker,
 } from '@gyblos/protocol/buyer-api';
@@ -11,6 +12,7 @@ import {
   controlInteger,
   controlObject,
 } from '@gyblos/protocol/control-validation';
+import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
 export const FUNDING = {
   balance: 'desktop:buyer-funding',
@@ -32,6 +34,44 @@ export interface BuyerFunding {
   replacementAtomic?: string;
   poolLimited?: true;
   channelBlocker?: ChannelBlocker;
+}
+export function sellerChannelStatus(funding: BuyerFunding | null) {
+  const blocker = funding?.channelBlocker;
+  if (blocker === SESSION_CODES.CLOSED)
+    return {
+      label: 'Settled',
+      description:
+        'Final settlement is confirmed. Review the previous deposit before authorizing a replacement.',
+    };
+  if (blocker === SESSION_CODES.EXPIRED)
+    return {
+      label: 'Expired',
+      description:
+        'This channel has expired. Review the previous deposit before authorizing a replacement.',
+    };
+  if (!funding || blocker === SESSION_CODES.STATUS_UNKNOWN)
+    return {
+      label: 'Needs review',
+      description: 'Spending is paused until the buyer can verify the channel.',
+    };
+  if (blocker)
+    return {
+      label: 'Needs review',
+      description: channelBlockerMessage(blocker),
+    };
+  if (
+    funding.channelId &&
+    funding.channelRemainingAtomic !== null &&
+    BigInt(funding.channelRemainingAtomic) > 0n
+  )
+    return {
+      label: 'Ready',
+      description: 'The buyer will check this channel again when you send.',
+    };
+  return {
+    label: 'No verified channel',
+    description: 'Review the seller and deposit terms before sending.',
+  };
 }
 export function sellerResponseLimit(
   funding: BuyerFunding | null,
