@@ -172,3 +172,24 @@ void test('the manual install page matches what install.sh writes and runs', asy
     assert.ok(identity && text.includes(`'${identity}'`), `${page}: identity`);
   }
 });
+
+void test('buyer error tables identify spending review responses for each API', async () => {
+  for (const path of [
+    join(ROOT, 'docs/buyer-api-keys.md'),
+    ...['use-from-code.mdx', 'use-from-code.es.mdx'].map((name) =>
+      join(CONTENT, 'buyers', name),
+    ),
+  ]) {
+    const text = await readFile(path, 'utf8');
+    const rows = text
+      .split('\n')
+      .filter(
+        (line) =>
+          line.startsWith('|') && line.includes('BUYER_KEY_NEEDS_REVIEW'),
+      )
+      .join('\n');
+    assert.match(rows, /503 \(Chat Completions/, path);
+    assert.match(rows, /400 \(Responses\)/, path);
+    assert.match(text, /x-should-retry: false/, path);
+  }
+});

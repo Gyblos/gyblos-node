@@ -111,11 +111,16 @@ free offers only; restart the buyer afterwards.
 
 ## Errors a client sees
 
-| Code                      | HTTP | Meaning                                                                 |
-| ------------------------- | ---- | ----------------------------------------------------------------------- |
-| `BUYER_KEY_LIMIT_REACHED` | 400  | The key's remaining limit cannot cover this request; nothing was sent   |
-| `BUYER_KEY_REVOKED`       | 403  | The key was revoked; nothing was sent                                   |
-| `BUYER_KEY_NEEDS_REVIEW`  | 503  | An earlier paid request on this key has an uncertain outcome; see below |
+| Code                      | HTTP                                                        | Meaning                                                               |
+| ------------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------- |
+| `BUYER_KEY_LIMIT_REACHED` | 400                                                         | The key's remaining limit cannot cover this request; nothing was sent |
+| `BUYER_KEY_REVOKED`       | 403                                                         | The key was revoked; nothing was sent                                 |
+| `BUYER_KEY_NEEDS_REVIEW`  | 503 (Chat Completions, Anthropic Messages), 400 (Responses) | The key ledger requires review before accepting new requests.         |
+
+The buyer sends `x-should-retry: false` with a key review refusal. Clients
+should stop automatic retries until the ledger allows new requests. In a
+Responses error after possible dispatch, the original Gyblos code appears in
+`error.gyblos_code`.
 
 A refusal for local validation, such as input that does not fit the model's
 context, leaves the key usable; it is not an uncertain payment.

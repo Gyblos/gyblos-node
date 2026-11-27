@@ -262,15 +262,17 @@ finish reason `stop` (Anthropic: `stop_reason: "stop_sequence"`). A cut answer c
 seller doesn't receive the sequences and keeps generating, so a stream closes only when the seller
 finishes, and `usage` counts everything it generated.
 
-| Answer                        | Meaning                                                                                     |
-| ----------------------------- | ------------------------------------------------------------------------------------------- |
-| 400                           | The request uses something Gyblos doesn't support; the message and `param` name it          |
-| 400 `BUYER_KEY_LIMIT_REACHED` | The key's remaining limit can't cover this request; nothing was sent. Create a new key      |
-| 403 `BUYER_KEY_REVOKED`       | The key was revoked; nothing was sent                                                       |
-| 404                           | The app can't use that model; the message lists the ones it can                             |
-| 503                           | No seller is available. `Retry-After` suggests when to try again; retrying is your decision |
-| 503 `BUYER_KEY_NEEDS_REVIEW`  | An earlier paid request on this key has an uncertain outcome. Review it in **Payments**     |
-| 504                           | The seller didn't answer in time                                                            |
+| Answer                                                                               | Meaning                                                                                     |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| 400                                                                                  | The request uses something Gyblos doesn't support; the message and `param` name it          |
+| 400 `BUYER_KEY_LIMIT_REACHED`                                                        | The key's remaining limit can't cover this request; nothing was sent. Create a new key      |
+| 403 `BUYER_KEY_REVOKED`                                                              | The key was revoked; nothing was sent                                                       |
+| 404                                                                                  | The app can't use that model; the message lists the ones it can                             |
+| 503                                                                                  | No seller is available. `Retry-After` suggests when to try again; retrying is your decision |
+| 503 (Chat Completions, Anthropic Messages), 400 (Responses) `BUYER_KEY_NEEDS_REVIEW` | The API key ledger requires review. Check its status in **Connections**.                    |
+| 504                                                                                  | The seller didn't answer in time                                                            |
+
+The buyer sends `x-should-retry: false`. Configure your client to stop automatic retries while the ledger requires review. In Responses, if the request may have been sent, the Gyblos code appears in `error.gyblos_code`.
 
 Errors use each API's own shape, so SDKs raise their usual exceptions. For other problems, see
 [Troubleshooting](/en/help/troubleshooting#buyer-and-desktop).

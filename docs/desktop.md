@@ -134,11 +134,12 @@ conversation content is not encrypted.
   preserves an existing draft in its conversation. A budget status check cannot
   establish a charge for the specific turn. Check status on a key review reads
   whether the authenticated key ledger currently allows requests. A key review
-  refusal disables automatic retries. Chat Completions returns HTTP 503 with
-  `x-should-retry: false` and Responses returns HTTP 400 with the same header.
-  For interrupted paid responses it can reconcile local spending records against
-  verified payment evidence. When the original session is unavailable, review
-  the payment history in Payments.
+  refusal asks clients to stop automatic retries. Each client controls its retry
+  behavior. Chat Completions returns HTTP 503 with `x-should-retry: false` and
+  Responses returns HTTP 400 with the same header. For interrupted paid
+  responses it can reconcile local spending records against verified payment
+  evidence. When the original session is unavailable, review the payment history
+  in Payments.
 - Earlier desktop versions may decline to load archives containing newer turn
   metadata. An unreadable archive disables saving and preserves the original
   file. Reopen it with the newer desktop version to recover the conversations.
