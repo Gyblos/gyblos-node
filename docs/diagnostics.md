@@ -64,6 +64,9 @@ settings for its local payment-channel records.
   failures, request deadlines and client disconnects. Each admitted chat request
   emits at most one terminal failure. At level `debug` the buyer also records
   successful chat and count-token completions, without content.
+- **Buyer key ledger.** A failed durable write emits `BUYER_KEY_LEDGER_WRITE_FAILED`
+  with component `buyer-key-ledger`, operation `persist` and phase `write`. The
+  record omits key and request identifiers.
 - **Lab tool acceptance workers.** Validated phase frames while starting,
   requesting, verifying, cancelling and closing resources. On failure the parent
   adds the child's exit code, signal and stdout/stderr byte counts, never raw

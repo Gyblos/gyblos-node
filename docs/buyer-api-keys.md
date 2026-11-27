@@ -166,6 +166,7 @@ has a single-process lock and durable writes. It stores no prompts, responses or
 signed payments. After a restart, keys keep their limits and usage, and a
 configured client keeps working with the same key.
 
+A cancellation proven to precede financial preparation and dispatch releases its own reservation.
 An interrupted paid reservation, a failed write or an inconsistent state fails
 closed. Unknown reservations also block operator inference and the creation of
 new keys. Revocation stays available and does not clear an obligation. The buyer

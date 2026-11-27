@@ -11,10 +11,11 @@ import { createControlQuote } from '@gyblos/core/control-quotes';
 import { createBuyerApiKeys } from '@gyblos/node/buyer-api-keys';
 import { SESSION_VERDICTS } from '@gyblos/node/constants';
 import { ENGINE_DONE_REASONS } from '@gyblos/protocol/constants';
+import type { DiagnosticSink } from '@gyblos/runtime/diagnostics';
 
 import { controlFixture } from './support/control-fixture';
 
-async function fixture() {
+async function fixture(diagnostics?: DiagnosticSink) {
   let saved: string | undefined;
   const files = {
     read: async () => saved,
@@ -24,6 +25,7 @@ async function fixture() {
   };
   const keys = await createBuyerApiKeys({
     files,
+    diagnostics,
     scope: {
       network: 'synthetic',
       mint: '1'.repeat(32),
@@ -137,11 +139,9 @@ void test('settled charges are durable before a caller aborts, and missing settl
     await f.keys.close();
   }
 });
-void test('a cancelled durable reservation never reaches inference or financial preparation', async () => {
-  const f = await fixture();
-  const controller = new AbortController();
+async function paidQuote() {
   const source = await controlFixture(false);
-  const signed = await createControlQuote(
+  return createControlQuote(
     {
       ...source.request,
       params: { ...source.request.params, maxAtomic: '100' },
@@ -149,12 +149,18 @@ void test('a cancelled durable reservation never reaches inference or financial 
     source.context,
     source.ownerSigner,
   );
+}
+void test('a cancelled durable reservation never reaches inference or financial preparation', async () => {
+  const f = await fixture();
+  const controller = new AbortController();
+  const signed = await paidQuote();
   const original = f.files.write;
   f.files.write = async (text) => {
     await original(text);
     controller.abort();
   };
-  let dispatched = false;
+  let preparations = 0;
+  let dispatches = 0;
   try {
     await assert.rejects(
       executeApiKey(
@@ -164,12 +170,14 @@ void test('a cancelled durable reservation never reaches inference or financial 
         async (signal, operation) => {
           assert.ok(operation);
           await reserveApiKey(operation, signed, signal);
-          dispatched = true;
+          preparations++;
+          dispatches++;
           return result;
         },
       ),
     );
-    assert.equal(dispatched, false);
+    assert.equal(preparations, 0);
+    assert.equal(dispatches, 0);
     const snapshot = await f.keys.snapshot();
     assert.equal(snapshot.blocked, false);
     assert.equal(snapshot.keys[0]?.reservedAtomic, '0');
@@ -180,11 +188,140 @@ void test('a cancelled durable reservation never reaches inference or financial 
       scope: snapshot.scope,
     });
     try {
-      const next = reopened.operation(f.key.id);
-      assert.equal(next.ceiling('100'), '100');
-      await reserveApiKey(next, signed);
-      await next.releaseUnsent();
-      assert.equal((await reopened.snapshot()).blocked, false);
+      const next = await executeApiKey(
+        reopened,
+        f.key.id,
+        new AbortController().signal,
+        async (signal, operation) => {
+          assert.ok(operation);
+          assert.equal(operation.ceiling('100'), '100');
+          await reserveApiKey(operation, signed, signal);
+          return {
+            ...result,
+            payment: {
+              verdict: SESSION_VERDICTS.APPROVED,
+              maxAtomic: '100',
+              expectedAtomic: '10',
+              chargedAtomic: null,
+              sellerAtomic: null,
+              feeAtomic: null,
+              refundedAtomic: null,
+              recorded: true,
+              session: {
+                approvedAtomic: '10',
+                cumulativeAtomic: '10',
+                depositAtomic: '100',
+              },
+            },
+          };
+        },
+      );
+      assert.equal(next.text, result.text);
+      const after = await reopened.snapshot();
+      assert.equal(after.blocked, false);
+      assert.equal(after.keys[0]?.spentAtomic, '10');
+    } finally {
+      await reopened.close();
+    }
+  } finally {
+    await f.keys.close();
+  }
+});
+
+void test('an unsent cancellation retains its primary error and durable reservation if release fails', async () => {
+  const evidence: string[] = [];
+  const f = await fixture((record) => {
+    evidence.push(JSON.stringify(record));
+    throw new Error('synthetic sink failure');
+  });
+  const signed = await paidQuote();
+  const original = f.files.write;
+  const controller = new AbortController();
+  const reason = new Error('synthetic cancellation canary');
+  let writes = 0;
+  f.files.write = async (text) => {
+    writes++;
+    if (writes > 1) throw new Error('synthetic storage canary');
+    await original(text);
+    controller.abort(reason);
+  };
+  try {
+    await assert.rejects(
+      executeApiKey(
+        f.keys,
+        f.key.id,
+        controller.signal,
+        async (signal, operation) => {
+          await reserveApiKey(operation, signed, signal);
+          assert.fail('unexpected dispatch');
+        },
+      ),
+      (error) => error === reason,
+    );
+    assert.equal(writes, 2);
+    assert.equal(evidence.length, 1);
+    assert.doesNotMatch(evidence[0]!, /canary/);
+    const snapshot = await f.keys.snapshot();
+    assert.equal(snapshot.blocked, true);
+    await f.keys.close();
+    const reopened = await createBuyerApiKeys({
+      files: f.files,
+      scope: snapshot.scope,
+    });
+    try {
+      const restored = await reopened.snapshot();
+      assert.equal(restored.blocked, true);
+      assert.equal(restored.keys[0]?.reservedAtomic, '100');
+    } finally {
+      await reopened.close();
+    }
+  } finally {
+    await f.keys.close();
+  }
+});
+void test('revocation at the reservation boundary releases unsent authority without reactivating the key', async () => {
+  const f = await fixture();
+  const signed = await paidQuote();
+  const op = f.keys.operation(f.key.id);
+  const reserve = op.reserve;
+  op.reserve = async (value) => {
+    await reserve(value);
+    await f.keys.revoke(f.key.id);
+  };
+  try {
+    await assert.rejects(reserveApiKey(op, signed), { name: 'AbortError' });
+    assert.equal(op.reserved(), false);
+    assert.equal((await f.keys.snapshot()).keys[0]?.reservedAtomic, '0');
+    assert.equal(f.keys.authenticate(f.key.secret), undefined);
+  } finally {
+    op.abandon();
+    await f.keys.close();
+  }
+});
+void test('an abort after dispatch retains the full reservation across restart', async () => {
+  const f = await fixture();
+  const signed = await paidQuote();
+  const controller = new AbortController();
+  let dispatches = 0;
+  try {
+    await assert.rejects(
+      executeApiKey(f.keys, f.key.id, controller.signal, async (signal, op) => {
+        await reserveApiKey(op, signed, signal);
+        dispatches++;
+        controller.abort();
+        signal.throwIfAborted();
+        return result;
+      }),
+      { name: 'AbortError' },
+    );
+    assert.equal(dispatches, 1);
+    const { scope } = await f.keys.snapshot();
+    await f.keys.close();
+    const reopened = await createBuyerApiKeys({ files: f.files, scope });
+    try {
+      const snapshot = await reopened.snapshot();
+      assert.equal(snapshot.blocked, true);
+      assert.equal(snapshot.keys[0]?.reservedAtomic, '100');
     } finally {
       await reopened.close();
     }

@@ -40,8 +40,11 @@ export async function reserveApiKey(
     requestDigest: quote.offer.requestDigest,
     sellerNodeId: quote.offer.nodeId,
   });
-  operation.signal.throwIfAborted();
-  signal?.throwIfAborted();
+  const cancelled = operation.signal.aborted ? operation.signal : signal;
+  if (cancelled?.aborted) {
+    await operation.releaseUnsent().catch(() => undefined);
+    cancelled.throwIfAborted();
+  }
 }
 export async function executeApiKeyFree(
   operation: BuyerApiKeyOperation | undefined,
@@ -136,7 +139,9 @@ export async function executeApiKey(
   } catch (error) {
     // A verified free route cannot create a financial obligation. Paid errors remain under review.
     if (operation.reserved() && operation.maximum() === '0')
-      await operation.complete('0', BUYER_KEY_CHARGE.SETTLED);
+      await operation
+        .complete('0', BUYER_KEY_CHARGE.SETTLED)
+        .catch(() => undefined);
     throw error;
   } finally {
     operation.abandon();

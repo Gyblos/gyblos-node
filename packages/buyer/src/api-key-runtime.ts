@@ -21,6 +21,7 @@ export async function withBuyerApiKeys(
         payer: role.buyer,
       },
       runtime.confirmUnchargedKey,
+      context.diagnostics,
     );
     try {
       await apiKeys.reconcileAbandoned();
