@@ -215,14 +215,14 @@ void test('the private disk ledger locks concurrent hosts and reopens with origi
 
 void test('overlapping recovery checks share one proof and complete the abandoned reservation exactly once', async () => {
   let confirm = () => {};
-  const proof = new Promise<boolean>((resolve) => {
-    confirm = () => resolve(true);
+  const proof = new Promise<string>((resolve) => {
+    confirm = () => resolve('0');
   });
   let checks = 0;
   const keys = await createBuyerApiKeys({
     files: storage(),
     scope,
-    confirmUncharged: () => {
+    confirmCharge: () => {
       checks++;
       return proof;
     },
@@ -233,10 +233,127 @@ void test('overlapping recovery checks share one proof and complete the abandone
   await keys.reconcileAbandoned();
   assert.equal(checks, 0);
   operation.abandon();
+  assert.equal(checks, 1);
   const before = keys.reconcileAbandoned();
   const during = keys.reconcileAbandoned();
   confirm();
   await Promise.all([before, during]);
   assert.equal(checks, 1);
   assert.equal((await keys.snapshot()).keys[0]?.reservedAtomic, '0');
+});
+
+void test('a finalized charge for an abandoned key reservation is applied once across restart', async () => {
+  const files = storage();
+  const keys = await createBuyerApiKeys({ files, scope });
+  const key = await keys.create('Client', '100');
+  const op = keys.operation(key.id);
+  await op.reserve(quote('80'));
+  op.abandon();
+  await keys.close();
+  const reopened = await createBuyerApiKeys({
+    files,
+    scope,
+    confirmCharge: async () => '17',
+  });
+  await Promise.all([
+    reopened.reconcileAbandoned(),
+    reopened.reconcileAbandoned(),
+  ]);
+  const result = await reopened.snapshot();
+  assert.equal(result.blocked, false);
+  assert.equal(result.keys[0]?.settledAtomic, '17');
+  assert.equal(result.keys[0]?.reservedAtomic, '0');
+  assert.equal(result.keys[0]?.spentAtomic, '17');
+  await reopened.close();
+});
+
+void test('automatic checks stop after exhaustion and an operator can request a fresh proof', async () => {
+  let calls = 0;
+  let charge: string | undefined;
+  const keys = await createBuyerApiKeys({
+    files: storage(),
+    scope,
+    confirmCharge: async () => {
+      calls++;
+      return charge;
+    },
+  });
+  const key = await keys.create('Client', '100');
+  const op = keys.operation(key.id);
+  await op.reserve(quote('80'));
+  op.abandon();
+  await keys.reconcileAbandoned();
+  await keys.reconcileAbandoned();
+  assert.equal(calls, 1);
+  assert.equal((await keys.snapshot()).blocked, true);
+  charge = '0';
+  await keys.reconcileAbandoned(true);
+  assert.equal((await keys.snapshot()).blocked, false);
+  await keys.close();
+});
+
+void test('a restart settles only provable abandoned pool reservations and keeps the unresolved key blocked until its own proof arrives', async () => {
+  const files = storage();
+  const first = await createBuyerApiKeys({ files, scope });
+  const a = await first.create('Client A', '100');
+  const b = await first.create('Client B', '100');
+  const opA = first.operation(a.id);
+  const opB = first.operation(b.id);
+  await opA.reserve({ ...quote('80'), requestId: 'request-alpha' });
+  await opB.reserve({
+    ...quote('70'),
+    requestId: 'request-bravo',
+    sellerNodeId: 'c'.repeat(64),
+  });
+  await first.close();
+  let later: string | undefined;
+  const keys = await createBuyerApiKeys({
+    files,
+    scope,
+    confirmCharge: async (ref) =>
+      ref.requestId === 'request-alpha' ? '15' : later,
+  });
+  await keys.reconcileAbandoned();
+  const firstStatus = await keys.snapshot();
+  assert.equal(firstStatus.blocked, true);
+  assert.equal(firstStatus.keys.find((k) => k.id === a.id)?.spentAtomic, '15');
+  assert.equal(
+    firstStatus.keys.find((k) => k.id === b.id)?.reservedAtomic,
+    '70',
+  );
+  later = '23';
+  await keys.reconcileAbandoned(true);
+  const final = await keys.snapshot();
+  assert.equal(final.blocked, false);
+  assert.equal(final.keys.find((k) => k.id === a.id)?.spentAtomic, '15');
+  assert.equal(final.keys.find((k) => k.id === b.id)?.spentAtomic, '23');
+  await keys.close();
+});
+
+void test('two abandoned reservations naming the same seller request cannot consume the same proof twice', async () => {
+  const files = storage();
+  const first = await createBuyerApiKeys({ files, scope });
+  const a = await first.create('A', '100');
+  const b = await first.create('B', '100');
+  await first.operation(a.id).reserve(quote('50'));
+  await first.operation(b.id).reserve(quote('50'));
+  await first.close();
+  let reads = 0;
+  const reopened = await createBuyerApiKeys({
+    files,
+    scope,
+    confirmCharge: async () => {
+      reads++;
+      return '12';
+    },
+  });
+  await reopened.reconcileAbandoned();
+  const snapshot = await reopened.snapshot();
+  assert.equal(reads, 0);
+  assert.equal(snapshot.blocked, true);
+  assert.deepEqual(
+    snapshot.keys.map((k) => k.spentAtomic),
+    ['0', '0'],
+  );
+  await reopened.close();
 });

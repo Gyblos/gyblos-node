@@ -4,13 +4,13 @@ import { clipboard, ipcMain, shell, type BrowserWindow } from 'electron';
 import type { HomeEnvironment } from '@gyblos/config/home';
 import {
   buyerUsdcBalance,
-  channelFundingRemaining,
   localFundingRole,
   switchingCredit,
 } from '@gyblos/node/buyer-funding';
 import type {
   BuyerApiPolicy,
   BuyerSellerChoice,
+  PaidChannelEligibility,
 } from '@gyblos/protocol/buyer-api';
 
 import { fundingHandlers } from './handlers';
@@ -21,6 +21,9 @@ export function registerFunding(
   environment: HomeEnvironment,
   policy: () => BuyerApiPolicy | null,
   managed: () => boolean,
+  inspectChannel: (
+    seller: BuyerSellerChoice,
+  ) => Promise<PaidChannelEligibility>,
   resolveOffer: (id: string) => BuyerSellerChoice | undefined,
 ) {
   const handlers = fundingHandlers({
@@ -37,8 +40,7 @@ export function registerFunding(
       managed()
         ? switchingCredit(environment, current, seller)
         : Promise.resolve(null),
-    remaining: (current, seller) =>
-      channelFundingRemaining(environment, current, seller),
+    remaining: (_current, seller) => inspectChannel(seller),
     copy: (text) => clipboard.writeText(text),
     open: (url) => shell.openExternal(url),
   });

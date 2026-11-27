@@ -3,8 +3,10 @@ import { DEVNET, DEVNET_USDC } from '@gyblos/config/network';
 import type {
   BuyerApiPolicy,
   BuyerSellerChoice,
+  PaidChannelEligibility,
 } from '@gyblos/protocol/buyer-api';
 import { controlHex } from '@gyblos/protocol/control-validation';
+import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
 import { FUNDING, type BuyerFunding } from './model';
 
@@ -28,7 +30,8 @@ interface FundingPorts {
   remaining(
     policy: BuyerApiPolicy,
     seller: BuyerSellerChoice,
-  ): Promise<string | null>;
+    rpcUrl: string,
+  ): Promise<PaidChannelEligibility>;
   copy(text: string): void;
   open(url: string): Promise<void>;
 }
@@ -63,31 +66,36 @@ async function fundingSource(ports: FundingPorts, event: Sender) {
   };
   return url && current() ? { policy, url, current } : null;
 }
+async function fundingAction(
+  ports: FundingPorts,
+  sharedBalance: FundingPorts['balance'],
+  event: Sender,
+  args: readonly unknown[],
+  kind: typeof FUNDING.copy | typeof FUNDING.faucet,
+) {
+  if (args.length !== 1 || typeof args[0] !== 'string') return false;
+  try {
+    const target = await fundingSource(ports, event);
+    if (!target || target.policy.payer !== args[0]) return false;
+    if (kind === FUNDING.copy) ports.copy(target.policy.payer);
+    else {
+      if (
+        (await sharedBalance(target.policy.payer, target.url)) === null ||
+        !target.current()
+      )
+        return false;
+      await ports.open(FUNDING.circle);
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function fundingHandlers(ports: FundingPorts) {
   const sharedBalance = coalesceBalance(ports.balance);
-  async function action(
-    event: Sender,
-    args: readonly unknown[],
-    kind: typeof FUNDING.copy | typeof FUNDING.faucet,
-  ) {
-    if (args.length !== 1 || typeof args[0] !== 'string') return false;
-    try {
-      const target = await fundingSource(ports, event);
-      if (!target || target.policy.payer !== args[0]) return false;
-      if (kind === FUNDING.copy) ports.copy(target.policy.payer);
-      else {
-        if (
-          (await sharedBalance(target.policy.payer, target.url)) === null ||
-          !target.current()
-        )
-          return false;
-        await ports.open(FUNDING.circle);
-      }
-      return true;
-    } catch {
-      return false;
-    }
-  }
+  let last:
+    { payer: string; url: string; atomic: string; at: number } | undefined;
   return {
     async balance(
       event: Sender,
@@ -100,31 +108,50 @@ export function fundingHandlers(ports: FundingPorts) {
         const seller = args.length
           ? ports.resolveOffer(controlHex(args[0]))
           : undefined;
-        const [balanceAtomic, channelRemainingAtomic] = await Promise.all([
-          sharedBalance(target.policy.payer, target.url),
-          seller ? ports.remaining(target.policy, seller) : null,
+        if (args.length && !seller) return null;
+        const [balanceAtomic, channel] = await Promise.all([
+          sharedBalance(target.policy.payer, target.url).catch(() => null),
+          seller ? ports.remaining(target.policy, seller, target.url) : null,
         ]);
         const switching =
-          seller && channelRemainingAtomic === null
+          seller &&
+          channel &&
+          (channel.blocker === null ||
+            channel.blocker === SESSION_CODES.REPLACEMENT_REQUIRED) &&
+          channel.channelRemainingAtomic === null
             ? await ports.switching?.(target.policy, seller)
             : null;
-        return target.current()
-          ? {
-              payer: target.policy.payer,
-              network: DEVNET,
-              balanceAtomic,
-              faucetAvailable: balanceAtomic !== null,
-              channelRemainingAtomic,
-              ...switching,
-            }
-          : null;
+        if (!target.current()) return null;
+        if (balanceAtomic !== null)
+          last = {
+            payer: target.policy.payer,
+            url: target.url,
+            atomic: balanceAtomic,
+            at: Date.now(),
+          };
+        return {
+          ...(balanceAtomic === null &&
+            last?.payer === target.policy.payer &&
+            last.url === target.url && {
+              lastBalanceAtomic: last.atomic,
+              lastBalanceAt: last.at,
+            }),
+          payer: target.policy.payer,
+          network: DEVNET,
+          balanceAtomic,
+          faucetAvailable: balanceAtomic !== null,
+          channelRemainingAtomic: channel?.channelRemainingAtomic ?? null,
+          ...(channel?.channelId && { channelId: channel.channelId }),
+          ...(channel?.blocker && { channelBlocker: channel.blocker }),
+          ...switching,
+        };
       } catch {
         return null;
       }
     },
     copy: (event: Sender, args: readonly unknown[]) =>
-      action(event, args, FUNDING.copy),
+      fundingAction(ports, sharedBalance, event, args, FUNDING.copy),
     faucet: (event: Sender, args: readonly unknown[]) =>
-      action(event, args, FUNDING.faucet),
+      fundingAction(ports, sharedBalance, event, args, FUNDING.faucet),
   };
 }

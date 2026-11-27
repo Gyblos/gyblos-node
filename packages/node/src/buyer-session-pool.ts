@@ -25,6 +25,7 @@ import {
   channelTurnAuthority,
   prepareNewChannel,
   UnsentChannelRequestError,
+  UnsentSellerChoiceError,
   verifyUnsentPoolQuote,
   type PreparedChannel,
 } from './buyer-channel-prepare';
@@ -121,11 +122,7 @@ async function unresolved<Remote extends BatchDestination>(
   for (const entry of await pool.list()) {
     signal.throwIfAborted();
     const owned = state.admission.leases.get(entry.terms.sellerNodeId);
-    if (
-      owned?.registered &&
-      owned.running &&
-      entry.requestId === owned.requestId
-    )
+    if (state.admission.ownsRequest(entry.requestId, entry.terms.sellerNodeId))
       continue;
     if (owned?.registered && !owned.running) {
       pending = true;
@@ -327,7 +324,9 @@ async function run<Remote extends BatchDestination>(
         lease.running = false;
         if (lease.registered) {
           if (
-            error instanceof UnsentOpeningError &&
+            (error instanceof UnsentOpeningError ||
+              (error instanceof UnsentSellerChoiceError &&
+                error.nodeId === id)) &&
             !lease.sent &&
             (await state.admission.serial(async () =>
               (await catalog(state)).resolve(id, lease.requestId),
@@ -384,6 +383,7 @@ export function createBuyerSessionPool<Remote extends BatchDestination>(
   return {
     busyNodeIds: () => new Set(state.admission.leases.keys()),
     checkBeforeExternalExecution: state.admission.check,
+    ownsRequest: state.admission.ownsRequest,
     unresolved: () => state.admission.serial(() => unresolved(state)),
     execute: (
       quote: SignedOfferV2,

@@ -11,15 +11,24 @@ import { promisify } from 'node:util';
 import { PAYPAL_ACTION } from '@gyblos/desktop/paypal-model';
 import { DESKTOP } from '@gyblos/desktop/window-chrome';
 import { X402_ACTION } from '@gyblos/desktop/x402-model';
+import { BUYER_KEY_CODES } from '@gyblos/protocol/buyer-api-keys';
+import { MODEL_IDS } from '@gyblos/protocol/constants';
+import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
 import { buildPreview } from './build';
 import { PREVIEW_FAILURE } from './constants';
 
-async function render(root: string, url: URL, width: number) {
+async function render(
+  root: string,
+  url: URL,
+  width: number,
+  reduceMotion = false,
+) {
   const { stdout } = await promisify(execFile)(
     process.env.CHROME_BIN || 'google-chrome',
     [
       '--headless',
+      ...(reduceMotion ? ['--force-prefers-reduced-motion'] : []),
       '--disable-background-networking',
       '--no-first-run',
       '--allow-file-access-from-files',
@@ -36,20 +45,24 @@ async function render(root: string, url: URL, width: number) {
   return stdout;
 }
 
-async function minimumLayout(head = '') {
+async function minimumLayout(
+  head = '',
+  probeName = 'check-minimum-layout.ts',
+  invoke = 'checkMinimumLayout()',
+  reduceMotion = false,
+) {
   const root = await mkdtemp(join(tmpdir(), 'gyblos-minimum-layout-'));
   try {
     const output = await buildPreview(join(root, 'dist'));
     const baseline = join(output, 'desktop');
     await copyFile(join(output, 'preview.js'), join(baseline, 'preview.js'));
-    const probe = await readFile(
-      new URL('./check-minimum-layout.ts', import.meta.url),
-      'utf8',
-    );
+    const probe = await readFile(new URL(probeName, import.meta.url), 'utf8');
     await writeFile(
       join(baseline, 'probe.mjs'),
       stripTypeScriptTypes(probe) +
-        '\ncheckMinimumLayout().catch((error) => {document.documentElement.dataset.layoutPassed = error.message;});',
+        '\n' +
+        invoke +
+        '.catch((error) => {document.documentElement.dataset.layoutPassed = error.message;});',
     );
     const entry = join(baseline, 'index.html');
     const html = await readFile(entry, 'utf8');
@@ -64,7 +77,7 @@ async function minimumLayout(head = '') {
     const url = pathToFileURL(entry);
     url.search =
       'screen=chat&connection-state=ready&funding=ready&seller-budget=ready';
-    const stdout = await render(root, url, DESKTOP.MIN_WIDTH);
+    const stdout = await render(root, url, DESKTOP.MIN_WIDTH, reduceMotion);
     return {
       passed: /data-layout-passed="([^"]+)"/.exec(stdout)?.[1],
       skipped: /data-inert-payment-rows="([^"]+)"/.exec(stdout)?.[1],
@@ -152,6 +165,9 @@ for (const example of [
   PREVIEW_FAILURE.SHARED,
   PREVIEW_FAILURE.STOP,
   PREVIEW_FAILURE.PAYPAL,
+  PREVIEW_FAILURE.PAYPAL_PROMPT,
+  PREVIEW_FAILURE.CLOSED,
+  PREVIEW_FAILURE.BINDING,
   PREVIEW_FAILURE.DECLINED,
   PREVIEW_FAILURE.EXPIRED,
   PREVIEW_FAILURE.SHARED_UNSENT,
@@ -204,3 +220,98 @@ for (const example of [
     }
   });
 }
+void test('confirmed paid Chat keeps the draft during a fresh seller check and manually recovers late evidence', async () => {
+  const args = [
+    SESSION_CODES.CLOSED,
+    BUYER_KEY_CODES.REVIEW,
+    X402_ACTION.REVIEW,
+    X402_ACTION.SEND,
+  ];
+  const result = await minimumLayout(
+    '',
+    'check-pinned-seller.ts',
+    'checkPinnedSeller(...' + JSON.stringify(args) + ')',
+    true,
+  );
+  assert.equal(result.passed, 'verified');
+});
+
+void test('a free profile without session terms configures paid Chat before checking and confirming the seller', async () => {
+  const args = [
+    SESSION_CODES.CLOSED,
+    BUYER_KEY_CODES.REVIEW,
+    X402_ACTION.REVIEW,
+    X402_ACTION.SEND,
+    X402_ACTION.CONFIGURE_PAID,
+  ];
+  const result = await minimumLayout(
+    '',
+    'check-pinned-seller.ts',
+    'checkPinnedSeller(...' + JSON.stringify(args) + ')',
+    true,
+  );
+  assert.equal(result.passed, 'verified');
+});
+
+for (const [description, input, output, affordable, partial, evidence] of [
+  ['refuses input above the limit', '100001', '200000', false, false],
+  ['refuses output above the limit', '100000', '200001', false, false],
+  ['sends at both limits', '100000', '200000', true, false],
+  [
+    'finds an affordable seller after a partial first page',
+    '100000',
+    '200000',
+    true,
+    true,
+  ],
+  [
+    'preserves the draft after a partial lookup',
+    '100001',
+    '200000',
+    false,
+    true,
+  ],
+  [
+    'keeps Chat available with zero wallet funds and partial listings',
+    '100000',
+    '200000',
+    true,
+    true,
+    'zero',
+  ],
+  [
+    'keeps Chat available with unknown funds and partial listings',
+    '100000',
+    '200000',
+    true,
+    true,
+    'unknown',
+  ],
+  [
+    'uses a free later listing without a funding read',
+    '100000',
+    '200000',
+    true,
+    true,
+    'free',
+  ],
+] as const)
+  void test(`the desktop Auto picker ${description} with verified switching credit`, async () => {
+    const args = [
+      MODEL_IDS.QWEN3_0_6B,
+      input,
+      output,
+      affordable,
+      SESSION_CODES.REPLACEMENT_REQUIRED,
+      X402_ACTION.SEND,
+      partial,
+      evidence,
+    ];
+    const result = await minimumLayout(
+      '',
+      'check-auto-seller.ts',
+      'checkAutoSeller(window.desktopCatalog, ...' + JSON.stringify(args) + ')',
+      true,
+    );
+    assert.equal(result.passed, 'verified');
+  });

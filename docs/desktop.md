@@ -90,6 +90,26 @@ from that environment are passed to the managed buyer.
 4. Finish the session to close this desktop's permission. Confirmed payment
    references stay in **Payments** and **Activity**.
 
+A legacy buyer profile without channel settings first accepts the spending
+maximum, then verifies the channel before the seller can be confirmed.
+
+In **Models**, select a paid offer and choose **Check payment channel** to see
+its verified status, remaining escrow and wallet balance. **Check status**
+refreshes the observation. When an API key reservation needs review, it first
+checks for finalized evidence and reconciles the reservation when possible.
+**Refresh wallet** only updates the observation. Before sending to a pinned paid
+seller, Chat checks the channel again and keeps the draft if spending is
+blocked. If the wallet observation fails, the last verified balance and its time
+appear when available.
+
+The Chat model picker checks paid Auto listings against the saved input and
+output rates and response maximum before using their reported switching credit.
+The buyer checks the signed offer again at dispatch. If the overview is partial,
+the picker checks the exact model across up to eight index pages within one
+request deadline. Results are capped at 64 listings. If no visible listing
+qualifies and the result is still partial, the draft stays available for a later
+check.
+
 The signed quote decides whether an answer is free or paid. Paid execution keeps
 the buyer's devnet, model, reasoning, identity, recount and journal checks; the
 paid runtime supports the pinned Qwen3 0.6B with reasoning off. Finishing does
@@ -142,6 +162,9 @@ conversation content is not encrypted.
   responses it can reconcile local spending records against verified payment
   evidence. When the original session is unavailable, review the payment history
   in Payments.
+- A verified channel refusal links to Payments for channel status or to Models
+  for changed seller terms or a replacement. A PayPal question rejected by local
+  prompt validation can be edited from its turn.
 - Earlier desktop versions may decline to load archives containing newer turn
   metadata. An unreadable archive disables saving and preserves the original
   file. Reopen it with the newer desktop version to recover the conversations.

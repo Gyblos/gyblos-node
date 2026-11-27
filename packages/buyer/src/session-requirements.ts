@@ -4,6 +4,7 @@ import type { SellerRequest } from '@gyblos/core/seller-selection';
 import { recountSessionInput } from '@gyblos/core/session-input';
 import { ensureModelTokenizer, modelTokenizer } from '@gyblos/node/artifacts';
 import { PaidBuyerError } from '@gyblos/node/buyer-paid-error';
+import { UnsentSellerChoiceError } from '@gyblos/node/buyer-session';
 import { PAID_BUYER_CODES } from '@gyblos/node/constants';
 import { rolePath, type RoleConfig } from '@gyblos/node/roles';
 import type { BuyerSessionBackend } from '@gyblos/node/session-backend';
@@ -33,7 +34,6 @@ import {
 } from './constants';
 import { refuse } from './free-startup';
 import { paidToken } from './paid-token';
-import { UnsentSellerChoiceError } from './seller-choice-error';
 import type { SellerFailureReporter } from './seller-failures';
 import { unsentSessionPreflight } from './session-errors';
 
@@ -89,6 +89,9 @@ export async function endpointToken() {
 }
 
 export interface BuyerStartupOptions {
+  observeSettlement?: BuyerSessionBackend['observe'];
+  channelClock?: () => number;
+  observeChannel?: import('./channel-eligibility').ObserveChannel;
   desktopChosenPrices?: boolean;
   preparePaidTokenizer?: boolean;
   telemetry?: import('@gyblos/protocol/telemetry').TelemetrySink;

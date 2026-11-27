@@ -7,28 +7,30 @@ import {
 } from '@gyblos/config/batch-session';
 import { MILLISECONDS_PER_MINUTE } from '@gyblos/config/constants';
 import { atomicToUsdc, usdcToAtomic } from '@gyblos/node/node-config-price';
+import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
-import { depositShortfall, sellerResponseLimit } from '../funding/model';
+import {
+  depositShortfall,
+  sellerResponseLimit,
+  type ReplacementTerms,
+} from '../funding/model';
 import { paidSellerLimitNotice, X402_ACTION } from '../x402-model';
 import { AmountField } from './AmountField';
-import { fundingAmount } from './BuyerFunding';
+import { fundingAmount, WalletBalanceNotice } from './BuyerFunding';
 import { BUTTON_VARIANT } from './constants';
 import { FormActions } from './Form';
 import { Facts, Pair } from './Management';
 import { Modal } from './Modal';
 import { usdPerMtok } from './model-price';
 import type { CatalogModel } from './model-types';
+import { ChannelReviewDetails } from './SellerChannelReview';
 import { SellerIdentity } from './SellerIdentity';
 import { Button } from './UI';
 import { useBuyerFunding } from './useBuyerFunding';
 import type { X402View } from './useX402';
 
-function useSellerConfirmation(
-  model: CatalogModel,
-  buyer: X402View,
-  confirm: (id: string) => void,
-  availableMaximum?: string,
-) {
+function useSellerConfirmation(props: TermsProps) {
+  const { model, buyer, confirm, availableMaximum } = props;
   const { policy } = buyer.state;
   const [maximum, setMaximum] = useState(() =>
     policy && policy.maxAtomic !== '0'
@@ -89,7 +91,11 @@ function useSellerConfirmation(
           'The channel terms were updated. Review them and confirm the seller.',
         );
       else if (notice) setError(notice);
-      else confirm(result.policy.policyId);
+      else
+        confirm(result.policy.policyId, {
+          switchingAtomic: props.switching,
+          replacementAtomic: props.replacement,
+        });
     } finally {
       setSaving(false);
     }
@@ -100,18 +106,32 @@ interface SellerDialogProps {
   model: CatalogModel;
   buyer: X402View;
   close(): void;
-  confirm(policyId: string): void;
+  confirm(policyId: string, consent?: ReplacementTerms): void;
 }
 export function PaidSellerDialog(
   props: SellerDialogProps & { addFunds(): void },
 ) {
   const policy = props.buyer.state.policy;
-  const { funding, loading, refresh } = useBuyerFunding(
-    policy?.payer,
-    props.model.offerId,
-  );
+  const configured = !!policy?.depositAtomic && !!policy.lifetimeMs;
+  const check = useBuyerFunding(policy?.payer, props.model.offerId, configured);
+  const { funding, loading, refresh } = check;
   // A legacy profile must acquire valid channel settings before its payer can be verified.
-  if (!policy) return <SellerTerms {...props} confirm={refresh} />;
+  if (!configured) return <SellerTerms {...props} confirm={refresh} />;
+  if (
+    funding?.channelBlocker &&
+    funding.channelBlocker !== SESSION_CODES.REPLACEMENT_REQUIRED
+  )
+    return (
+      <ChannelReviewDetails
+        model={props.model}
+        policy={policy}
+        funding={funding}
+        checking={loading}
+        refresh={refresh}
+        close={props.close}
+        backLabel="Back"
+      />
+    );
   const remaining = funding?.channelRemainingAtomic;
   if (
     funding?.poolLimited ||
@@ -132,18 +152,11 @@ export function PaidSellerDialog(
   const balance = funding?.balanceAtomic;
   if (!hasEscrow && (loading || balance == null))
     return (
-      <Modal title="Buyer wallet balance" close={props.close}>
-        <div className="ui-form">
-          <p role="status">
-            {loading
-              ? 'Checking available USDC…'
-              : 'Could not check the buyer wallet balance.'}
-          </p>
-          <Button disabled={loading} onClick={refresh}>
-            Refresh balance
-          </Button>
-        </div>
-      </Modal>
+      <WalletBalanceNotice
+        close={props.close}
+        loading={loading}
+        refresh={refresh}
+      />
     );
   const deposit =
     funding?.replacementAtomic ??
@@ -181,9 +194,9 @@ type TermsProps = SellerDialogProps & {
   availableMaximum?: string;
 };
 function SellerTerms(props: TermsProps) {
-  const { model, buyer, close, confirm } = props;
+  const { model, buyer, close } = props;
   const { maximum, setMaximum, error, setError, saving, select } =
-    useSellerConfirmation(model, buyer, confirm, props.availableMaximum);
+    useSellerConfirmation(props);
   const { policy } = buyer.state;
   const deposit =
     props.replacement ??

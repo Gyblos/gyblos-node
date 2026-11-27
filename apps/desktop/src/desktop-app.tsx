@@ -3,11 +3,16 @@
 import { Check, CheckCircle, X } from '@phosphor-icons/react';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 
+import { listingFitsBudget } from '@gyblos/core/seller-selection';
 import { MODEL_IDS } from '@gyblos/protocol/constants';
 
 import manifest from '../package.json';
 import { WINDOW_CHROME } from './constants';
-import { autoFundingAvailable, FUNDING } from './funding/model';
+import {
+  autoFundingAvailable,
+  autoFundingNotice,
+  type ReplacementTerms,
+} from './funding/model';
 import {
   canSelectPreviewModel,
   canSwitchPaymentMethod,
@@ -219,6 +224,7 @@ export function DesktopApp() {
     (typeof UI_DIALOG)[keyof typeof UI_DIALOG] | null
   >(null);
   const [confirmedPolicy, setConfirmedPolicy] = useState<string>();
+  const [replacement, setReplacement] = useState<ReplacementTerms>();
   const [paidModel, setPaidModel] = useState<Model | null>(null);
   const [toast, setToast] = useState('');
   const chatRef = useRef<ChatHandle>(null);
@@ -288,7 +294,7 @@ export function DesktopApp() {
   async function chooseAuto(name: string) {
     const policy = x402.state.policy;
     if (!policy?.autoRoutes?.some((route) => route.modelId === name)) return;
-    const offers = networkModels.filter((item) => item.name === name);
+    let offers = networkModels.filter((item) => item.name === name);
     const listing = offers[0];
     if (!listing) return;
     const attempt = ++autoAttempt.current;
@@ -305,10 +311,31 @@ export function DesktopApp() {
       if (name === MODEL_IDS.QWEN3_0_6B) navigate(UI_VIEW.PAYMENTS);
       return;
     }
+    let partial = false;
+    if (paid && !offers.some((item) => item.free)) {
+      setToast('Checking seller listings…');
+      const current = await announcements.autoListings(name, offers);
+      if (attempt !== autoAttempt.current) return;
+      offers = current.offers;
+      partial = current.partial;
+    }
     if (!offers.some((item) => item.free)) {
+      const eligible = offers.filter(
+        (item) =>
+          policy.autoPrices &&
+          listingFitsBudget(item.prices, policy.autoPrices, policy.maxAtomic),
+      );
+      if (!eligible.length) {
+        setToast(
+          partial
+            ? 'The catalog is partial. No verified seller in these results fits your Auto rates. Try again.'
+            : 'No listed seller fits your Auto rates and response limit. Review Payments.',
+        );
+        return;
+      }
       setToast('Checking channel funds…');
       const funding = await Promise.all(
-        offers.map(async (item) =>
+        eligible.map(async (item) =>
           item.offerId
             ? ((await window.desktopFunding
                 ?.balance(item.offerId)
@@ -317,15 +344,10 @@ export function DesktopApp() {
         ),
       );
       if (attempt !== autoAttempt.current) return;
-      const available = autoFundingAvailable(policy, funding);
+      const available = autoFundingAvailable(policy, funding, !!paid);
       if (available !== true) {
-        setToast(
-          available === false
-            ? 'Add devnet USDC to open a channel.'
-            : available === FUNDING.channelLimit
-              ? 'Channel capacity cannot cover this response. Review Payments.'
-              : 'Could not confirm channel funds. Check Payments and try again.',
-        );
+        setToast(autoFundingNotice(available, partial));
+        if (partial) return;
         navigate(UI_VIEW.PAYMENTS);
         if (available === false) setModal(UI_DIALOG.ADD_FUNDS);
         return;
@@ -350,11 +372,7 @@ export function DesktopApp() {
   function choose(next: Model) {
     autoAttempt.current++;
     if (paymentMethod === PAYMENT_METHOD.PAYPAL) return;
-    if (
-      next.id === model.id &&
-      (!next.offerId || confirmedPolicy === x402.state.policy?.policyId)
-    )
-      return;
+    if (next.id === model.id && (!next.offerId || next.free)) return;
     if (!next.free) {
       setPaidModel(next);
       return;
@@ -505,6 +523,7 @@ export function DesktopApp() {
               onBrowseApplications={() => navigate(UI_VIEW.TOOLS)}
               models={chatModels}
               confirmedPolicy={confirmedPolicy}
+              replacement={replacement}
               onDefaultModel={() => setModel(MODELS[0])}
               autoModels={autoModels}
               onAutoModel={(name) => void chooseAuto(name)}
@@ -527,6 +546,7 @@ export function DesktopApp() {
               networkModels={networkModels}
               auto={
                 x402.state.policy && {
+                  policy: x402.state.policy,
                   buyerModels: autoModels,
                   paid: !!x402.state.policy.paidAuto,
                   selected: !!model.automatic,
@@ -700,7 +720,8 @@ export function DesktopApp() {
               setModal(UI_DIALOG.ADD_FUNDS);
             }}
             close={() => setPaidModel(null)}
-            confirm={(policyId) => {
+            confirm={(policyId, consent) => {
+              setReplacement(consent);
               setConfirmedPolicy(policyId);
               setModel(paidModel);
               setPaidModel(null);

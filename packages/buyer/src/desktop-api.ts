@@ -11,10 +11,15 @@ import {
 } from '@gyblos/protocol/buyer-api';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 
+import {
+  inspectChannelRequest,
+  type InspectBuyerChannel,
+} from './channel-eligibility-http';
 import { CHAT_ROUTES } from './constants';
 import type { BuyerSelectionConfig } from './selection-config';
 
 export interface BuyerDesktopOptions {
+  inspectChannel?: InspectBuyerChannel;
   token?: string;
   reconcilePool?: () => Promise<void>;
   preparePaidChat?: () => Promise<void>;
@@ -192,8 +197,14 @@ async function prepareRequest(
 export function createDesktopApi(
   policy: BuyerApiPolicy | undefined,
   authenticated: boolean,
-  preparePaidChat?: () => Promise<void>,
-  reconcilePool?: () => Promise<void>,
+  {
+    preparePaidChat,
+    reconcilePool,
+    inspectChannel,
+  }: Pick<
+    BuyerDesktopOptions,
+    'preparePaidChat' | 'reconcilePool' | 'inspectChannel'
+  > = {},
 ) {
   return {
     async handled(
@@ -201,6 +212,15 @@ export function createDesktopApi(
       response: ServerResponse,
       owner: boolean,
     ) {
+      if (request.url === BUYER_API.CHANNEL_ELIGIBILITY_PATH) {
+        await inspectChannelRequest(
+          request,
+          response,
+          policy,
+          authenticated && owner ? inspectChannel : undefined,
+        );
+        return true;
+      }
       const reconcile = request.url === BUYER_API.RECONCILE_POOL_PATH;
       if (reconcile || request.url === BUYER_API.PAID_PREPARATION_PATH) {
         await prepareRequest(

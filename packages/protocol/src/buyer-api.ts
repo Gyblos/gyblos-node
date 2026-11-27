@@ -3,6 +3,12 @@ import { BUYER_API } from './buyer-api/constants';
 import type { TokenPricesV2 } from './control-types';
 
 export {
+  parsePaidChannelEligibility,
+  isChannelBlocker,
+  type PaidChannelEligibility,
+  type ChannelBlocker,
+} from './buyer-api/channel-eligibility';
+export {
   parseBuyerSellerChoice,
   type BuyerSellerChoice,
 } from './buyer-api/seller-choice';

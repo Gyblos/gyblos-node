@@ -218,7 +218,51 @@ export async function checkFailedTurn(
       !notice.includes('choose a model')
     )
       throw new Error('Missing recovery for a limit without output');
-  } else if (example === examples.DECLINED || example === examples.EXPIRED) {
+  } else if (example === examples.CLOSED || example === examples.BINDING) {
+    const status = document.querySelector(
+      '.chat-answer [role=status]',
+    )?.textContent;
+    const closed = example === examples.CLOSED;
+    if (
+      !status?.includes(
+        closed ? 'channel has closed' : 'selected seller or terms changed',
+      ) ||
+      !status.includes('No charge was made for this turn.')
+    )
+      throw new Error('Missing verified channel refusal');
+    const action = button(
+      '.chat-answer button',
+      closed ? 'Review in Payments' : 'Review sellers',
+    );
+    if (!action || button('.chat-answer button', 'Edit in new chat'))
+      throw new Error('Incorrect channel recovery action');
+    action.click();
+    await wait(
+      () =>
+        Boolean(
+          document.querySelector(
+            '[aria-current=page][aria-label="' +
+              (closed ? 'Usage & payments' : 'Models') +
+              '"]',
+          ),
+        ),
+      'Recovery did not open the correct page',
+    );
+  } else if (
+    example === examples.DECLINED ||
+    example === examples.EXPIRED ||
+    example === examples.PAYPAL_PROMPT
+  ) {
+    if (example === examples.PAYPAL_PROMPT) {
+      const status = document.querySelector(
+        '.chat-answer [role=status]',
+      )?.textContent;
+      if (
+        !status?.includes('reserved model control markers') ||
+        !status.includes('No charge was made for this turn.')
+      )
+        throw new Error('Missing local prompt correction');
+    }
     if (example === examples.EXPIRED) {
       const status = document.querySelector(
         '.chat-answer [role=status]',

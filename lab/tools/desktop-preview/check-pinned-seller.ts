@@ -1,0 +1,237 @@
+import type { ChannelBlocker } from '@gyblos/protocol/buyer-api';
+
+export async function checkPinnedSeller(
+  closed: ChannelBlocker,
+  keyReview: ChannelBlocker,
+  reviewAction: string,
+  sendAction: string,
+  configureAction?: string,
+) {
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+    throw new Error('Unexpected animated test environment');
+  const maxAttempts = 100;
+  const pollMs = 40;
+  async function until<T>(observe: () => T | null | undefined | false) {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const result = observe();
+      if (result) return result;
+      await new Promise((resolve) => setTimeout(resolve, pollMs));
+    }
+    throw new Error('Seller check timed out: ' + observe.toString());
+  }
+  async function click(label: string) {
+    (
+      await until(() =>
+        Array.from(document.querySelectorAll('button')).find(
+          (button) =>
+            !button.disabled &&
+            !button.closest('[inert]') &&
+            button.getBoundingClientRect().width &&
+            (button.textContent.trim() === label ||
+              button.getAttribute('aria-label') === label),
+        ),
+      )
+    ).click();
+  }
+  async function choosePaidSeller() {
+    await until(() => !document.querySelector('dialog[open]'));
+    window.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }),
+    );
+    (
+      await until(() =>
+        Array.from(
+          document.querySelectorAll<HTMLButtonElement>('.preview-model-head'),
+        ).find((button) => button.textContent.includes('qwen3-0.6b')),
+      )
+    ).click();
+    (
+      await until(() =>
+        document.querySelector<HTMLButtonElement>('button[aria-label*="83ce"]'),
+      )
+    ).click();
+  }
+  const funding = window.desktopFunding;
+  const buyer = window.desktopX402;
+  if (!funding || !buyer) throw new Error('Missing synthetic buyer');
+  const walletRead = funding.balance();
+  let configured = !configureAction;
+  let blocker: ChannelBlocker | undefined;
+  let hold: Promise<void> | undefined;
+  let capacity: Partial<
+    NonNullable<Awaited<ReturnType<typeof funding.balance>>>
+  > = {};
+  const actions: unknown[] = [];
+  funding.balance = async (offer) => {
+    const wallet = await walletRead;
+    if (!wallet) throw new Error('Missing fixture');
+    if (offer) await hold;
+    return {
+      ...wallet,
+      balanceAtomic: blocker === keyReview ? null : '2000000',
+      ...(offer && {
+        channelBlocker: configured ? blocker : keyReview,
+        ...capacity,
+      }),
+    };
+  };
+  const execute = buyer.run;
+  buyer.run = async (input) => {
+    if (input && typeof input === 'object' && 'action' in input) {
+      actions.push(input.action);
+      if (input.action === configureAction) {
+        configured = true;
+        blocker = closed;
+      }
+      if (input.action === reviewAction) blocker = closed;
+    }
+    const result = await execute(input);
+    if (configured || !result.policy) return result;
+    const {
+      depositAtomic: _deposit,
+      lifetimeMs: _lifetime,
+      ...previous
+    } = result.policy;
+    const policy = { ...previous, maxAtomic: '0' };
+    return { ...result, policy };
+  };
+  if (configureAction) {
+    await until(() =>
+      document.querySelector('.pk-composer-tab [aria-busy="false"] .sr-only'),
+    );
+    await choosePaidSeller();
+    await click('Use this model');
+    const amount = await until(() =>
+      document.querySelector<HTMLInputElement>('#paid-response-maximum'),
+    );
+    Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      'value',
+    )?.set?.call(amount, '0.01');
+    amount.dispatchEvent(new Event('input', { bubbles: true }));
+    await click('Confirm seller');
+    await until(() =>
+      document.querySelector('dialog')?.textContent.includes('Settled'),
+    );
+    if (!configured || actions.includes(sendAction))
+      throw new Error(
+        'Initial configuration selected or dispatched the seller',
+      );
+    blocker = undefined;
+    await click('Check status');
+    await click('Confirm seller');
+    await until(() => !document.querySelector('dialog[open]'));
+    if (
+      actions.filter((action) => action === configureAction).length !== 1 ||
+      actions.includes(sendAction)
+    )
+      throw new Error('Unexpected legacy configuration action');
+    document.documentElement.dataset.layoutPassed = 'verified';
+    return;
+  }
+  await until(() =>
+    document
+      .querySelector('.composer-note')
+      ?.textContent.includes('Choose a seller'),
+  );
+  await choosePaidSeller();
+  await click('Use this model');
+  await click('Confirm seller');
+  await until(() => !document.querySelector('dialog[open]'));
+  await click('Chat');
+  const form = await until(() =>
+    document.querySelector<HTMLFormElement>(
+      '.chat-root:not([hidden]) form.composer',
+    ),
+  );
+  const draft = form.querySelector('textarea');
+  if (!draft) throw new Error('Missing draft');
+  Object.getOwnPropertyDescriptor(
+    HTMLTextAreaElement.prototype,
+    'value',
+  )?.set?.call(draft, 'Keep this draft');
+  draft.dispatchEvent(new Event('input', { bubbles: true }));
+  const button = await until(() =>
+    form.querySelector<HTMLButtonElement>(
+      'button[type="submit"]:not(:disabled)',
+    ),
+  );
+  let release: (() => void) | undefined;
+  hold = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  blocker = closed;
+  form.requestSubmit();
+  form.requestSubmit();
+  await until(() => button.disabled);
+  if (!release) throw new Error('Missing status observation');
+  release();
+  await until(() =>
+    document.querySelector('.composer-note')?.textContent.includes('closed'),
+  );
+  if (
+    draft.value !== 'Keep this draft' ||
+    actions.includes(sendAction) ||
+    !button.disabled
+  )
+    throw new Error('Blocked seller consumed draft or sent request');
+  blocker = keyReview;
+  await choosePaidSeller();
+  await click('Check payment channel');
+  await until(() =>
+    document
+      .querySelector('dialog')
+      ?.textContent.includes('Reserved by API key'),
+  );
+  await click('Refresh wallet');
+  await until(() =>
+    document
+      .querySelector('dialog')
+      ?.textContent.includes('Reserved by API key'),
+  );
+  if (actions.includes(reviewAction))
+    throw new Error('Wallet refresh reconciled payment');
+  await click('Check status');
+  await until(() =>
+    document.querySelector('dialog')?.textContent.includes('Settled'),
+  );
+  if (
+    actions.filter((action) => action === reviewAction).length !== 1 ||
+    actions.includes(sendAction)
+  )
+    throw new Error('Unexpected payment action during review');
+  blocker = undefined;
+  await click('Back to models');
+  await until(() => !document.querySelector('dialog[open]'));
+  await click('Chat');
+  await until(() => !button.disabled);
+  for (const observation of [
+    { poolLimited: true as const },
+    { balanceAtomic: null },
+    { balanceAtomic: '999999' },
+  ]) {
+    capacity = observation;
+    form.requestSubmit();
+    await until(
+      () =>
+        button.disabled &&
+        !document
+          .querySelector('.composer-note')
+          ?.textContent.includes('Checking'),
+    );
+    if (draft.value !== 'Keep this draft' || actions.includes(sendAction))
+      throw new Error('Insufficient capacity consumed draft');
+    capacity = {};
+    const picker = form.querySelector<HTMLButtonElement>('.ui-model-trigger');
+    if (!picker) throw new Error('Missing model menu');
+    picker.click();
+    await until(() => !button.disabled);
+    picker.click();
+  }
+  form.requestSubmit();
+  form.requestSubmit();
+  await until(() => actions.includes(sendAction));
+  if (actions.filter((action) => action === sendAction).length !== 1)
+    throw new Error('Duplicate verified send');
+  document.documentElement.dataset.layoutPassed = 'verified';
+}

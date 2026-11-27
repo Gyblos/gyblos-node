@@ -17,9 +17,10 @@ import type {
 } from '@gyblos/node/session-backend';
 import * as sessions from '@gyblos/payments-upto/batch-session';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
-import type {
-  PaymentSessionTerms,
-  SessionSettlement,
+import {
+  SESSION_STATES,
+  type PaymentSessionTerms,
+  type SessionSettlement,
 } from '@gyblos/protocol/payment-session';
 
 import type { paidAcceptanceRoles } from './paid-acceptance-config';
@@ -150,6 +151,16 @@ export async function sessionProductPayments(
     },
   };
   return {
+    observeSettlement: observe,
+    observeChannel: async (
+      _paths: ReturnType<typeof batchSessionPathsIn>,
+      _terms: PaymentSessionTerms,
+      id: string,
+    ) => {
+      if (settled.has(id)) return SESSION_STATES.CLOSED;
+      assert.ok(opened.has(id));
+      return SESSION_STATES.OPEN;
+    },
     buyer: async () => buyerAt(paths(P2P_ROLES.BUYER)),
     pool: async (_role: unknown, totalDepositAtomic: string) =>
       sessions.openBatchBuyerPool({

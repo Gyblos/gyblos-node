@@ -46,7 +46,10 @@ import {
   type BuyerSessionPolicy,
 } from './session-policy';
 
-export { UnsentChannelRequestError } from './buyer-channel-prepare';
+export {
+  UnsentSellerChoiceError,
+  UnsentChannelRequestError,
+} from './buyer-channel-prepare';
 
 export interface BuyerSessionOptions<Remote extends BatchDestination> {
   // Known capability of the financial adapter. Unspecified adapters negotiate after construction.
@@ -57,7 +60,8 @@ export interface BuyerSessionOptions<Remote extends BatchDestination> {
   ) => Promise<(() => Promise<void>) | undefined>;
   onDeclined?: BuyerBatchSessionOptions<Remote>['onDeclined'];
   beforeInference?: BuyerBatchSessionOptions<Remote>['beforeInference'];
-  switchingAllowed?(): Promise<boolean>;
+  checkReusableChannel?: BuyerSessionOptions<Remote>['verify'];
+  switchingAllowed?(requestId: string): Promise<boolean>;
   openingSupportsBlocks?: boolean;
   preparation?: PreparedChannel;
   receipt?: BuyerBatchSessionOptions<Remote>['receipt'];
@@ -130,7 +134,7 @@ async function openCurrent<Remote extends BatchDestination>(
     await verifyOpeningQuote(options, quote, replacement);
     const switching =
       stored.terms.sellerNodeId !== replacement.sellerNodeId &&
-      (await options.switchingAllowed?.());
+      (await options.switchingAllowed?.(quote.offer.requestId));
     const backend = await getBackend(state, signal, start);
     const renew = backend.renew?.bind(backend);
     if (!renew) return sessionFail(SESSION_CODES.CLOSED);
@@ -206,33 +210,33 @@ async function run<Remote extends BatchDestination>(
   start: StartChannelWork,
   onDelta?: (text: string) => Promise<void>,
 ) {
-  recountSessionInput(quote, input, state.options.meter);
-  await bounded(state.options.verify(quote, signal), signal);
-  if (await bounded(state.options.unresolved(), signal))
+  const { options } = state;
+  recountSessionInput(quote, input, options.meter);
+  await bounded(options.verify(quote, signal), signal);
+  if (await bounded(options.unresolved(), signal))
     return sessionFail(SESSION_CODES.UNVERIFIED);
   const opened = await current(state, quote, signal, start);
   if (
     BigInt(opened.priorSpentAtomic) + BigInt(opened.terms.depositAtomic) >
-      BigInt(state.options.policy.depositAtomic) ||
-    opened.terms.withdrawDelaySeconds >
-      state.options.policy.withdrawDelaySeconds ||
+      BigInt(options.policy.depositAtomic) ||
+    opened.terms.withdrawDelaySeconds > options.policy.withdrawDelaySeconds ||
     opened.terms.protocolFeeBps !== PROTOCOL_FEE.bps ||
     opened.terms.treasury !== PROTOCOL_FEE.treasury ||
-    opened.terms.expiresAt - state.options.now() >
-      state.options.policy.lifetimeMs
+    opened.terms.expiresAt - options.now() > options.policy.lifetimeMs
   )
     return sessionFail(SESSION_CODES.LIMIT);
   const switching =
     opened.terms.sellerNodeId !== quote.offer.nodeId ||
     opened.terms.owner !== quote.offer.owner;
-  if (switching && !(await state.options.switchingAllowed?.()))
+  if (switching && !(await options.switchingAllowed?.(quote.offer.requestId)))
     throw new UnsentSellerBusyError(quote.offer.nodeId);
   const renew = () => renewable(state, opened, quote, signal, switching, start);
   const ready =
-    switching && state.options.financialPermission
-      ? await state.options.financialPermission(renew)
+    switching && options.financialPermission
+      ? await options.financialPermission(renew)
       : await renew();
   const before = ready.financial.snapshot();
+  if (before.channelId) await options.checkReusableChannel?.(quote, signal);
   const value = await start(() =>
     ready.host.execute(quote, input, signal, onDelta),
   ).catch(async (error: unknown) => {

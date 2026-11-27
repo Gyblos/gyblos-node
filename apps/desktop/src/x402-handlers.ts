@@ -1,3 +1,4 @@
+import { reviewPayment } from '@gyblos/node/buyer-payment-review';
 import {
   BUYER_API,
   parseAutoPrices,
@@ -106,7 +107,11 @@ export interface ManagedBuyerPorts {
     autoPrices?: TokenPricesV2 | null,
   ): Promise<void>;
   changing?(): boolean;
-  review?: Parameters<X402Budget['review']>[0];
+  review?: (
+    ref: Parameters<Parameters<X402Budget['review']>[0]>[0],
+    policy: BuyerApiPolicy,
+    signal?: AbortSignal,
+  ) => ReturnType<Parameters<X402Budget['review']>[0]>;
 }
 function sendResponse(
   client: X402Client,
@@ -270,6 +275,17 @@ async function buyerStatus(client: X402Client, budget: X402Budget) {
     policy: client.policy(),
   };
 }
+async function autoReview(budget: X402Budget, managed?: ManagedBuyerPorts) {
+  const review = managed?.review;
+  if (review)
+    await budget
+      .review(
+        (ref, policy) => reviewPayment((signal) => review(ref, policy, signal)),
+        true,
+      )
+      .catch(() => false);
+}
+
 export function createX402Handlers(
   client: X402Client,
   budget: X402Budget,
@@ -291,6 +307,8 @@ export function createX402Handlers(
   ): Promise<X402Result> => {
     const input = buyerAction(owner, event, args);
     try {
+      if (input.action === X402_ACTION.STATUS)
+        await autoReview(budget, managed);
       if (await configureAction(managed, input)) return await summary();
       if (await manageBuyer(input.action, managed, client, budget))
         return await summary();
@@ -339,6 +357,7 @@ export function createX402Handlers(
         throw new Error('Unsupported buyer request');
       return await summary();
     } catch (error) {
+      if (input.action === X402_ACTION.SEND) await autoReview(budget, managed);
       const current = await summary();
       return {
         ...current,

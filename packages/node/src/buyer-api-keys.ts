@@ -28,12 +28,18 @@ import {
 } from '@gyblos/runtime/diagnostics';
 
 import {
+  bindKeyExecution,
+  buyerKeyReviewQueue,
   buyerKeyState,
   keyReservation,
   type BuyerKeyReservation,
   type BuyerKeyState,
 } from './buyer-api-key-state';
-import { BUYER_KEY_LEDGER_DIAGNOSTICS } from './constants';
+import { bounded } from './buyer-operation';
+import {
+  BUYER_KEY_LEDGER_DIAGNOSTICS,
+  BUYER_PAYMENT_REVIEW,
+} from './constants';
 
 export interface BuyerApiKeyFiles {
   read(): Promise<string | undefined>;
@@ -42,12 +48,14 @@ export interface BuyerApiKeyFiles {
 }
 export type BuyerApiKeyQuote = Omit<BuyerKeyReservation, 'id' | 'keyId'>;
 const digest = (value: string) => createHash('sha256').update(value).digest();
-export type ConfirmUnchargedKey = (
+export type ConfirmKeyCharge = (
   reservation: BuyerApiKeyQuote,
   scope: BuyerKeyScope,
-) => Promise<boolean>;
+  signal: AbortSignal,
+) => Promise<string | undefined>;
 export class BuyerApiKeys {
   private proof?: Promise<void>;
+  private readonly checked = new Set<string>();
   private failed = false;
   private closed = false;
   private queue: Promise<unknown> = Promise.resolve();
@@ -56,7 +64,7 @@ export class BuyerApiKeys {
   constructor(
     private state: BuyerKeyState,
     private readonly files: BuyerApiKeyFiles,
-    private readonly confirmUncharged?: ConfirmUnchargedKey,
+    private readonly confirmCharge?: ConfirmKeyCharge,
     sink?: DiagnosticSink,
   ) {
     const catalog = BUYER_KEY_LEDGER_DIAGNOSTICS;
@@ -235,35 +243,49 @@ export class BuyerApiKeys {
       pending: this.state.pending.filter((entry) => entry.id !== id),
     });
     this.active.delete(id);
+    this.checked.delete(id);
   }
-  reconcileAbandoned() {
+  reconcileAbandoned(manual = false) {
     if (!this.proof)
-      this.proof = this.recoverUncharged().finally(() => {
+      this.proof = this.recoverCharge(manual).finally(() => {
         this.proof = undefined;
       });
     return this.proof;
   }
-  private async recoverUncharged() {
-    const prove = this.confirmUncharged;
-    const [orphan] = this.state.pending;
-    if (
-      !prove ||
-      this.state.pending.length !== 1 ||
-      !orphan ||
-      this.active.size
-    )
-      return;
-    const proved = await prove(orphan, this.state.scope).catch(() => false);
-    if (proved)
-      await this.serial(async () => {
-        if (
-          this.state.pending.length === 1 &&
-          this.state.pending[0]?.id === orphan.id &&
-          !this.active.size
-        )
-          await this.finish(orphan.id, '0', BUYER_KEY_CHARGE.SETTLED);
-      });
+  private async recoverCharge(manual: boolean) {
+    const prove = this.confirmCharge;
+    if (!prove || this.closed) return;
+    const queue = buyerKeyReviewQueue(
+      this.state.pending,
+      this.active,
+      this.checked,
+      manual,
+    );
+    const deadline = AbortSignal.timeout(BUYER_PAYMENT_REVIEW.deadlineMs);
+    const review = async () => {
+      while (!deadline.aborted && !this.closed) {
+        const item = queue.shift();
+        if (!item) return;
+        this.checked.add(item.id);
+        const charge = await bounded(
+          prove(item, this.state.scope, deadline),
+          deadline,
+        ).catch(() => undefined);
+        if (charge === undefined) continue;
+        await this.serial(async () => {
+          if (
+            !this.closed &&
+            !this.active.has(item.id) &&
+            this.state.pending.includes(item)
+          )
+            await this.finish(item.id, charge, BUYER_KEY_CHARGE.SETTLED);
+        });
+      }
+    };
+    const workers = Math.min(queue.length, BUYER_PAYMENT_REVIEW.concurrency);
+    await Promise.all(Array.from({ length: workers }, review));
   }
+
   operation(keyId: string) {
     this.assertReady();
     if (this.key(keyId).revoked) return buyerKeyFail(BUYER_KEY_CODES.REVOKED);
@@ -296,6 +318,19 @@ export class BuyerApiKeys {
         reserved = true;
         maximum = quote.maxAtomic;
       },
+      bindExecution: (requestId: string, executionDigest: string) =>
+        this.serial(async () => {
+          this.writable();
+          const pending = bindKeyExecution(
+            this.state.pending,
+            id,
+            keyId,
+            requestId,
+            executionDigest,
+            controller.signal,
+          );
+          await this.save({ ...this.state, pending });
+        }),
       complete: async (charge: string, kind: BuyerKeyCharge) => {
         if (finished || !reserved) return buyerKeyFail(BUYER_KEY_CODES.REVIEW);
         await this.complete(id, charge, kind);
@@ -311,6 +346,8 @@ export class BuyerApiKeys {
       },
       abandon: () => {
         this.active.delete(id);
+        if (reserved && !finished && !this.closed)
+          void this.reconcileAbandoned().catch(() => {});
       },
     };
   }
@@ -349,14 +386,14 @@ export type BuyerApiKeyOperation = ReturnType<BuyerApiKeys['operation']>;
 export async function createBuyerApiKeys(options: {
   files: BuyerApiKeyFiles;
   scope: BuyerKeyScope;
-  confirmUncharged?: ConfirmUnchargedKey;
+  confirmCharge?: ConfirmKeyCharge;
   diagnostics?: DiagnosticSink;
 }) {
   const scope = parseBuyerKeyScope(options.scope);
   return new BuyerApiKeys(
     buyerKeyState(await options.files.read(), scope),
     options.files,
-    options.confirmUncharged,
+    options.confirmCharge,
     options.diagnostics,
   );
 }

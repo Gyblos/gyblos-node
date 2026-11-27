@@ -4,7 +4,6 @@ import { type HomeEnvironment } from '@gyblos/config/home';
 import {
   batchPoolChannelPaths,
   batchPoolPathsIn,
-  batchSessionPathsIn,
 } from '@gyblos/config/home-payments';
 import { DEVNET, DEVNET_USDC } from '@gyblos/config/network';
 import {
@@ -12,8 +11,6 @@ import {
   inspectBatchPool,
   inspectBatchSession,
   poolAllowsSellerDeposit,
-  poolFundingPending,
-  type BatchStoredSession,
 } from '@gyblos/payments-upto/batch-session';
 import type {
   BuyerApiPolicy,
@@ -37,58 +34,6 @@ export async function localFundingRole(
     ? role
     : null;
 }
-function available(
-  stored: BatchStoredSession | undefined,
-  policy: BuyerApiPolicy,
-  seller: BuyerSellerChoice,
-  now: number,
-) {
-  if (
-    !stored ||
-    !stored.snapshot.channelId ||
-    stored.snapshot.state !== SESSION_STATES.OPEN ||
-    stored.pending ||
-    stored.recoverable
-  )
-    return null;
-  const terms = stored.terms;
-  if (
-    terms.sellerNodeId !== seller.nodeId ||
-    terms.owner !== seller.owner ||
-    terms.buyer !== policy.payer ||
-    terms.mint !== policy.mint ||
-    terms.network !== policy.network ||
-    terms.expiresAt <= now
-  )
-    return null;
-  const remaining =
-    BigInt(terms.depositAtomic) -
-    BigInt(stored.snapshot.cumulativeAtomic) -
-    BigInt(stored.snapshot.reservedAtomic);
-  return remaining >= 0n ? String(remaining) : null;
-}
-export async function channelFundingRemaining(
-  environment: HomeEnvironment,
-  policy: BuyerApiPolicy,
-  seller: BuyerSellerChoice,
-) {
-  const entries = await inspectBatchPool(batchPoolPathsIn(environment), {
-    includeLegacy: false,
-  });
-  if (entries.length) {
-    // A durable intent on any seller can block the whole pool until reconciled.
-    if (entries.some(poolFundingPending)) return null;
-    const match = entries.find(
-      (entry) => entry.terms.sellerNodeId === seller.nodeId,
-    );
-    return available(match?.stored, policy, seller, Date.now());
-  }
-  const root = await inspectBatchSession(
-    batchSessionPathsIn(environment, P2P_ROLES.BUYER),
-  );
-  return available(root, policy, seller, Date.now());
-}
-
 export async function switchingCredit(
   environment: HomeEnvironment,
   policy: BuyerApiPolicy,
@@ -144,6 +89,7 @@ export async function reviewDesktopCharge(
   environment: HomeEnvironment,
   ref: import('./desktop-opening').DesktopRequestBinding,
   policy: BuyerApiPolicy,
+  signal?: AbortSignal,
 ) {
   const role = await localFundingRole(environment, policy);
   if (!role) return undefined;
@@ -157,6 +103,7 @@ export async function reviewDesktopCharge(
       role.rpcUrl,
       ref,
       policy,
+      signal,
     );
     if (result) return result;
   }

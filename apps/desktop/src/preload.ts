@@ -130,6 +130,10 @@ contextBridge.exposeInMainWorld('desktopCatalog', {
     parseNetworkCatalog(
       await ipcRenderer.invoke(NETWORK_CATALOG.STATUS_CHANNEL),
     ),
+  lookupAuto: async (model: unknown) =>
+    parseNetworkCatalog(
+      await ipcRenderer.invoke(NETWORK_CATALOG.AUTO_LOOKUP_CHANNEL, model),
+    ),
   lookup: async (model: unknown) =>
     parseNetworkCatalog(
       await ipcRenderer.invoke(NETWORK_CATALOG.LOOKUP_CHANNEL, model),

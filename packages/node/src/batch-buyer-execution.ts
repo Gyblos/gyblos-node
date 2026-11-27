@@ -4,6 +4,7 @@ import { recountSessionInput } from '@gyblos/core/session-input';
 import { verifyInferenceUsage } from '@gyblos/inference/conversation';
 import {
   BATCH_METHODS,
+  batchExecutionDigest,
   batchFail,
   batchSessionRequest,
   buildBatchExecutionRequest,
@@ -167,12 +168,16 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
     options.financialPermission,
   );
   await verify(signal);
-  await options.beforeInference?.(request.requestId, {
-    requestId: request.requestId,
-    channelId: request.channelId,
-    sellerNodeId: terms.sellerNodeId,
-    baseAtomic: options.buyer.snapshot().cumulativeAtomic,
-  });
+  await options.beforeInference?.(
+    request.requestId,
+    {
+      requestId: request.requestId,
+      channelId: request.channelId,
+      sellerNodeId: terms.sellerNodeId,
+      baseAtomic: options.buyer.snapshot().cumulativeAtomic,
+    },
+    await batchExecutionDigest(request),
+  );
   signal.throwIfAborted();
   if (blockMode) return runBuyerBlocks(context, request, signal, onDelta);
   return runBuyerSession(context, request, {

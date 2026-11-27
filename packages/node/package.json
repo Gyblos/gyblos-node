@@ -75,6 +75,8 @@
     "./seller-funds": "./src/seller-funds.ts",
     "./buyer-quote-execution": "./src/buyer-quote-execution.ts",
     "./desktop-opening": "./src/desktop-opening.ts",
+    "./buyer-channel-message": "./src/buyer-channel-message.ts",
+    "./buyer-payment-review": "./src/buyer-payment-review.ts",
     "./buyer-operation": "./src/buyer-operation.ts",
     "./buyer-init": "./src/buyer-init.ts",
     "./buyer-init-constants": "./src/buyer-init-constants.ts",

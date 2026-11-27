@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { SELLER_SELECTION_CODES } from '@gyblos/core/constants';
-import { desktopBuyerFailure } from '@gyblos/desktop/buyer-error';
+import {
+  DesktopBuyerFailure,
+  desktopBuyerFailure,
+} from '@gyblos/desktop/buyer-error';
 import { CHAT_FAILURE } from '@gyblos/desktop/chat-archive-model';
 import {
   emptyUsdcApi,
@@ -216,7 +219,16 @@ for (const [code, neverSent, reason] of [
   [PAID_EXECUTION_CODES.EXPIRED, false, undefined],
   [BUYER_API.TOKENIZER_UNAVAILABLE, true, BUYER_API.TOKENIZER_UNAVAILABLE],
   [PAID_EXECUTION_CODES.PEER, true, PAID_EXECUTION_CODES.PEER],
-  [SESSION_CODES.BINDING, true, CHAT_FAILURE.NOT_SENT],
+  [SESSION_CODES.CLOSED, true, SESSION_CODES.CLOSED],
+  [SESSION_CODES.EXPIRED, true, SESSION_CODES.EXPIRED],
+  [SESSION_CODES.STATUS_UNKNOWN, true, SESSION_CODES.STATUS_UNKNOWN],
+  [
+    SESSION_CODES.REPLACEMENT_REQUIRED,
+    true,
+    SESSION_CODES.REPLACEMENT_REQUIRED,
+  ],
+  [SESSION_CODES.OPENING_RETURNED, true, SESSION_CODES.OPENING_RETURNED],
+  [SESSION_CODES.BINDING, true, SESSION_CODES.BINDING],
   [SESSION_CODES.BINDING, false, undefined],
   ['UNKNOWN_CODE', true, undefined],
 ] as const) {
@@ -347,4 +359,26 @@ void test('secret replies reject extra fields and a navigation during refresh pr
     return result;
   };
   await assert.rejects(fixture.host.reveal(fixture.event, [input]));
+});
+
+void test('Desktop preserves explicit delivery certainty only for bound buyer pre-dispatch failures', () => {
+  for (const code of [
+    SESSION_CODES.CLOSED,
+    PAID_EXECUTION_CODES.EXPIRED,
+    BUYER_API.TOKENIZER_UNAVAILABLE,
+    PAID_EXECUTION_CODES.PEER,
+  ]) {
+    const error = desktopBuyerFailure(
+      { code, [BUYER_API.NEVER_SENT_FIELD]: true },
+      policy,
+    );
+    assert.ok(error instanceof DesktopBuyerFailure);
+    assert.equal(error.neverSent, true);
+  }
+  const uncertain = desktopBuyerFailure(
+    { code: SESSION_CODES.BINDING },
+    policy,
+  );
+  assert.ok(uncertain instanceof DesktopBuyerFailure);
+  assert.equal(uncertain.neverSent, false);
 });

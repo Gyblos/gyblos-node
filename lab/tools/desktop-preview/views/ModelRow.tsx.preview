@@ -33,6 +33,7 @@ function ModelRow({ model, selected, canSelect, onSelect }: {
   model: CatalogModel; selected: string; canSelect: boolean; onSelect(model: CatalogModel): void;
 }) {
   const [open, setOpen] = useState(false);
+  const [review, setReview] = useState(false);
   const [choice, setChoice] = useState(() => modelChoice.get(model.id) ?? { strategy: previewSetting('sellerMode'), pinned: null });
   const sellers = previewSellers(model);
   const prices = sellers.map((s) => s.input);
@@ -75,10 +76,12 @@ function ModelRow({ model, selected, canSelect, onSelect }: {
         </span>
         <CaretRight size={14} aria-hidden="true" />
       </button>
+      {review && <ChannelReview model={model.name} initial="unknown" close={() => setReview(false)} />}
       <MotionPresence>{open && (
         <Modal title={model.name} size="lg" close={() => setOpen(false)}>
           <div className="preview-seller-drawer">
             <div className="preview-model-head-line">
+              {!model.free && <Button onClick={() => {setOpen(false); setReview(true);}}>Check payment channel</Button>}
               <span className="ui-help-text">{model.family + ' · ' + model.context + ' context · ' + sellers.length + ' sellers'}</span>
               {canSelect && !current && <Button variant={BUTTON_VARIANT.PRIMARY} onClick={() => { setOpen(false); onSelect(model); }}>Use this model</Button>}
             </div>
@@ -262,9 +265,51 @@ const ALL_FAMILIES = 'All families';
 const CONTEXT_FILTERS = ['Any context', '128K+', '256K+'] as const;
 const CATALOG_SORTS = ['Most sellers', 'Lowest price', 'Name'] as const;
 const contextK = (context: string) => Number.parseInt(context, 10);
+type ChannelExample = 'eligible' | 'expired' | 'settled' | 'unknown';
+function channelExample() {
+  const value = new URLSearchParams(location.search).get('channel');
+  return value === 'eligible' || value === 'expired' || value === 'settled' || value === 'unknown' ? value : undefined;
+}
+function ChannelReview({ model, initial, close }: { model: string; initial: ChannelExample; close(): void }) {
+  const [state, setState] = useState(initial);
+  const [checking, setChecking] = useState(false);
+  const [wallet, setWallet] = useState(() => new URLSearchParams(location.search).get('wallet') ?? 'positive');
+  const review = new URLSearchParams(location.search).get('reservation') === 'pending';
+  const check = async () => {
+    setChecking(true);
+    await new Promise<void>((resolve) => setTimeout(resolve, 500));
+    if (state === 'unknown') setState('settled');
+    setChecking(false);
+  };
+  const description = state === 'expired' ? 'This channel has expired. Review the previous deposit before authorizing a replacement.'
+    : state === 'settled' ? 'Final settlement is confirmed. Review the previous deposit before authorizing a replacement.'
+    : state === 'unknown' ? 'Spending is paused until the buyer can verify the channel.'
+    : 'The buyer will check this channel again when you send.';
+  return (
+    <Modal title="Payment channel" close={close}>
+      <div className="ui-form">
+        <DetailSummary
+          status={{label: checking ? 'Checking' : {eligible: 'Ready', expired: 'Expired', settled: 'Settled', unknown: 'Needs review'}[state], tone: state === 'eligible' ? TONE.SUCCESS : TONE.WARNING}}
+          meta={model + ' · Seller 7ab1…61f0'}
+          totals={[{label: 'Per-response limit', value: '0.01 USDC'}, {label: 'Wallet balance', value: wallet === 'unknown' ? 'Unavailable' : wallet === 'zero' ? '0 USDC' : '2 USDC'}]}
+          rows={[{label: 'Current channel', value: '5Pt7…w9Qm'}, {label: 'Input / output per 1M tokens', value: '0.08 / 0.24 USDC'},
+            ...(wallet === 'unknown' ? [{label: 'Last verified wallet balance', value: '2 USDC · 10:45 UTC'}] : []),
+            ...(review ? [{label: 'Reserved by API key', value: '0.01 USDC'}, {label: 'Usage approval', value: 'Unconfirmed'}, {label: 'Final settlement', value: 'Unconfirmed'}] : [])]}
+        />
+        <Notice tone={state === 'eligible' ? TONE.NEUTRAL : TONE.WARNING}>{checking ? 'Checking finalized channel status…' : description}</Notice>
+        <FormActions>
+          {wallet === 'unknown' && <Button onClick={() => setWallet('positive')}>Refresh wallet</Button>}
+          <Button onClick={close}>Back to models</Button>
+          <Button variant={BUTTON_VARIANT.PRIMARY} disabled={checking} onClick={() => {void check();}}>Check status</Button>
+        </FormActions>
+      </div>
+    </Modal>
+  );
+}
 function PreviewCatalog({ query, filter, selected, canSelect, onSelect }: {
   query: string; filter: ModelFilter; selected: string; canSelect: boolean; onSelect(model: CatalogModel): void;
 }) {
+  const [channel, setChannel] = useState(channelExample);
   const [lab, setLab] = useState(ALL_LABS);
   const [family, setFamily] = useState(ALL_FAMILIES);
   const [context, setContext] = useState<(typeof CONTEXT_FILTERS)[number]>(CONTEXT_FILTERS[0]);
@@ -291,6 +336,7 @@ function PreviewCatalog({ query, filter, selected, canSelect, onSelect }: {
   };
   return (
     <>
+      {channel && <ChannelReview model="Qwen3 0.6B" initial={channel} close={() => setChannel(undefined)} />}
       <div className="ui-toolbar preview-catalog-filters">
         <ChoiceMenu label="Model lab" value={lab} options={labs} onChange={(v) => reset(() => { setLab(v); setFamily(ALL_FAMILIES); })} />
         <ChoiceMenu label="Model family" value={family} options={families} onChange={(v) => reset(() => setFamily(v))} />

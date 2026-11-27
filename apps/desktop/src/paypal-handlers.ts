@@ -2,7 +2,11 @@
 import { PAYPAL_SANDBOX_LIMIT_OPTIONS } from '@gyblos/config/constants';
 import { PAYPAL_REQUEST_LIMITS } from '@gyblos/node/constants';
 import { PAYPAL_ERROR_CODES } from '@gyblos/protocol/constants';
-import { isPaypalId, PaypalError } from '@gyblos/protocol/paypal-payment';
+import {
+  isPaypalId,
+  PaypalError,
+  PaypalPromptValidationError,
+} from '@gyblos/protocol/paypal-payment';
 
 import {
   PAYPAL_ACTION,
@@ -31,6 +35,11 @@ type ConfirmFinish = (summary: {
 }) => Promise<boolean>;
 
 function actionError(failure: unknown, input: PaypalRequest) {
+  if (
+    input.action === PAYPAL_ACTION.SEND &&
+    failure instanceof PaypalPromptValidationError
+  )
+    return PAYPAL_DESKTOP_ERROR.PROMPT_REJECTED;
   if (failure instanceof PaypalError) {
     if (failure.code === PAYPAL_ERROR_CODES.NOT_APPROVED)
       return PAYPAL_DESKTOP_ERROR.NOT_APPROVED;

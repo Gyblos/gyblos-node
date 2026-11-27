@@ -29,6 +29,15 @@ import {
 import { UnsentSellerBusyError } from './buyer-routing';
 import type { BuyerSessionOptions } from './buyer-session';
 
+export class UnsentSellerChoiceError extends PaymentSessionError {
+  constructor(
+    code: PaymentSessionError['code'],
+    readonly nodeId?: string,
+  ) {
+    super(code);
+  }
+}
+
 export class UnsentChannelRequestError extends Error {
   readonly code: BatchChannelError['code'];
   constructor(

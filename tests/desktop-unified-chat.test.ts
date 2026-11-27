@@ -167,3 +167,21 @@ void test('a locally oversized PayPal question is restored as editable and unsen
     CHAT_FAILURE.PAYPAL_PROMPT_TOO_LONG,
   );
 });
+
+void test('a PayPal prompt rejected by the local engine is archived as editable and uncharged', async () => {
+  const { chat: paypal, f } = await setup();
+  await paypal.refresh();
+  await paypal.create();
+  await paypal.approve();
+  const chat = new ChatController('one');
+  const prompt = 'Explain <think> as a template';
+  chat.setDraft(prompt);
+  await sendPaypalMessage(chat, paypal, 'invalid-prompt');
+  const archive = projectChatArchive(chat.getSnapshot());
+  assert.equal(archive?.sessions[0]?.draft, prompt);
+  assert.deepEqual(f.calls, ['create', 'authorize']);
+  assert.equal(
+    archive?.sessions[0]?.messages.at(-1)?.failureReason,
+    CHAT_FAILURE.PAYPAL_PROMPT_INVALID,
+  );
+});

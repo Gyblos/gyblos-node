@@ -23,12 +23,14 @@ pagadas, abre **Usage & payments → Limits** en la app de escritorio y elige **
 Luego elige **Save Auto settings**. La sección aparece cuando tu comprador busca vendedores por su cuenta
 (descubrimiento abierto), y solo se puede guardar para el comprador que maneja la app: para un comprador que conectaste por separado, la app rechaza el cambio. En el chat, abre el modelo y elige **Auto**. Por ahora, Auto pagado
 en el chat cubre solo `qwen3-0.6b`; para los demás modelos Auto sigue usando solo ofertas gratis, aunque igual puedes elegir un vendedor pagado específico en el menú del modelo.
+Al elegir Auto en Chat, la aplicación compara los precios de entrada y salida anunciados con tus límites guardados antes de contar los fondos del canal de un vendedor. Si el catálogo está incompleto, Chat consulta más ofertas de ese modelo. Puedes volver a intentarlo con el mismo borrador si aún no puede verificar un vendedor dentro de tus límites.
+Si falla una página posterior, la aplicación puede emitir un código de diagnóstico local sin incluir el modelo, el vendedor ni los detalles de la búsqueda.
 
 Estos límites se aplican al chat y a todas las claves API de este comprador, así que tus herramientas de código
 también los respetan. El máximo por respuesta es el límite del comprador para toda respuesta pagada, no solo
 para Auto, y se mantiene cuando desactivas las ofertas pagadas. Auto pide ofertas firmadas a vendedores
 verificados. Se sigue respetando el saldo de cada clave API, y una clave con límite `0` solo puede usar ofertas
-gratis. Auto puede liquidar el canal anterior antes de abrir otro con el depósito autorizado restante. Para que
+gratis. Si una herramienta necesita reemplazar un canal existente, revisa el vendedor y el depósito en Desktop. Un cambio de Auto autorizado por el titular puede liquidar el canal anterior y usar el depósito autorizado restante. Para que
 Auto vuelva a usar solo ofertas gratis, desmarca **Allow paid offers in Auto** y elige **Save Auto settings**.
 
 ## Requisitos previos [#antes-de-empezar]

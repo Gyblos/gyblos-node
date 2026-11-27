@@ -21,6 +21,7 @@ export interface BuyerKeyReservation {
   requestId: string;
   requestDigest: string;
   sellerNodeId: string;
+  executionDigest?: string;
 }
 export interface BuyerKeyState {
   version: typeof BUYER_API_KEYS.VERSION;
@@ -53,8 +54,16 @@ function reservation(value: unknown): BuyerKeyReservation {
     'requestId',
     'requestDigest',
     'sellerNodeId',
+    ...(value &&
+    typeof value === 'object' &&
+    Object.hasOwn(value, 'executionDigest')
+      ? ['executionDigest']
+      : []),
   ]);
   if (
+    (row.executionDigest !== undefined &&
+      (typeof row.executionDigest !== 'string' ||
+        !BUYER_API_KEYS.DIGEST_PATTERN.test(row.executionDigest))) ||
     typeof row.id !== 'string' ||
     !BUYER_API.POLICY_PATTERN.test(row.id) ||
     typeof row.keyId !== 'string' ||
@@ -76,6 +85,9 @@ function reservation(value: unknown): BuyerKeyReservation {
     requestId: row.requestId,
     requestDigest: row.requestDigest,
     sellerNodeId: row.sellerNodeId,
+    ...(typeof row.executionDigest === 'string' && {
+      executionDigest: row.executionDigest,
+    }),
   };
 }
 export function buyerKeyState(
@@ -127,4 +139,46 @@ export function keyReservation(
   keyId: string,
 ) {
   return reservation({ ...value, id, keyId });
+}
+
+export function buyerKeyReviewQueue(
+  pendingRows: readonly BuyerKeyReservation[],
+  active: ReadonlyMap<string, AbortController>,
+  checked: ReadonlySet<string>,
+  manual: boolean,
+) {
+  const pending = pendingRows.filter(
+    (row) =>
+      !active.has(row.id) &&
+      !pendingRows.some(
+        (other) =>
+          other.id !== row.id &&
+          other.requestId === row.requestId &&
+          other.sellerNodeId === row.sellerNodeId,
+      ),
+  );
+  const unchecked = pending.filter((row) => !checked.has(row.id));
+  return manual
+    ? [...unchecked, ...pending.filter((row) => checked.has(row.id))]
+    : unchecked;
+}
+
+export function bindKeyExecution(
+  pending: readonly BuyerKeyReservation[],
+  id: string,
+  keyId: string,
+  requestId: string,
+  executionDigest: string,
+  signal: AbortSignal,
+) {
+  const current = pending.find((item) => item.id === id);
+  if (
+    !current ||
+    current.requestId !== requestId ||
+    current.executionDigest ||
+    signal.aborted
+  )
+    return buyerKeyFail(BUYER_KEY_CODES.REVIEW);
+  const bound = keyReservation({ ...current, executionDigest }, id, keyId);
+  return pending.map((item) => (item.id === id ? bound : item));
 }

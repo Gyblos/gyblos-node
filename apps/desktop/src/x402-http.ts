@@ -15,6 +15,7 @@ import {
   PaidSellerLimitError,
   paidSellerLimitNotice,
   StaleSellerOffer,
+  x402Policy,
 } from './x402-model';
 
 export type DesktopSellerChoice =
@@ -199,4 +200,25 @@ export function validateChoice(
     );
     if (notice) throw new PaidSellerLimitError(notice);
   }
+}
+
+export async function buyerConnection(
+  response: Response,
+  url: URL,
+  token: string,
+  managed: boolean,
+) {
+  const policy = x402Policy(await readJson(response));
+  return {
+    url,
+    token,
+    managed,
+    policy,
+    reconcilesPool:
+      response.headers.get(BUYER_API.RECONCILE_POOL_HEADER) ===
+      BUYER_API.RECONCILE_POOL_PATH,
+    preparesPaidChat:
+      response.headers.get(BUYER_API.PAID_PREPARATION_HEADER) ===
+      BUYER_API.PAID_PREPARATION_PATH,
+  };
 }

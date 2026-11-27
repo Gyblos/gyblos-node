@@ -41,6 +41,7 @@ export async function sessionProductHost(
   },
   capacity?: { maxSessions: number },
 ) {
+  let clockOffset = 0;
   let servedMaxSessions: number | undefined;
   const workspace = await createAcceptanceWorkspace();
   const previous = new Map(
@@ -177,6 +178,9 @@ export async function sessionProductHost(
         meter:
           conversation?.loadMeter ??
           (async () => conversation?.meter ?? paidAcceptanceMeter),
+        observeSettlement: finance.observeSettlement,
+        observeChannel: finance.observeChannel,
+        channelClock: () => Date.now() + clockOffset,
         batch: finance.buyer,
         pool: finance.pool,
       });
@@ -185,6 +189,9 @@ export async function sessionProductHost(
     await start();
     return {
       finance,
+      advanceChannelClock(ms: number) {
+        clockOffset += ms;
+      },
       servedMaxSessions: () => servedMaxSessions,
       engine,
       binding,

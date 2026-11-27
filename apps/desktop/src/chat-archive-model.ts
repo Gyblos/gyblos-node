@@ -117,7 +117,8 @@ function parseMessage(value: unknown): ArchivedMessage | null {
       (!failureReason ||
         role !== CHAT_ROLE.ASSISTANT ||
         (state !== MESSAGE_STATE.FAILED && state !== MESSAGE_STATE.STOPPED) ||
-        (failureReason === CHAT_FAILURE.PAYPAL_PROMPT_TOO_LONG
+        (failureReason === CHAT_FAILURE.PAYPAL_PROMPT_TOO_LONG ||
+        failureReason === CHAT_FAILURE.PAYPAL_PROMPT_INVALID
           ? method !== PAYMENT_METHOD.PAYPAL
           : method !== PAYMENT_METHOD.USDC &&
             failureReason !== CHAT_FAILURE.INTERRUPTED))) ||

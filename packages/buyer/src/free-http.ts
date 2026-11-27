@@ -261,13 +261,13 @@ export function freeBuyerHandler(
   diagnostics?: DiagnosticSink,
   preparePaidChat?: () => Promise<void>,
   reconcilePool?: () => Promise<void>,
+  inspectChannel?: BuyerDesktopOptions['inspectChannel'],
 ) {
-  const desktop = createDesktopApi(
-    desktopPolicy,
-    authorize !== undefined,
+  const desktop = createDesktopApi(desktopPolicy, authorize !== undefined, {
     preparePaidChat,
     reconcilePool,
-  );
+    inspectChannel,
+  });
   const accept = buyerApiCaller(authorize, apiKeys, desktopPolicy);
   const observe = httpDiagnostics(diagnostics);
   let active = 0;
@@ -358,6 +358,7 @@ export async function startFreeBuyerHttp(
       options.diagnostics,
       options.preparePaidChat,
       options.reconcilePool,
+      options.inspectChannel,
     ),
   );
   await new Promise<void>((resolve, reject) => {

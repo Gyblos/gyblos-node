@@ -36,6 +36,9 @@ function trackOperation<T>(
 function forbid(): never {
   return sessionFail(SESSION_CODES.BUSY);
 }
+function ownsRequest(lease: PoolLease | undefined, id: string | null) {
+  return !!lease?.registered && lease.running && lease.requestId === id;
+}
 export function createPoolAdmissions() {
   const leases = new Map<string, PoolLease>();
   const pending = new Set<Promise<unknown>>();
@@ -57,6 +60,8 @@ export function createPoolAdmissions() {
     trackOperation(pending, operation);
   return {
     leases,
+    ownsRequest: (id: string | null, seller: string) =>
+      ownsRequest(leases.get(seller), id),
     enter(id: string, requestId: string) {
       if (
         closing ||

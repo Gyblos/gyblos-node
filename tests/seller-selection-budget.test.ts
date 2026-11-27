@@ -36,3 +36,22 @@ void test('an over-budget listing counts as priced only at an acceptable reasoni
     code: SELLER_SELECTION_CODES.NO_CANDIDATES,
   });
 });
+
+void test('saved Auto rates preserve single atomic differences beyond display number precision', async () => {
+  const { listingFitsBudget } = await import('@gyblos/core/seller-selection');
+  const rates = {
+    inputAtomicPerMtok: '9007199254740992',
+    outputAtomicPerMtok: '1000000',
+  };
+  const budget = '9007199256';
+  assert.equal(listingFitsBudget(rates, rates, budget), true);
+  assert.equal(
+    listingFitsBudget(
+      { ...rates, inputAtomicPerMtok: '9007199254740993' },
+      rates,
+      budget,
+    ),
+    false,
+  );
+  assert.equal(listingFitsBudget(rates, rates, '9007199255'), false);
+});

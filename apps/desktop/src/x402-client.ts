@@ -4,7 +4,11 @@ import { randomUUID } from 'node:crypto';
 
 import { AGENT_SETUP_CODES, AgentSetupError } from '@gyblos/node/agent-setup';
 import { PAID_BUYER_CODES } from '@gyblos/node/constants';
-import { BUYER_API, type BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
+import {
+  BUYER_API,
+  type BuyerApiPolicy,
+  type BuyerSellerChoice,
+} from '@gyblos/protocol/buyer-api';
 import type { BuyerApiKeyCommand } from '@gyblos/protocol/buyer-api-keys';
 import {
   FREE_CHAT_ROLES,
@@ -13,10 +17,12 @@ import {
 
 import { requestAgentEndpoint } from './agent-endpoint';
 import { desktopBuyerFailure } from './buyer-error';
+import { inspectDesktopChannel } from './funding/client';
 import { requestBuyerApiKeys } from './usdc-api-client';
 import { X402Budget } from './x402-budget';
 import {
   assertFreeBudget,
+  buyerConnection,
   buyerEndpoint,
   policyForRoute,
   policyForSeller,
@@ -27,7 +33,7 @@ import {
   waitForPaidBuyer,
   type DesktopSellerChoice,
 } from './x402-http';
-import { DESKTOP_X402, PaidSellerLimitError, x402Policy } from './x402-model';
+import { DESKTOP_X402, PaidSellerLimitError } from './x402-model';
 import {
   buyerReplyMetrics,
   buyerResponseObject as object,
@@ -39,14 +45,7 @@ export { buyerEndpoint } from './x402-http';
 export { parseBuyerReply } from './x402-reply';
 export type { DesktopSellerChoice } from './x402-http';
 export class X402Client {
-  private connection: {
-    url: URL;
-    token: string;
-    managed: boolean;
-    preparesPaidChat: boolean;
-    reconcilesPool: boolean;
-    policy: BuyerApiPolicy;
-  } | null = null;
+  private connection: Awaited<ReturnType<typeof buyerConnection>> | null = null;
   private busy = false;
   private closed = false;
   private controller: AbortController | null = null;
@@ -109,20 +108,8 @@ export class X402Client {
         redirect: 'error',
         signal: AbortSignal.timeout(DESKTOP_X402.STATUS_MS),
       });
-      const policy = x402Policy(await readJson(response));
-      this.connection = {
-        url,
-        token,
-        managed,
-        policy,
-        reconcilesPool:
-          response.headers.get(BUYER_API.RECONCILE_POOL_HEADER) ===
-          BUYER_API.RECONCILE_POOL_PATH,
-        preparesPaidChat:
-          response.headers.get(BUYER_API.PAID_PREPARATION_HEADER) ===
-          BUYER_API.PAID_PREPARATION_PATH,
-      };
-      return policy;
+      this.connection = await buyerConnection(response, url, token, managed);
+      return this.connection.policy;
     } finally {
       this.busy = false;
     }
@@ -135,6 +122,15 @@ export class X402Client {
     if (!connection?.reconcilesPool) return;
     await reconcileBuyerPool(connection, expected, this.request);
     if (this.connection !== connection) throw new Error('Unconfirmed payment');
+  }
+  inspectChannel(seller: BuyerSellerChoice) {
+    const connection = this.connection;
+    return inspectDesktopChannel(
+      connection,
+      seller,
+      this.request,
+      () => !this.closed && connection === this.connection,
+    );
   }
   manageApiKeys(command?: BuyerApiKeyCommand) {
     if (!this.connection || this.closed || (command && this.busy))

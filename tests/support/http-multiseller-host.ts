@@ -42,7 +42,7 @@ import { paidAcceptanceMeter } from './paid-acceptance-engine';
 
 export async function httpMultisellerHost(
   onBusy: BuyerBusyPolicy = BUYER_BUSY_POLICIES.REROUTE,
-  totalAtomic: string = HTTP_MULTI.totalAtomic,
+  totalAtomic: string | null = HTTP_MULTI.totalAtomic,
 ) {
   const workspace = await createAcceptanceWorkspace();
   const saved = new Map(
@@ -80,7 +80,7 @@ export async function httpMultisellerHost(
   let buyer: Awaited<ReturnType<typeof startBuyer>> | undefined;
   const sellers: HttpMultiSeller[] = [];
   const addresses = new Map<string, string[]>();
-  const wire = httpMultiWire();
+  const wire = httpMultiWire(totalAtomic === null ? addresses : undefined);
   globalThis.fetch = async (input, init) => {
     const request = new Request(input, init);
     const url = new URL(request.url);
@@ -198,10 +198,16 @@ export async function httpMultisellerHost(
     });
     config.session = {
       depositAtomic: HTTP_MULTI.depositAtomic,
-      totalDepositAtomic: totalAtomic,
+      ...(totalAtomic !== null && { totalDepositAtomic: totalAtomic }),
       lifetimeMs: 3600000,
       withdrawDelaySeconds: 900,
     };
+    if (totalAtomic === null) {
+      delete config.pinnedNodeId;
+      config.sellers = [];
+      config.discovery.open = true;
+      config.discovery.paidAuto = true;
+    }
     const start = async () => {
       await writeFile(path, JSON.stringify(config), {
         mode: FILE_MODES.privateFile,
@@ -211,7 +217,12 @@ export async function httpMultisellerHost(
         bind: wire.bind,
         meter: async () => paidAcceptanceMeter,
         pool: ledger.pool,
-        batch: async () => assert.fail('single-seller backend forbidden'),
+        observeChannel: ledger.observeChannel,
+        observeSettlement: ledger.observe,
+        batch:
+          totalAtomic === null
+            ? ledger.single
+            : async () => assert.fail('single-seller backend forbidden'),
       });
     };
     await start();

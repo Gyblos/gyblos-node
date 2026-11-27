@@ -82,6 +82,8 @@ Si el vendedor rechaza la pregunta antes de cobrarte, elige **Edit question**. S
 borrador, **Edit in new chat** conserva ambos textos. Si el comprador verifica que detuvo la pregunta antes de enviarla, Chat confirma que no hubo un cobro por ese turno. Una respuesta de pago interrumpida indica si el
 importe final sigue sin conocerse. Usa **Check status** o **Review in Payments** para revisar el presupuesto.
 Una reserva anterior de una API key puede pausar el escritorio y las herramientas conectadas antes de enviar tu pregunta. En ese caso, Chat indica que este turno no tuvo ningún cargo y permite consultar si el registro de API keys permite nuevas solicitudes. El comprador pide a las herramientas conectadas que suspendan los reintentos automáticos mientras el registro requiere revisión. Cada herramienta controla sus propios reintentos.
+Si el canal impide el envío, abre **Payments** para revisar su estado o **Review sellers** para comprobar un cambio de condiciones o un reemplazo. Si la validación local de PayPal rechaza la pregunta, usa **Edit question** para acortarla o quitar los marcadores reservados del modelo.
+
 Si la sesión ya no está activa, abre **Connections** para revisar el gasto de las API keys. En respuestas de pago interrumpidas, **Check status** puede actualizar el registro local de gastos cuando hay evidencia del pago. El estado de la sesión por sí solo no confirma el cobro de una respuesta concreta.
 
 El vendedor que ejecuta el modelo puede leer tus mensajes, y también su proveedor de motor, si usa uno. No
@@ -104,6 +106,8 @@ distinta de la billetera protegida de **Payments**.
 
 Para chatear con un vendedor pagado, configura un máximo por respuesta mayor que cero. Abre el menú de modelos del chat para ver las ofertas gratis y pagadas de la red. Elige el vendedor y confirma sus tarifas, el máximo por respuesta, el depósito configurado y la duración del canal. También puedes fijar un presupuesto total del chat en **Payments**. Cada clave API conserva su límite de gasto obligatorio. Si el resultado de una solicitud pagada es incierto, la app bloquea los mensajes nuevos hasta que lo
 revises en **Payments**. Detener una respuesta no prueba que no hubo cobro.
+
+En **Models**, selecciona una oferta de pago y elige **Check payment channel**. **Check status** actualiza el estado del canal y de la cartera sin enviar tu borrador ni abrir un canal. Si tu perfil antiguo carece de configuración de canal, introduce primero un máximo. Desktop comprueba el canal antes de que confirmes el vendedor. Si una reserva de una clave API requiere revisión, **Check status** también comprueba si hay pruebas de liquidación definitiva. **Refresh wallet** solo actualiza los datos visibles. Al enviar, el chat vuelve a verificar el canal del vendedor de pago fijado y conserva tu borrador si el gasto está bloqueado. Si no se puede consultar el saldo actual, la app muestra el último importe verificado y su fecha cuando están disponibles.
 
 Si el comprador local no arranca, elige **Payments → Retry local buyer**. Eso solo reintenta el arranque: la
 app nunca reenvía sola un mensaje que falló. **Activity** guarda el historial de tus sesiones y sus

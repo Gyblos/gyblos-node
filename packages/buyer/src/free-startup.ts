@@ -7,7 +7,7 @@ import {
 import type {
   BuyerApiKeyOperation,
   BuyerApiKeys,
-  ConfirmUnchargedKey,
+  ConfirmKeyCharge,
 } from '@gyblos/node/buyer-api-keys';
 import { withBuyerRuntime } from '@gyblos/node/buyer-runtime';
 import { NODE_ERROR_CODES } from '@gyblos/node/constants';
@@ -65,10 +65,11 @@ export type BuyerExecutionFactory = (context: {
   sellerChoice?: boolean;
   singlePaidChannel?: boolean;
   preparePaidChat?: () => Promise<void>;
+  inspectChannel?: import('./channel-eligibility-http').InspectBuyerChannel;
   reconcilePool?: () => Promise<void>;
   token?: string;
   apiKeys?: BuyerApiKeys;
-  confirmUnchargedKey?: ConfirmUnchargedKey;
+  confirmKeyCharge?: ConfirmKeyCharge;
   requestMs?: number;
   classify?: ChatErrorClassifier;
   chat(url: string): ReturnType<typeof ownedChat> & { automatic?: boolean };
@@ -235,6 +236,7 @@ function buyerHttp(
         classify: execution?.classify,
         preparePaidChat: execution?.preparePaidChat,
         reconcilePool: execution?.reconcilePool,
+        inspectChannel: execution?.inspectChannel,
       },
     ),
   );

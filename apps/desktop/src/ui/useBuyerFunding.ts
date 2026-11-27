@@ -1,5 +1,5 @@
 // Discard obsolete balance reads when the selected offer or buyer changes.
-import { useEffect, useState } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 
 import type { BuyerFunding } from '../funding/model';
 
@@ -20,30 +20,27 @@ export function useBuyerFunding(
     setEnabledBefore(enabled);
     setSnapshot(undefined);
   }
-  useEffect(() => {
-    if (!enabled) return;
-    let active = true;
-    async function read() {
-      let funding: BuyerFunding | null;
-      try {
-        funding = (await window.desktopFunding?.balance(offerId)) ?? null;
-        if (payer && funding?.payer !== payer) funding = null;
-      } catch {
-        funding = null;
-      }
-      if (active)
-        setSnapshot({
-          payer,
-          offerId,
-          attempt,
-          funding,
-        });
+  const generation = useRef(0);
+  const verify = useCallback(async () => {
+    const id = ++generation.current;
+    setSnapshot(undefined);
+    let funding: BuyerFunding | null;
+    try {
+      funding = (await window.desktopFunding?.balance(offerId)) ?? null;
+      if (payer && funding?.payer !== payer) funding = null;
+    } catch {
+      funding = null;
     }
-    void read();
+    if (generation.current !== id) return null;
+    setSnapshot({ payer, offerId, attempt, funding });
+    return funding;
+  }, [payer, offerId, attempt]);
+  useLayoutEffect(() => {
+    if (enabled) void verify();
     return () => {
-      active = false;
+      generation.current++;
     };
-  }, [payer, offerId, attempt, enabled]);
+  }, [enabled, verify]);
   const current =
     enabled &&
     snapshot &&
@@ -53,6 +50,7 @@ export function useBuyerFunding(
   return {
     loading: enabled && !current,
     funding: current ? snapshot.funding : null,
+    verify,
     refresh: () => setAttempt((n) => n + 1),
   };
 }

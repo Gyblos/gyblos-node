@@ -22,6 +22,10 @@ interface Files {
   read(): Promise<string | undefined>;
   write(text: string): Promise<void>;
 }
+type ObserveCharge = (
+  ref: DesktopRequestBinding,
+  policy: BuyerApiPolicy,
+) => Promise<{ chargeAtomic: string; transaction: string | null } | undefined>;
 interface State {
   version: typeof DESKTOP_X402.VERSION;
   summary: X402Summary;
@@ -33,6 +37,8 @@ export class X402Budget {
   private state: State | null = null;
   private failed = false;
   private liveIntent?: string;
+  private reviewedIntent?: string;
+  private checking?: { intent: string; result: Promise<boolean> };
   private queue: Promise<unknown> = Promise.resolve();
   constructor(
     private readonly files: Files,
@@ -53,14 +59,7 @@ export class X402Budget {
     }
     return this.state!;
   }
-  async review(
-    observe: (
-      ref: DesktopRequestBinding,
-      policy: BuyerApiPolicy,
-    ) => Promise<
-      { chargeAtomic: string; transaction: string | null } | undefined
-    >,
-  ) {
+  async review(observe: ObserveCharge, automatic = false) {
     const state = await this.serial(async () =>
       this.recoverIfIdle(await this.load()),
     );
@@ -68,21 +67,37 @@ export class X402Budget {
     if (!state.openingIntent) throw new LegacyPaymentReview();
     if (this.liveIntent === state.openingIntent || !state.summary.policy)
       return false;
-    const ref = await this.opening?.reference(state.openingIntent);
+    if (this.checking?.intent === state.openingIntent)
+      return this.checking.result;
+    if (automatic && this.reviewedIntent === state.openingIntent) return false;
+    this.reviewedIntent = state.openingIntent;
+    const result = this.reviewRequest(
+      state.pending,
+      state.openingIntent,
+      state.summary.policy,
+      observe,
+    ).finally(() => {
+      if (this.checking?.result === result) this.checking = undefined;
+    });
+    this.checking = { intent: state.openingIntent, result };
+    return result;
+  }
+  private async reviewRequest(
+    pending: string,
+    intent: string,
+    policy: BuyerApiPolicy,
+    observe: ObserveCharge,
+  ) {
+    const ref = await this.opening?.reference(intent);
     if (!ref) throw new LegacyPaymentReview();
-    const result = await observe(ref, state.summary.policy);
+    const result = await observe(ref, policy);
     if (!result) return false;
     if (result.transaction === null) {
       if (result.chargeAtomic !== '0') return false;
-      await this.cancelUnsent(state.pending, state.openingIntent);
+      await this.cancelUnsent(pending, intent);
       return true;
     }
-    await this.complete(
-      state.pending,
-      { ...result, free: false },
-      undefined,
-      state.openingIntent,
-    );
+    await this.complete(pending, { ...result, free: false }, undefined, intent);
     return true;
   }
   private recoverIfIdle(state: State) {

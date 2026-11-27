@@ -7,12 +7,17 @@ import {
   UnsentChannelPeerError,
   UnsentOpeningError,
 } from '@gyblos/node/batch-buyer';
+import { channelBlockerMessage } from '@gyblos/node/buyer-channel-message';
 import { bounded } from '@gyblos/node/buyer-operation';
 import { PaidBuyerError } from '@gyblos/node/buyer-paid-error';
 import { UnsentSellerBusyError } from '@gyblos/node/buyer-routing';
-import { UnsentChannelRequestError } from '@gyblos/node/buyer-session';
+import {
+  UnsentChannelRequestError,
+  UnsentSellerChoiceError,
+} from '@gyblos/node/buyer-session';
 import { UnsentChannelLimitError } from '@gyblos/node/session-policy';
 import { BatchChannelError } from '@gyblos/protocol/batch-channel';
+import { isChannelBlocker } from '@gyblos/protocol/buyer-api';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import { PaymentError } from '@gyblos/protocol/payment';
 import { PaymentSessionError } from '@gyblos/protocol/payment-session';
@@ -20,7 +25,6 @@ import { PaymentSessionError } from '@gyblos/protocol/payment-session';
 import { buyerApiKeyErrorView } from './api-key-http';
 import { FREE_BUYER_CODES, PAID_BUYER_CODES } from './constants';
 import type { ChatErrorView } from './free-http';
-import { UnsentSellerChoiceError } from './seller-choice-error';
 
 const unavailable = (
   code: ChatErrorView['code'],
@@ -67,6 +71,12 @@ export async function unsentSessionPreflight<T>(
 
 // Paid errors only; anything else is left to the free answer.
 export function classifyPaidError(error: unknown): ChatErrorView | undefined {
+  if (error instanceof UnsentSellerChoiceError && isChannelBlocker(error.code))
+    return {
+      ...unavailable(error.code, true),
+      status: HTTP_STATUS.badRequest,
+      detail: channelBlockerMessage(error.code),
+    };
   if (
     error instanceof UnsentOpeningError ||
     error instanceof UnsentSessionPreflightError ||

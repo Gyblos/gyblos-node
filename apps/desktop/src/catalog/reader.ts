@@ -5,12 +5,22 @@ import { DEVNET, DEVNET_USDC, DISCOVERY_INDEX_URL } from '@gyblos/config';
 import {
   fetchModels,
   fetchSellers,
+  supersedes,
   type DiscoveredSeller,
   type DiscoveryFetch,
 } from '@gyblos/discovery-http';
 import type { BuyerSellerChoice as CatalogSellerChoice } from '@gyblos/protocol/buyer-api';
+import { DIAGNOSTIC_LEVELS } from '@gyblos/runtime/constants';
+import {
+  createDiagnostics,
+  type DiagnosticSink,
+} from '@gyblos/runtime/diagnostics';
 
-import { CATALOG_STATE, NETWORK_CATALOG } from './constants';
+import {
+  CATALOG_DIAGNOSTICS,
+  CATALOG_STATE,
+  NETWORK_CATALOG,
+} from './constants';
 import {
   emptyCatalog,
   type AnnouncedModel,
@@ -27,6 +37,7 @@ const isShown = (pricing: Pricing) =>
   isFree(pricing) ||
   (pricing.network === DEVNET && pricing.asset === DEVNET_USDC);
 
+export { CATALOG_DIAGNOSTICS } from './constants';
 export type { BuyerSellerChoice as CatalogSellerChoice } from '@gyblos/protocol/buyer-api';
 
 function project(
@@ -115,18 +126,59 @@ export async function readAnnouncements(
   now: () => number,
   signal: AbortSignal,
   choices?: Map<string, CatalogSellerChoice>,
+  followPages = false,
+  sink?: DiagnosticSink,
 ): Promise<NetworkCatalog> {
-  const page = await fetchSellers({
-    baseUrl: DISCOVERY_INDEX_URL,
-    model,
-    fetch,
-    now,
+  const operation = createDiagnostics({
+    component: CATALOG_DIAGNOSTICS.component,
+    operation: CATALOG_DIAGNOSTICS.operation,
+    phases: [CATALOG_DIAGNOSTICS.phase],
+    codes: [CATALOG_DIAGNOSTICS.code],
+    sink,
+  }).start();
+  const deadline = AbortSignal.any([
     signal,
-    limit: NETWORK_CATALOG.MAX_ANNOUNCEMENTS,
-    timeoutMs: NETWORK_CATALOG.REQUEST_MS,
-  });
+    AbortSignal.timeout(NETWORK_CATALOG.REQUEST_MS),
+  ]);
+  const read = (cursor?: string) =>
+    fetchSellers({
+      baseUrl: DISCOVERY_INDEX_URL,
+      model,
+      fetch,
+      now,
+      signal: deadline,
+      limit: NETWORK_CATALOG.MAX_ANNOUNCEMENTS,
+      timeoutMs: NETWORK_CATALOG.REQUEST_MS,
+      cursor,
+    });
+  let page = await read();
+  const sellers = new Map(page.sellers.map((row) => [row.catalog.nodeId, row]));
+  const cursors = new Set<string>();
+  while (
+    page.next !== null &&
+    followPages &&
+    cursors.size + 1 < NETWORK_CATALOG.MAX_LOOKUP_PAGES &&
+    !cursors.has(page.next)
+  ) {
+    cursors.add(page.next);
+    try {
+      page = await read(page.next);
+    } catch {
+      signal.throwIfAborted();
+      operation.report({
+        phase: CATALOG_DIAGNOSTICS.phase,
+        code: CATALOG_DIAGNOSTICS.code,
+        level: DIAGNOSTIC_LEVELS.WARN,
+      });
+      break;
+    }
+    for (const row of page.sellers) {
+      const held = sellers.get(row.catalog.nodeId);
+      if (!held || supersedes(row, held)) sellers.set(row.catalog.nodeId, row);
+    }
+  }
   const checkedAt = now();
-  const result = project(page.sellers, model, checkedAt, choices);
+  const result = project([...sellers.values()], model, checkedAt, choices);
   return {
     state: result.models.length ? CATALOG_STATE.READY : CATALOG_STATE.EMPTY,
     query: model,

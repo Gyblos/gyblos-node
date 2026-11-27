@@ -2,6 +2,8 @@
 import assert from 'node:assert/strict';
 import { test, type TestContext } from 'node:test';
 
+import { paidChannelEligibility } from '@gyblos/buyer/channel-eligibility';
+import type { HomeEnvironment } from '@gyblos/config/home';
 import { batchPoolPathsIn } from '@gyblos/config/home-payments';
 import {
   DEVNET,
@@ -16,15 +18,32 @@ import {
   FUNDING,
   sellerResponseLimit,
 } from '@gyblos/desktop/funding-model';
-import {
-  channelFundingRemaining,
-  switchingCredit,
-} from '@gyblos/node/buyer-funding';
+import { switchingCredit } from '@gyblos/node/buyer-funding';
 import { openBatchBuyerPool } from '@gyblos/payments-upto/batch-session';
 import { buyerUsdcBalance } from '@gyblos/payments-upto/buyer-funding';
-import { BUYER_API } from '@gyblos/protocol/buyer-api';
+import {
+  BUYER_API,
+  type BuyerApiPolicy,
+  type BuyerSellerChoice,
+} from '@gyblos/protocol/buyer-api';
+import { SESSION_STATES } from '@gyblos/protocol/payment-session';
 
 import { sessionRig } from './support/batch-session';
+
+async function channelFundingRemaining(
+  environment: HomeEnvironment,
+  policy: BuyerApiPolicy,
+  seller: BuyerSellerChoice,
+) {
+  const result = await paidChannelEligibility(
+    environment,
+    { ...policy, ...seller },
+    Date.now,
+    async () => SESSION_STATES.OPEN,
+    new AbortController().signal,
+  );
+  return result.channelRemainingAtomic;
+}
 
 const payer = '11111111111111111111111111111111';
 
@@ -114,7 +133,7 @@ void test('only the same connected devnet buyer can copy or open the fixed Circl
     rpcUrl: async () => 'https://example.invalid',
     balance: async () => balance,
     resolveOffer: () => undefined,
-    remaining: async () => null,
+    remaining: async () => ({ blocker: null, channelRemainingAtomic: null }),
     copy: (text) => {
       actions.push(text);
     },
@@ -123,11 +142,16 @@ void test('only the same connected devnet buyer can copy or open the fixed Circl
     },
   });
   assert.equal((await service.balance(event, []))?.balanceAtomic, '0');
+  assert.equal(await service.balance(event, ['56'.repeat(32)]), null);
   assert.equal(await service.copy(event, ['other']), false);
   assert.equal(await service.copy(event, [payer]), true);
   assert.equal(await service.faucet(event, [payer]), true);
   balance = null;
-  assert.equal((await service.balance(event, []))?.faucetAvailable, false);
+  const unavailable = await service.balance(event, []);
+  assert.equal(unavailable?.faucetAvailable, false);
+  assert.equal(unavailable?.balanceAtomic, null);
+  assert.equal(unavailable?.lastBalanceAtomic, '0');
+  assert.ok(unavailable?.lastBalanceAt);
   assert.equal(await service.faucet(event, [payer]), false);
   network = 'testnet';
   assert.equal(await service.balance(event, []), null);
@@ -208,26 +232,16 @@ for (const selectedSeller of [true, false]) {
       await channelFundingRemaining(environment, policy, seller),
       null,
     );
+    const live = await paidChannelEligibility(
+      environment,
+      { ...policy, ...seller, activeRequest: (id) => id === 'af'.repeat(16) },
+      rig.now,
+      async () => SESSION_STATES.OPEN,
+      new AbortController().signal,
+    );
+    assert.equal(live.channelRemainingAtomic, selectedSeller ? null : '960');
   });
 }
-
-void test('a funded wallet cannot expand the authority of the channel selected for a response', () => {
-  const funding = {
-    network: DEVNET,
-    payer,
-    balanceAtomic: '2000000',
-    channelRemainingAtomic: '600000',
-    faucetAvailable: true,
-  } as const;
-  assert.equal(sellerResponseLimit(funding, '1000000'), '600000');
-  assert.equal(
-    sellerResponseLimit(
-      { ...funding, channelRemainingAtomic: null },
-      '1000000',
-    ),
-    '1000000',
-  );
-});
 
 void test('an exhausted open buyer channel cannot authorize another response using the wallet balance', async (t) => {
   const { rig, environment, policy, seller } = await fundedChannel(t);
@@ -334,7 +348,7 @@ void test('an unreadable pool cannot approve a seller from the wallet balance al
     rpcUrl: async () => 'https://example.invalid',
     balance: async () => '20000',
     resolveOffer: () => seller,
-    remaining: async () => null,
+    remaining: async () => ({ blocker: null, channelRemainingAtomic: null }),
     switching: async () => {
       throw new Error('unreadable');
     },

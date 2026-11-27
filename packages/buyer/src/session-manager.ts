@@ -5,12 +5,10 @@ import {
   batchPoolPathsIn,
   batchSessionPathsIn,
 } from '@gyblos/config/home-payments';
-import type {
-  BuyerApiKeyOperation,
-  ConfirmUnchargedKey,
-} from '@gyblos/node/buyer-api-keys';
+import type { BuyerApiKeyOperation } from '@gyblos/node/buyer-api-keys';
 import {
   createBuyerSessionManager,
+  UnsentSellerChoiceError,
   type BuyerSessionOptions,
 } from '@gyblos/node/buyer-session';
 import {
@@ -18,21 +16,29 @@ import {
   buyerSessionPoolChain,
 } from '@gyblos/node/buyer-session-chain';
 import { createBuyerSessionPool } from '@gyblos/node/buyer-session-pool';
+import { BUYER_PAYMENT_REVIEW } from '@gyblos/node/constants';
 import { desktopOpening } from '@gyblos/node/desktop-opening';
 import {
   batchSessionTerminal,
-  finalizedUnchargedRequest,
   inspectBatchPool,
   inspectBatchSession,
 } from '@gyblos/payments-upto/batch-session';
 import { canonicalJson } from '@gyblos/protocol';
 import { batchFail } from '@gyblos/protocol/batch-channel';
+import type { BuyerSellerChoice } from '@gyblos/protocol/buyer-api';
+import { BUYER_KEY_CODES, buyerKeyFail } from '@gyblos/protocol/buyer-api-keys';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
+import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
 import type { ChatTokenizer } from '@gyblos/protocol/engine';
 import { PAID_EXECUTION_CODES } from '@gyblos/protocol/paid/constants';
 import { SESSION_CODES, sessionFail } from '@gyblos/protocol/payment-session';
 
 import { reserveApiKey } from './api-key-execution';
+import {
+  observeChannelAt,
+  paidChannelEligibility,
+  sellerReplacementAuthorized,
+} from './channel-eligibility';
 import { PAID_BUYER_HTTP_MS } from './constants';
 import {
   permitsWinner,
@@ -43,6 +49,7 @@ import {
 import type { BuyerExecutionFactory } from './free-startup';
 import { verifyBuyerIdentity } from './identity';
 import { restoredSellerAddress } from './seller-address';
+import { keyProof } from './session-key-proof';
 import {
   createSessionPreflight,
   prepareChosenMeter,
@@ -54,6 +61,7 @@ type Context = Parameters<BuyerExecutionFactory>[0];
 type Options = BuyerStartupOptions;
 type Winner = Awaited<ReturnType<typeof selectWinner>>;
 export interface SessionState {
+  activeRequest?: (id: string, seller: string) => boolean;
   openingIntent?: AsyncLocalStorage<string | undefined>;
   selections: Map<string, Winner & { permission?: BuyerApiKeyOperation }>;
   sending: Map<string, () => void>;
@@ -158,15 +166,20 @@ function desktopPermissions(
       const id = state.openingIntent?.getStore();
       return id ? desktopOpening(process.env).whileArmed(id, run) : run();
     },
-    switchingAllowed: async () => {
-      const intent = state.openingIntent?.getStore();
-      return intent ? desktopOpening(process.env).armed(intent) : paidAuto;
-    },
+    switchingAllowed: (requestId) =>
+      sellerReplacementAuthorized(
+        paidAuto,
+        !!state.selections.get(requestId)?.permission,
+        state.openingIntent?.getStore(),
+      ),
     onDeclined: async () => {
       const intent = state.openingIntent?.getStore();
       if (intent) await desktopOpening(process.env).declined(intent);
     },
-    beforeInference: async (_id, ref) => {
+    beforeInference: async (id, ref, executionDigest) => {
+      await state.selections
+        .get(id)
+        ?.permission?.bindExecution(id, executionDigest);
       const intent = state.openingIntent?.getStore();
       if (intent) await desktopOpening(process.env).consume(intent, ref);
     },
@@ -185,20 +198,86 @@ async function previousSeller(
 function inspectSingle() {
   return inspectBatchSession(batchSessionPathsIn(process.env, P2P_ROLES.BUYER));
 }
-function singleKeyProof(
+function pickerChannel(
   context: Context,
-  reconcile: (signal: AbortSignal) => Promise<unknown>,
-): ConfirmUnchargedKey | undefined {
-  if (context.prepared.config.session?.totalDepositAtomic !== undefined)
-    return undefined;
-  return (ref, scope) =>
-    finalizedUnchargedRequest(
-      batchSessionPathsIn(process.env, P2P_ROLES.BUYER),
-      ref,
-      scope,
-      context.endpoint.id().toString(),
-      () => reconcile(AbortSignal.timeout(PAID_BUYER_HTTP_MS)),
+  options: Options,
+  state: SessionState,
+) {
+  const config = context.prepared.config;
+  return (choice: BuyerSellerChoice, signal: AbortSignal) => {
+    if (context.role.role !== P2P_ROLES.BUYER)
+      return sessionFail(SESSION_CODES.BINDING);
+    const known = config.sellers.find(
+      (seller) => seller.nodeId === choice.nodeId,
     );
+    if (
+      (known && known.owner !== choice.owner) ||
+      (!known && !config.discovery?.open)
+    )
+      return Promise.resolve({
+        blocker: SESSION_CODES.BINDING,
+        channelRemainingAtomic: null,
+      });
+    return paidChannelEligibility(
+      process.env,
+      {
+        ...choice,
+        payer: context.role.buyer,
+        network: config.request.network,
+        mint: config.request.asset,
+        maxAtomic: config.request.maxAtomic,
+        pinnedNodeId: config.pinnedNodeId,
+        activeRequest: state.activeRequest,
+      },
+      options.channelClock ?? Date.now,
+      options.observeChannel ?? observeChannelAt(context.role.rpcUrl),
+      signal,
+    );
+  };
+}
+function checkSelectedChannel(
+  context: Context,
+  options: Options,
+  state: SessionState,
+) {
+  const { config } = context.prepared;
+  const observe =
+    options.observeChannel ?? observeChannelAt(context.role.rpcUrl);
+  return async (
+    quote: SignedOfferV2,
+    signal: AbortSignal,
+    intent = state.openingIntent?.getStore(),
+    delegated = !!state.selections.get(quote.offer.requestId)?.permission,
+  ) => {
+    const result = await paidChannelEligibility(
+      process.env,
+      {
+        ...quote.offer,
+        payer: quote.offer.buyer,
+        pinnedNodeId:
+          config.session?.totalDepositAtomic !== undefined &&
+          config.routing?.allowPinnedFallback
+            ? undefined
+            : config.pinnedNodeId,
+        replacementAuthorized: await sellerReplacementAuthorized(
+          config.discovery?.paidAuto === true,
+          delegated,
+          intent,
+        ),
+        activeRequest: state.activeRequest,
+      },
+      options.channelClock ?? Date.now,
+      observe,
+      AbortSignal.any([
+        signal,
+        AbortSignal.timeout(BUYER_PAYMENT_REVIEW.deadlineMs),
+      ]),
+    );
+    if (result.blocker === BUYER_KEY_CODES.REVIEW)
+      return buyerKeyFail(result.blocker);
+    if (result.blocker)
+      throw new UnsentSellerChoiceError(result.blocker, quote.offer.nodeId);
+  };
 }
 function sessionAuthorization(
   state: SessionState,
@@ -209,6 +288,17 @@ function sessionAuthorization(
     return permission?.releaseUnsent;
   };
 }
+async function unresolvedPool(totalDepositAtomic: string | undefined) {
+  if (totalDepositAtomic !== undefined) return false;
+  return (
+    await inspectBatchPool(batchPoolPathsIn(process.env), {
+      includeLegacy: false,
+    })
+  ).some(
+    (entry) =>
+      !entry.stored || entry.uncertain || !batchSessionTerminal(entry.stored),
+  );
+}
 export function makeManager(
   context: Context,
   options: Options,
@@ -216,6 +306,7 @@ export function makeManager(
   state: SessionState,
 ) {
   const { prepared, role, endpoint, relayOnly } = context;
+  const checkChannel = checkSelectedChannel(context, options, state);
   const common: Parameters<
     typeof createBuyerSessionManager<ReturnType<typeof sellerAddress>>
   >[0] = {
@@ -239,19 +330,8 @@ export function makeManager(
       beforeExecute: (request) =>
         state.sending.get(request.quote.offer.requestId)?.(),
     },
-    unresolved: async () => {
-      if (policy.totalDepositAtomic !== undefined) return false;
-      return (
-        await inspectBatchPool(batchPoolPathsIn(process.env), {
-          includeLegacy: false,
-        })
-      ).some(
-        (entry) =>
-          !entry.stored ||
-          entry.uncertain ||
-          !batchSessionTerminal(entry.stored),
-      );
-    },
+    unresolved: () => unresolvedPool(policy.totalDepositAtomic),
+    checkReusableChannel: checkChannel,
     authorizeRequest: sessionAuthorization(state),
     verify: trustedQuote(context, state),
     receipt: sessionReceipts(context, state),
@@ -268,13 +348,16 @@ export function makeManager(
             ),
         })
       : createBuyerSessionManager(common);
+  if ('ownsRequest' in manager) state.activeRequest = manager.ownsRequest;
   const loadMeter = sessionMeter(prepared.config.request.maxAtomic, options);
   const check = createSessionPreflight(loadMeter, policy, () =>
     context.endpoint.id().toString(),
   );
   return {
     ...manager,
-    confirmUnchargedKey: singleKeyProof(context, manager.reconcile),
+    checkChannel,
+    inspectChannel: pickerChannel(context, options, state),
+    confirmKeyCharge: keyProof(context, options),
     previousSeller: () =>
       previousSeller(policy.totalDepositAtomic, common.inspect),
     preparePaidChat: async () => {

@@ -25,6 +25,7 @@ import {
 } from '@gyblos/protocol/payment-binding';
 import {
   SESSION_CODES,
+  SESSION_STATES,
   sessionFail,
   type PaymentSessionTerms,
   type SessionSettlement,
@@ -193,6 +194,19 @@ export function batchSessionObserver(options: BatchObserverOptions) {
     terms: structuredClone(options.terms),
   };
   return {
+    async status(channelId: string, signal: AbortSignal) {
+      const current = await context(state, signal);
+      if (
+        channelId !== current.record.channelId ||
+        !(await originalLanded(state, current))
+      )
+        return sessionFail(SESSION_CODES.UNVERIFIED);
+      const found = await channel(state, current);
+      if (found?.status === UPTO_CHANNEL_ACCOUNT.statuses.OPEN)
+        return SESSION_STATES.OPEN;
+      if (await settlement(state, current)) return SESSION_STATES.CLOSED;
+      return sessionFail(SESSION_CODES.UNVERIFIED);
+    },
     async bound(channelId: string) {
       const current = await context(state);
       if (
@@ -223,8 +237,8 @@ export function batchSessionObserver(options: BatchObserverOptions) {
         UPTO_CHANNEL_ACCOUNT.statuses.CLOSING
       );
     },
-    async settlement(channelId: string) {
-      const current = await context(state);
+    async settlement(channelId: string, signal?: AbortSignal) {
+      const current = await context(state, signal);
       if (channelId !== current.record.channelId)
         return sessionFail(SESSION_CODES.BINDING);
       if (!(await originalLanded(state, current))) return undefined;

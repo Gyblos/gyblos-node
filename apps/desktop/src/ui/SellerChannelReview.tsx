@@ -1,0 +1,182 @@
+import { Info, Warning } from '@phosphor-icons/react';
+import { useRef, useState } from 'react';
+
+import type { BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
+import { BUYER_KEY_CODES } from '@gyblos/protocol/buyer-api-keys';
+
+import { sellerChannelStatus, type BuyerFunding } from '../funding/model';
+import { X402_ACTION } from '../x402-model';
+import { fundingAmount } from './BuyerFunding';
+import { BUTTON_VARIANT } from './constants';
+import { DetailSummary, type DetailItem } from './DetailSummary';
+import { FormActions } from './Form';
+import { shortReference } from './history-presentation';
+import { Modal } from './Modal';
+import type { ModelOption } from './model-types';
+import { TONE } from './status-tone';
+import { Button } from './UI';
+import { useBuyerFunding } from './useBuyerFunding';
+
+type Policy = Pick<BuyerApiPolicy, 'payer' | 'maxAtomic'>;
+export function SellerChannelReview({
+  model,
+  policy,
+  close,
+}: {
+  model: ModelOption;
+  policy?: Policy | null;
+  close(): void;
+}) {
+  const { funding, loading, refresh } = useBuyerFunding(
+    policy?.payer,
+    model.offerId,
+    !!model.offerId && !!policy,
+  );
+  return (
+    <ChannelReviewDetails
+      model={model}
+      policy={policy}
+      funding={funding}
+      checking={!!policy && loading}
+      refresh={refresh}
+      close={close}
+    />
+  );
+}
+export function ChannelReviewDetails({
+  model,
+  policy,
+  funding,
+  checking,
+  refresh,
+  close,
+  backLabel = 'Back to models',
+}: {
+  model: ModelOption;
+  policy?: Policy | null;
+  funding: BuyerFunding | null;
+  checking: boolean;
+  backLabel?: string;
+  refresh(): void;
+  close(): void;
+}) {
+  const { pending, checkStatus } = useChannelReview(funding, refresh);
+  const status = sellerChannelStatus(funding);
+  const ready = !checking && status.label === 'Ready';
+  const Icon = ready ? Info : Warning;
+  return (
+    <Modal title="Payment channel" close={close}>
+      <div className="ui-form">
+        <DetailSummary
+          status={{
+            label: checking ? 'Checking' : status.label,
+            tone: ready ? TONE.SUCCESS : TONE.WARNING,
+          }}
+          meta={[model.name, model.family].filter(Boolean).join(' · ')}
+          totals={[
+            {
+              label: 'Per-response limit',
+              value: policy ? fundingAmount(policy.maxAtomic) : 'Unavailable',
+            },
+            {
+              label: 'Wallet balance',
+              value:
+                funding?.balanceAtomic != null
+                  ? fundingAmount(funding.balanceAtomic)
+                  : 'Unavailable',
+            },
+          ]}
+          rows={channelEvidence(model, funding)}
+        />
+        <p
+          className="pk-notice"
+          data-tone={ready ? TONE.NEUTRAL : TONE.WARNING}
+          role="status"
+        >
+          <Icon size={15} weight="fill" aria-hidden="true" />
+          <span>
+            {checking
+              ? 'Checking finalized channel status…'
+              : status.description}
+          </span>
+        </p>
+        <FormActions>
+          {!checking && funding?.balanceAtomic == null && (
+            <Button disabled={!policy || pending} onClick={refresh}>
+              Refresh wallet
+            </Button>
+          )}
+          <Button onClick={close}>{backLabel}</Button>
+          <Button
+            variant={BUTTON_VARIANT.PRIMARY}
+            disabled={!policy || checking || pending}
+            onClick={() => void checkStatus()}
+          >
+            Check status
+          </Button>
+        </FormActions>
+      </div>
+    </Modal>
+  );
+}
+
+function channelEvidence(model: ModelOption, funding: BuyerFunding | null) {
+  const rows: DetailItem[] = [
+    {
+      label: 'Current channel',
+      value: funding?.channelId
+        ? shortReference(funding.channelId)
+        : 'Unavailable',
+    },
+    {
+      label: 'Input / output per 1M tokens',
+      value: model.input + ' / ' + model.output + ' USDC',
+    },
+  ];
+  if (funding?.channelRemainingAtomic != null)
+    rows.push({
+      label: 'Remaining channel balance',
+      value: fundingAmount(funding.channelRemainingAtomic),
+    });
+  if (
+    funding?.balanceAtomic === null &&
+    funding.lastBalanceAtomic !== undefined &&
+    funding.lastBalanceAt !== undefined
+  )
+    rows.push({
+      label: 'Last verified wallet balance',
+      value:
+        fundingAmount(funding.lastBalanceAtomic) +
+        ' · ' +
+        new Date(funding.lastBalanceAt).toLocaleString(),
+    });
+  if (funding?.channelBlocker === BUYER_KEY_CODES.REVIEW)
+    rows.push(
+      { label: 'Reserved by API key', value: 'Amount unavailable' },
+      { label: 'Usage approval', value: 'Unconfirmed' },
+      { label: 'Final settlement', value: 'Unconfirmed' },
+    );
+  return rows;
+}
+
+function useChannelReview(funding: BuyerFunding | null, refresh: () => void) {
+  const reviewing = useRef(false);
+  const [pending, setPending] = useState(false);
+  async function checkStatus() {
+    if (reviewing.current) return;
+    if (funding?.channelBlocker === BUYER_KEY_CODES.REVIEW) {
+      reviewing.current = true;
+      setPending(true);
+      try {
+        await window.desktopX402
+          ?.run({ action: X402_ACTION.REVIEW })
+          .catch(() => undefined);
+      } finally {
+        reviewing.current = false;
+        setPending(false);
+      }
+    }
+    refresh();
+  }
+  return { pending, checkStatus };
+}

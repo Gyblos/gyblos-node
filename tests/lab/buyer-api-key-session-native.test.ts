@@ -3,17 +3,16 @@ import assert from 'node:assert/strict';
 import { readFile, writeFile } from 'node:fs/promises';
 import test from 'node:test';
 
-import { BUYER_SELECTION, PAID_BUYER } from '@gyblos/buyer/constants';
+import { BUYER_SELECTION } from '@gyblos/buyer/constants';
 import type { BuyerSelectionConfig } from '@gyblos/buyer/selection-config';
 import { batchSessionPathsIn, rolePathIn } from '@gyblos/config';
 import { buyerApiKeyPathsIn } from '@gyblos/config/home';
 import type { BuyerApiKeyQuote } from '@gyblos/node/buyer-api-keys';
 import {
-  finalizedUnchargedRequest,
+  finalizedKeyCharge,
   inspectBatchSession,
 } from '@gyblos/payments-upto/batch-session';
 import { BATCH_CHANNEL } from '@gyblos/protocol/batch-channel';
-import { BUYER_API, parseBuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 import {
   BUYER_API_KEYS,
   parseBuyerApiKeysReply,
@@ -22,58 +21,8 @@ import { P2P_ROLES } from '@gyblos/protocol/constants';
 
 import { NATIVE_CAPABILITY } from '../support/native-runtime';
 import { paidAcceptanceMeter } from '../support/paid-acceptance-engine';
+import { buyerClient } from '../support/session-product-client';
 import { sessionProductHost } from '../support/session-product-host';
-
-async function buyerClient(
-  host: Awaited<ReturnType<typeof sessionProductHost>>,
-  request: typeof fetch,
-) {
-  const token = (
-    await readFile(
-      rolePathIn(process.env, P2P_ROLES.BUYER, PAID_BUYER.tokenFile),
-      'utf8',
-    )
-  ).trim();
-  const owner = (url: URL, init?: RequestInit) => {
-    const headers = new Headers(init?.headers);
-    headers.set('authorization', 'Bearer ' + token);
-    return request(url, { ...init, headers });
-  };
-  const metadata = await owner(
-    new URL(BUYER_API.STATUS_PATH, host.buyer().url),
-  );
-  const policy = parseBuyerApiPolicy(await metadata.json());
-  const created = await owner(new URL(BUYER_API_KEYS.PATH, host.buyer().url), {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'if-match': '"' + policy.policyId + '"',
-    },
-    body: JSON.stringify({
-      action: 'create',
-      name: 'Synthetic tools',
-      limitAtomic: '1000',
-    }),
-  });
-  assert.equal(created.status, 200, await created.clone().text());
-  const key = parseBuyerApiKeysReply(await created.json()).created;
-  assert.ok(key);
-  const ask = (maxTokens?: number, signal?: AbortSignal) =>
-    request(host.buyer().url, {
-      signal,
-      method: 'POST',
-      headers: {
-        authorization: 'Bearer ' + key.secret,
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: policy.model,
-        messages: [{ role: 'user', content: 'synthetic' }],
-        max_completion_tokens: maxTokens,
-      }),
-    });
-  return { ask, owner };
-}
 
 void test(
   'native buyer keys constrain signed session quotes and retain approved usage across a product restart',
@@ -201,26 +150,27 @@ void test(
       network: existing.terms.network,
     };
     const confirm = (candidate: BuyerApiKeyQuote) =>
-      finalizedUnchargedRequest(
+      finalizedKeyCharge(
         batchSessionPathsIn(process.env, P2P_ROLES.BUYER),
         candidate,
         identity,
         existing.terms.buyerNodeId,
         async () => {
           observations++;
+          return undefined;
         },
       );
     assert.equal(
       await confirm({ ...binding, sellerNodeId: '0'.repeat(64) }),
-      false,
+      undefined,
     );
     assert.equal(
       await confirm({ ...binding, requestId: '0'.repeat(32) }),
-      false,
+      undefined,
     );
-    assert.equal(await confirm({ ...binding, maxAtomic: '1' }), false);
+    assert.equal(await confirm({ ...binding, maxAtomic: '1' }), undefined);
     assert.equal(observations, 0);
-    assert.equal(await confirm(binding), false);
+    assert.equal(await confirm(binding), undefined);
     assert.equal(observations, 1);
 
     host.finance.settled.set(channelId, {

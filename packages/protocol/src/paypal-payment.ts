@@ -14,6 +14,12 @@ export class PaypalError extends Error {
   }
 }
 
+export class PaypalPromptValidationError extends PaypalError {
+  constructor() {
+    super(PAYPAL_ERROR_CODES.INVALID_REQUEST);
+  }
+}
+
 export function isPaypalId(value: unknown): value is string {
   return typeof value === 'string' && PAYPAL_ID_PATTERN.test(value);
 }

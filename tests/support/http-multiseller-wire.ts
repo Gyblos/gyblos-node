@@ -1,6 +1,8 @@
 // Observes only method/correlation metadata on real native loopback; never records prompts or answers.
 import assert from 'node:assert/strict';
 
+import { EndpointAddr } from '@number0/iroh';
+
 import { receiptNativeBinding } from '@gyblos/lab-harness/acceptance/receipt-native';
 import { BATCH_CHANNEL, BATCH_METHODS } from '@gyblos/protocol/batch-channel';
 import { CONTROL_ALPN, CONTROL_METHODS } from '@gyblos/protocol/constants';
@@ -9,7 +11,7 @@ import { controlObject } from '@gyblos/protocol/control-validation';
 
 import { batchDeferred } from './batch-deferred';
 
-export function httpMultiWire() {
+export function httpMultiWire(addresses?: ReadonlyMap<string, string[]>) {
   const binding = receiptNativeBinding({ calls: () => 0 });
   const quotes = new Map<string, Set<string>>();
   const executions = new Map<string, number>();
@@ -21,6 +23,12 @@ export function httpMultiWire() {
     const endpoint = await binding.bind(...args);
     const connect = endpoint.connect.bind(endpoint);
     endpoint.connect = async (...input) => {
+      if (addresses) {
+        const id = input[0].id();
+        const local = addresses.get(id.toString());
+        assert.ok(local);
+        input[0] = new EndpointAddr(id, undefined, local);
+      }
       const connection = await connect(...input);
       const nodeId = connection.remoteId().toString();
       const alpn = Buffer.from(input[1]).toString();

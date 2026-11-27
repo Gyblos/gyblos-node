@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 
 import { HTTP_STATUS } from '@gyblos/config';
 import type { BuyerApiKeys } from '@gyblos/node/buyer-api-keys';
+import { channelBlockerMessage } from '@gyblos/node/buyer-channel-message';
 import { BUYER_API, type BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 import {
   BUYER_API_KEYS,
@@ -109,6 +110,8 @@ export function buyerApiKeyErrorView(
     detail:
       error.code === BUYER_KEY_CODES.LIMIT
         ? 'The API key spend limit cannot cover this request.'
-        : undefined,
+        : error.code === BUYER_KEY_CODES.REVIEW
+          ? channelBlockerMessage(BUYER_KEY_CODES.REVIEW)
+          : undefined,
   };
 }

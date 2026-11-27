@@ -420,6 +420,11 @@ export const GENESIS_READ_MS = 10000;
 export * from './paypal/constants';
 
 // Buyer orchestration values shared by every host, with no process or network actions.
+export const BUYER_PAYMENT_REVIEW = {
+  offsetsMs: [0, 2000, 6000],
+  deadlineMs: 10000,
+  concurrency: 4,
+} as const;
 export const BUYER_PAID_TIMEOUTS = {
   requestMs: 180000,
   receiptMs: 30000,

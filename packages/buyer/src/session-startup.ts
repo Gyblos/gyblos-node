@@ -46,6 +46,7 @@ import {
 } from './session-requirements';
 import { pinnedBusy, routeScope, sessionRouter } from './session-routing';
 import {
+  preferChannel,
   prepareChosenSeller,
   verifyChosenOffer,
 } from './session-seller-choice';
@@ -64,10 +65,13 @@ async function executePaidSession(
   permission?: BuyerApiKeyOperation,
   openingIntent?: string,
 ): Promise<ChatResult> {
+  const { quote } = winner;
   current.throwIfAborted();
-  await manager.preflight(winner.quote, input, current);
+  await manager.preflight(quote, input, current);
   current.throwIfAborted();
-  const id = winner.quote.offer.requestId;
+  await manager.checkChannel(quote, current, openingIntent, !!permission);
+  current.throwIfAborted();
+  const id = quote.offer.requestId;
   if (state.selections.has(id)) return sessionFail(SESSION_CODES.BINDING);
   const scope = (state.openingIntent ??= new AsyncLocalStorage<
     string | undefined
@@ -105,15 +109,6 @@ async function executePaidSession(
   };
   await recordApiKeyPayment(permission, payment);
   return { ...result.value, payment };
-}
-async function preferChannel(
-  selectionRoute: SelectionRoute | undefined,
-  paidAuto: boolean | undefined,
-  previousSeller: () => Promise<string | undefined>,
-) {
-  return selectionRoute?.open && paidAuto && !selectionRoute.previousSeller
-    ? { ...selectionRoute, previousSeller: await previousSeller() }
-    : selectionRoute;
 }
 function sessionSelection(
   context: Context,
@@ -334,7 +329,10 @@ export async function startSessionQuoteRuntime(
     return sessionFail();
   requireBuyerIdentity(prepared.config, prepared.identity);
   const token = await endpointToken();
-  const state: SessionState = { selections: new Map(), sending: new Map() };
+  const state: SessionState = {
+    selections: new Map(),
+    sending: new Map(),
+  };
   const manager = makeManager(context, options, policy, state);
   const router =
     policy.totalDepositAtomic === undefined
@@ -354,7 +352,8 @@ export async function startSessionQuoteRuntime(
     router,
   );
   return {
-    confirmUnchargedKey: manager.confirmUnchargedKey,
+    confirmKeyCharge: manager.confirmKeyCharge,
+    inspectChannel: manager.inspectChannel,
     sellerChoice: true,
     singlePaidChannel: !router && prepared.config.request.maxAtomic !== '0',
     reconcilePool: router

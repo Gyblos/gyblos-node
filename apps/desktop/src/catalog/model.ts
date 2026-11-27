@@ -101,7 +101,8 @@ function parseModel(value: unknown): AnnouncedModel | null {
     !integer(value.contextTokens, 1) ||
     value.contextTokens > PUBLIC_RECORD_LIMITS.maxContextTokens ||
     !integer(value.announcements, 1) ||
-    value.announcements > NETWORK_CATALOG.MAX_ANNOUNCEMENTS ||
+    value.announcements >
+      NETWORK_CATALOG.MAX_ANNOUNCEMENTS * NETWORK_CATALOG.MAX_LOOKUP_PAGES ||
     !integer(value.expiresAt) ||
     typeof value.free !== 'boolean' ||
     !atomic(value.inputAtomicPerMtok) ||

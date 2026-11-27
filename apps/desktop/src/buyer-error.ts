@@ -1,14 +1,17 @@
-// Static desktop explanations for validated buyer failures; remote text is never displayed.
-// Presentation does not change retry decisions, budget reservations or payment uncertainty.
 import {
   BUYER_ROUTING_CODES,
   SELLER_SELECTION_CODES,
   type SellerSelectionCode,
 } from '@gyblos/core/constants';
+import { channelBlockerMessage } from '@gyblos/node/buyer-channel-message';
+// Static desktop explanations for validated buyer failures; remote text is never displayed.
+// Presentation does not change retry decisions, budget reservations or payment uncertainty.
 import {
   BUYER_API,
   BUYER_SIDECAR,
+  isChannelBlocker,
   type BuyerApiPolicy,
+  type ChannelBlocker,
 } from '@gyblos/protocol/buyer-api';
 import {
   FREE_EXECUTION_CODES,
@@ -35,7 +38,7 @@ export class BuyerSessionRequired extends Error {
 }
 
 type BuyerCode =
-  | typeof CHAT_FAILURE.KEY_REVIEW
+  | ChannelBlocker
   | typeof BUYER_API.TOKENIZER_UNAVAILABLE
   | typeof BUYER_ROUTING_CODES.BUSY
   | typeof PAID_EXECUTION_CODES.EXPIRED
@@ -72,8 +75,7 @@ function explanation(code: BuyerCode, reason: unknown, free: boolean) {
     return 'The network has not confirmed the channel deposit yet. Wait a moment and try again with the same seller. Your message has not been sent.';
   if (code === SESSION_CODES.OPENING_ABSENT)
     return 'The deposit did not reach the chain. You can send your message again.';
-  if (code === SESSION_CODES.BINDING)
-    return 'The selected seller or terms changed. Refresh the listing before sending.';
+  if (isChannelBlocker(code)) return channelBlockerMessage(code);
   if (code === SESSION_CODES.UNVERIFIED)
     return 'The local buyer could not verify this seller. Review the listing and buyer settings.';
   if (code === SESSION_CODES.LIMIT)
@@ -123,6 +125,12 @@ export function desktopBuyerFailure(
     value && typeof value === 'object' && !Array.isArray(value)
       ? (value as Record<string, unknown>)
       : {};
+  if (row[BUYER_API.NEVER_SENT_FIELD] === true && isChannelBlocker(row.code))
+    return new DesktopBuyerFailure(
+      row.code,
+      channelBlockerMessage(row.code),
+      true,
+    );
   if (
     row.code === PAID_EXECUTION_CODES.EXPIRED &&
     row[BUYER_API.NEVER_SENT_FIELD] === true

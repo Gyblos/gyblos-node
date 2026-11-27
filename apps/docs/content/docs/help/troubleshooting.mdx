@@ -186,6 +186,13 @@ make a check pass, don't run setup into another home, and never run `docker comp
 | An error says the seller was too slow (`engine_timeout`)                               | Send the message again; another seller usually answers. With a coding agent, you can also shorten or compact the conversation                                     |
 | `An unfinished payment needs review. New messages are blocked.`                        | Open **Payments** and review the payment. Don't delete app data to clear it; ask for help if it stays unresolved                                                  |
 
+A paid request can be refused even when the wallet has USDC. An expired
+channel or a channel with verified final settlement cannot fund another turn.
+Check its status in **Payments** before authorizing a new deposit. An uncertain
+channel stays blocked while the buyer checks the evidence. A delegated key
+under review pauses Desktop and connected coding tools. A status check never
+sends the question or creates a deposit.
+
 ## Ask for help safely [#ask-for-help-safely]
 
 Write in the [Gyblos Telegram](https://t.me/gyblos) with the error code and these outputs. The group is
@@ -200,3 +207,5 @@ docker compose images seller
 For a native seller, send the output of `gyblos seller status` and `gyblos --version`. If status doesn't
 run, send the doctor code instead. Review the output before you send it. Never send `seller.env`, invite
 codes, raw logs, environment dumps, `docker inspect` output, receipts, key files or volume contents.
+
+Desktop checks the selected seller against the running buyer before sending. If the selected response limit exceeds the verified channel funds, review the replacement deposit. Refresh the wallet separately when its balance is unavailable.

@@ -126,6 +126,7 @@ export function registerDesktopX402(
     environment,
     () => client.policy(),
     () => client.managed(),
+    (seller) => client.inspectChannel(seller),
     resolveOffer.resolve,
   );
   const owner = frameOwner(window);
@@ -136,7 +137,8 @@ export function registerDesktopX402(
     (url) => shell.openExternal(url),
     {
       ...managed,
-      review: (ref, policy) => reviewDesktopCharge(environment, ref, policy),
+      review: (ref, policy, signal) =>
+        reviewDesktopCharge(environment, ref, policy, signal),
     },
     (value) => clipboard.writeText(value),
     (progress) =>

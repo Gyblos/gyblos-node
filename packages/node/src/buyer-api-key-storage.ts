@@ -8,13 +8,13 @@ import {
   writePrivateFile,
 } from '@gyblos/runtime/private-file';
 
-import { createBuyerApiKeys, type ConfirmUnchargedKey } from './buyer-api-keys';
+import { createBuyerApiKeys, type ConfirmKeyCharge } from './buyer-api-keys';
 import { BUYER_API_KEY_STORAGE } from './constants';
 
 export async function openBuyerApiKeys(
   environment: HomeEnvironment,
   scope: BuyerKeyScope,
-  confirmUncharged?: ConfirmUnchargedKey,
+  confirmCharge?: ConfirmKeyCharge,
   diagnostics?: DiagnosticSink,
 ) {
   const paths = buyerApiKeyPathsIn(environment);
@@ -22,7 +22,7 @@ export async function openBuyerApiKeys(
   try {
     return await createBuyerApiKeys({
       scope,
-      confirmUncharged,
+      confirmCharge,
       diagnostics,
       files: {
         read: () =>

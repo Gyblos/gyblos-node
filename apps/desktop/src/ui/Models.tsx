@@ -17,6 +17,10 @@ import { Badge, List, ListRow, PagePanel, RowCopy, SearchField } from './UI';
 type ModelsProps = {
   networkModels: readonly CatalogModel[];
   auto: {
+    policy: Pick<
+      import('@gyblos/protocol/buyer-api').BuyerApiPolicy,
+      'payer' | 'maxAtomic'
+    > | null;
     buyerModels: readonly string[];
     paid: boolean;
     selected: boolean;
@@ -64,6 +68,7 @@ export function Models({
       </div>
       {canSelect ? (
         <CatalogOffers
+          policy={auto?.policy}
           models={offers}
           selected={selected}
           automatic={!!auto?.selected}

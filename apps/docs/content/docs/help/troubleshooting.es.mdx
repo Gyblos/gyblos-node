@@ -188,6 +188,13 @@ una llave para que una comprobación pase, no ejecutes setup en otro home y nunc
 | Un error dice que el vendedor fue demasiado lento (`engine_timeout`)                           | Envía el mensaje de nuevo; normalmente responde otro vendedor. Con un agente de código, también puedes acortar o compactar la conversación                                   |
 | `An unfinished payment needs review. New messages are blocked.`                                | Abre **Payments** y revisa el pago. No borres datos de la app para desbloquearlo; pide ayuda si sigue sin resolverse                                                         |
 
+Una solicitud de pago puede rechazarse aunque la billetera tenga USDC. Un
+canal vencido o con liquidación final verificada ya no puede pagar otro turno.
+Revisa su estado en **Pagos** antes de autorizar un depósito nuevo. Un canal
+con resultado incierto queda bloqueado mientras el comprador comprueba la
+evidencia. Una clave delegada en revisión pausa Desktop y las herramientas de
+código conectadas. Comprobar el estado nunca envía la pregunta ni abre un depósito.
+
 ## Pide ayuda de forma segura [#pide-ayuda-de-forma-segura]
 
 Escribe en el [Telegram de Gyblos](https://t.me/gyblos) con el código de error y estas salidas. El grupo es
@@ -203,3 +210,5 @@ Con un vendedor nativo, envía la salida de `gyblos seller status` y `gyblos --v
 funciona, envía el código de doctor. Revisa la salida antes de enviarla. Nunca envíes `seller.env`, códigos de
 invitación, logs sin procesar, volcados del entorno, la salida de `docker inspect`, recibos, archivos de llaves
 ni el contenido de volúmenes.
+
+Desktop consulta al comprador activo antes de enviar al vendedor seleccionado. Si el límite de la respuesta supera el saldo verificado del canal, revisa el depósito de reemplazo. Si el saldo de la cartera no está disponible, actualízalo por separado.
