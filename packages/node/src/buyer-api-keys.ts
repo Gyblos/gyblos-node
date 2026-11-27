@@ -34,7 +34,10 @@ import {
   type BuyerKeyState,
 } from './buyer-api-key-state';
 import { bounded } from './buyer-operation';
-import { BUYER_KEY_LEDGER_DIAGNOSTICS, BUYER_PAYMENT_REVIEW } from './constants';
+import {
+  BUYER_KEY_LEDGER_DIAGNOSTICS,
+  BUYER_PAYMENT_REVIEW,
+} from './constants';
 
 export interface BuyerApiKeyFiles {
   read(): Promise<string | undefined>;

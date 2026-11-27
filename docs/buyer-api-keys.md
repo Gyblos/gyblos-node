@@ -180,21 +180,21 @@ has a single-process lock and durable writes. It stores no prompts, responses or
 signed payments. After a restart, keys keep their limits and usage, and a
 configured client keeps working with the same key.
 
-A cancellation proven to precede financial preparation and dispatch releases its own reservation.
-An interrupted paid reservation, a failed write or an inconsistent state fails
-closed. Unknown reservations also block operator inference and the creation of
-new keys. Revocation stays available and does not clear an obligation. The buyer
-checks the matching channel for finalized settlement after an interrupted
-request, at startup and on the next request. Checks start immediately and again
-at two and six seconds, with a ten-second deadline. Each abandoned reservation
-can be released or charged its attributable amount when the settlement matches
-the private usage records. A settlement using an earlier recorded voucher can
-establish a full, partial or zero charge for a request with a verified execution
-digest and cumulative spending baseline. Older reservations without an execution
-digest require proof of zero charge. Missing or conflicting proof keeps spending
-paused for both Desktop and coding tools. The buyer operator can request another
-check from Payments. A status check cannot fund a replacement or resubmit the
-original prompt.
+A cancellation proven to precede financial preparation and dispatch releases its
+own reservation. An interrupted paid reservation, a failed write or an
+inconsistent state fails closed. Unknown reservations also block operator
+inference and the creation of new keys. Revocation stays available and does not
+clear an obligation. The buyer checks the matching channel for finalized
+settlement after an interrupted request, at startup and on the next request.
+Checks start immediately and again at two and six seconds, with a ten-second
+deadline. Each abandoned reservation can be released or charged its attributable
+amount when the settlement matches the private usage records. A settlement using
+an earlier recorded voucher can establish a full, partial or zero charge for a
+request with a verified execution digest and cumulative spending baseline. Older
+reservations without an execution digest require proof of zero charge. Missing
+or conflicting proof keeps spending paused for both Desktop and coding tools.
+The buyer operator can request another check from Payments. A status check
+cannot fund a replacement or resubmit the original prompt.
 
 > **Warning:** Never delete the permission ledger or its lock to resume
 > spending, and never restore an older copy. Doing so erases recorded

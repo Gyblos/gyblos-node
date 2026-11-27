@@ -14,8 +14,8 @@ import {
   DESKTOP_X402,
   PaidSellerLimitError,
   paidSellerLimitNotice,
-  x402Policy,
   StaleSellerOffer,
+  x402Policy,
 } from './x402-model';
 
 export type DesktopSellerChoice =
