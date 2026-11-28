@@ -8,7 +8,7 @@ import {
   type NetworkStatus,
 } from '../lib/network-status';
 import { tablePager, type ExplorerQuery } from '../lib/paging';
-import { notOnlineMeta, sellerHref } from '../lib/seller-identity';
+import { namesByNode, notOnlineMeta, sellerHref } from '../lib/seller-identity';
 import { SELLER_STATUS_LABELS } from '../lib/seller-profile';
 import { Chip } from './board/chip';
 import { pagedRows, Pager } from './pager';
@@ -65,6 +65,7 @@ function NotOnlineTable({
   const nodes = notOnline(network).filter(
     (node) => !accounts || accounts.has(node.nodeId),
   );
+  const names = namesByNode(network);
   const page = pagedRows(query, 'offline', nodes, !network.truncated, {
     lastSeen: (node) => node.lastSeenAt,
     firstSeen: (node) => node.firstSeenAt,
@@ -100,7 +101,7 @@ function NotOnlineTable({
               <SellerCell
                 nodeId={node.nodeId}
                 github={node.github}
-                name={node.name}
+                name={names.get(node.nodeId) ?? null}
                 href={sellerHref(node.nodeId, query)}
               >
                 {node.github ? (
