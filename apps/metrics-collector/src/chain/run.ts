@@ -9,6 +9,7 @@ export interface ChainRun {
   orm: CollectorDatabase;
   rpc: ChainEndpoints;
   now: number;
+  lease: number | null;
   cursor: ChainCursorState;
   // Channels a read transaction named: their accounts are read at the end.
   touched: Set<string>;

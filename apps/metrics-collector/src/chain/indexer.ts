@@ -136,11 +136,24 @@ export async function runChainIndex(
   now: number,
 ): Promise<ChainIndexResult> {
   const orm = createD1Orm(database);
+  const leaseUntil = await acquireLease(orm, now);
+  const blank: ChainCursorState = {
+    newest: null,
+    newestSlot: null,
+    gapUntil: null,
+    gapBefore: null,
+    gapUntilSlot: null,
+    gapFull: false,
+    backfillBefore: null,
+    backfillFull: false,
+    backfillDone: false,
+  };
   const run: ChainRun = {
     orm,
     rpc,
     now,
-    cursor: await readCursor(orm),
+    lease: leaseUntil,
+    cursor: leaseUntil === null ? await readCursor(orm) : blank,
     touched: new Set(),
     listed: 0,
     read: 0,
@@ -160,11 +173,11 @@ export async function runChainIndex(
     usage: rpc.usage(),
     cursor: run.cursor,
   });
-  const leaseUntil = await acquireLease(orm, now);
   if (leaseUntil === null) return result(true, 0);
   let failure: unknown;
   let channels = 0;
   try {
+    run.cursor = await readCursor(orm);
     const phases = await readPhases(run);
     channels = phases.channels;
     if (phases.failure) throw phases.failure;

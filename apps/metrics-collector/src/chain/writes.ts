@@ -9,6 +9,7 @@ import { DEVNET_GYBLOS_TREASURY } from '@gyblos/config/network';
 
 import {
   CHAIN_CHANNEL_CLOSED,
+  CHAIN_CURSOR_ID,
   CHAIN_INSTRUCTIONS,
   COLLECTOR_LIMITS,
   GYBLOS_OPEN_MEMOS,
@@ -45,11 +46,15 @@ export interface ChainCursorState {
 const atomic = (value: bigint | null) =>
   value === null ? null : value.toString();
 // Rows per statement so every column of `table` fits under the parameter limit.
-function chunksFor<T>(table: SQLiteTable, rows: readonly T[]): T[][] {
+function chunksFor<T>(
+  table: SQLiteTable,
+  rows: readonly T[],
+  reserved = 0,
+): T[][] {
   const columns = Object.keys(getTableColumns(table)).length;
   const size = Math.max(
     1,
-    Math.floor(COLLECTOR_LIMITS.maxBoundParameters / columns),
+    Math.floor((COLLECTOR_LIMITS.maxBoundParameters - reserved) / columns),
   );
   const result: T[][] = [];
   for (let start = 0; start < rows.length; start += size)
@@ -57,28 +62,52 @@ function chunksFor<T>(table: SQLiteTable, rows: readonly T[]): T[][] {
   return result;
 }
 
-export function cursorUpsert(
+const owned = (lease: number | null) =>
+  sql`exists (select 1 from ${chainCursor} where ${chainCursor.id} = ${CHAIN_CURSOR_ID} and ${chainCursor.leaseUntil} = ${lease})`;
+const tuples = (rows: readonly Record<string, unknown>[]) =>
+  sql.join(
+    rows.map(
+      (row) =>
+        sql`(${sql.join(
+          Object.values(row).map((value) => sql`${value}`),
+          sql`, `,
+        )})`,
+    ),
+    sql`, `,
+  );
+const ownedInsert = <T extends SQLiteTable>(
+  orm: CollectorDatabase,
+  table: T,
+  chunk: Record<string, unknown>[],
+  lease: number | null,
+) =>
+  orm
+    .insert(table)
+    .select(sql`select * from (values ${tuples(chunk)}) where ${owned(lease)}`);
+export function cursorUpdate(
   orm: CollectorDatabase,
   id: number,
   cursor: ChainCursorState,
   now: number,
+  lease: number | null,
 ) {
-  const values = {
-    newestSignature: cursor.newest,
-    newestSlot: cursor.newestSlot,
-    gapUntil: cursor.gapUntil,
-    gapUntilSlot: cursor.gapUntilSlot,
-    gapBefore: cursor.gapBefore,
-    gapFull: cursor.gapFull ? 1 : 0,
-    backfillBefore: cursor.backfillBefore,
-    backfillFull: cursor.backfillFull ? 1 : 0,
-    backfillDone: cursor.backfillDone ? 1 : 0,
-    updatedAt: now,
-  };
   return orm
-    .insert(chainCursor)
-    .values({ id, ...values })
-    .onConflictDoUpdate({ target: chainCursor.id, set: values });
+    .update(chainCursor)
+    .set({
+      newestSignature: cursor.newest,
+      newestSlot: cursor.newestSlot,
+      gapUntil: cursor.gapUntil,
+      gapUntilSlot: cursor.gapUntilSlot,
+      gapBefore: cursor.gapBefore,
+      gapFull: cursor.gapFull ? 1 : 0,
+      backfillBefore: cursor.backfillBefore,
+      backfillFull: cursor.backfillFull ? 1 : 0,
+      backfillDone: cursor.backfillDone ? 1 : 0,
+      updatedAt: now,
+    })
+    .where(
+      sql`${chainCursor.id} = ${id} and ${chainCursor.leaseUntil} = ${lease}`,
+    );
 }
 
 const isGyblosMemo = (memo: string) =>
@@ -229,20 +258,21 @@ export function transactionWrites(
   orm: CollectorDatabase,
   transactions: ChainTransaction[],
   now: number,
+  lease: number | null,
 ): BatchItem[] {
   const rows = rowsOf(transactions, now);
   return [
-    ...chunksFor(chainTxs, rows.txs).map((chunk) =>
-      orm.insert(chainTxs).values(chunk).onConflictDoNothing(),
+    ...chunksFor(chainTxs, rows.txs, 2).map((chunk) =>
+      ownedInsert(orm, chainTxs, chunk, lease).onConflictDoNothing(),
     ),
-    ...chunksFor(chainInstructions, rows.instructions).map((chunk) =>
-      orm.insert(chainInstructions).values(chunk).onConflictDoNothing(),
+    ...chunksFor(chainInstructions, rows.instructions, 2).map((chunk) =>
+      ownedInsert(orm, chainInstructions, chunk, lease).onConflictDoNothing(),
     ),
-    ...chunksFor(chainTokenDeltas, rows.deltas).map((chunk) =>
-      orm.insert(chainTokenDeltas).values(chunk).onConflictDoNothing(),
+    ...chunksFor(chainTokenDeltas, rows.deltas, 2).map((chunk) =>
+      ownedInsert(orm, chainTokenDeltas, chunk, lease).onConflictDoNothing(),
     ),
-    ...chunksFor(chainChannels, rows.channels).map((chunk) =>
-      orm.insert(chainChannels).values(chunk).onConflictDoUpdate({
+    ...chunksFor(chainChannels, rows.channels, 2).map((chunk) =>
+      ownedInsert(orm, chainChannels, chunk, lease).onConflictDoUpdate({
         target: chainChannels.channel,
         set: channelMerge,
       }),
@@ -256,6 +286,7 @@ export function channelStateUpserts(
   orm: CollectorDatabase,
   states: { channel: string; state: ChannelState }[],
   now: number,
+  lease: number | null,
 ): BatchItem[] {
   const rows = states.map(({ channel, state }) => ({
     ...blankChannel(channel, '', 0, now),
@@ -265,23 +296,20 @@ export function channelStateUpserts(
     payoutAtomic: atomic(state.payoutAtomic),
     accountReadAt: now,
   }));
-  return chunksFor(chainChannels, rows).map((chunk) =>
-    orm
-      .insert(chainChannels)
-      .values(chunk)
-      .onConflictDoUpdate({
-        target: chainChannels.channel,
-        set: {
-          status: sql`excluded.status`,
-          depositAtomic: sql`coalesce(excluded.deposit_atomic, ${chainChannels.depositAtomic})`,
-          settledAtomic: sql`coalesce(excluded.settled_atomic, ${chainChannels.settledAtomic})`,
-          payoutAtomic: sql`coalesce(excluded.payout_atomic, ${chainChannels.payoutAtomic})`,
-          accountReadAt: sql`excluded.account_read_at`,
-          updatedAt: sql`excluded.updated_at`,
-          // A closed channel is no longer followed.
-          following: sql`case when excluded.status = ${CHAIN_CHANNEL_CLOSED} then 0 else ${chainChannels.following} end`,
-        },
-      }),
+  return chunksFor(chainChannels, rows, 2).map((chunk) =>
+    ownedInsert(orm, chainChannels, chunk, lease).onConflictDoUpdate({
+      target: chainChannels.channel,
+      set: {
+        status: sql`excluded.status`,
+        depositAtomic: sql`coalesce(excluded.deposit_atomic, ${chainChannels.depositAtomic})`,
+        settledAtomic: sql`coalesce(excluded.settled_atomic, ${chainChannels.settledAtomic})`,
+        payoutAtomic: sql`coalesce(excluded.payout_atomic, ${chainChannels.payoutAtomic})`,
+        accountReadAt: sql`excluded.account_read_at`,
+        updatedAt: sql`excluded.updated_at`,
+        // A closed channel is no longer followed.
+        following: sql`case when excluded.status = ${CHAIN_CHANNEL_CLOSED} then 0 else ${chainChannels.following} end`,
+      },
+    }),
   );
 }
 
@@ -292,6 +320,7 @@ export function programCounts(
   orm: CollectorDatabase,
   entries: readonly ChainSignature[],
   now: number,
+  lease: number | null,
 ): BatchItem[] {
   const days = new Map<string, { transactions: number; failed: number }>();
   for (const entry of entries) {
@@ -308,10 +337,17 @@ export function programCounts(
     updatedAt: now,
   }));
   return [
-    ...chunksFor(chainProgramDaily, rows).map((chunk) =>
-      orm
+    ...chunksFor(chainProgramDaily, rows, 2).map((chunk) => {
+      const values = sql.join(
+        chunk.map(
+          (row) =>
+            sql`(${row.day}, ${row.transactions}, ${row.failed}, ${row.updatedAt})`,
+        ),
+        sql`, `,
+      );
+      return orm
         .insert(chainProgramDaily)
-        .values(chunk)
+        .select(sql`select * from (values ${values}) where ${owned(lease)}`)
         .onConflictDoUpdate({
           target: chainProgramDaily.day,
           set: {
@@ -319,13 +355,15 @@ export function programCounts(
             failed: sql`${chainProgramDaily.failed} + excluded.failed`,
             updatedAt: sql`excluded.updated_at`,
           },
-        }),
-    ),
-    ...chunksFor(aggChainDirtyDays, rows).map((chunk) =>
-      orm
-        .insert(aggChainDirtyDays)
-        .values(chunk.map(({ day }) => ({ day })))
-        .onConflictDoNothing(),
+        });
+    }),
+    ...chunksFor(aggChainDirtyDays, rows, 2).map((chunk) =>
+      ownedInsert(
+        orm,
+        aggChainDirtyDays,
+        chunk.map(({ day }) => ({ day })),
+        lease,
+      ).onConflictDoNothing(),
     ),
   ];
 }
@@ -337,6 +375,7 @@ export function followUpdate(
   channel: string,
   follow: { until: string | null; following: boolean },
   now: number,
+  lease: number | null,
 ): BatchItem {
   return orm
     .update(chainChannels)
@@ -345,5 +384,5 @@ export function followUpdate(
       following: follow.following ? 1 : 0,
       followedAt: now,
     })
-    .where(sql`${chainChannels.channel} = ${channel}`);
+    .where(sql`${chainChannels.channel} = ${channel} and ${owned(lease)}`);
 }

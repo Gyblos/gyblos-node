@@ -23,6 +23,7 @@ import {
 } from '@gyblos/metrics-collector/constants';
 
 import {
+  BLOCK_TIME_S,
   endpoints,
   failingWith,
   fakeChainRpc,
@@ -344,5 +345,142 @@ void test('a failing lease release after a clean run reports the release phase',
       assert.equal((error as { cleanupFailed?: boolean }).cleanupFailed, false);
       return true;
     },
+  );
+});
+
+void test('a run that lost its lease mid-flight neither counts nor moves the cursor', async () => {
+  const database = createCollectorD1();
+  const { rpc } = fakeChainRpc(plain(3, 'p'));
+  const foreignLease = 2000;
+  const takeover: ChainRpc = {
+    ...rpc,
+    signatures(address, range) {
+      database.raw
+        .prepare(
+          'UPDATE collector_chain_cursor SET lease_until = ? WHERE id = ?',
+        )
+        .run(foreignLease, CHAIN_CURSOR_ID);
+      return rpc.signatures(address, range);
+    },
+  };
+  await runChainIndex(database, endpoints(takeover), 1000);
+  assert.equal(counted(database), 0);
+  assert.deepEqual(
+    rows(database, 'SELECT newest_signature FROM collector_chain_cursor'),
+    [{ newest_signature: null }],
+  );
+  await runChainIndex(database, endpoints(rpc), foreignLease + 1);
+  assert.equal(counted(database), 3);
+});
+
+void test('a run reads the cursor after taking the lease, never a stale snapshot', async () => {
+  const database = createCollectorD1();
+  const { rpc } = fakeChainRpc(plain(3, 'p'));
+  database.raw.exec(
+    'INSERT INTO collector_chain_cursor (id, gap_full, backfill_full, backfill_done, updated_at) VALUES (1, 0, 0, 0, 0)',
+  );
+  const day = new Date(BLOCK_TIME_S * 1000).toISOString().slice(0, 10);
+  const prepare = database.prepare.bind(database);
+  let seeded = false;
+  database.prepare = (sql) => {
+    if (!seeded && sql.startsWith('update') && sql.includes('lease_until')) {
+      seeded = true;
+      database.raw
+        .prepare(
+          'UPDATE collector_chain_cursor SET newest_signature = ?, backfill_before = ? WHERE id = ?',
+        )
+        .run('p3', 'p2', CHAIN_CURSOR_ID);
+      database.raw
+        .prepare(
+          'INSERT INTO collector_chain_program_daily (day, transactions, failed, updated_at) VALUES (?, 2, 0, 0)',
+        )
+        .run(day);
+    }
+    return prepare(sql);
+  };
+  const run = await runChainIndex(database, endpoints(rpc), 1000);
+  assert.equal(run.listed, 1);
+  assert.equal(counted(database), 3);
+});
+
+void test('a run that lost its lease never moves a followed channel cursor', async () => {
+  const database = createCollectorD1();
+  database.raw.exec(
+    `INSERT INTO collector_chain_channels (channel, gyblos, status, following, follow_until, last_signature, last_slot, updated_at)
+       VALUES ('chan', 1, 'open', 1, 'sig-start', 'sig-start', 1, 0)`,
+  );
+  const history = plain(2, 'f');
+  for (const entry of history) entry.addresses.push('chan');
+  const { rpc } = fakeChainRpc(history);
+  const takeover: ChainRpc = {
+    ...rpc,
+    signatures(address, range) {
+      database.raw
+        .prepare(
+          'UPDATE collector_chain_cursor SET lease_until = ? WHERE id = ?',
+        )
+        .run(2000, CHAIN_CURSOR_ID);
+      return rpc.signatures(address, range);
+    },
+  };
+  await runChainIndex(database, endpoints(takeover), 1000);
+  assert.deepEqual(
+    rows(
+      database,
+      "SELECT follow_until FROM collector_chain_channels WHERE channel = 'chan'",
+    ),
+    [{ follow_until: 'sig-start' }],
+  );
+});
+
+void test('a page spanning more days than one count statement holds stays countable', async () => {
+  const database = createCollectorD1();
+  const DAY_MS = 86_400_000;
+  const base = Date.UTC(2026, 11, 28);
+  const history = Array.from({ length: 27 }, (_, index) =>
+    withSignature(`day${index}`, undefined, {
+      blockTimeMs: base - index * DAY_MS,
+    }),
+  );
+  const { rpc } = fakeChainRpc(history);
+  await runChainIndex(database, endpoints(rpc), 1000);
+  assert.equal(counted(database), 27);
+});
+
+void test('a run that lost its lease writes no transaction or channel rows', async () => {
+  const database = createCollectorD1();
+  const history = lifecycle();
+  const { rpc } = fakeChainRpc(history, { [CHANNEL]: null });
+  const takeover: ChainRpc = {
+    ...rpc,
+    signatures(address, range) {
+      database.raw
+        .prepare(
+          'UPDATE collector_chain_cursor SET lease_until = ? WHERE id = ?',
+        )
+        .run(2000, CHAIN_CURSOR_ID);
+      return rpc.signatures(address, range);
+    },
+  };
+  await runChainIndex(database, endpoints(takeover), 1000);
+  assert.deepEqual(
+    rows(database, 'SELECT count(*) AS c FROM collector_chain_txs'),
+    [{ c: 0 }],
+  );
+  assert.deepEqual(
+    rows(database, 'SELECT count(*) AS c FROM collector_chain_channels'),
+    [{ c: 0 }],
+  );
+  assert.deepEqual(
+    rows(database, 'SELECT count(*) AS c FROM collector_chain_instructions'),
+    [{ c: 0 }],
+  );
+  assert.deepEqual(
+    rows(database, 'SELECT count(*) AS c FROM collector_chain_token_deltas'),
+    [{ c: 0 }],
+  );
+  assert.deepEqual(
+    rows(database, 'SELECT count(*) AS c FROM collector_agg_chain_dirty_days'),
+    [{ c: 0 }],
   );
 });

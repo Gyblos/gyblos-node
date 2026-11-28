@@ -12,7 +12,7 @@ import type { ChainTransaction } from './decode';
 import { ChainRpcError, type ChainSignature } from './rpc';
 import { readTransaction, type ChainRun } from './run';
 import {
-  cursorUpsert,
+  cursorUpdate,
   listsGyblosMemo,
   programCounts,
   transactionWrites,
@@ -46,9 +46,9 @@ async function storeListPage(
   if (stored.length) {
     const cursor = after(stored, lastPage && stored.length === page.length);
     await run.orm.batch([
-      cursorUpsert(run.orm, CHAIN_CURSOR_ID, cursor, run.now),
-      ...programCounts(run.orm, stored, run.now),
-      ...transactionWrites(run.orm, read, run.now),
+      cursorUpdate(run.orm, CHAIN_CURSOR_ID, cursor, run.now, run.lease),
+      ...programCounts(run.orm, stored, run.now, run.lease),
+      ...transactionWrites(run.orm, read, run.now, run.lease),
     ]);
     run.cursor = cursor;
     run.listed += stored.length;
@@ -75,7 +75,7 @@ function refuseOlder(page: ChainSignature[], untilSlot: number | null) {
 async function saveCursor(run: ChainRun, cursor: ChainCursorState) {
   run.cursor = cursor;
   await run.orm.batch([
-    cursorUpsert(run.orm, CHAIN_CURSOR_ID, cursor, run.now),
+    cursorUpdate(run.orm, CHAIN_CURSOR_ID, cursor, run.now, run.lease),
   ]);
 }
 
