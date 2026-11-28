@@ -19,8 +19,12 @@ export class UnsentOpeningError extends BatchChannelError {
       | typeof SESSION_CODES.OPENING_ABSENT
       | typeof SESSION_CODES.OPENING_PENDING
       | typeof SESSION_CODES.OPENING_RETURNED,
+    readonly acknowledged = false,
   ) {
     super(code);
+  }
+  get canReleaseInference() {
+    return this.acknowledged || this.code === SESSION_CODES.OPENING_ABSENT;
   }
 }
 export async function recoverBuyerOpening<T>(
@@ -62,7 +66,7 @@ export async function recoverBuyerOpening<T>(
           signal: confirmation,
         }).catch(() => undefined);
       }
-      throw new UnsentOpeningError(SESSION_CODES.OPENING_PENDING);
+      throw new UnsentOpeningError(SESSION_CODES.OPENING_PENDING, true);
     }
     return first.value;
   }

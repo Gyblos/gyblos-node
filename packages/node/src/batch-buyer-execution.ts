@@ -206,7 +206,7 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
     signal,
     options.financialPermission,
   ).catch(async (error: unknown) => {
-    if (error instanceof UnsentOpeningError || signal.aborted)
+    if (error instanceof UnsentOpeningError && error.canReleaseInference)
       await release?.().catch(() => undefined);
     throw error;
   });
