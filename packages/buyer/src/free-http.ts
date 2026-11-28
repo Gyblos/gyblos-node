@@ -19,7 +19,10 @@ import type {
 } from '@gyblos/node/buyer-api-keys';
 import { desktopOpening } from '@gyblos/node/desktop-opening';
 import { BUYER_API, type BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
-import { FREE_EXECUTION } from '@gyblos/protocol/constants';
+import {
+  FREE_EXECUTION,
+  OFFER_PRICING_KINDS,
+} from '@gyblos/protocol/constants';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
 import type { DiagnosticSink } from '@gyblos/runtime/diagnostics';
 import { acceptLoopbackHost } from '@gyblos/runtime/loopback-host';
@@ -227,6 +230,8 @@ async function serveChat(
       settings,
       scoped.stream !== undefined,
       selectedSellerAllowed,
+      request.headers[BUYER_API.EXPLICIT_FREE_HEADER] ===
+        OFFER_PRICING_KINDS.FREE,
     );
     if (
       route.openingIntent &&

@@ -41,6 +41,20 @@ export function policyForSeller(
     maxTokens: Math.min(choice.contextTokens, policy.maxTokens),
   });
 }
+export function chatHeaders(
+  token: string,
+  policyId: string,
+  explicitFree?: boolean,
+) {
+  return {
+    authorization: 'Bearer ' + token,
+    'content-type': 'application/json',
+    'if-match': '"' + policyId + '"',
+    ...(explicitFree && {
+      [BUYER_API.EXPLICIT_FREE_HEADER]: OFFER_PRICING_KINDS.FREE,
+    }),
+  };
+}
 export function sellerFields(choice?: DesktopSellerChoice) {
   if (choice === OFFER_PRICING_KINDS.FREE)
     return { [BUYER_API.FREE_ONLY_FIELD]: true };

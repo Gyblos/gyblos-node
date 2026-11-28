@@ -20,6 +20,7 @@ import {
 } from '@gyblos/protocol/buyer-api-keys';
 import {
   ENGINE_DONE_REASONS,
+  FREE_CHAT_ROLES,
   OFFER_PRICING_KINDS,
   P2P_ROLES,
 } from '@gyblos/protocol/constants';
@@ -110,7 +111,7 @@ for (const scenario of ['restart', 'live', 'desktop'])
         },
         body: JSON.stringify({
           model: policy.model,
-          messages: [{ role: 'user', content: 'synthetic' }],
+          messages: [{ role: FREE_CHAT_ROLES.USER, content: 'synthetic' }],
           max_completion_tokens: 128,
           stream: true,
         }),
@@ -167,25 +168,22 @@ for (const scenario of ['restart', 'live', 'desktop'])
           ).json(),
         );
         const submit = (explicit: boolean) =>
-          owner(
-            new URL(
-              explicit ? BUYER_API.CHANNEL_CHAT_PATH : BUYER_API.CHAT_PATH,
-              host.buyer().url,
-            ),
-            {
-              method: 'POST',
-              headers: {
-                'content-type': 'application/json',
-                'if-match': JSON.stringify(currentPolicy.policyId),
-              },
-              body: JSON.stringify({
-                ...(explicit && { [BUYER_API.FREE_ONLY_FIELD]: true }),
-                model: policy.model,
-                messages: [{ role: 'user', content: 'synthetic' }],
-                stream: true,
+          owner(new URL(BUYER_API.CHANNEL_CHAT_PATH, host.buyer().url), {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+              'if-match': JSON.stringify(currentPolicy.policyId),
+              ...(explicit && {
+                [BUYER_API.EXPLICIT_FREE_HEADER]: OFFER_PRICING_KINDS.FREE,
               }),
             },
-          );
+            body: JSON.stringify({
+              [BUYER_API.FREE_ONLY_FIELD]: true,
+              model: policy.model,
+              messages: [{ role: FREE_CHAT_ROLES.USER, content: 'synthetic' }],
+              stream: true,
+            }),
+          });
         const automatic = await submit(false);
         assert.match(
           await automatic.text(),
@@ -240,7 +238,7 @@ for (const scenario of ['restart', 'live', 'desktop'])
           },
           body: JSON.stringify({
             model: policy.model,
-            messages: [{ role: 'user', content }],
+            messages: [{ role: FREE_CHAT_ROLES.USER, content }],
             max_completion_tokens: 128,
             stream: true,
           }),

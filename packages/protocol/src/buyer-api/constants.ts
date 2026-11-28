@@ -8,6 +8,7 @@ export const BUYER_API = {
   PAID_PREPARATION_HEADER: 'gyblos-paid-preparation',
   CHANNEL_CHAT_PATH: '/v1/gyblos/channel-chat',
   AUTO: 'auto',
+  EXPLICIT_FREE_HEADER: 'gyblos-explicit-free',
   AUTO_FIELD: 'gyblos_auto',
   FREE_ONLY_FIELD: 'gyblos_free_only',
   OPENING_INTENT_FIELD: 'gyblos_opening_intent',

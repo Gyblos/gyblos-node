@@ -12,6 +12,7 @@ import {
 import { parseX402Result, x402Explorer } from '@gyblos/desktop/x402-model';
 import { SESSION_VERDICTS } from '@gyblos/node/constants';
 import { BUYER_API } from '@gyblos/protocol/buyer-api';
+import { OFFER_PRICING_KINDS } from '@gyblos/protocol/constants';
 
 import { budget, policy, reply, token } from './support/desktop-paid-chat';
 
@@ -333,6 +334,10 @@ void test('an explicit free chat under a paid policy cannot spend or change API 
     if (options?.method !== 'POST') return Response.json(policy);
     assert.equal(new URL(String(url)).pathname, BUYER_API.CHANNEL_CHAT_PATH);
     const request = JSON.parse(String(options.body));
+    assert.equal(
+      new Headers(options.headers).get(BUYER_API.EXPLICIT_FREE_HEADER),
+      posts < 2 ? OFFER_PRICING_KINDS.FREE : null,
+    );
     assert.equal(request[BUYER_API.FREE_ONLY_FIELD], true);
     posts++;
     if (claimPaid) return Response.json(reply());
@@ -344,6 +349,13 @@ void test('an explicit free chat under a paid policy cannot spend or change API 
   assert.equal(posts, 1);
   claimPaid = false;
   await client.send('free-turn', 'test', undefined, 'free');
+  await client.send(
+    'auto-free-turn',
+    'test',
+    undefined,
+    OFFER_PRICING_KINDS.FREE,
+    { id: policy.model, modelId: policy.model, maxTokens: policy.maxTokens },
+  );
   assert.deepEqual(client.policy(), policy);
   assert.equal((await ledger.summary()).spentAtomic, '0');
   assert.equal((await ledger.summary()).active, false);

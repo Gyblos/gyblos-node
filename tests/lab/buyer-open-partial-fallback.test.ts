@@ -3,7 +3,11 @@ import { test } from 'node:test';
 
 import { batchSessionPathsIn } from '@gyblos/config';
 import { inspectBatchSession } from '@gyblos/payments-upto/batch-session';
-import { MODEL_IDS, P2P_ROLES } from '@gyblos/protocol/constants';
+import {
+  FREE_CHAT_ROLES,
+  MODEL_IDS,
+  P2P_ROLES,
+} from '@gyblos/protocol/constants';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
 import { acceptanceWait } from '../support/acceptance-wait';
@@ -43,7 +47,7 @@ void test(
         },
         body: JSON.stringify({
           model: MODEL_IDS.QWEN3_0_6B,
-          messages: [{ role: 'user', content }],
+          messages: [{ role: FREE_CHAT_ROLES.USER, content }],
           max_completion_tokens: 128,
           stream: true,
         }),

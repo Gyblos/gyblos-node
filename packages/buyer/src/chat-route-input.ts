@@ -78,6 +78,7 @@ export function routedInput(
   settings: ChatSettings,
   streaming: boolean,
   selectedSellerAllowed: boolean,
+  explicitFree = false,
 ) {
   const mode = parseDesktopMode(body, settings, selectedSellerAllowed);
   body = mode.body;
@@ -136,7 +137,7 @@ export function routedInput(
     payload: withoutStop(rest),
     route: {
       ...route,
-      ...(freeOnly && { freeOnly: true }),
+      ...(freeOnly && { freeOnly: true, explicitFree }),
       ...(openingIntent && { openingIntent }),
     },
     model,

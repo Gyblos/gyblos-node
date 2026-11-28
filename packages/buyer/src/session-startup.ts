@@ -270,7 +270,7 @@ function sessionExecutor(
         onDelta,
         onUnfit,
         retries,
-        model?.freeOnly === true,
+        model?.explicitFree === true,
       ),
       paid: (winner, current, sending) => {
         if (retries.failure()) throw retries.failure();
