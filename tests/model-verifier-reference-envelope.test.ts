@@ -12,20 +12,16 @@ import { openReference } from '@gyblos/model-verifier/reference';
 const DIGEST = 'cd'.repeat(32);
 
 function validEnvelope() {
+  const tokenize = (token: string) => ({
+    token,
+    logprob: -0.1,
+    bytes: Array.from(new TextEncoder().encode(token)),
+  });
   const topLogprobs = Array.from(
     { length: CHALLENGE_SET.rule.topLogprobs },
-    (_, index) => ({
-      token: ` token${index}`,
-      logprob: -0.1,
-      bytes: [32, 116],
-    }),
+    (_, index) => tokenize(` token${index}`),
   );
-  const entry = {
-    token: ' token0',
-    logprob: -0.1,
-    bytes: [32, 116],
-    top_logprobs: topLogprobs,
-  };
+  const entry = { ...tokenize(' token0'), top_logprobs: topLogprobs };
   return {
     response: ' token0',
     done: true,
@@ -136,23 +132,25 @@ void test('malformed reference response envelopes are rejected at the boundary',
 });
 
 void test('a full valid reference envelope is accepted', async () => {
-  const fetchImpl: typeof fetch = async (input) =>
-    String(input).endsWith('/api/tags')
-      ? tagsResponse()
-      : Response.json(validEnvelope());
-  const reference = await openReference(
-    'http://127.0.0.1:11434',
-    'qwen3-1.7b',
-    fetchImpl,
-    0,
-  );
-  const candidates = await reference.candidates(
-    'prompt',
-    CHALLENGE_SET.rule.topLogprobs,
-  );
-  assert.equal(candidates?.length, CHALLENGE_SET.rule.topLogprobs);
-  assert.equal(candidates?.[0]?.token, ' token0');
-  assert.equal(candidates?.[0]?.logprob, -0.1);
+  const json = JSON.stringify(validEnvelope());
+  const bodies = [json, '\uFEFF' + json];
+  for (const body of bodies) {
+    const fetchImpl: typeof fetch = async (input) =>
+      String(input).endsWith('/api/tags') ? tagsResponse() : new Response(body);
+    const reference = await openReference(
+      'http://127.0.0.1:11434',
+      'qwen3-1.7b',
+      fetchImpl,
+      0,
+    );
+    const candidates = await reference.candidates(
+      'prompt',
+      CHALLENGE_SET.rule.topLogprobs,
+    );
+    assert.equal(candidates?.length, CHALLENGE_SET.rule.topLogprobs);
+    assert.equal(candidates?.[0]?.token, ' token0');
+    assert.equal(candidates?.[0]?.logprob, -0.1);
+  }
 });
 
 void test('reference responses with invalid UTF-8 bytes fail closed', async () => {
