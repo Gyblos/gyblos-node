@@ -269,7 +269,7 @@ void test(
       { depositAtomic: '10000', renewalBudgetAtomic: '10060' },
     );
     t.after(host.close);
-    const { ask } = await buyerClient(host, request, '50000');
+    const { ask, owner } = await buyerClient(host, request, '50000');
     const paths = batchSessionPathsIn(process.env, P2P_ROLES.BUYER);
     const first = await ask(64);
     assert.equal(first.status, 200, await first.clone().text());
@@ -321,11 +321,71 @@ void test(
     const smaller: BuyerSelectionConfig = JSON.parse(config);
     smaller.request.maxAtomic = '1000';
     await writeFile(configPath, JSON.stringify(smaller));
+    await setBuyerRenewalBudget(process.env, '10000');
+    await host.restartBoth();
+    const lowered = await ask(64);
+    const denied = (await lowered.json()).error;
+    assert.equal(denied?.code, SESSION_CODES.LIMIT);
+    assert.equal(denied[BUYER_API.NEVER_SENT_FIELD], true);
+    const status = parseBuyerApiKeysReply(
+      await (
+        await owner(new URL(BUYER_API_KEYS.PATH, host.buyer().url))
+      ).json(),
+    ).snapshot;
+    assert.equal(status.blocked, false);
+    assert.equal(status.keys[0]?.reservedAtomic, '0');
+    assert.deepEqual(host.finance.calls, calls);
+    await host.stopBuyer();
     await setBuyerRenewalBudget(process.env, null);
     await host.restartBoth();
     const remaining = await ask(64);
     assert.equal(remaining.status, 200, await remaining.clone().text());
     assert.equal(host.engine.attempts(), 3);
     assert.deepEqual(host.finance.calls, calls);
+  },
+);
+
+void test(
+  'a quote that expires during confirmed close leaves an unfunded replacement usable by the next request',
+  { skip: NATIVE_CAPABILITY.transportSkip },
+  async (t) => {
+    const request = globalThis.fetch;
+    const realNow = Date.now;
+    let offset = 0;
+    t.mock.method(Date, 'now', () => realNow() + offset);
+    const host = await sessionProductHost(
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { depositAtomic: '10000', renewalBudgetAtomic: '30000' },
+    );
+    t.after(host.close);
+    const { ask } = await buyerClient(host, request, '50000');
+    const first = await ask(64);
+    assert.equal(first.status, 200, await first.clone().text());
+    const recordSettlement = host.finance.settled.set.bind(
+      host.finance.settled,
+    );
+    t.mock.method(
+      host.finance.settled,
+      'set',
+      (...args: Parameters<typeof recordSettlement>) => {
+        offset = 60000;
+        return recordSettlement(...args);
+      },
+    );
+    const stale = await ask(64);
+    assert.equal(stale.ok, false);
+    const paths = batchSessionPathsIn(process.env, P2P_ROLES.BUYER);
+    const stored = await inspectBatchSession(paths);
+    assert.equal(stored?.empty, true);
+    assert.equal((await stale.json()).error[BUYER_API.NEVER_SENT_FIELD], true);
+    assert.equal(host.engine.attempts(), 1);
+    assert.deepEqual(host.finance.calls, ['deposit', 'refund']);
+    const fresh = await ask(64);
+    assert.equal(fresh.status, 200, await fresh.clone().text());
+    assert.equal(host.engine.attempts(), 2);
+    assert.deepEqual(host.finance.calls, ['deposit', 'refund', 'deposit']);
   },
 );

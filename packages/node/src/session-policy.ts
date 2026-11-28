@@ -141,6 +141,7 @@ export function checkChannelAuthority(
   terms: PaymentSessionTerms,
   priorSpent: string,
   now: number,
+  nodeId: string,
 ) {
   if (
     BigInt(terms.depositAtomic) > BigInt(policy.depositAtomic) ||
@@ -152,7 +153,7 @@ export function checkChannelAuthority(
     terms.treasury !== PROTOCOL_FEE.treasury ||
     terms.expiresAt - now > policy.lifetimeMs
   )
-    return sessionFail(SESSION_CODES.LIMIT);
+    throw new UnsentChannelLimitError(nodeId);
 }
 
 export function replacementTerms(

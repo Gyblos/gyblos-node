@@ -228,6 +228,7 @@ async function run<Remote extends BatchDestination>(
     opened.terms,
     opened.priorSpentAtomic,
     options.now(),
+    quote.offer.nodeId,
   );
   const switching =
     opened.terms.sellerNodeId !== quote.offer.nodeId ||
@@ -303,6 +304,7 @@ async function renewable<Remote extends BatchDestination>(
     ),
   );
   signal.throwIfAborted();
+  await plan.verify();
   return current(state, quote, signal, start);
 }
 

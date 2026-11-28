@@ -232,7 +232,10 @@ void test('renewal refuses a full byte budget before replacing any proof', async
   );
   const full = JSON.stringify(record);
   await writeFile(options.paths.state, full);
-  assert.ok(await inspectBatchSession(options.paths));
+  assert.equal(
+    (await inspectBatchSession(options.paths))?.renewalLimitReached,
+    true,
+  );
   await assert.rejects(renewBatchSession(options), {
     code: SESSION_CODES.LIMIT,
   });

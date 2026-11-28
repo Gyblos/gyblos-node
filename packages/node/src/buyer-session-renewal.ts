@@ -15,6 +15,7 @@ import {
 import type { BatchDestination } from '@gyblos/transport-iroh/batch-client';
 
 import {
+  UnsentChannelRequestError,
   UnsentSellerChoiceError,
   type StartChannelWork,
 } from './buyer-channel-prepare';
@@ -69,12 +70,7 @@ export async function prepareRenewal<Remote extends BatchDestination>(
       canRenew,
     );
   const verify = (terms: PaymentSessionTerms) =>
-    verifyBatchQuote(
-      quote,
-      terms,
-      options.endpoint.id().toString(),
-      options.now(),
-    );
+    verifyReplacementQuote(state, quote, terms);
   await verify(proposed);
   const stored = await options.inspect();
   if (!stored || stored.pending) return sessionFail(SESSION_CODES.UNVERIFIED);
@@ -96,10 +92,30 @@ export async function prepareRenewal<Remote extends BatchDestination>(
       (await start(() => opened.host.close(signal))))
     : undefined;
   const terms = replacement(settlement?.chargedAtomic ?? '0');
-  await verify(terms);
   signal.throwIfAborted();
   await disconnectChannel(opened);
-  return { channelId: snapshot.channelId, terms };
+  return {
+    channelId: snapshot.channelId,
+    terms,
+    verify: () => verify(terms),
+  };
+}
+
+async function verifyReplacementQuote<Remote extends BatchDestination>(
+  state: State<Remote>,
+  quote: SignedOfferV2,
+  terms: PaymentSessionTerms,
+) {
+  try {
+    await verifyBatchQuote(
+      quote,
+      terms,
+      state.options.endpoint.id().toString(),
+      state.options.now(),
+    );
+  } catch (error) {
+    throw new UnsentChannelRequestError(quote.offer.nodeId, error);
+  }
 }
 
 function canUseCurrent(

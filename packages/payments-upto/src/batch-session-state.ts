@@ -38,7 +38,7 @@ export interface BatchStoredSession {
   empty?: true;
   priorSpentAtomic?: string;
 }
-async function readRecord(paths: BatchPaths): Promise<BatchRecord | undefined> {
+async function readRecord(paths: BatchPaths) {
   try {
     await lstat(paths.state);
   } catch (error) {
@@ -56,24 +56,36 @@ async function readRecord(paths: BatchPaths): Promise<BatchRecord | undefined> {
     const raw: unknown = JSON.parse(text);
     if (!raw || typeof raw !== 'object' || !('terms' in raw))
       return sessionFail();
-    return parseRecord(raw, termsFor(raw.terms));
+    return {
+      record: parseRecord(raw, termsFor(raw.terms)),
+      bytes: Buffer.byteLength(text),
+    };
   } catch {
     return sessionFail(SESSION_CODES.UNAVAILABLE);
   }
 }
-export async function readBatchRecord(paths: BatchPaths) {
+async function readState(paths: BatchPaths) {
   try {
     return await withBatchState(paths, () => readRecord(paths));
   } catch {
     return sessionFail(SESSION_CODES.UNAVAILABLE);
   }
 }
+export async function readBatchRecord(paths: BatchPaths) {
+  return (await readState(paths))?.record;
+}
 export async function inspectBatchSession(
   paths: BatchPaths,
 ): Promise<BatchStoredSession | undefined> {
-  const record = await readBatchRecord(paths);
-  if (!record) return undefined;
-  return storedBatchSession(record);
+  const read = await readState(paths);
+  if (!read) return undefined;
+  const stored = storedBatchSession(read.record);
+  if (
+    read.bytes + BATCH_RENEWAL_STATE.settlementAndPreparationBytes >
+    BATCH_SESSION_DEFAULTS.stateBytes
+  )
+    stored.renewalLimitReached = true;
+  return stored;
 }
 export function storedBatchSession(record: BatchRecord): BatchStoredSession {
   const pending = Object.values(record.requests).filter(
