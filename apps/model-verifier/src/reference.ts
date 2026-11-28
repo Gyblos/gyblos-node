@@ -1,6 +1,8 @@
 import { setTimeout as delay } from 'node:timers/promises';
 
 import { ROUTES } from '@gyblos/config';
+import { boundedText } from '@gyblos/core/engine-http';
+import { jsonFields } from '@gyblos/core/engine-provider';
 import { MODEL_CLASSIFICATIONS } from '@gyblos/protocol/constants';
 import { resolveModel, usesPinnedTokenizer } from '@gyblos/protocol/models';
 
@@ -17,6 +19,8 @@ export interface ReferenceModel {
   candidates(prompt: string, topLogprobs: number): Promise<Candidate[] | null>;
   confirm(): Promise<void>;
 }
+
+const MAX_BYTE_VALUE = 255;
 
 const unavailable = () =>
   new ModelVerifierError(MODEL_VERIFIER_CODES.REFERENCE_UNAVAILABLE);
@@ -70,29 +74,57 @@ async function call(
     throw unavailable();
   }
   try {
-    return record(await response.json());
+    return jsonFields(
+      await boundedText(response, MODEL_VERIFIER.referenceMaxResponseBytes),
+    );
   } catch {
     throw unavailable();
   }
+}
+
+function validBytes(value: unknown) {
+  return (
+    value === undefined ||
+    (Array.isArray(value) &&
+      value.every(
+        (byte) => Number.isInteger(byte) && byte >= 0 && byte <= MAX_BYTE_VALUE,
+      ))
+  );
+}
+
+function validLogprob(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value <= 0;
+}
+
+function validOptionalTokenLogprob(entry: Record<string, unknown>) {
+  if ('token' in entry && typeof entry.token !== 'string') return false;
+  if ('logprob' in entry && !validLogprob(entry.logprob)) return false;
+  return validBytes(entry.bytes);
 }
 
 function parseCandidates(
   body: Record<string, unknown>,
   topLogprobs: number,
 ): Candidate[] | null {
+  if (
+    body.done !== true ||
+    typeof body.response !== 'string' ||
+    ('done_reason' in body && typeof body.done_reason !== 'string')
+  )
+    throw unavailable();
   const logprobs = body.logprobs;
-  if (logprobs === undefined && body.done === true && body.response === '')
-    return null;
-  const first = Array.isArray(logprobs) ? record(logprobs[0]) : {};
+  if (logprobs === undefined && body.response === '') return null;
+  if (!Array.isArray(logprobs) || logprobs.length !== 1) throw unavailable();
+  const first = record(logprobs[0]);
+  if (!validOptionalTokenLogprob(first)) throw unavailable();
   const top = first.top_logprobs;
   if (!Array.isArray(top) || top.length !== topLogprobs) throw unavailable();
   const candidates = top.map((item) => {
     const candidate = record(item);
     if (
       typeof candidate.token !== 'string' ||
-      typeof candidate.logprob !== 'number' ||
-      !Number.isFinite(candidate.logprob) ||
-      candidate.logprob > 0
+      !validLogprob(candidate.logprob) ||
+      !validBytes(candidate.bytes)
     )
       throw unavailable();
     return { token: candidate.token, logprob: candidate.logprob };

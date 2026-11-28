@@ -41,7 +41,8 @@ puntuación distinguen entre un fallo de cotización, un fallo de ejecución y u
 respuesta que no se pudo puntuar, incluida una por encima del límite de tokens de salida. Los fallos de cotización y ejecución registran
 un código, no los detalles originales del error.
 
-Si el Ollama de referencia devuelve una lista de candidatos vacía, incompleta o malformada y los reintentos no lo resuelven, el comando
+Las respuestas de referencia se leen con un límite de un MiB. Si el Ollama de referencia devuelve un sobre de respuesta por encima del límite,
+incompleto o malformado, incluida una lista de candidatos vacía, incompleta o malformada, y los reintentos no lo resuelven, el comando
 se detiene con `REFERENCE_UNAVAILABLE` y no emite un resultado firmado. Una lista completa puede contener cadenas vacías
 para alternativas improbables que no coinciden; las alternativas vacías que podrían afectar una decisión, o una lista sin
 ningún token utilizable, siguen siendo errores de la referencia. Es un error de la referencia, no un veredicto sobre el vendedor.

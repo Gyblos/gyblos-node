@@ -8,6 +8,7 @@ export const MODEL_VERIFIER = {
   referenceTimeoutMs: 120_000,
   referenceAttempts: 3,
   referenceRetryMs: 3_000,
+  referenceMaxResponseBytes: 1_048_576,
   answerTimeoutMs: 180_000,
   directoryMode: 0o700,
   stagingPrefix: '.verification-',
