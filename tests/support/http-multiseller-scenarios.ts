@@ -57,6 +57,26 @@ async function generated(
     host.signal,
   );
 }
+async function cancelQueuedRequest(host: HttpMultisellerHost) {
+  const marker = 'cancelled-waiter';
+  const abort = new AbortController();
+  const observation = httpMultiHttpObservation(host, marker);
+  try {
+    const request = httpMultiChat(host, abort.signal, marker);
+    const rejected = assert.rejects(request);
+    await httpMultiPhase(observation.bodyRead, request, host.signal);
+    abort.abort();
+    await rejected;
+    await httpMultiPhase(
+      observation.closed,
+      new Promise(() => {}),
+      host.signal,
+    );
+  } finally {
+    abort.abort();
+    observation.dispose();
+  }
+}
 async function parallel(host: HttpMultisellerHost) {
   const [a, b] = host.sellers;
   host.index.available(false);
@@ -77,10 +97,7 @@ async function parallel(host: HttpMultisellerHost) {
   );
   const second = httpMultiChat(host);
   await generated(host, 1, 1);
-  assert.equal(
-    (await httpMultiChat(host)).response.status,
-    HTTP_STATUS.tooManyRequests,
-  );
+  await cancelQueuedRequest(host);
   assert.equal((await host.inspect()).length, 2);
   // Force the actual publisher's busy withdrawal rather than relying on a fast test run.
   await host.waitListed(0);
@@ -134,20 +151,9 @@ async function queue(host: HttpMultisellerHost) {
   );
   assert.equal((await host.inspect()).length, 1);
   assert.equal(host.ledger.calls.length, 1);
-  const abort = new AbortController();
-  const disconnected = httpMultiHttpObservation(host, 'cancelled-waiter');
   const next = httpMultiHttpObservation(host, 'fresh-waiter');
   try {
-    const cancelled = httpMultiChat(host, abort.signal, 'cancelled-waiter');
-    const rejected = assert.rejects(cancelled);
-    await httpMultiPhase(disconnected.bodyRead, cancelled, host.signal);
-    abort.abort();
-    await rejected;
-    await httpMultiPhase(
-      disconnected.closed,
-      new Promise(() => {}),
-      host.signal,
-    );
+    await cancelQueuedRequest(host);
     // Use the normal configured wait; cancellation must free admission before its deadline.
     const second = httpMultiChat(host, host.signal, 'fresh-waiter');
     await httpMultiPhase(next.bodyRead, second, host.signal);
@@ -155,7 +161,6 @@ async function queue(host: HttpMultisellerHost) {
     httpMultiAnswer(await first, 0);
     httpMultiAnswer(await second, 0);
   } finally {
-    disconnected.dispose();
     next.dispose();
   }
   assert.equal((await a.health()).generations, 2);
