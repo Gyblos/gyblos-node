@@ -15,6 +15,7 @@ import {
   createSession,
   endActivity,
   failPaidRun,
+  restoredPaidDraft,
   startRun,
   stopRun,
   type ChatSession,
@@ -307,11 +308,7 @@ export class ChatController {
         ? session
         : {
             ...session,
-            draft:
-              session.paypalRun &&
-              session.draftRevision === session.paypalRun.draftRevision
-                ? session.paypalRun.prompt
-                : session.draft,
+            draft: restoredPaidDraft(session),
             paypalRun: null,
             messages: session.messages.map((message) =>
               message.id === `${id}-assistant`

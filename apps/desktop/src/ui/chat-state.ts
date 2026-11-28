@@ -200,6 +200,13 @@ export function toggleToolSelection(
     : [...enabled, id];
 }
 
+export function restoredPaidDraft(session: ChatSession) {
+  const run = session.paypalRun;
+  return run && session.draftRevision === run.draftRevision
+    ? run.prompt
+    : session.draft;
+}
+
 export function endActivity({ activity }: ChatMessage, now: () => number) {
   return activity ? { activity: { ...activity, ended: now() } } : {};
 }
@@ -230,10 +237,7 @@ export function failPaidRun(
   }
   return {
     ...session,
-    draft:
-      session.draftRevision === session.paypalRun?.draftRevision
-        ? session.paypalRun.prompt
-        : session.draft,
+    draft: restoredPaidDraft(session),
     paypalRun: null,
     notice,
     noticeIsTurnFailure: true,
