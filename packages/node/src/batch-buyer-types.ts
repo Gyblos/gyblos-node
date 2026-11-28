@@ -6,6 +6,7 @@ import type {
   SessionBuyer,
   SessionSettlement,
 } from '@gyblos/protocol/payment-session';
+import type { DiagnosticSink } from '@gyblos/runtime/diagnostics';
 import type {
   BatchClientOptions,
   BatchDestination,
@@ -18,8 +19,11 @@ export interface BuyerBatchSessionOptions<Remote extends BatchDestination> {
   // The first quote declares usage: blocks need the model's tokenizer, so a channel it opens runs without
   // them. A channel that already checkpoints keeps doing so.
   declared?: boolean;
+  settleInterrupted?: boolean;
+  diagnostics?: DiagnosticSink;
   credentialId?(requestId: string): string | undefined;
   financialPermission?<T>(run: () => Promise<T>): Promise<T>;
+  unsentRelease?(requestId: string): (() => Promise<void>) | undefined;
   onDeclined?(): Promise<void>;
   beforeInference?(
     requestId: string,
@@ -54,6 +58,7 @@ export interface BuyerBatchContext<Remote extends BatchDestination> {
     typeof import('@gyblos/transport-iroh/batch-client').createBatchChannelClient<Remote>
   >;
   active: boolean;
+  closeInterrupted(): Promise<void>;
   lifetime: AbortController;
   // Every client this channel opened, to close and settle together.
   clients: () => BuyerBatchContext<Remote>['client'][];

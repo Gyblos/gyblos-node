@@ -6,6 +6,7 @@ import {
   DeclinedChannelRequest,
   UnsentChannelPeerError,
   UnsentOpeningError,
+  UnsentSessionPreflightError,
 } from '@gyblos/node/batch-buyer';
 import { channelBlockerMessage } from '@gyblos/node/buyer-channel-message';
 import { bounded } from '@gyblos/node/buyer-operation';
@@ -40,8 +41,6 @@ const unavailable = (
   neverSent,
   stop: {},
 });
-
-class UnsentSessionPreflightError extends BatchChannelError {}
 
 export function unaffordableSessionQuote(
   error: unknown,

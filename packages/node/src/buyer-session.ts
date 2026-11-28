@@ -68,7 +68,9 @@ export interface BuyerSessionOptions<Remote extends BatchDestination> {
     quote: SignedOfferV2,
     signal: AbortSignal,
   ) => Promise<(() => Promise<void>) | undefined>;
+  diagnostics?: BuyerBatchSessionOptions<Remote>['diagnostics'];
   credentialId?: BuyerBatchSessionOptions<Remote>['credentialId'];
+  unsentRelease?: BuyerBatchSessionOptions<Remote>['unsentRelease'];
   onDeclined?: BuyerBatchSessionOptions<Remote>['onDeclined'];
   beforeInference?: BuyerBatchSessionOptions<Remote>['beforeInference'];
   checkReusableChannel?: BuyerSessionOptions<Remote>['verify'];
@@ -175,6 +177,7 @@ async function openCurrent<Remote extends BatchDestination>(
       host: createBuyerBatchSession({
         ...options,
         preparation,
+        settleInterrupted: !!options.policy.renewalBudgetAtomic,
         declared: quote?.offer.meteringMode === CONTROL_METERING_MODES.DECLARED,
         terms,
         buyer: financial,

@@ -142,8 +142,11 @@ wallet balance and settlement. An unknown balance or an uncertain payment stops
 the request before a replacement deposit.
 
 If a streamed reply ends after a signed output block, the buyer keeps the
-partial delivery and checks for final settlement on subsequent requests. With
-renewal enabled, a fresh user question can open one same-seller replacement
+partial delivery. With automatic renewal enabled, it asks the seller to close
+the channel after an acknowledged nonterminal block if the stream fails. It
+verifies the final charge and refund independently. On a newly funded channel,
+the buyer waits for evidence of the original deposit before sending inference.
+With renewal enabled, a fresh user question can open one same-seller replacement
 after the charge and refund are verified. Replaying the interrupted user
 conversation cannot authorize another execution on a paid route or its automatic
 free fallback. The owner can explicitly select Free in Desktop to send the same

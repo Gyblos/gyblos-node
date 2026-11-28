@@ -316,6 +316,8 @@ export function makeManager(
     typeof createBuyerSessionManager<ReturnType<typeof sellerAddress>>
   >[0] = {
     policy,
+    diagnostics: context.diagnostics,
+    unsentRelease: (id) => state.selections.get(id)?.permission?.releaseUnsent,
     ...desktopPermissions(state, prepared.config.discovery?.paidAuto === true),
     openingSupportsBlocks:
       (policy.totalDepositAtomic !== undefined

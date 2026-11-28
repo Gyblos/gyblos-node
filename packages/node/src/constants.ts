@@ -475,6 +475,13 @@ export const SELLER_REGISTRATION_STATE = {
   secretBytes: 64,
 } as const;
 
+export const BUYER_CHANNEL_DIAGNOSTICS = {
+  component: 'buyer-channel',
+  operation: 'settle-interrupted',
+  phase: 'cleanup',
+  code: 'INTERRUPTED_CHANNEL_CLOSE_UNCONFIRMED',
+} as const;
+
 export const BUYER_KEY_LEDGER_DIAGNOSTICS = {
   component: 'buyer-key-ledger',
   operation: 'persist',

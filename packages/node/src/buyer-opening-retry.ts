@@ -11,14 +11,20 @@ import {
 
 import { bounded } from './buyer-operation';
 
+export class UnsentSessionPreflightError extends BatchChannelError {}
+
 export class UnsentOpeningError extends BatchChannelError {
   constructor(
     code:
       | typeof SESSION_CODES.OPENING_ABSENT
       | typeof SESSION_CODES.OPENING_PENDING
       | typeof SESSION_CODES.OPENING_RETURNED,
+    readonly acknowledged = false,
   ) {
     super(code);
+  }
+  get canReleaseInference() {
+    return this.acknowledged || this.code === SESSION_CODES.OPENING_ABSENT;
   }
 }
 export async function recoverBuyerOpening<T>(
@@ -30,18 +36,40 @@ export async function recoverBuyerOpening<T>(
 ): Promise<T> {
   const evidence = buyer.openingRecovery;
   const first = await permit(async () => {
+    const awaitingFirstCharge = buyer.snapshot().cumulativeAtomic === '0';
     const open = await prepare();
     if (!evidence) return { value: await open() };
     if (await evidence.claim()) {
       try {
-        return { value: await open() };
+        return { value: await open(), confirm: awaitingFirstCharge };
       } catch {
         signal.throwIfAborted();
       }
     }
     return { replay: open, evidence };
   });
-  if (!first.replay) return first.value;
+  if (!first.replay) {
+    if (first.confirm && evidence) {
+      const confirmation = AbortSignal.any([
+        signal,
+        AbortSignal.timeout(BATCH_SESSION_DEFAULTS.openingConfirmMs),
+      ]);
+      while (!confirmation.aborted) {
+        const status = await bounded(
+          evidence.status(confirmation),
+          confirmation,
+        ).catch(() => OPENING_STATUS.UNKNOWN);
+        if (status === OPENING_STATUS.PRESENT) return first.value;
+        if (status === OPENING_STATUS.ABSENT)
+          throw new UnsentOpeningError(SESSION_CODES.OPENING_ABSENT);
+        await delay(BATCH_SESSION_DEFAULTS.openingConfirmPollMs, undefined, {
+          signal: confirmation,
+        }).catch(() => undefined);
+      }
+      throw new UnsentOpeningError(SESSION_CODES.OPENING_PENDING, true);
+    }
+    return first.value;
+  }
   const recovery = AbortSignal.any([
     signal,
     AbortSignal.timeout(BATCH_SESSION_DEFAULTS.operationMs),

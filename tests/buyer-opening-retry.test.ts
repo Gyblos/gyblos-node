@@ -110,3 +110,45 @@ void test('permission withdrawn after the deposit prevents replay and inference'
   assert.equal(fixture.offers.generations(), 0);
   assert.deepEqual(fixture.rig.calls, ['deposit']);
 });
+
+for (const presigned of [false, true])
+  void test(`an acknowledged opening waits for the original deposit when already signed: ${presigned}`, async (t) => {
+    let reads = 0;
+    let visible = false;
+    const f = await batchPrepareFixture(async () => {
+      visible = ++reads > 1;
+      return visible ? OPENING_STATUS.PRESENT : OPENING_STATUS.UNKNOWN;
+    });
+    t.after(f.close);
+    if (presigned) await f.rig.buyer.open();
+    let opens = 0;
+    let executions = 0;
+    f.intercept(async (...args) => {
+      if (args[0].method === BATCH_METHODS.OPEN) opens++;
+      if (args[0].method === BATCH_METHODS.EXECUTE) {
+        executions++;
+        if (!visible) throw new BatchChannelError(SESSION_CODES.UNVERIFIED);
+      }
+      return f.service.exchange(...args);
+    });
+    const result = await f.buyer.execute(
+      await f.offers.quote(1),
+      f.offers.input,
+    );
+    assert.equal(result.text, 'ok!');
+    assert.equal(opens, 1);
+    assert.equal(executions, 1);
+    assert.equal(f.offers.generations(), 1);
+    assert.deepEqual(f.rig.calls, ['deposit']);
+  });
+
+void test('a seller acknowledgement alone cannot authorize inference for an absent deposit', async (t) => {
+  const f = await batchPrepareFixture(async () => OPENING_STATUS.ABSENT);
+  t.after(f.close);
+  await assert.rejects(
+    f.buyer.execute(await f.offers.quote(1), f.offers.input),
+    { code: SESSION_CODES.OPENING_ABSENT },
+  );
+  assert.equal(f.offers.generations(), 0);
+  assert.deepEqual(f.rig.calls, ['deposit']);
+});

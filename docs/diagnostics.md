@@ -73,6 +73,10 @@ settings for its local payment-channel records.
   stderr. The duration runs from when the parent began spawning the child. If
   the child never starts, the last phase is `startup`. A phase is the last
   observed boundary, not proof of a cause.
+- **Interrupted buyer payment channels.** Component `buyer-channel`, operation
+  `settle-interrupted`, phase `cleanup`. An unconfirmed close records
+  `INTERRUPTED_CHANNEL_CLOSE_UNCONFIRMED`; the original stream failure still
+  reaches the client.
 - **Seller payment channels.** Component `seller-channel`, phase `exchange`: one
   record per failed operation attempt from the authenticated, bound buyer
   (`prepare`, `open`, `execute`, `approve`, `snapshot`, `close`,

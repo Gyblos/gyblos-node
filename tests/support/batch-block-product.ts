@@ -8,6 +8,7 @@ import { recountedMeter } from '@gyblos/node/free-meter';
 import type { BuyerReceiptEvidence } from '@gyblos/node/receipts';
 import { ENGINE_DONE_REASONS } from '@gyblos/protocol/constants';
 import type { ChatTokenizer } from '@gyblos/protocol/engine';
+import type { DiagnosticSink } from '@gyblos/runtime/diagnostics';
 import type { RouteProbe } from '@gyblos/transport-iroh';
 
 import { batchOfferFixture } from './batch-iroh-offer';
@@ -56,6 +57,8 @@ export async function blockProduct(
     receipt?: (evidence: BuyerReceiptEvidence) => void | Promise<void>;
     // false runs the same paid session without blocks (no stable-prefix meter, no block transport).
     blocks?: boolean;
+    settleInterrupted?: boolean;
+    diagnostics?: DiagnosticSink;
     route?: RouteProbe;
     // Adjusts the seller's live offer after the block engine is set, e.g. to declare usage.
     offer?: (offers: Awaited<ReturnType<typeof batchOfferFixture>>) => void;
@@ -104,6 +107,8 @@ export async function blockProduct(
     observe: f.sellerOptions.observe,
     receipt: options.receipt,
     declared: options.declared,
+    settleInterrupted: options.settleInterrupted,
+    diagnostics: options.diagnostics,
   });
   return {
     f,

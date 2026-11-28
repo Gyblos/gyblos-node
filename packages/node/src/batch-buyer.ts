@@ -2,6 +2,7 @@
 import { randomBytes } from 'node:crypto';
 
 import { TRANSPORT_TIMEOUTS } from '@gyblos/config';
+import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
 import { canonicalJson } from '@gyblos/protocol';
 import {
   BATCH_CHANNEL,
@@ -23,6 +24,7 @@ import {
   SESSION_BLOCK_KINDS,
   SESSION_BLOCKS,
 } from '@gyblos/protocol/session-blocks';
+import { createDiagnostics } from '@gyblos/runtime/diagnostics';
 import {
   createBatchChannelClient,
   type BatchDestination,
@@ -35,9 +37,13 @@ import type {
   BuyerBatchSessionOptions,
 } from './batch-buyer-types';
 import { bounded } from './buyer-operation';
+import { BUYER_CHANNEL_DIAGNOSTICS } from './constants';
 
 export { DeclinedChannelRequest } from './buyer-declined-request';
-export { UnsentOpeningError } from './buyer-opening-retry';
+export {
+  UnsentOpeningError,
+  UnsentSessionPreflightError,
+} from './buyer-opening-retry';
 export { UnsentChannelPeerError } from './buyer-channel-prepare';
 export type { BuyerBatchSessionOptions } from './batch-buyer-types';
 type ChannelTransport<Remote extends BatchDestination> = Pick<
@@ -133,6 +139,23 @@ function createContext<Remote extends BatchDestination>(
     terms,
     ...primary,
     active: false,
+    async closeInterrupted() {
+      const signal = AbortSignal.any([
+        context.lifetime.signal,
+        AbortSignal.timeout(BATCH_SESSION_DEFAULTS.operationMs),
+      ]);
+      const { component, operation, phase, code } = BUYER_CHANNEL_DIAGNOSTICS;
+      const diagnostic = createDiagnostics({
+        component,
+        operation,
+        phases: [phase],
+        codes: [code],
+        sink: options.diagnostics,
+      }).start();
+      await close(context, signal).catch(() =>
+        diagnostic.report({ phase, code }),
+      );
+    },
     lifetime: new AbortController(),
     clients: () => [primary.client, ...(whole ? [whole.client] : [])],
     // A view for one request's transport: exclusive() keeps `active` on the channel itself, never here.
