@@ -169,7 +169,7 @@ function PlainCard({
       onClick={selection.onPress}
       className={cx(
         frame,
-        'cursor-pointer text-left hover:bg-raised focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal',
+        'cursor-pointer text-left transition-colors hover:bg-raised focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal',
         selection.pressed && 'ring-1 ring-inset ring-signal',
       )}
     >

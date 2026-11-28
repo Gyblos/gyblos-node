@@ -11,7 +11,7 @@ import { currentPage, isCurrentPage } from '../lib/layout';
 import { cx } from './board/cx';
 
 const ITEM =
-  'block rounded-lg px-3 py-1.5 outline-none hover:bg-raised hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal';
+  'block rounded-lg px-3 py-1.5 transition-colors hover:bg-raised hover:text-ink';
 const STACKED = 'flex min-h-11 items-center py-2';
 const MENU_ID = 'explorer-menu';
 

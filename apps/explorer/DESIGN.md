@@ -27,10 +27,14 @@ classes, hex or OKLCH literals, or `dark:` color overrides. Dark mode is owned
 by the token layer.
 
 `signal` is a restricted interaction accent. It may be used for focus rings or
-outlines, selected states, small status indicators, the top navigation loader
-and other short-lived interaction affordances. It is not body text, heading
-text or a general-purpose link color. Chart marks use `chart`, even when the
-chart token intentionally resolves to the same blue.
+outlines, selected states, small status indicators, the top navigation loader,
+the fill of a primary action button and other short-lived interaction
+affordances. It is not body text, heading text or a general-purpose link
+color. Chart marks use `chart`, even when the chart token intentionally
+resolves to the same blue.
+
+The token layer may map a component border role onto a text tone such as
+`dim`; component source still references only the semantic border token.
 
 `money`, `good` and `bad` are semantic result tones, not decorative accents.
 Money amounts use `money`; positive and negative operational states use `good`
@@ -84,6 +88,14 @@ Keyboard focus must always be visible. Dense controls use a 2 px `signal` ring
 without a large offset; icon-only or inline help buttons may use a 2 px `signal`
 outline with a small offset so the shape remains visible outside the control.
 Focus treatment must not rely on a subtle text-color change alone.
+
+Plain anchors are owned by the base-layer `a:focus-visible` outline rule in
+`app/globals.css` and need no focus classes. The rule lives in `@layer base`
+so an anchor control that needs the dense ring can suppress it with
+`outline-none` and paint the ring alone; unlayered, the rule would override
+every utility and double the indicator. Never combine `outline-none` with
+`focus-visible:outline-*` utilities in one class string: in Tailwind v4 the
+outline style variable stays `none` and the focus outline never paints.
 
 Controls that look compact on precise pointers still need touch-sized hit areas
 on coarse pointers. Preserve the existing `sm:pointer-fine:` pattern unless a
@@ -159,7 +171,8 @@ Reusable Explorer components live in `components/board` and are published
 through `registry.json`. Use those components or the installed BoardUI
 primitives instead of hand-building lookalikes. Registry changes must preserve
 the dependency closure, version pins, theme tokens and font mappings needed by
-an outside consumer.
+an outside consumer. Font mappings carry in-variable fallbacks, so a consumer
+without the explorer's next/font variables still resolves a sane stack.
 
 When a visual rule changes, update this file in the same change. Do not keep a
 second conflicting design source in component comments.

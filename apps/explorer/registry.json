@@ -23,8 +23,8 @@
           "color-good": "var(--good)",
           "color-bad": "var(--bad)",
           "color-chart": "var(--chart)",
-          "font-sans": "var(--font-instrument), system-ui, sans-serif",
-          "font-mono": "var(--font-jetbrains), ui-monospace, monospace"
+          "font-sans": "var(--font-instrument, 'Instrument Sans'), system-ui, sans-serif",
+          "font-mono": "var(--font-jetbrains, 'JetBrains Mono'), ui-monospace, monospace"
         },
         "light": {
           "brand-blue": "#0a28f0",

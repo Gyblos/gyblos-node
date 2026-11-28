@@ -45,7 +45,6 @@ const styles = sortCx({
   base: [
     'inline-flex items-center justify-center gap-0.5 whitespace-nowrap overflow-hidden',
     'font-sans select-none cursor-pointer',
-    'button-press-motion',
     'outline-none focus-visible:ring-2 focus-visible:ring-border-focus-ring',
     'disabled:cursor-not-allowed aria-disabled:cursor-not-allowed',
   ].join(' '),

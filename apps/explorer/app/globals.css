@@ -50,8 +50,8 @@
   --color-good: var(--good);
   --color-bad: var(--bad);
   --color-chart: var(--chart);
-  --font-sans: var(--font-instrument), system-ui, sans-serif;
-  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+  --font-sans: var(--font-instrument, 'Instrument Sans'), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains, 'JetBrains Mono'), ui-monospace, monospace;
 }
 
 body {
@@ -60,9 +60,11 @@ body {
   font-family: var(--font-instrument), system-ui, sans-serif;
 }
 
-a:focus-visible {
-  outline: 2px solid var(--signal);
-  outline-offset: 2px;
+@layer base {
+  a:focus-visible {
+    outline: 2px solid var(--signal);
+    outline-offset: 2px;
+  }
 }
 
 .seller-avatar {
