@@ -136,7 +136,7 @@ function PageCell({
 }) {
   const className = cx(
     PAGE_CELL,
-    'outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-border-focus-ring',
+    'outline-none focus-visible:ring-2 focus-visible:ring-border-focus-ring',
     current
       ? 'border border-border-button-default bg-background-primary-default text-text-primary shadow-xs'
       : 'text-text-secondary hover:bg-background-secondary-hover hover:text-text-primary',

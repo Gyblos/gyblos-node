@@ -19,7 +19,7 @@ export function SectionHelp({ title, text }: { title: string; text: string }) {
           type="button"
           aria-label={`What ${title} shows`}
           onClick={() => setOpen((isOpen) => !isOpen)}
-          className="flex size-11 shrink-0 cursor-help items-center justify-center sm:pointer-fine:size-auto text-dim outline-none hover:text-ink focus-visible:text-ink"
+          className="flex size-11 shrink-0 cursor-help items-center justify-center rounded-md text-dim outline-none transition-colors duration-150 ease hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal sm:pointer-fine:size-auto"
         >
           <CircleHelp aria-hidden className="size-4" />
         </button>

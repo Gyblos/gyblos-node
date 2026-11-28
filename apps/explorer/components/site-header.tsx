@@ -13,7 +13,7 @@ export function SiteHeader({ crumb }: { crumb?: ReactNode }) {
       <div className="flex flex-wrap items-center justify-between gap-3 py-3">
         <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
           <Link href="/" className="flex items-baseline gap-3">
-            <span className="text-xl font-medium tracking-tight">gyblos</span>
+            <span className="text-title-2-medium tracking-tight">gyblos</span>
             <span className="text-muted">Explorer</span>
           </Link>
           {crumb ? (

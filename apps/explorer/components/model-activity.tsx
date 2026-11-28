@@ -212,7 +212,7 @@ export function ModelActivity({
       <ModelCharts stat={stat} days={days} modelId={modelId} />
       {stat ? (
         <>
-          <h3 className="mt-6 mb-2 text-sm text-muted">Detail</h3>
+          <h3 className="mt-6 mb-2 text-body-medium text-muted">Detail</h3>
           <DetailTable stat={stat} />
         </>
       ) : null}

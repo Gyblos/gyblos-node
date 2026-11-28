@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { cx } from '../../../components/board/cx';
+import { SURFACE } from '../../../components/board/styles';
 import { OperationChip } from '../../../components/channel-txs';
 import { PageFrame } from '../../../components/page-frame';
 import { SellerCell } from '../../../components/seller-cell';
@@ -95,7 +97,7 @@ export default async function OperationPage({
         title="Operation"
         meta={<Link href={PAGES.transactions}>All transactions →</Link>}
       />
-      <section className="space-y-5 rounded-xl border border-line bg-panel p-5">
+      <section className={cx('space-y-5 p-5', SURFACE.panel)}>
         <OperationChip kind={row.kind} />
         <p className="break-all font-mono text-sm">{tx.signature}</p>
         <dl className="grid grid-cols-2 gap-5 md:grid-cols-4">

@@ -57,7 +57,7 @@ function SideCard({
 }) {
   return (
     <div className={cx('min-w-0 p-4 sm:p-5', SURFACE.card)}>
-      <div className="text-sm text-muted">{title}</div>
+      <div className="text-body-medium text-muted">{title}</div>
       <p className="mt-1 text-xs text-dim">{caption}</p>
       <div className="mt-2 grid gap-x-8 gap-y-4 sm:grid-cols-2">
         {SIDES.map((side) => (

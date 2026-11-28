@@ -46,7 +46,7 @@ const styles = sortCx({
     'inline-flex items-center justify-center gap-0.5 whitespace-nowrap overflow-hidden',
     'font-sans select-none cursor-pointer',
     'button-press-motion',
-    'outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-border-focus-ring',
+    'outline-none focus-visible:ring-2 focus-visible:ring-border-focus-ring',
     'disabled:cursor-not-allowed aria-disabled:cursor-not-allowed',
   ].join(' '),
   size: {
@@ -71,14 +71,16 @@ const styles = sortCx({
   },
   variant: {
     primary: [
-      'bg-button-primary text-text-white shadow-xs',
-      'disabled:text-button-primary-disabled-foreground disabled:shadow-none',
-      'aria-disabled:text-button-primary-disabled-foreground aria-disabled:shadow-none',
+      'bg-signal text-text-white shadow-xs',
+      'hover:brightness-[1.06] active:brightness-95',
+      'disabled:bg-background-primary-disabled disabled:text-text-tertiary disabled:shadow-none',
+      'aria-disabled:bg-background-primary-disabled aria-disabled:text-text-tertiary aria-disabled:shadow-none',
     ].join(' '),
     danger: [
-      'bg-button-danger text-text-white shadow-xs',
-      'disabled:text-foreground-disabled-danger disabled:shadow-none',
-      'aria-disabled:text-foreground-disabled-danger aria-disabled:shadow-none',
+      'bg-bad text-bg shadow-xs',
+      'hover:brightness-[1.06] active:brightness-95',
+      'disabled:bg-background-primary-disabled disabled:text-text-tertiary disabled:shadow-none',
+      'aria-disabled:bg-background-primary-disabled aria-disabled:text-text-tertiary aria-disabled:shadow-none',
     ].join(' '),
     secondary: [
       'bg-background-primary-default text-text-primary',
@@ -89,10 +91,10 @@ const styles = sortCx({
       'aria-disabled:bg-background-primary-disabled aria-disabled:border-border-button-default aria-disabled:text-text-tertiary aria-disabled:shadow-none',
     ].join(' '),
     ghost: [
-      'bg-button-ghost-background text-button-ghost-foreground',
-      'hover:bg-button-ghost-hover active:bg-button-ghost-active',
-      'disabled:bg-button-ghost-disabled disabled:text-button-ghost-disabled-foreground disabled:shadow-none',
-      'aria-disabled:bg-button-ghost-disabled aria-disabled:text-button-ghost-disabled-foreground aria-disabled:shadow-none',
+      'bg-transparent text-text-primary',
+      'hover:bg-background-secondary-hover active:bg-background-primary-active',
+      'disabled:bg-transparent disabled:text-text-tertiary disabled:shadow-none',
+      'aria-disabled:bg-transparent aria-disabled:text-text-tertiary aria-disabled:shadow-none',
     ].join(' '),
   },
 });

@@ -306,7 +306,7 @@ function DailyTable({
   return (
     <section id={PAGING.anchors.daily} className="mt-10 scroll-mt-4">
       <Table
-        heading={<h2 className="text-xl font-medium">Daily</h2>}
+        heading={<h2 className="text-title-3-medium">Daily</h2>}
         compactLabel="Daily usage metrics"
         minWidth={DISPLAY.dailyTable}
         head={head}

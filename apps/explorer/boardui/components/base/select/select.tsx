@@ -82,7 +82,7 @@ function triggerStyles(size: SelectSize, triggerClassName?: string) {
     'text-text-primary',
     'transition-[background-color,border-color,box-shadow,padding,font-size] duration-200 ease motion-reduce:transition-none',
     'hover:bg-background-primary-hover hover:border-border-button-hover',
-    'outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-border-focus-ring',
+    'outline-none focus-visible:ring-2 focus-visible:ring-border-focus-ring',
     'disabled:cursor-not-allowed disabled:bg-background-primary-disabled disabled:text-text-tertiary disabled:shadow-none',
     size === 'sm'
       ? 'gap-1 px-[7px] py-1 text-body-2-medium'

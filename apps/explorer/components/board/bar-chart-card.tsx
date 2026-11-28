@@ -53,7 +53,7 @@ export function BarChartCard({
   );
   return (
     <div className={cx('min-w-0 p-4 sm:p-5', SURFACE.card)}>
-      <div className="text-sm text-muted">{title}</div>
+      <div className="text-body-medium text-muted">{title}</div>
       <ChartReadout
         kind={kind}
         value={active ? active.amount : total}
