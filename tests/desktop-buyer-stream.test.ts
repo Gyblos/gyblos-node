@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  CHAT_FAILURE,
   projectChatArchive,
   restoreChatArchive,
 } from '@gyblos/desktop/chat-archive-model';
@@ -12,8 +13,21 @@ import { MESSAGE_STATE } from '@gyblos/desktop/chat-state';
 import { PAYMENT_METHOD } from '@gyblos/desktop/paypal-model';
 import { X402Budget } from '@gyblos/desktop/x402-budget';
 import { X402Client } from '@gyblos/desktop/x402-client';
+import { BUYER_API } from '@gyblos/protocol/buyer-api';
 
-import { connect, latch, policy, setup, tick } from './support/desktop-stream';
+import {
+  budget as paidBudget,
+  policy as paidPolicy,
+} from './support/desktop-paid-chat';
+import {
+  chunk,
+  connect,
+  frame,
+  latch,
+  policy,
+  setup,
+  tick,
+} from './support/desktop-stream';
 
 void test('desktop streams visible text before its terminal and completes one verified free request', async () => {
   const value = setup();
@@ -136,6 +150,7 @@ void test('desktop controller retains stopped partials and rejects late or cross
   chat.appendBuyer('first', 'turn-one', 'Hello');
   assert.equal(chat.getSnapshot().sessions[0]?.messages.at(-1)?.text, 'Hello');
   chat.stopBuyer('first', 'turn-one');
+  assert.equal(chat.getSnapshot().sessions[0]?.draft, 'Synthetic question');
   chat.newChat('second');
   chat.startPaypal(
     'Another question',
@@ -228,7 +243,9 @@ void test('live activity follows the first nonempty delta and terminal for its o
   chat.appendBuyer('first', 'one', 'Hello');
   clock = 24;
   chat.appendBuyer('first', 'one', ' world');
+  chat.setDraft('Newer draft');
   chat.stopBuyer('first', 'one');
+  assert.equal(chat.getSnapshot().sessions[0]?.draft, 'Newer draft');
   clock = 99;
   chat.failPaypal('first', 'one', 'late');
   assert.deepEqual(answer()?.activity, { started: 10, first: 20, ended: 24 });
@@ -239,8 +256,85 @@ void test('live activity follows the first nonempty delta and terminal for its o
   chat.startPaypal('Question', model, 'two');
   chat.completePaypal('first', 'two', 'Answer', model);
   assert.deepEqual(answer()?.activity, { started: 99, ended: 99 });
+  chat.startPaypal('Queued', model, 'queue', undefined, PAYMENT_METHOD.USDC);
+  chat.stopBuyer('first', 'queue');
+  chat.failPaypal(
+    'first',
+    'queue',
+    'Confirmed before dispatch',
+    CHAT_FAILURE.NOT_SENT,
+  );
+  assert.equal(answer()?.failureReason, CHAT_FAILURE.NOT_SENT);
+  assert.equal(chat.getSnapshot().sessions[0]?.draft, 'Queued');
   chat.startPaypal('Question', model, 'three');
   clock = 101;
   chat.failPaypal('first', 'three', 'Unavailable');
   assert.deepEqual(answer()?.activity, { started: 99, ended: 101 });
+});
+
+void test('Stop after a visible paid delta aborts immediately without consulting the queue', async () => {
+  const budget = paidBudget();
+  const visible = latch();
+  const release = latch();
+  let cancellations = 0;
+  let signal: AbortSignal | null | undefined;
+  const client = new X402Client(budget, async (url, init) => {
+    if (init?.method !== 'POST')
+      return Response.json(
+        {
+          ...paidPolicy,
+          paidAuto: true,
+          depositAtomic: '10000',
+          lifetimeMs: 3600000,
+        },
+        {
+          headers: {
+            [BUYER_API.CANCEL_QUEUED_HEADER]: BUYER_API.CANCEL_QUEUED_PATH,
+          },
+        },
+      );
+    if (new URL(String(url)).pathname === BUYER_API.CANCEL_QUEUED_PATH) {
+      cancellations++;
+      await release.promise;
+      return new Response(null, { status: 403 });
+    }
+    signal = init.signal;
+    return new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.enqueue(
+            frame({ ...chunk('Hello'), model: paidPolicy.model }),
+          );
+          init.signal?.addEventListener(
+            'abort',
+            () => controller.error(new Error('stopped')),
+            { once: true },
+          );
+        },
+      }),
+      { headers: { 'content-type': 'text/event-stream' } },
+    );
+  });
+  await client.connect(
+    'http://127.0.0.1:8090/v1/chat/completions',
+    'synthetic-local-buyer-token',
+  );
+  const send = client.send(
+    'started',
+    'Hello',
+    () => visible.resolve(),
+    BUYER_API.AUTO,
+  );
+  const settled = Promise.allSettled([send]);
+  try {
+    await visible.promise;
+    assert.ok(client.stop('started'));
+    assert.equal(cancellations, 0);
+    assert.ok(signal?.aborted);
+  } finally {
+    release.resolve();
+    await settled;
+    await client.close();
+  }
+  assert.equal((await budget.summary()).blocked, true);
 });

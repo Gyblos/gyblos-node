@@ -1,8 +1,6 @@
 // Shared per-request routing over trusted selection/execution ports; no payment SDK or persistence.
-import { setTimeout as delay } from 'node:timers/promises';
 
 import { TRANSPORT_LIMITS } from '@gyblos/config';
-import { BUYER_ROUTING_DEFAULTS } from '@gyblos/config/buyer-routing';
 import {
   BuyerRoutingError,
   fallbackPriceCeilings,
@@ -29,6 +27,7 @@ import {
 import {
   createBuyerQueue,
   createQuoteQueue,
+  waitForRemoteSeller,
   type BuyerWaitScope,
 } from './buyer-routing-queue';
 import {
@@ -68,6 +67,7 @@ export type BuyerRoutePorts<T> = Omit<
   BuyerQuoteDependencies<T>,
   'enter' | 'unresolved' | 'select' | 'free' | 'paid'
 > & {
+  sellerWait?(waiting: boolean): void;
   takeFreeResend?(): boolean;
   // Trusted execution port ends queue time immediately before its first possible prompt write.
   free(
@@ -151,19 +151,18 @@ async function waitForSeller<T>(
   request.pinnedNodeId = nodeId;
   request.waitingFor = nodeId;
   if (remote) state.queue.release(nodeId, request.owner);
-  await state.queue.acquire(nodeId, request.owner, request.wait.signal);
-  if (remote) {
-    try {
-      await delay(BUYER_ROUTING_DEFAULTS.queuePollMs, undefined, {
-        signal: request.wait.signal,
-      });
-    } catch {
-      request.wait.signal.throwIfAborted();
-    }
+  const observe =
+    request.kind === undefined ? request.ports.sellerWait : undefined;
+  observe?.(true);
+  try {
+    await state.queue.acquire(nodeId, request.owner, request.wait.signal);
+    if (remote) await waitForRemoteSeller(request.wait.signal);
+    if (await bounded(unresolved(state), request.wait.signal))
+      throw new PaidBuyerError(PAID_BUYER_CODES.UNRESOLVED);
+    request.wait.signal.throwIfAborted();
+  } finally {
+    observe?.(false);
   }
-  if (await bounded(unresolved(state), request.wait.signal))
-    throw new PaidBuyerError(PAID_BUYER_CODES.UNRESOLVED);
-  request.wait.signal.throwIfAborted();
 }
 function occupied<T>(state: State, request: Request<T>, nodeId: string) {
   const owner = state.owners.get(nodeId);

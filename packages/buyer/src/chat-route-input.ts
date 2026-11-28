@@ -79,6 +79,7 @@ export function routedInput(
   streaming: boolean,
   selectedSellerAllowed: boolean,
   explicitFree = false,
+  sellerWait?: (waiting: boolean) => void,
 ) {
   const mode = parseDesktopMode(body, settings, selectedSellerAllowed);
   body = mode.body;
@@ -102,6 +103,7 @@ export function routedInput(
       selection,
       maxTokens: Math.min(settings.maxTokens, sellerChoice.contextTokens),
       sellerChoice,
+      ...(sellerWait && { sellerWait }),
       ...(intent && { openingIntent: intent }),
     };
     const input = api.parse(rest, selection, route.maxTokens, streaming, false);
@@ -137,6 +139,7 @@ export function routedInput(
     payload: withoutStop(rest),
     route: {
       ...route,
+      ...(sellerWait && { sellerWait }),
       ...(freeOnly && { freeOnly: true, explicitFree }),
       ...(openingIntent && { openingIntent }),
     },

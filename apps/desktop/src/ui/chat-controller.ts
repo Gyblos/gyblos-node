@@ -13,7 +13,9 @@ import { parseResponseMetrics } from '../response-metrics';
 import {
   advanceRun,
   createSession,
+  endActivity,
   failPaidRun,
+  restoredPaidDraft,
   startRun,
   stopRun,
   type ChatSession,
@@ -271,7 +273,7 @@ export class ChatController {
               text,
               model: { ...model },
               state: MESSAGE_STATE.COMPLETE,
-              ...this.endActivity(message),
+              ...endActivity(message, this.activityClock),
               ...(metrics ? { metrics } : {}),
             }
           : message,
@@ -306,6 +308,7 @@ export class ChatController {
         ? session
         : {
             ...session,
+            draft: restoredPaidDraft(session),
             paypalRun: null,
             messages: session.messages.map((message) =>
               message.id === `${id}-assistant`
@@ -313,7 +316,7 @@ export class ChatController {
                     ...message,
                     state: MESSAGE_STATE.STOPPED,
                     failureReason: CHAT_FAILURE.INTERRUPTED,
-                    ...this.endActivity(message),
+                    ...endActivity(message, this.activityClock),
                   }
                 : message,
             ),
@@ -326,23 +329,25 @@ export class ChatController {
     notice: string,
     failureReason?: ChatFailureReason,
   ) {
-    this.updatePaypal(sessionId, id, (session) =>
-      failPaidRun(session, id, notice, failureReason, this.activityClock),
+    this.updatePaypal(
+      sessionId,
+      id,
+      (session) =>
+        failPaidRun(session, id, notice, failureReason, this.activityClock),
+      true,
     );
-  }
-  private endActivity({ activity }: ChatSession['messages'][number]) {
-    if (!activity) return {};
-    return { activity: { ...activity, ended: this.activityClock() } };
   }
   private updatePaypal(
     sessionId: string,
     id: string,
     update: (session: ChatSession) => ChatSession,
+    includeStopped = false,
   ) {
     this.publish({
       ...this.snapshot,
       sessions: this.snapshot.sessions.map((session) =>
-        session.id === sessionId && session.paypalRun?.id === id
+        session.id === sessionId &&
+        (includeStopped || session.paypalRun?.id === id)
           ? update(session)
           : session,
       ),

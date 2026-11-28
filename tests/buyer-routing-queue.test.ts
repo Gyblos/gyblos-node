@@ -124,10 +124,12 @@ void test('disconnect removes a waiting request without executing it or retainin
   );
   await entered.promise;
   const cancel = new AbortController();
+  const waiting: boolean[] = [];
   const second = assert.rejects(
     host.router.execute(
       {
         ...host.ports,
+        sellerWait: (value: boolean) => waiting.push(value),
         paid: async () => {
           calls++;
           return 'unexpected';
@@ -142,6 +144,7 @@ void test('disconnect removes a waiting request without executing it or retainin
   finish.resolve();
   await first;
   assert.equal(calls, 1);
+  assert.deepEqual(waiting, [true, false]);
   assert.equal(host.router.activeRequests(), 0);
 });
 void test('a granted waiter keeps its seller while refreshing, so a newcomer cannot pass it', async (t) => {
@@ -211,10 +214,12 @@ void test('remote busy retains FIFO ownership while refreshing rather than letti
   t.after(host.close);
   const busy = batchDeferred<void>();
   const order: string[] = [];
+  const waits: boolean[] = [];
   let attempts = 0;
   const first = host.router.execute(
     {
       ...host.ports,
+      sellerWait: (waiting) => waits.push(waiting),
       paid: async (winner) => {
         if (++attempts === 1) {
           order.push('busy');
@@ -242,6 +247,7 @@ void test('remote busy retains FIFO ownership while refreshing rather than letti
   try {
     await second;
     assert.deepEqual(order, ['busy', 'first', 'second']);
+    assert.deepEqual(waits, []);
   } finally {
     await first;
   }

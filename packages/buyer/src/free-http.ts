@@ -40,6 +40,7 @@ import {
 } from './chat-api';
 import { readBody } from './chat-body';
 import { replyError, replyJson, type ChatErrorClassifier } from './chat-errors';
+import { queuedRequest, scheduledExecutors } from './chat-queue';
 import { routedInput, type ChatSettings } from './chat-route-input';
 import { stoppedResult, stoppingStream } from './chat-stop';
 import {
@@ -78,32 +79,10 @@ type FreeChatExecutor = (
   model?: RoutedModel,
   permission?: BuyerApiKeyOperation,
 ) => Promise<ChatResult>;
-type ChatExecutors = {
+export type ChatExecutors = {
   execute: FreeChatExecutor;
   stream?: FreeChatStreamExecutor;
 };
-function scheduledExecutors(
-  schedule: ReturnType<typeof executionSlots>,
-  { execute, stream }: ReturnType<typeof buyerApiKeyExecutors>,
-) {
-  let queued = false;
-  const enter = <T>(signal: AbortSignal, run: () => Promise<T>) => {
-    queued = true;
-    return schedule(signal, () => {
-      queued = false;
-      return run();
-    });
-  };
-  return {
-    queued: () => queued,
-    execute: (input, signal, delta, model) =>
-      enter(signal, () => execute(input, signal, delta, model)),
-    stream:
-      stream &&
-      ((input, signal, delta, model) =>
-        enter(signal, () => stream(input, signal, delta, model))),
-  } satisfies ChatExecutors & { queued(): boolean };
-}
 function isJson(request: IncomingMessage) {
   const type = request.headers['content-type']?.split(';')[0]?.trim();
   return type?.toLowerCase() === FREE_BUYER.contentType;
@@ -203,6 +182,7 @@ async function serveChat(
   diagnostic: ReturnType<ReturnType<typeof httpDiagnostics>>,
   selectedSellerAllowed: boolean,
   classify?: ChatErrorClassifier,
+  cancellation?: ReturnType<typeof queuedRequest>,
 ) {
   let format: ChatStreamFormat | undefined;
   const lifecycle = httpRequestLifecycle(
@@ -223,15 +203,18 @@ async function serveChat(
       ),
   );
   const controller = lifecycle.controller;
+  cancellation?.register(scoped.entered, controller);
+  const { signal } = controller;
   try {
     const { input, payload, route, model } = routedInput(
       api,
-      await readBody(request, controller.signal),
+      await readBody(request, signal),
       settings,
       scoped.stream !== undefined,
       selectedSellerAllowed,
       request.headers[BUYER_API.EXPLICIT_FREE_HEADER] ===
         OFFER_PRICING_KINDS.FREE,
+      cancellation?.sellerWait,
     );
     if (
       route.openingIntent &&
@@ -245,7 +228,7 @@ async function serveChat(
       await executeFreeSse(
         run.stream,
         payload,
-        controller.signal,
+        signal,
         response,
         format,
         route,
@@ -254,14 +237,9 @@ async function serveChat(
       diagnostic.success();
       return;
     }
-    const result = await run.execute(
-      payload,
-      controller.signal,
-      undefined,
-      route,
-    );
+    const result = await run.execute(payload, signal, undefined, route);
     diagnostic.responding();
-    if (!controller.signal.aborted) {
+    if (!signal.aborted) {
       replyJson(response, api.completion(model, result));
       diagnostic.success();
     }
@@ -269,8 +247,38 @@ async function serveChat(
     diagnostic.failure(error);
     replyError(response, error, classify, api, format);
   } finally {
+    cancellation?.close();
     lifecycle.close();
   }
+}
+function admitChat(
+  request: IncomingMessage,
+  response: ServerResponse,
+  desktop: ReturnType<typeof createDesktopApi>,
+  owner: boolean,
+  pending: Map<string, () => boolean>,
+  full: boolean,
+) {
+  const channelRoute =
+    request.url?.split('?')[0] === BUYER_API.CHANNEL_CHAT_PATH;
+  const localApi = desktop.accepts(request, isJson(request))
+    ? defaultChatApi
+    : undefined;
+
+  const selectedSellerAllowed = Boolean(owner && localApi && channelRoute);
+  if (channelRoute && !selectedSellerAllowed) {
+    replyError(response, new FreeBuyerError(FREE_BUYER_CODES.INVALID));
+    return;
+  }
+  const cancellation = selectedSellerAllowed
+    ? queuedRequest(request, pending)
+    : undefined;
+  if (cancellation && pending.has(cancellation.id)) {
+    replyError(response, new FreeBuyerError(FREE_BUYER_CODES.INVALID));
+    return;
+  }
+  const api = admit(request, response, full, localApi);
+  return api && { api, selectedSellerAllowed, cancellation };
 }
 export function freeBuyerHandler(
   execute: FreeChatExecutor,
@@ -311,23 +319,19 @@ export function freeBuyerHandler(
     if (asksModels(request)) return listModels(response, settings);
     if (asksTokenCount(request))
       return countTokens(request, response, requestMs, diagnostic);
-    const channelRoute =
-      request.url?.split('?')[0] === BUYER_API.CHANNEL_CHAT_PATH;
-    const localApi = desktop.accepts(request, isJson(request))
-      ? defaultChatApi
-      : undefined;
-    const ownsChat = authorize && settings.sellerChoice && caller.owner;
-    const selectedSellerAllowed = Boolean(ownsChat && localApi && channelRoute);
-    if (channelRoute && !selectedSellerAllowed) {
-      replyError(response, new FreeBuyerError(FREE_BUYER_CODES.INVALID));
-      return;
-    }
-    const full = active >= FREE_BUYER.maxHttpRequests;
-    const api = admit(request, response, full, localApi);
-    if (!api) {
+    const admission = admitChat(
+      request,
+      response,
+      desktop,
+      !!authorize && !!settings.sellerChoice && caller.owner,
+      desktop.pending,
+      active >= FREE_BUYER.maxHttpRequests,
+    );
+    if (!admission) {
       if (response.statusCode >= HTTP_STATUS.badRequest) diagnostic.refused();
       return;
     }
+    const { api, selectedSellerAllowed, cancellation } = admission;
     diagnostic.input();
     active++;
     try {
@@ -344,6 +348,7 @@ export function freeBuyerHandler(
         diagnostic,
         selectedSellerAllowed,
         classify,
+        cancellation,
       );
     } finally {
       active--;

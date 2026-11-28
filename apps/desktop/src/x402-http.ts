@@ -104,6 +104,26 @@ async function buyerPolicyAction(
   await response.body?.cancel();
   return response.status;
 }
+export async function cancelQueuedChat(
+  connection: { url: URL; token: string; policy: BuyerApiPolicy },
+  request: typeof fetch,
+  id: string,
+) {
+  const response = await request(
+    new URL(BUYER_API.CANCEL_QUEUED_PATH, connection.url),
+    {
+      method: 'POST',
+      redirect: 'error',
+      signal: AbortSignal.timeout(DESKTOP_X402.STATUS_MS),
+      headers: {
+        ...chatHeaders(connection.token, connection.policy.policyId),
+        [BUYER_API.QUEUE_ID_HEADER]: id,
+      },
+    },
+  );
+  await response.body?.cancel();
+  return response.status === HTTP_STATUS.noContent;
+}
 export async function reconcileBuyerPool(
   connection: { url: URL; token: string; policy: BuyerApiPolicy },
   expected: BuyerApiPolicy,
@@ -228,6 +248,9 @@ export async function buyerConnection(
     token,
     managed,
     policy,
+    cancelsQueued:
+      response.headers.get(BUYER_API.CANCEL_QUEUED_HEADER) ===
+      BUYER_API.CANCEL_QUEUED_PATH,
     reconcilesPool:
       response.headers.get(BUYER_API.RECONCILE_POOL_HEADER) ===
       BUYER_API.RECONCILE_POOL_PATH,

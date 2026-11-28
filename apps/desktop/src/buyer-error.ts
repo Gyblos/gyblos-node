@@ -38,6 +38,7 @@ export class BuyerSessionRequired extends Error {
 }
 
 type BuyerCode =
+  | typeof CHAT_FAILURE.NOT_SENT
   | ChannelBlocker
   | typeof BUYER_API.TOKENIZER_UNAVAILABLE
   | typeof BUYER_ROUTING_CODES.BUSY

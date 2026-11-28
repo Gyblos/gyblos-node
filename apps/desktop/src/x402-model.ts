@@ -14,7 +14,11 @@ import {
 } from '@gyblos/protocol/buyer-api';
 import { MODEL_IDS } from '@gyblos/protocol/constants';
 
-import { chatFailureReason, type ChatFailureReason } from './constants';
+import {
+  CHAT_FAILURE,
+  chatFailureReason,
+  type ChatFailureReason,
+} from './constants';
 import { parseResponseMetrics, type ResponseMetrics } from './response-metrics';
 import { DESKTOP_X402 } from './x402/constants';
 
@@ -330,6 +334,11 @@ export function parseX402Result(input: unknown): X402Result {
     result.error = value.error;
     const reason = chatFailureReason(value.failureReason);
     if (reason) result.failureReason = reason;
+  } else if (
+    value.failureReason === CHAT_FAILURE.NOT_SENT &&
+    !result.summary.blocked
+  ) {
+    result.failureReason = CHAT_FAILURE.NOT_SENT;
   }
   if (value.reply !== undefined) {
     if (!value.reply || typeof value.reply !== 'object')

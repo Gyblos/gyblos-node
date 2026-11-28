@@ -10,26 +10,22 @@ import {
   type BuyerSellerChoice,
 } from '@gyblos/protocol/buyer-api';
 import type { BuyerApiKeyCommand } from '@gyblos/protocol/buyer-api-keys';
-import {
-  FREE_CHAT_ROLES,
-  OFFER_PRICING_KINDS,
-} from '@gyblos/protocol/constants';
+import { OFFER_PRICING_KINDS } from '@gyblos/protocol/constants';
 
 import { requestAgentEndpoint } from './agent-endpoint';
 import { desktopBuyerFailure } from './buyer-error';
 import { inspectDesktopChannel } from './funding/client';
 import { requestBuyerApiKeys } from './usdc-api-client';
 import { X402Budget } from './x402-budget';
+import { DesktopChatRequest } from './x402-chat-request';
 import {
   assertFreeBudget,
   buyerConnection,
   buyerEndpoint,
-  chatHeaders,
   policyForRoute,
   policyForSeller,
   readJson,
   reconcileBuyerPool,
-  sellerFields,
   validateChoice,
   waitForPaidBuyer,
   type DesktopSellerChoice,
@@ -49,7 +45,7 @@ export class X402Client {
   private connection: Awaited<ReturnType<typeof buyerConnection>> | null = null;
   private busy = false;
   private closed = false;
-  private controller: AbortController | null = null;
+  private controller: DesktopChatRequest | null = null;
   private requestId: string | null = null;
   private pending: Promise<unknown> | null = null;
   private readonly keyRequests = new Map<Promise<unknown>, AbortController>();
@@ -191,14 +187,7 @@ export class X402Client {
     });
   }
   stop(id: string) {
-    if (
-      this.requestId !== id ||
-      !this.controller ||
-      this.controller.signal.aborted
-    )
-      return false;
-    this.controller.abort();
-    return true;
+    return this.requestId === id && !!this.controller?.stop();
   }
   send(
     id: string,
@@ -213,14 +202,14 @@ export class X402Client {
       return Promise.reject(new Error('Message is empty or too large'));
     this.busy = true;
     const connection = this.connection;
-    const controller = new AbortController();
+    const controller = new DesktopChatRequest();
     this.controller = controller;
     this.requestId = id;
     const work = this.execute(
       connection,
       id,
       prompt,
-      controller.signal,
+      controller,
       onDelta,
       choice,
       route,
@@ -237,13 +226,13 @@ export class X402Client {
     connection: NonNullable<X402Client['connection']>,
     id: string,
     prompt: string,
-    external: AbortSignal,
+    external: DesktopChatRequest,
     onDelta?: (text: string) => void,
     choice?: DesktopSellerChoice,
     route?: NonNullable<BuyerApiPolicy['autoRoutes']>[number],
   ) {
     const current = await this.budget.summary();
-    external.throwIfAborted();
+    external.signal.throwIfAborted();
     if (choice === OFFER_PRICING_KINDS.FREE) {
       assertFreeBudget(current, id);
       return this.executeReserved(
@@ -269,7 +258,7 @@ export class X402Client {
     await waitForPaidBuyer(
       connection,
       this.request,
-      external,
+      external.signal,
       seller?.expiresAt,
     );
     const intent =
@@ -288,7 +277,7 @@ export class X402Client {
     );
     let sent = false;
     try {
-      external.throwIfAborted();
+      external.signal.throwIfAborted();
       sent = true;
       return await this.executeReserved(
         connection,
@@ -301,14 +290,16 @@ export class X402Client {
         { intent },
       );
     } catch (error) {
+      const confirmed = await external.confirmed;
       if (intent) await this.budget.recoverOpening();
-      else if (!sent) await this.budget.cancelUnsent(id);
+      else if (!sent || (confirmed && (await this.budget.summary()).blocked))
+        await this.budget.cancelUnsent(id);
       else if (
         policy.maxAtomic === '0' &&
         (await this.budget.summary()).blocked
       )
         await this.budget.releaseFree(id);
-      throw error;
+      throw confirmed ? external.unsentFailure() : error;
     }
   }
   private async executeReserved(
@@ -316,36 +307,27 @@ export class X402Client {
     id: string,
     prompt: string,
     policy: BuyerApiPolicy,
-    external: AbortSignal,
+    external: DesktopChatRequest,
     onDelta?: (text: string) => void,
     choice?: DesktopSellerChoice,
     { intent, explicitFree }: { intent?: string; explicitFree?: boolean } = {},
   ) {
     const started = performance.now();
     const signal = AbortSignal.any([
-      external,
+      external.signal,
       AbortSignal.timeout(DESKTOP_X402.REQUEST_MS),
     ]);
     signal.throwIfAborted();
-    const response = await this.request(
-      new URL(
-        choice ? BUYER_API.CHANNEL_CHAT_PATH : BUYER_API.CHAT_PATH,
-        connection.url,
-      ),
-      {
-        method: 'POST',
-        redirect: 'error',
-        signal,
-        headers: chatHeaders(connection.token, policy.policyId, explicitFree),
-        body: JSON.stringify({
-          ...sellerFields(choice),
-          ...(intent && { [BUYER_API.OPENING_INTENT_FIELD]: intent }),
-          model: policy.model,
-          messages: [{ role: FREE_CHAT_ROLES.USER, content: prompt }],
-          max_tokens: policy.maxTokens,
-          stream: !!onDelta,
-        }),
-      },
+    const response = await external.post(
+      connection,
+      this.request,
+      policy,
+      prompt,
+      !!onDelta,
+      choice,
+      intent,
+      explicitFree,
+      signal,
     );
     signal.throwIfAborted();
     const body =

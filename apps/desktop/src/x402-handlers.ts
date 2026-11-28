@@ -68,7 +68,7 @@ function actionFailure(action: unknown, blocked: boolean, error: unknown) {
     return { ...failure, failureReason: error.code };
   if (error.neverSent)
     return {
-      ...failure,
+      ...(error.code !== CHAT_FAILURE.NOT_SENT && failure),
       failureReason: chatFailureReason(error.code) ?? CHAT_FAILURE.NOT_SENT,
     };
   return failure;

@@ -15,6 +15,7 @@ import {
   inspectChannelRequest,
   type InspectBuyerChannel,
 } from './channel-eligibility-http';
+import { cancelQueuedRequest } from './chat-queue';
 import { CHAT_ROUTES } from './constants';
 import type { BuyerSelectionConfig } from './selection-config';
 
@@ -110,6 +111,7 @@ function metadataRequest(
   response: ServerResponse,
   policy: BuyerApiPolicy | undefined,
   authenticated: boolean,
+  ownerCancellation: boolean,
   preparePaidChat: boolean,
   reconcilePool: boolean,
 ) {
@@ -120,6 +122,9 @@ function metadataRequest(
       .writeHead(HTTP_STATUS.ok, {
         'content-type': 'application/json',
         'cache-control': 'no-store',
+        ...(ownerCancellation && {
+          [BUYER_API.CANCEL_QUEUED_HEADER]: BUYER_API.CANCEL_QUEUED_PATH,
+        }),
         ...(reconcilePool && {
           [BUYER_API.RECONCILE_POOL_HEADER]: BUYER_API.RECONCILE_POOL_PATH,
         }),
@@ -210,12 +215,24 @@ export function createDesktopApi(
     'preparePaidChat' | 'reconcilePool' | 'inspectChannel'
   > = {},
 ) {
+  const pending = new Map<string, () => boolean>();
   return {
+    pending,
     async handled(
       request: IncomingMessage,
       response: ServerResponse,
       owner: boolean,
     ) {
+      if (
+        cancelQueuedRequest(
+          request,
+          response,
+          authenticated && owner,
+          policy,
+          pending,
+        )
+      )
+        return true;
       if (request.url === BUYER_API.CHANNEL_ELIGIBILITY_PATH) {
         await inspectChannelRequest(
           request,
@@ -241,6 +258,7 @@ export function createDesktopApi(
         response,
         policy,
         authenticated,
+        owner,
         !!preparePaidChat && owner,
         !!reconcilePool && owner,
       );

@@ -52,6 +52,7 @@ function neverSent(error: unknown) {
   return error instanceof FreeSelectionFailure;
 }
 function errorStatus(error: unknown, code: string) {
+  if (code === FREE_BUYER_CODES.CANCELLED) return HTTP_STATUS.badRequest;
   if (code === FREE_BUYER_CODES.INVALID) return HTTP_STATUS.badRequest;
   if (code === FREE_BUYER_CODES.TOO_LARGE) return HTTP_STATUS.payloadTooLarge;
   if (code === FREE_EXECUTION_CODES.LIMIT) return HTTP_STATUS.badRequest;

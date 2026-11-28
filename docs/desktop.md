@@ -9,6 +9,10 @@ download, first launch and everyday use, and
 [apps/desktop/DESIGN.md](../apps/desktop/DESIGN.md) owns the visual system.
 
 The app is experimental and runs on Solana devnet. Its packages are unsigned.
+Stopping a queued paid question restores its draft unless you have already
+edited it. The authenticated buyer can confirm cancellation before seller
+dispatch through `POST /v1/gyblos/cancel-queued`. Once the buyer confirms the
+question was never sent, you can send another without reviewing the payment.
 
 ## Screens
 
