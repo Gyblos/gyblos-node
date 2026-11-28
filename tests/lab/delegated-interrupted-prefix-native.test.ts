@@ -5,7 +5,7 @@ import test from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
 
 import { paidChannelEligibility } from '@gyblos/buyer/channel-eligibility';
-import { BUYER_SELECTION } from '@gyblos/buyer/constants';
+import { BUYER_SELECTION, FREE_BUYER_CODES } from '@gyblos/buyer/constants';
 import { batchSessionPathsIn } from '@gyblos/config';
 import { SELLER_SELECTION_CODES } from '@gyblos/core/constants';
 import { inspectBatchSession } from '@gyblos/payments-upto/batch-session';
@@ -172,6 +172,7 @@ for (const scenario of ['restart', 'live', 'desktop'])
           path:
             | typeof BUYER_API.CHAT_PATH
             | typeof BUYER_API.CHANNEL_CHAT_PATH = BUYER_API.CHANNEL_CHAT_PATH,
+          freeOnly = path === BUYER_API.CHANNEL_CHAT_PATH,
         ) =>
           owner(new URL(path, host.buyer().url), {
             method: 'POST',
@@ -183,7 +184,7 @@ for (const scenario of ['restart', 'live', 'desktop'])
               }),
             },
             body: JSON.stringify({
-              ...(path === BUYER_API.CHANNEL_CHAT_PATH && {
+              ...(freeOnly && {
                 [BUYER_API.FREE_ONLY_FIELD]: true,
               }),
               model: policy.model,
@@ -191,6 +192,13 @@ for (const scenario of ['restart', 'live', 'desktop'])
               stream: true,
             }),
           });
+        const invalid = await submit(true, BUYER_API.CHAT_PATH, true);
+        assert.equal(invalid.status, 400);
+        assert.equal(
+          (await invalid.json()).error.code,
+          FREE_BUYER_CODES.INVALID,
+        );
+        assert.equal(dispatches, 1);
         const ordinary = await submit(true, BUYER_API.CHAT_PATH);
         assert.equal(ordinary.ok, false);
         assert.match(
