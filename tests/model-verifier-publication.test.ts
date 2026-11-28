@@ -27,6 +27,8 @@ import {
   DIAGNOSTIC_OUTCOMES,
 } from '@gyblos/runtime/constants';
 
+import { referenceGenerate } from './support/verifier-reference';
+
 const scoredAnswer = 'first scored';
 const seller = `export function parseSellerTarget(value) { return value; }
 export async function openSeller() {
@@ -78,19 +80,17 @@ async function withVerifier(
     (input: Parameters<typeof fetch>[0]) =>
       Promise.resolve(
         String(input).endsWith('/api/generate')
-          ? Response.json({
-              logprobs: [
-                {
-                  top_logprobs: Array.from(
-                    { length: CHALLENGE_SET.rule.topLogprobs },
-                    (_, index) => ({
-                      token: index === 0 ? ' scored' : ` token${index}`,
-                      logprob: -0.1,
-                    }),
-                  ),
-                },
-              ],
-            })
+          ? Response.json(
+              referenceGenerate(
+                Array.from(
+                  { length: CHALLENGE_SET.rule.topLogprobs },
+                  (_, index) => ({
+                    token: index === 0 ? ' scored' : ` token${index}`,
+                    logprob: -0.1,
+                  }),
+                ),
+              ),
+            )
           : Response.json({
               models: [{ name: 'qwen3:1.7b', digest: 'cd'.repeat(32) }],
             }),

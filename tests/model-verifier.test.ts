@@ -28,6 +28,8 @@ import {
   verifyModelVerification,
 } from '@gyblos/protocol/model-verification';
 
+import { referenceGenerate } from './support/verifier-reference';
+
 const OWNER = '2nc4a8RxZMdWMMyBxAeKcT22HpAs5c3zgSTXnvYZ2L9S';
 const NODE_ID = 'ab'.repeat(32);
 const DIGEST = 'cd'.repeat(32);
@@ -342,9 +344,7 @@ void test('the reference reads top candidates for the catalog alias of the decla
       return Response.json({
         models: [{ name: 'qwen3:1.7b', digest: DIGEST }],
       });
-    return Response.json({
-      logprobs: [{ top_logprobs: topCandidates() }],
-    });
+    return Response.json(referenceGenerate(topCandidates()));
   };
   const model = await openReference(
     'http://127.0.0.1:11434',
@@ -383,11 +383,9 @@ void test('the reference reads top candidates for the catalog alias of the decla
   const broken: typeof fetch = async (input) =>
     String(input).endsWith('/api/tags')
       ? Response.json({ models: [{ name: 'qwen3:1.7b', digest: DIGEST }] })
-      : Response.json({
-          logprobs: [
-            { top_logprobs: [{ token: 1 }, ...topCandidates().slice(1)] },
-          ],
-        });
+      : Response.json(
+          referenceGenerate([{ token: 1 }, ...topCandidates().slice(1)]),
+        );
   const flaky = await openReference(
     'http://127.0.0.1:11434',
     'qwen3-1.7b',
@@ -409,9 +407,7 @@ void test('the reference retries a passing failure and gives up after a bounded 
       });
     generates++;
     if (generates === 1) return new Response('busy', { status: 500 });
-    return Response.json({
-      logprobs: [{ top_logprobs: topCandidates() }],
-    });
+    return Response.json(referenceGenerate(topCandidates()));
   };
   const model = await openReference(
     'http://127.0.0.1:11434',

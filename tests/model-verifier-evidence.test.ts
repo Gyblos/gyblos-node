@@ -43,6 +43,7 @@ import {
   NATIVE_CAPABILITY,
   NATIVE_TEST_OPTIONS,
 } from './support/native-runtime';
+import { referenceGenerate } from './support/verifier-reference';
 
 const tokenizer =
   'export async function outputTokenCounter() { return (text) => text.trim() ? text.trim().split(/\\s+/).length : 0; }';
@@ -195,16 +196,14 @@ void test(
           models: [{ name: referenceTag(modelId), digest: 'ab'.repeat(32) }],
         });
       if (url.pathname === ROUTES.ollamaGenerate)
-        return Response.json({
-          logprobs: [
-            {
-              top_logprobs: Array.from({ length: 20 }, (_, index) => ({
-                token: index === 0 ? ' w' : ` token${index}`,
-                logprob: -0.1,
-              })),
-            },
-          ],
-        });
+        return Response.json(
+          referenceGenerate(
+            Array.from({ length: 20 }, (_, index) => ({
+              token: index === 0 ? ' w' : ` token${index}`,
+              logprob: -0.1,
+            })),
+          ),
+        );
       assert.fail('Unexpected Ollama route.');
     });
     const sellerFile = join(home, 'seller.json');
