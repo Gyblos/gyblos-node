@@ -21,6 +21,7 @@ export function isChannelBlocker(value: unknown): value is ChannelBlocker {
 }
 export interface PaidChannelEligibility {
   channelId?: string;
+  renewalDepositAtomic?: string;
   blocker: ChannelBlocker | null;
   channelRemainingAtomic: string | null;
 }
@@ -32,12 +33,21 @@ export function parsePaidChannelEligibility(
     value !== null &&
     typeof value === 'object' &&
     Object.hasOwn(value, 'channelId');
+  const hasRenewal =
+    value !== null &&
+    typeof value === 'object' &&
+    Object.hasOwn(value, 'renewalDepositAtomic');
   const row = controlObject(value, [
+    ...(hasRenewal ? ['renewalDepositAtomic'] : []),
     'blocker',
     'channelRemainingAtomic',
     ...(hasChannel ? ['channelId'] : []),
   ]);
   if (
+    (hasRenewal &&
+      (!hasChannel ||
+        row.blocker !== null ||
+        row.renewalDepositAtomic === '0')) ||
     (row.blocker !== null && !isChannelBlocker(row.blocker)) ||
     (row.blocker !== null &&
       row.blocker !== SESSION_CODES.REPLACEMENT_REQUIRED &&
@@ -47,6 +57,9 @@ export function parsePaidChannelEligibility(
     throw new Error('Invalid buyer channel status');
   return {
     blocker: row.blocker,
+    ...(hasRenewal && {
+      renewalDepositAtomic: controlAtomic(row.renewalDepositAtomic),
+    }),
     channelRemainingAtomic:
       row.channelRemainingAtomic === null
         ? null

@@ -30,6 +30,7 @@ export interface BuyerFunding {
   faucetAvailable: boolean;
   channelId?: string;
   channelRemainingAtomic: string | null;
+  renewalDepositAtomic?: string;
   switchingAtomic?: string;
   replacementAtomic?: string;
   poolLimited?: true;
@@ -62,7 +63,7 @@ export function sellerChannelStatus(funding: BuyerFunding | null) {
   if (
     funding.channelId &&
     funding.channelRemainingAtomic !== null &&
-    BigInt(funding.channelRemainingAtomic) > 0n
+    (BigInt(funding.channelRemainingAtomic) > 0n || fundedRenewal(funding))
   )
     return {
       label: 'Ready',
@@ -73,11 +74,25 @@ export function sellerChannelStatus(funding: BuyerFunding | null) {
     description: 'Review the seller and deposit terms before sending.',
   };
 }
+function fundedRenewal(funding: BuyerFunding) {
+  if (
+    !funding.renewalDepositAtomic ||
+    funding.channelRemainingAtomic === null ||
+    funding.balanceAtomic === null
+  )
+    return undefined;
+  return BigInt(funding.balanceAtomic) +
+    BigInt(funding.channelRemainingAtomic) >=
+    BigInt(funding.renewalDepositAtomic)
+    ? funding.renewalDepositAtomic
+    : undefined;
+}
 export function sellerResponseLimit(
   funding: BuyerFunding | null,
   deposit: string,
 ) {
   return (
+    (funding && fundedRenewal(funding)) ??
     funding?.channelRemainingAtomic ??
     funding?.switchingAtomic ??
     funding?.replacementAtomic ??
@@ -114,6 +129,11 @@ export function autoFundingAvailable(
     const escrow = item.channelRemainingAtomic ?? item.switchingAtomic;
     if (escrow != null && BigInt(escrow) >= BigInt(policy.maxAtomic))
       return true;
+    if (
+      item.renewalDepositAtomic &&
+      BigInt(item.renewalDepositAtomic) >= BigInt(policy.maxAtomic)
+    )
+      return item.balanceAtomic === null ? null : Boolean(fundedRenewal(item));
     if (escrow != null) return FUNDING.channelLimit;
     if (
       item.replacementAtomic !== undefined &&
@@ -187,44 +207,36 @@ export function depositShortfall(balanceAtomic: string, depositAtomic: string) {
 }
 export function parseBuyerFunding(value: unknown): BuyerFunding | null {
   try {
+    const optional = [
+      'channelId',
+      'channelBlocker',
+      'poolLimited',
+      'switchingAtomic',
+      'replacementAtomic',
+      'renewalDepositAtomic',
+    ];
+    const present = (key: string) =>
+      value !== null && typeof value === 'object' && Object.hasOwn(value, key);
     const row = controlObject(value, [
       'network',
       'payer',
       'balanceAtomic',
       'faucetAvailable',
       'channelRemainingAtomic',
-      ...(value &&
-      typeof value === 'object' &&
-      Object.hasOwn(value, 'channelId')
-        ? ['channelId']
-        : []),
-      ...(value &&
-      typeof value === 'object' &&
-      Object.hasOwn(value, 'lastBalanceAtomic')
+      ...optional.filter(present),
+      ...(present('lastBalanceAtomic')
         ? ['lastBalanceAtomic', 'lastBalanceAt']
-        : []),
-      ...(value &&
-      typeof value === 'object' &&
-      Object.hasOwn(value, 'channelBlocker')
-        ? ['channelBlocker']
-        : []),
-      ...(value &&
-      typeof value === 'object' &&
-      Object.hasOwn(value, 'poolLimited')
-        ? ['poolLimited']
-        : []),
-      ...(value &&
-      typeof value === 'object' &&
-      Object.hasOwn(value, 'switchingAtomic')
-        ? ['switchingAtomic']
-        : []),
-      ...(value &&
-      typeof value === 'object' &&
-      Object.hasOwn(value, 'replacementAtomic')
-        ? ['replacementAtomic']
         : []),
     ]);
     if (
+      (row.renewalDepositAtomic !== undefined &&
+        (row.channelId === undefined ||
+          row.channelRemainingAtomic === null ||
+          row.channelBlocker !== undefined ||
+          row.renewalDepositAtomic === '0' ||
+          row.poolLimited ||
+          row.switchingAtomic !== undefined ||
+          row.replacementAtomic !== undefined)) ||
       (row.channelBlocker !== undefined &&
         !isChannelBlocker(row.channelBlocker)) ||
       (row.poolLimited !== undefined && row.poolLimited !== true) ||
@@ -234,6 +246,9 @@ export function parseBuyerFunding(value: unknown): BuyerFunding | null {
       return null;
     return {
       network: DEVNET,
+      ...(row.renewalDepositAtomic !== undefined && {
+        renewalDepositAtomic: controlAtomic(row.renewalDepositAtomic),
+      }),
       ...(row.channelId !== undefined && {
         channelId: controlAddress(row.channelId),
       }),

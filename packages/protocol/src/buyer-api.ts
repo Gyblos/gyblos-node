@@ -28,6 +28,7 @@ export interface BuyerApiPolicy {
   autoPrices?: TokenPricesV2;
   autoRoutes?: { id: string; modelId: string; maxTokens: number }[];
   depositAtomic?: string;
+  renewalBudgetAtomic?: string;
   lifetimeMs?: number;
   network: string;
   mint: string;
@@ -103,7 +104,9 @@ export function parseBuyerApiPolicy(input: unknown): BuyerApiPolicy {
   )
     throw new Error('Invalid buyer policy');
   const session =
-    value.depositAtomic === undefined && value.lifetimeMs === undefined
+    value.depositAtomic === undefined &&
+    value.lifetimeMs === undefined &&
+    value.renewalBudgetAtomic === undefined
       ? {}
       : parseTerms(value);
   return {
@@ -133,10 +136,20 @@ function parseTerms(value: Record<string, unknown>) {
   if (
     !buyerAtomic(value.depositAtomic) ||
     value.depositAtomic === '0' ||
+    (value.renewalBudgetAtomic !== undefined &&
+      (!buyerAtomic(value.renewalBudgetAtomic) ||
+        BigInt(value.renewalBudgetAtomic) < BigInt(value.depositAtomic) ||
+        value.totalDepositAtomic !== undefined)) ||
     typeof value.lifetimeMs !== 'number' ||
     !Number.isSafeInteger(value.lifetimeMs) ||
     value.lifetimeMs <= 0
   )
     throw new Error('Invalid buyer channel terms');
-  return { depositAtomic: value.depositAtomic, lifetimeMs: value.lifetimeMs };
+  return {
+    depositAtomic: value.depositAtomic,
+    lifetimeMs: value.lifetimeMs,
+    ...(value.renewalBudgetAtomic !== undefined && {
+      renewalBudgetAtomic: value.renewalBudgetAtomic,
+    }),
+  };
 }

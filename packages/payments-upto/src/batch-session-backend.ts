@@ -30,6 +30,7 @@ import type {
   BatchSellerBackend,
 } from './batch-session-types';
 import { waitBatch } from './batch-session-wait';
+import { paymentTokenBalance } from './buyer-funding';
 import { createBuyerObservationRpc } from './buyer-observation-transport';
 import { BATCH_OPENING_LIMITS } from './constants';
 import { assertFeeWire, limitedFeePayer } from './fee-payer';
@@ -60,12 +61,12 @@ export function openBatchBuyerBackend(
   let observer: ReturnType<typeof batchSessionObserver> | undefined;
   return {
     inspect: () => inspectBatchSession(options.paths),
-    async renew(
-      expectedChannelId: string,
-      terms: PaymentSessionTerms,
-      totalBudgetAtomic: string,
-      switchSeller = false,
-    ) {
+    async availableBalance(terms, signal) {
+      if (terms.buyer !== options.payer.address) return null;
+      await verifyPaymentNetwork(rpc, terms.network);
+      return paymentTokenBalance(rpc, terms.buyer, terms.mint, signal);
+    },
+    async renew(expectedChannelId, terms, totalBudgetAtomic, switchSeller) {
       if (options.payer.address !== terms.buyer)
         return sessionFail(SESSION_CODES.BINDING);
       const existing = await inspectBatchSession(options.paths);
@@ -79,7 +80,7 @@ export function openBatchBuyerBackend(
         expectedChannelId,
         terms,
         totalBudgetAtomic,
-        switchSeller,
+        switchSeller: switchSeller ?? false,
         now: options.now ?? Date.now,
         observe: oldObserver.settlement,
       });

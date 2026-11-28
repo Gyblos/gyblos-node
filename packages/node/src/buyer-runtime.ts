@@ -16,12 +16,9 @@ interface BuyerRuntimeHost {
     signal?: AbortSignal,
   ): Promise<{ chargedAtomic: string; refundedAtomic: string } | undefined>;
 }
-export async function withBuyerRuntime<Host extends BuyerRuntimeHost>(
-  environment: HomeEnvironment,
-  start: () => Promise<Host>,
-): Promise<Host> {
+function acquireRuntime(environment: HomeEnvironment) {
   const paths = batchPoolPathsIn(environment);
-  const lock = await ensurePrivatePaymentPaths({
+  return ensurePrivatePaymentPaths({
     directory: paths.directory,
     lock: paths.runtimeLock,
   })
@@ -29,6 +26,23 @@ export async function withBuyerRuntime<Host extends BuyerRuntimeHost>(
     .catch(() => {
       throw new NodeError(NODE_ERROR_CODES.BUYER_RUNTIME_UNAVAILABLE);
     });
+}
+export async function withStoppedBuyer<T>(
+  environment: HomeEnvironment,
+  run: () => Promise<T>,
+) {
+  const lock = await acquireRuntime(environment);
+  try {
+    return await run();
+  } finally {
+    await lock.release();
+  }
+}
+export async function withBuyerRuntime<Host extends BuyerRuntimeHost>(
+  environment: HomeEnvironment,
+  start: () => Promise<Host>,
+): Promise<Host> {
+  const lock = await acquireRuntime(environment);
   try {
     const host = await start();
     const close = host.close.bind(host);

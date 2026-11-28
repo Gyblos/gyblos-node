@@ -254,6 +254,7 @@ function buyerHost(
 ) {
   return {
     url: host.url,
+    pauseWhenIdle: host.pauseWhenIdle,
     chat: execution?.chat(host.url) ?? freeChat(request, host.url),
     receipts: receipts.health,
     telemetry: telemetry.health,

@@ -42,6 +42,11 @@ export async function sessionProductHost(
     telemetry?: import('@gyblos/protocol/telemetry').TelemetrySink;
   },
   capacity?: { maxSessions: number },
+  budget?: {
+    depositAtomic: string;
+    renewalBudgetAtomic: string;
+    beforeDeposit?: () => Promise<void>;
+  },
 ) {
   let clockOffset = 0;
   let servedMaxSessions: number | undefined;
@@ -95,7 +100,7 @@ export async function sessionProductHost(
   };
   try {
     const roles = await paidAcceptanceRoles();
-    const finance = await sessionProductPayments(roles);
+    const finance = await sessionProductPayments(roles, budget?.beforeDeposit);
     await paidSellerConfiguration(pricing);
     const configuration = process.env.GYBLOS_CONFIG!;
     if (capacity)
@@ -173,7 +178,8 @@ export async function sessionProductHost(
     selection.sellers[0]!.manualTrust = true;
     selection.session = {
       ...(totalDepositAtomic ? { totalDepositAtomic } : {}),
-      depositAtomic: '100000',
+      depositAtomic: budget?.depositAtomic ?? '100000',
+      ...(budget && { renewalBudgetAtomic: budget.renewalBudgetAtomic }),
       lifetimeMs: 3600000,
       withdrawDelaySeconds: 900,
     };
@@ -223,8 +229,11 @@ export async function sessionProductHost(
         buyer = undefined;
         await seller?.stop();
         await startSeller();
-        selection.sellers[0]!.directAddresses = binding.directAddresses();
-        await writeFile(path, JSON.stringify(selection), {
+        const current: BuyerSelectionConfig = JSON.parse(
+          await readFile(path, 'utf8'),
+        );
+        current.sellers[0]!.directAddresses = binding.directAddresses();
+        await writeFile(path, JSON.stringify(current), {
           mode: FILE_MODES.privateFile,
         });
         return start();

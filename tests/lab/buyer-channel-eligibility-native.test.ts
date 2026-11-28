@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile, writeFile } from 'node:fs/promises';
 import test from 'node:test';
 
+import { setBuyerRenewalBudget } from '@gyblos/buyer/auto-settings';
 import { BUYER_SELECTION } from '@gyblos/buyer/constants';
 import type { BuyerSelectionConfig } from '@gyblos/buyer/selection-config';
 import { batchSessionPathsIn, rolePathIn } from '@gyblos/config';
@@ -252,5 +253,139 @@ void test(
     assert.deepEqual(host.finance.calls, calls);
     const resumed = await ask(64);
     assert.equal(resumed.status, 200, await resumed.clone().text());
+  },
+);
+
+void test(
+  'a delegated key renews healthy exhausted escrow once under its operator budget across restart',
+  { skip: NATIVE_CAPABILITY.transportSkip },
+  async (t) => {
+    const request = globalThis.fetch;
+    const host = await sessionProductHost(
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { depositAtomic: '10000', renewalBudgetAtomic: '10060' },
+    );
+    t.after(host.close);
+    const { ask, owner } = await buyerClient(host, request, '50000');
+    const paths = batchSessionPathsIn(process.env, P2P_ROLES.BUYER);
+    const first = await ask(64);
+    assert.equal(first.status, 200, await first.clone().text());
+    const initial = await inspectBatchSession(paths);
+    assert.ok(initial?.snapshot.channelId);
+    const configPath = rolePathIn(
+      process.env,
+      P2P_ROLES.BUYER,
+      BUYER_SELECTION.configFile,
+    );
+    const config = await readFile(configPath, 'utf8');
+    const changed: BuyerSelectionConfig = JSON.parse(config);
+    assert.ok(changed.session);
+    changed.session.withdrawDelaySeconds = 1800;
+    await writeFile(configPath, JSON.stringify(changed));
+    await host.restartBuyer();
+    const mismatch = await ask(64);
+    const error = (await mismatch.json()).error;
+    assert.equal(error.code, SESSION_CODES.BINDING);
+    assert.equal(error[BUYER_API.NEVER_SENT_FIELD], true);
+    assert.deepEqual(host.finance.calls, ['deposit']);
+    await writeFile(configPath, config);
+    await host.restartBuyer();
+    for (const balance of [null, '0']) {
+      host.finance.walletBalance(balance);
+      const unready = await ask(64);
+      assert.equal(unready.ok, false);
+      assert.equal(
+        (await unready.json()).error.code,
+        balance === null ? SESSION_CODES.STATUS_UNKNOWN : SESSION_CODES.LIMIT,
+      );
+      assert.deepEqual(host.finance.calls, ['deposit']);
+    }
+    host.finance.walletBalance('1000000');
+    await host.restartBoth();
+    const second = await ask(64);
+    assert.equal(second.status, 200, await second.clone().text());
+    const renewed = await inspectBatchSession(paths);
+    assert.ok(renewed?.snapshot.channelId);
+    assert.notEqual(initial.snapshot.channelId, renewed.snapshot.channelId);
+    assert.equal(renewed.priorSpentAtomic, initial.snapshot.cumulativeAtomic);
+    assert.equal(host.finance.calls.filter((x) => x === 'deposit').length, 2);
+    const calls = [...host.finance.calls];
+    const rejected = await ask(64);
+    assert.equal(rejected.ok, false);
+    assert.equal(host.engine.attempts(), 2);
+    assert.deepEqual(host.finance.calls, calls);
+    await host.stopBuyer();
+    const smaller: BuyerSelectionConfig = JSON.parse(config);
+    smaller.request.maxAtomic = '1000';
+    await writeFile(configPath, JSON.stringify(smaller));
+    await setBuyerRenewalBudget(process.env, '10000');
+    await host.restartBoth();
+    const lowered = await ask(64);
+    const denied = (await lowered.json()).error;
+    assert.equal(denied?.code, SESSION_CODES.LIMIT);
+    assert.equal(denied[BUYER_API.NEVER_SENT_FIELD], true);
+    const status = parseBuyerApiKeysReply(
+      await (
+        await owner(new URL(BUYER_API_KEYS.PATH, host.buyer().url))
+      ).json(),
+    ).snapshot;
+    assert.equal(status.blocked, false);
+    assert.equal(status.keys[0]?.reservedAtomic, '0');
+    assert.deepEqual(host.finance.calls, calls);
+    await host.stopBuyer();
+    await setBuyerRenewalBudget(process.env, null);
+    await host.restartBoth();
+    const remaining = await ask(64);
+    assert.equal(remaining.status, 200, await remaining.clone().text());
+    assert.equal(host.engine.attempts(), 3);
+    assert.deepEqual(host.finance.calls, calls);
+  },
+);
+
+void test(
+  'a quote that expires during confirmed close leaves an unfunded replacement usable by the next request',
+  { skip: NATIVE_CAPABILITY.transportSkip },
+  async (t) => {
+    const request = globalThis.fetch;
+    const realNow = Date.now;
+    let offset = 0;
+    t.mock.method(Date, 'now', () => realNow() + offset);
+    const host = await sessionProductHost(
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { depositAtomic: '10000', renewalBudgetAtomic: '30000' },
+    );
+    t.after(host.close);
+    const { ask } = await buyerClient(host, request, '50000');
+    const first = await ask(64);
+    assert.equal(first.status, 200, await first.clone().text());
+    const recordSettlement = host.finance.settled.set.bind(
+      host.finance.settled,
+    );
+    t.mock.method(
+      host.finance.settled,
+      'set',
+      (...args: Parameters<typeof recordSettlement>) => {
+        offset = 60000;
+        return recordSettlement(...args);
+      },
+    );
+    const stale = await ask(64);
+    assert.equal(stale.ok, false);
+    const paths = batchSessionPathsIn(process.env, P2P_ROLES.BUYER);
+    const stored = await inspectBatchSession(paths);
+    assert.equal(stored?.empty, true);
+    assert.equal((await stale.json()).error[BUYER_API.NEVER_SENT_FIELD], true);
+    assert.equal(host.engine.attempts(), 1);
+    assert.deepEqual(host.finance.calls, ['deposit', 'refund']);
+    const fresh = await ask(64);
+    assert.equal(fresh.status, 200, await fresh.clone().text());
+    assert.equal(host.engine.attempts(), 2);
+    assert.deepEqual(host.finance.calls, ['deposit', 'refund', 'deposit']);
   },
 );

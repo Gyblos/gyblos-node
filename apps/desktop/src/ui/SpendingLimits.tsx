@@ -11,6 +11,7 @@ import { x402BudgetInput } from '../x402-model';
 import { ActionButton } from './ActionButton';
 import { AmountField } from './AmountField';
 import { Modal } from './Modal';
+import { RenewalBudget } from './RenewalBudget';
 import { TONE, type Tone } from './status-tone';
 import { Button, IconButton } from './UI';
 import { useUsdcApiKeys } from './useUsdcApiKeys';
@@ -242,32 +243,14 @@ export function SpendingLimits({
               className="ui-help-text"
               title="Chat and each API key have their own spending limits."
             >
-              No shared limit
+              {policy?.renewalBudgetAtomic
+                ? money(BigInt(policy.renewalBudgetAtomic)) + ' renewal budget'
+                : 'No shared limit'}
             </span>
           </div>
           <SpendingBar segments={segments} total={total} />
         </section>
-        <section className="preview-panel" aria-label="Spending breakdown">
-          <h3>Spending</h3>
-          <div className="preview-panel-row">
-            <span>Chat · current session</span>
-            <strong>{money(chat)}</strong>
-          </div>
-          <div className="preview-panel-row">
-            <span>API keys · lifetime</span>
-            <strong>{money(keySpent)}</strong>
-          </div>
-          <div className="preview-panel-row">
-            <span>Remaining · chat</span>
-            <strong>
-              {sameChat && summary.active && chat !== null
-                ? money(BigInt(summary.limitAtomic) - chat)
-                : sameChat
-                  ? 'No active limit'
-                  : 'Unavailable'}
-            </strong>
-          </div>
-        </section>
+        <SpendingBreakdown {...{ chat, keySpent, sameChat, summary }} />
       </div>
       <LimitControl
         key={policy?.policyId}
@@ -275,6 +258,11 @@ export function SpendingLimits({
         policy={policy}
         open={(amount) => setReview({ policyId: policy?.policyId, amount })}
       />
+      {buyer.state.canConfigureRenewal &&
+        policy?.depositAtomic &&
+        policy.mint === DEVNET_USDC && (
+          <RenewalBudget buyer={buyer} policy={policy} />
+        )}
       <KeyLimits snapshot={keys} manage={manage} />
       {review && review.policyId === policy?.policyId && (
         <Modal title="Chat budget" close={() => setReview(null)}>
@@ -359,4 +347,38 @@ function parseLimit(policy: BuyerApiPolicy | null, value: string) {
   } catch {
     return null;
   }
+}
+
+function SpendingBreakdown({
+  chat,
+  keySpent,
+  sameChat,
+  summary,
+}: Pick<
+  ReturnType<typeof spendingBySource>,
+  'chat' | 'keySpent' | 'sameChat' | 'summary'
+>) {
+  return (
+    <section className="preview-panel" aria-label="Spending breakdown">
+      <h3>Spending</h3>
+      <div className="preview-panel-row">
+        <span>Chat · current session</span>
+        <strong>{money(chat)}</strong>
+      </div>
+      <div className="preview-panel-row">
+        <span>API keys · lifetime</span>
+        <strong>{money(keySpent)}</strong>
+      </div>
+      <div className="preview-panel-row">
+        <span>Remaining · chat</span>
+        <strong>
+          {sameChat && summary.active && chat !== null
+            ? money(BigInt(summary.limitAtomic) - chat)
+            : sameChat
+              ? 'No active limit'
+              : 'Unavailable'}
+        </strong>
+      </div>
+    </section>
+  );
 }

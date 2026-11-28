@@ -31,6 +31,7 @@ export interface BuyerDesktopOptions {
     | 'maxAtomic'
     | 'depositAtomic'
     | 'lifetimeMs'
+    | 'renewalBudgetAtomic'
     | 'totalDepositAtomic'
     | 'paidAuto'
     | 'autoPrices'
@@ -55,6 +56,9 @@ export function configuredBuyerAccess(
             ...(session && {
               depositAtomic: session.depositAtomic,
               lifetimeMs: session.lifetimeMs,
+              ...(session.renewalBudgetAtomic !== undefined && {
+                renewalBudgetAtomic: session.renewalBudgetAtomic,
+              }),
               ...(session.totalDepositAtomic !== undefined && {
                 totalDepositAtomic: session.totalDepositAtomic,
               }),

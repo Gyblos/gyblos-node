@@ -86,6 +86,53 @@ interface Connection {
 interface Running {
   exit: Promise<void>;
   stop(): void;
+  stopWhenIdle(recover?: () => void): Promise<boolean>;
+}
+function idleStop(worker: BuyerWorker, exit: Promise<void>, timeout: number) {
+  let pending: ((ok: boolean) => void) | undefined;
+  worker.on('message', (message) => {
+    if (!message || typeof message !== 'object' || !('kind' in message)) return;
+    if (
+      message.kind === BUYER_SIDECAR.IDLE ||
+      message.kind === BUYER_SIDECAR.BUSY
+    ) {
+      pending?.(message.kind === BUYER_SIDECAR.IDLE);
+      pending = undefined;
+    }
+  });
+  return async (recover?: () => void) => {
+    if (pending) return false;
+    let expired = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const answered = new Promise<boolean>((resolve, reject) => {
+      pending = resolve;
+
+      try {
+        worker.postMessage(BUYER_SIDECAR.STOP_IF_IDLE);
+      } catch (error) {
+        pending = undefined;
+        reject(error);
+      }
+    });
+    try {
+      const stopped = answered.then(async (idle) => {
+        if (idle) {
+          await exit;
+          if (expired) recover?.();
+        }
+        return idle;
+      });
+      const deadline = new Promise<false>((resolve) => {
+        timer = setTimeout(() => {
+          expired = true;
+          resolve(false);
+        }, timeout);
+      });
+      return await Promise.race([stopped, deadline]);
+    } finally {
+      clearTimeout(timer);
+    }
+  };
 }
 function supervise(
   worker: BuyerWorker,
@@ -97,12 +144,12 @@ function supervise(
   let stopping = false;
   let exited = false;
   let accepted = false;
-  let finish = () => {};
-  let resolveReady = (_connection: Connection) => {};
-  let rejectReady = (_reason: Error) => {};
+  let finish!: () => void;
   const exit = new Promise<void>((resolve) => {
     finish = resolve;
   });
+  let resolveReady = (_connection: Connection) => {};
+  let rejectReady = (_reason: Error) => {};
   const ready = new Promise<Connection>((resolve, reject) => {
     resolveReady = resolve;
     rejectReady = reject;
@@ -126,10 +173,7 @@ function supervise(
   });
   worker.on('message', (message) => {
     if (exited || stopping || accepted) return;
-    if (!message || typeof message !== 'object') {
-      fail();
-      return;
-    }
+    if (!message || typeof message !== 'object') return fail();
     const value = message as Record<string, unknown>;
     if (isBuyerSessionConfigFailure(value.kind))
       return fail(new BuyerSessionRequired(value.kind));
@@ -157,6 +201,7 @@ function supervise(
   return {
     ready,
     exit,
+    stopWhenIdle: idleStop(worker, exit, stopMs),
     stop() {
       if (exited || stopping) return;
       stopping = true;
@@ -200,6 +245,9 @@ export class ManagedBuyer {
     );
     this.running = operation;
     return operation.ready;
+  }
+  async stopWhenIdle(recover?: () => void) {
+    return (await this.running?.stopWhenIdle(recover)) ?? false;
   }
   async close() {
     this.closed = true;

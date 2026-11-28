@@ -4,6 +4,7 @@ import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
 import { matchBatchTerms } from '@gyblos/protocol/batch-channel';
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
 import {
+  controlAddress,
   controlAtomic,
   controlInteger,
   controlObject,
@@ -20,33 +21,44 @@ export { UnsentChannelLimitError } from '@gyblos/protocol/payment-session';
 export interface BuyerSessionPolicy {
   depositAtomic: string;
   totalDepositAtomic?: string;
+  renewalBudgetAtomic?: string;
+  fundedChannelId?: string;
   lifetimeMs: number;
   withdrawDelaySeconds: number;
 }
 export function parseBuyerSessionPolicy(value: unknown): BuyerSessionPolicy {
   try {
-    const optional =
-      value !== null &&
-      typeof value === 'object' &&
-      Object.hasOwn(value, 'withdrawDelaySeconds');
-    const hasTotal =
-      value !== null &&
-      typeof value === 'object' &&
-      Object.hasOwn(value, 'totalDepositAtomic');
+    if (!value || typeof value !== 'object') return sessionFail();
+    const optional = Object.hasOwn(value, 'withdrawDelaySeconds');
+    const hasTotal = Object.hasOwn(value, 'totalDepositAtomic');
+    const hasBudget = Object.hasOwn(value, 'renewalBudgetAtomic');
+    const hasFunded = Object.hasOwn(value, 'fundedChannelId');
     const row = controlObject(value, [
       'depositAtomic',
       'lifetimeMs',
       ...(hasTotal ? ['totalDepositAtomic'] : []),
+      ...(hasBudget ? ['renewalBudgetAtomic'] : []),
       ...(optional ? ['withdrawDelaySeconds'] : []),
+      ...(hasFunded ? ['fundedChannelId'] : []),
     ]);
     const depositAtomic = controlAtomic(row.depositAtomic);
+    const renewalBudgetAtomic = hasBudget
+      ? positiveTotal(row.renewalBudgetAtomic)
+      : undefined;
     if (
+      (hasFunded && (hasBudget || hasTotal)) ||
+      (renewalBudgetAtomic !== undefined &&
+        (hasTotal || BigInt(renewalBudgetAtomic) < BigInt(depositAtomic))) ||
       depositAtomic === '0' ||
       BigInt(depositAtomic) > BigInt(BATCH_SESSION_DEFAULTS.maxDepositAtomic)
     )
       sessionFail();
     return {
       depositAtomic,
+      ...(renewalBudgetAtomic && { renewalBudgetAtomic }),
+      ...(hasFunded && {
+        fundedChannelId: controlAddress(row.fundedChannelId),
+      }),
       ...(hasTotal
         ? { totalDepositAtomic: positiveTotal(row.totalDepositAtomic) }
         : {}),
@@ -120,21 +132,63 @@ function positiveTotal(value: unknown) {
   return total;
 }
 
+type DepositPolicy = Pick<
+  BuyerSessionPolicy,
+  'depositAtomic' | 'renewalBudgetAtomic'
+>;
+export function spendingAuthority(policy: DepositPolicy) {
+  return policy.renewalBudgetAtomic ?? policy.depositAtomic;
+}
+
+export function checkChannelAuthority(
+  policy: BuyerSessionPolicy,
+  terms: PaymentSessionTerms,
+  priorSpent: string,
+  now: number,
+  nodeId: string,
+) {
+  if (
+    BigInt(terms.depositAtomic) > BigInt(policy.depositAtomic) ||
+    (!policy.fundedChannelId &&
+      BigInt(priorSpent) + BigInt(terms.depositAtomic) >
+        BigInt(spendingAuthority(policy))) ||
+    terms.withdrawDelaySeconds > policy.withdrawDelaySeconds ||
+    terms.protocolFeeBps !== PROTOCOL_FEE.bps ||
+    terms.treasury !== PROTOCOL_FEE.treasury ||
+    terms.expiresAt - now > policy.lifetimeMs
+  )
+    throw new UnsentChannelLimitError(nodeId);
+}
+
+export function remainingDepositAuthority(
+  policy: DepositPolicy,
+  priorSpentAtomic: string | undefined,
+  spent: string,
+) {
+  const cap = BigInt(policy.depositAtomic);
+  const available =
+    BigInt(spendingAuthority(policy)) -
+    BigInt(priorSpentAtomic ?? '0') -
+    BigInt(spent);
+  return available < cap ? available : cap;
+}
+
 export function replacementTerms(
   policy: BuyerSessionPolicy,
   now: () => number,
   quote: SignedOfferV2,
   priorSpentAtomic?: string,
 ) {
-  const authority =
-    BigInt(policy.depositAtomic) - BigInt(priorSpentAtomic ?? '0');
-  return (spent: string) =>
-    newSessionTerms(
+  return (spent: string) => {
+    return newSessionTerms(
       quote,
       {
         ...policy,
-        depositAtomic: String(authority - BigInt(spent)),
+        depositAtomic: String(
+          remainingDepositAuthority(policy, priorSpentAtomic, spent),
+        ),
       },
       now(),
     );
+  };
 }

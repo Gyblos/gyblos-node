@@ -13,6 +13,7 @@ export const BUYER_COMMANDS = {
   INIT: 'init',
   SETUP: 'setup',
   AUTO: 'auto',
+  BUDGET: 'budget',
   AGENT: 'agent',
   WITHDRAW: 'withdraw',
 } as const;

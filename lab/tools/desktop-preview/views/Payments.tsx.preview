@@ -17,7 +17,7 @@ import type { BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 import { WALLET_STATUS } from '../wallet/model';
 import { BUTTON_VARIANT } from './constants';
 import { CompactAmount, FUNDS_HOST, openPreviewFunds, PreviewFundsDialog, SegmentedBar, showPreviewToast, Tag, TONE, useSpending } from './PreviewKit';
-import { FormActions } from './Form';
+import { FormActions, FormField } from './Form';
 import { Modal } from './Modal';
 import { MotionPresence } from './Motion';
 import { PaypalSessionPanel } from './PaypalSessionPanel';
@@ -233,6 +233,7 @@ function Limits({ buyer, onBudget, onConnections }: {
               </div>}
         </div>
       </section>
+      {policy && <RenewalBudget policy={policy} />}
       <section className="ui-section" aria-label="API key limits">
         <div className="ui-section-title">
           <h2>API keys</h2>
@@ -320,6 +321,42 @@ function LimitRow({ buyer, policy, spent, current, limited }: {
       </div>
     </div>
   );
+}
+function RenewalBudget({ policy }: { policy: BuyerApiPolicy }) {
+  const [budget, setBudget] = useState(() => sessionStorage.getItem('preview-renewal-budget') ?? '');
+  const [editing, setEditing] = useState(() => new URLSearchParams(location.search).get('review') === 'renewal');
+  const [amount, setAmount] = useState(budget);
+  const atomic = atomicOf(amount, policy);
+  const valid = atomic !== null && atomic >= 1000000n;
+  const save = (value: string) => {
+    sessionStorage.setItem('preview-renewal-budget', value);
+    setBudget(value);
+    setEditing(false);
+  };
+  return <section className="ui-section" aria-label="Channel renewal">
+    <div className="preview-settings-rows"><div>
+      <span>Automatic channel renewal<small className="ui-help-text">{budget
+        ? 'Enabled · ' + budget + ' USDC total budget'
+        : 'Off · Approve a budget to keep agents running when a channel fills up.'}</small></span>
+      <Button onClick={() => { setAmount(budget); setEditing(true); }}>{budget ? 'Manage budget' : 'Set budget'}</Button>
+    </div></div>
+    <MotionPresence>{editing && <Modal title="Automatic channel renewal" close={() => setEditing(false)}>
+      <div className="ui-form">
+        <p>Let the buyer replace a full channel with the same seller at the same terms. Chat and your API keys share this budget.</p>
+        <FormField label="Total renewal budget" htmlFor="renewal-budget">
+          <CompactAmount id="renewal-budget" unit="USDC" value={amount} onChange={setAmount} placeholder="0"
+            parse={value => atomicOf(value, policy)} format={value => x402Amount(String(value), policy)}
+            step={1000000n} invalid={!!amount && !valid} describedBy="renewal-help" />
+        </FormField>
+        <p id="renewal-help" className="ui-help-text">Minimum 1 USDC for a channel deposit. The budget has no automatic reset. Each API key keeps its own limit.</p>
+        <FormActions align="start">
+          <Button disabled={!valid} variant={BUTTON_VARIANT.PRIMARY} onClick={() => save(amount)}>{budget ? 'Save budget' : 'Authorize renewal'}</Button>
+          {budget && <Button onClick={() => save('')}>Turn off renewal</Button>}
+          <Button onClick={() => setEditing(false)}>Cancel</Button>
+        </FormActions>
+      </div>
+    </Modal>}</MotionPresence>
+  </section>;
 }
 function WalletOverview({
   buyer,
