@@ -125,11 +125,11 @@ function PlainCard({
   changed,
 }: CardProps & { changed: (Delta | null)[] | null }) {
   const frame =
-    '@container row-span-3 grid min-w-0 grid-rows-subgrid gap-y-0 rounded-xl bg-background-secondary-default p-3';
+    'row-span-3 grid min-w-0 grid-rows-subgrid gap-y-0 rounded-xl bg-background-secondary-default p-3';
   const content = (
     <>
-      <span className="flex items-center gap-2">
-        <span className="flex items-center rounded-md bg-stat-card-icon-background p-1.5 @max-[8rem]:hidden">
+      <span className="@container flex items-center gap-2">
+        <span className="flex items-center rounded-md bg-stat-card-icon-background p-1.5 @max-[7rem]:hidden">
           <Icon
             aria-hidden
             className="size-4 shrink-0 text-foreground-icon-primary"
@@ -137,7 +137,7 @@ function PlainCard({
         </span>
         <span
           className={cx(
-            'min-w-0 flex-1 @max-[8rem]:text-caption-1-medium',
+            'min-w-0 flex-1 @max-[7rem]:text-caption-1-medium',
             LABEL,
           )}
         >

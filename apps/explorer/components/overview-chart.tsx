@@ -258,7 +258,7 @@ function MetricSelector({
 }) {
   return (
     <div
-      className="grid grid-cols-3 gap-2"
+      className="grid grid-cols-2 gap-2 min-[420px]:grid-cols-3"
       role="group"
       aria-label="Activity metric"
     >

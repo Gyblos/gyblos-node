@@ -157,11 +157,15 @@ preserve the public data contract.
 Mobile keeps the desktop's compact density: grids stay multi-column instead of
 collapsing to loose full-width stacks, and card internals adapt to narrow
 containers rather than overflowing or wasting the row. The activity metric
-selector keeps three columns at every viewport width. Plain stat cards are
-container-query contexts: below an 8rem card width the icon tile drops and the
-label steps down to caption size, so the value and baseline evidence keep the
-limited width. Adaptation keys off the card's own width, never the viewport, so
-the same card reads correctly in any grid.
+selector keeps two columns on small phones and three above 420px, never a
+single loose column; the baseline chip is unwrappable and just under a hundred
+pixels wide, so three columns only appear where the card interior still
+contains it along with growing values. Inside plain stat cards the label row is
+the container-query context, never the card frame: a size container establishes
+an independent formatting context, which would destroy the subgrid row sharing
+the cards exist for. Below a 7rem label-row width the icon tile drops and the
+label steps down to caption size, so adaptation keys off the space the row
+actually has rather than the viewport.
 
 The Explorer must fit without global horizontal scrolling at mobile widths;
 wide tables scroll inside their own containers and preserve their pinned
