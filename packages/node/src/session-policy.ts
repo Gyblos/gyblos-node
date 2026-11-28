@@ -132,7 +132,11 @@ function positiveTotal(value: unknown) {
   return total;
 }
 
-export function spendingAuthority(policy: BuyerSessionPolicy) {
+type DepositPolicy = Pick<
+  BuyerSessionPolicy,
+  'depositAtomic' | 'renewalBudgetAtomic'
+>;
+export function spendingAuthority(policy: DepositPolicy) {
   return policy.renewalBudgetAtomic ?? policy.depositAtomic;
 }
 
@@ -156,20 +160,34 @@ export function checkChannelAuthority(
     throw new UnsentChannelLimitError(nodeId);
 }
 
+export function remainingDepositAuthority(
+  policy: DepositPolicy,
+  priorSpentAtomic: string | undefined,
+  spent: string,
+) {
+  const cap = BigInt(policy.depositAtomic);
+  const available =
+    BigInt(spendingAuthority(policy)) -
+    BigInt(priorSpentAtomic ?? '0') -
+    BigInt(spent);
+  return available < cap ? available : cap;
+}
+
 export function replacementTerms(
   policy: BuyerSessionPolicy,
   now: () => number,
   quote: SignedOfferV2,
   priorSpentAtomic?: string,
 ) {
-  const cap = BigInt(policy.depositAtomic);
-  const authority =
-    BigInt(spendingAuthority(policy)) - BigInt(priorSpentAtomic ?? '0');
   return (spent: string) => {
-    const available = authority - BigInt(spent);
     return newSessionTerms(
       quote,
-      { ...policy, depositAtomic: String(available < cap ? available : cap) },
+      {
+        ...policy,
+        depositAtomic: String(
+          remainingDepositAuthority(policy, priorSpentAtomic, spent),
+        ),
+      },
       now(),
     );
   };

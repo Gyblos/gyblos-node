@@ -141,6 +141,9 @@ export function fundingHandlers(ports: FundingPorts) {
           balanceAtomic,
           faucetAvailable: balanceAtomic !== null,
           channelRemainingAtomic: channel?.channelRemainingAtomic ?? null,
+          ...(channel?.renewalDepositAtomic && {
+            renewalDepositAtomic: channel.renewalDepositAtomic,
+          }),
           ...(channel?.channelId && { channelId: channel.channelId }),
           ...(channel?.blocker && { channelBlocker: channel.blocker }),
           ...switching,

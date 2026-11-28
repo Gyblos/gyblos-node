@@ -1,3 +1,4 @@
+import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
 import type { HomeEnvironment } from '@gyblos/config/home';
 import {
   batchPoolChannelPaths,
@@ -7,10 +8,15 @@ import {
 import { bounded } from '@gyblos/node/buyer-operation';
 import { desktopOpening } from '@gyblos/node/desktop-opening';
 import {
+  remainingDepositAuthority,
+  type BuyerSessionPolicy,
+} from '@gyblos/node/session-policy';
+import {
   batchSessionObserver,
   inspectBatchPool,
   inspectBatchSession,
   poolFundingPending,
+  type BatchStoredSession,
 } from '@gyblos/payments-upto/batch-session';
 import type {
   ChannelBlocker,
@@ -51,7 +57,10 @@ interface Selection {
   maxAtomic?: string;
   requestId?: string;
   replacementAuthorized?: boolean;
-  renewExhausted?: boolean;
+  renewalPolicy?: Pick<
+    BuyerSessionPolicy,
+    'depositAtomic' | 'renewalBudgetAtomic'
+  >;
   pinnedNodeId?: string;
   credentialBlocked?: boolean;
   activeRequest?(id: string, sellerNodeId: string): boolean;
@@ -89,6 +98,35 @@ function remainingChannel(
     channelRemainingAtomic: String(remaining),
     channelId: snapshot.channelId ?? undefined,
   };
+}
+function selectedChannel(
+  stored: BatchStoredSession,
+  selection: Selection,
+): PaidChannelEligibility {
+  const { terms, snapshot } = stored;
+  const result = remainingChannel(terms, snapshot, selection.maxAtomic);
+  if (
+    result.blocker === SESSION_CODES.REPLACEMENT_REQUIRED &&
+    selection.renewalPolicy?.renewalBudgetAtomic &&
+    !stored.openingPending &&
+    snapshot.state === SESSION_STATES.OPEN &&
+    snapshot.reservedAtomic === '0'
+  ) {
+    const deposit = remainingDepositAuthority(
+      selection.renewalPolicy,
+      stored.priorSpentAtomic,
+      snapshot.cumulativeAtomic,
+    );
+    return {
+      ...result,
+      blocker: null,
+      ...(!stored.renewalLimitReached &&
+        deposit >= BigInt(BATCH_SESSION_DEFAULTS.minDepositAtomic) && {
+          renewalDepositAtomic: String(deposit),
+        }),
+    };
+  }
+  return result;
 }
 export async function paidChannelEligibility(
   environment: HomeEnvironment,
@@ -155,16 +193,7 @@ export async function paidChannelEligibility(
           ? null
           : SESSION_CODES.REPLACEMENT_REQUIRED,
       );
-    const result = remainingChannel(terms, snapshot, selection.maxAtomic);
-    if (
-      result.blocker === SESSION_CODES.REPLACEMENT_REQUIRED &&
-      selection.renewExhausted &&
-      !stored.openingPending &&
-      snapshot.state === SESSION_STATES.OPEN &&
-      snapshot.reservedAtomic === '0'
-    )
-      return { ...result, blocker: null };
-    return result;
+    return selectedChannel(stored, selection);
   } catch {
     return unavailable(SESSION_CODES.STATUS_UNKNOWN);
   }

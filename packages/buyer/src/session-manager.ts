@@ -226,7 +226,7 @@ function pickerChannel(
         network: config.request.network,
         mint: config.request.asset,
         maxAtomic: config.request.maxAtomic,
-        renewExhausted: config.session?.renewalBudgetAtomic !== undefined,
+        renewalPolicy: config.session,
         pinnedNodeId: config.pinnedNodeId,
         activeRequest: state.activeRequest,
       },
@@ -260,7 +260,7 @@ function checkSelectedChannel(
           config.routing?.allowPinnedFallback
             ? undefined
             : config.pinnedNodeId,
-        renewExhausted: config.session?.renewalBudgetAtomic !== undefined,
+        renewalPolicy: config.session,
         replacementAuthorized: await sellerReplacementAuthorized(
           config.discovery?.paidAuto === true,
           delegated,
