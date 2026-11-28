@@ -42,12 +42,12 @@ export function SiteHeader({ crumb }: { crumb?: ReactNode }) {
         <form
           action="/search"
           role="search"
-          className="flex min-h-11 items-center rounded-lg border border-line bg-panel pr-2 focus-within:border-signal sm:pointer-fine:min-h-8"
+          className="flex min-h-11 items-center rounded-lg border border-line bg-panel pr-2 focus-within:ring-2 focus-within:ring-signal sm:pointer-fine:min-h-8"
         >
           <button
             type="submit"
             aria-label="Search Explorer"
-            className="flex size-11 shrink-0 items-center justify-center text-dim hover:text-ink sm:pointer-fine:size-8"
+            className="flex size-11 shrink-0 items-center justify-center text-dim outline-none hover:text-ink sm:pointer-fine:size-8"
           >
             <Search aria-hidden size={15} />
           </button>

@@ -60,6 +60,11 @@ body {
   font-family: var(--font-instrument), system-ui, sans-serif;
 }
 
+a:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
+}
+
 .seller-avatar {
   display: inline-grid;
   width: 28px;
