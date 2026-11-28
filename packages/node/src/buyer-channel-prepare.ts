@@ -30,6 +30,18 @@ import { UnsentSellerBusyError } from './buyer-routing';
 import type { BuyerSessionOptions } from './buyer-session';
 
 export class RefusedChannelPreparation extends BatchChannelError {}
+export function verifyOpeningQuote<Remote extends BatchDestination>(
+  options: BuyerSessionOptions<Remote>,
+  quote: SignedOfferV2,
+  terms: PaymentSessionTerms,
+) {
+  return verifyBatchQuote(
+    quote,
+    terms,
+    options.endpoint.id().toString(),
+    options.now(),
+  );
+}
 export function remotePreparationBusy(
   error: unknown,
 ): error is BatchClientError {

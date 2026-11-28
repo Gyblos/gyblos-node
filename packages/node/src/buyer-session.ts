@@ -1,7 +1,6 @@
 // One explicitly authorized reusable session for shared buyer hosts; no selection or prompt retry.
 import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
 import type { BatchStoredSession } from '@gyblos/payments-upto/batch-session';
-import { verifyBatchQuote } from '@gyblos/protocol/batch-channel';
 import { BuyerApiKeyError } from '@gyblos/protocol/buyer-api-keys';
 import { CONTROL_METERING_MODES } from '@gyblos/protocol/constants';
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
@@ -26,6 +25,7 @@ import {
   channelTurnAuthority,
   prepareNewChannel,
   UnsentChannelRequestError,
+  verifyOpeningQuote,
   type PreparedChannel,
   type StartChannelWork,
 } from './buyer-channel-prepare';
@@ -39,6 +39,7 @@ import {
 import { bounded } from './buyer-operation';
 import { UnsentSellerBusyError } from './buyer-routing';
 import {
+  checkInterruptedQuestion,
   prepareRenewal,
   verifyPreparationRefusal,
   verifyQuestion,
@@ -112,18 +113,6 @@ function getBackend<Remote extends BatchDestination>(
     });
   }
   return bounded(state.backend, signal);
-}
-function verifyOpeningQuote<Remote extends BatchDestination>(
-  options: BuyerSessionOptions<Remote>,
-  quote: SignedOfferV2,
-  terms: PaymentSessionTerms,
-) {
-  return verifyBatchQuote(
-    quote,
-    terms,
-    options.endpoint.id().toString(),
-    options.now(),
-  );
 }
 async function openCurrent<Remote extends BatchDestination>(
   state: State<Remote>,
@@ -349,6 +338,11 @@ export function createBuyerSessionManager<Remote extends BatchDestination>(
     active: false,
   };
   return {
+    checkInterruptedQuestion: (
+      input: FreeExecutionBuildInput,
+      keyId: string | undefined,
+      signal: AbortSignal,
+    ) => checkInterruptedQuestion(options.inspect, input, keyId, signal),
     unresolved: () => unresolved(state),
     async execute(
       quote: SignedOfferV2,

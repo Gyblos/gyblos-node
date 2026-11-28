@@ -26,8 +26,10 @@ export function freeSessionExecution(
   onUnfit: () => void,
   retries: ReturnType<typeof delegatedFreeResends>,
 ): BuyerRoutePorts<ChatResult>['free'] {
-  return (winner, current, sending) =>
-    executeApiKeyFree(permission, winner.quote, current, () =>
+  return async (winner, current, sending) => {
+    if ('checkInterruptedQuestion' in manager)
+      await manager.checkInterruptedQuestion(input, permission?.keyId, current);
+    return executeApiKeyFree(permission, winner.quote, current, () =>
       executeSelectedBuyerFree(
         input,
         context.dependencies,
@@ -43,6 +45,7 @@ export function freeSessionExecution(
         retries.onResend,
       ),
     );
+  };
 }
 
 export function fittingSelect(

@@ -50,18 +50,28 @@ export async function verifyQuestion<Remote extends BatchDestination>(
   await bounded(options.verify(quote, signal), signal);
   if (await bounded(options.unresolved(), signal))
     return sessionFail(SESSION_CODES.UNVERIFIED);
-  const stored = await bounded(options.inspect(), signal);
+  await checkInterruptedQuestion(
+    options.inspect,
+    input,
+    options.credentialId?.(quote.offer.requestId),
+    signal,
+  );
+}
+export async function checkInterruptedQuestion(
+  inspect: State<BatchDestination>['options']['inspect'],
+  input: FreeExecutionBuildInput,
+  keyId: string | undefined,
+  signal: AbortSignal,
+) {
+  const stored = await bounded(inspect(), signal);
   if (
     stored?.interruptedQuestions?.includes(
-      buyerQuestionDigest(
-        input.messages,
-        options.credentialId?.(quote.offer.requestId),
-      ),
+      buyerQuestionDigest(input.messages, keyId),
     )
   )
     throw new UnsentSellerChoiceError(
       SESSION_CODES.STATUS_UNKNOWN,
-      quote.offer.nodeId,
+      stored.terms.sellerNodeId,
     );
 }
 export async function prepareRenewal<Remote extends BatchDestination>(

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
+import { readFile, writeFile } from 'node:fs/promises';
 import test from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
 
@@ -17,7 +18,11 @@ import {
   BUYER_API_KEYS,
   parseBuyerApiKeysReply,
 } from '@gyblos/protocol/buyer-api-keys';
-import { ENGINE_DONE_REASONS, P2P_ROLES } from '@gyblos/protocol/constants';
+import {
+  ENGINE_DONE_REASONS,
+  OFFER_PRICING_KINDS,
+  P2P_ROLES,
+} from '@gyblos/protocol/constants';
 import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
 import { blockTestMeter } from '../support/batch-block-product';
@@ -26,6 +31,7 @@ import {
   interruptedFragment,
   interruptedGeneration,
 } from '../support/opencode-interruption';
+import { paidSellerConfiguration } from '../support/paid-acceptance-config';
 import { buyerClient } from '../support/session-product-client';
 import { sessionProductHost } from '../support/session-product-host';
 
@@ -225,6 +231,28 @@ for (const restart of [true, false])
       assert.equal(independent.status, 200, await independent.clone().text());
       assert.match(await independent.text(), /done/);
       assert.equal(dispatches, 3);
+      await paidSellerConfiguration(OFFER_PRICING_KINDS.FREE);
+      const configFile = process.env.GYBLOS_CONFIG!;
+      await writeFile(
+        configFile,
+        (await readFile(configFile, 'utf8')).replace(
+          'publish = true',
+          'publish = false',
+        ),
+      );
+      await host.restartBoth();
+      const freeReplay = await afterCooldown('synthetic');
+      assert.equal(freeReplay.ok, false);
+      assert.match(
+        await freeReplay.text(),
+        new RegExp(SESSION_CODES.STATUS_UNKNOWN),
+      );
+      assert.equal(dispatches, 3);
+      const freeQuestion = await afterCooldown('fresh free question');
+      assert.equal(freeQuestion.status, 200, await freeQuestion.clone().text());
+      assert.match(await freeQuestion.text(), /done/);
+      assert.equal(dispatches, 4);
+
       assert.equal(
         host.finance.calls.filter((call) => call === 'deposit').length,
         2,

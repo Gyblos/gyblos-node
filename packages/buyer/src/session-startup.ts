@@ -21,7 +21,6 @@ import {
 import { ownedChat } from './chat-owned';
 import { PAID_BUYER_HTTP_MS } from './constants';
 import { observeBuyerExecution } from './execution-observation';
-import type { SelectionRoute } from './free-route';
 import { selectWinner } from './free-selection';
 import type { ChatPayment, ChatResult } from './free-sse';
 import type { BuyerExecutionFactory } from './free-startup';
@@ -46,8 +45,8 @@ import {
 } from './session-requirements';
 import { pinnedBusy, routeScope, sessionRouter } from './session-routing';
 import {
+  channelSelector,
   prepareChosenSeller,
-  selectForChannel,
   verifyChosenOffer,
 } from './session-seller-choice';
 import { singleSessionExecutor } from './session-serial';
@@ -135,35 +134,20 @@ function sessionSelection(
         request.maxAtomic === '0' ? request.priceCeilings : route.priceCeilings,
       ...(inferenceNeedsTools(input) ? { tools: true as const } : {}),
     };
-    const select = async (
-      candidate: typeof request,
-      selectionRoute?: SelectionRoute,
-    ) => {
-      const pick = (proposal: typeof request, hint?: SelectionRoute) =>
-        selectWinner(
-          prepared,
-          {
-            endpoint,
-            buyer,
-            relayOnly,
-            onSellerFailure: options.onSellerFailure,
-            ...(router ? { onPinnedBusy: pinnedBusy } : {}),
-          },
-          excluded,
-          current,
-          proposal,
-          hint,
-        );
-      return selectForChannel(
-        prepared.config,
-        candidate,
-        selectionRoute,
-        previousSeller,
-        excluded,
-        current,
-        pick,
-      );
-    };
+    const select = channelSelector(
+      prepared,
+      {
+        endpoint,
+        buyer,
+        relayOnly,
+        onSellerFailure: options.onSellerFailure,
+        ...(router ? { onPinnedBusy: pinnedBusy } : {}),
+      },
+      excluded,
+      current,
+      previousSeller,
+      selectWinner,
+    );
     if (choice) {
       if (permission) return sessionFail(SESSION_CODES.BINDING);
       const chosen = prepareChosenSeller(prepared, choice);

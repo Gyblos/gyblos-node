@@ -6,7 +6,11 @@ import { primaryRelayUrl } from '@gyblos/transport-iroh/endpoint';
 
 import type { FreeWinner } from './free-execution';
 import type { SelectionRoute } from './free-route';
-import type { PreparedSelection } from './free-selection';
+import type {
+  FreeSelectionOptions,
+  PreparedSelection,
+  selectWinner,
+} from './free-selection';
 import { selectForSettledPartial } from './quote-selection';
 
 export function prepareChosenSeller(
@@ -67,13 +71,14 @@ export function verifyChosenOffer(
     throw new UnsentSellerChoiceError(SESSION_CODES.BINDING);
 }
 
-export async function selectForChannel<Winner>(
+type PreviousSeller = () => Promise<
+  { nodeId: string; partial: boolean } | undefined
+>;
+async function selectForChannel<Winner>(
   config: PreparedSelection['config'],
   candidate: PreparedSelection['config']['request'],
   selectionRoute: SelectionRoute | undefined,
-  previousSeller: () => Promise<
-    { nodeId: string; partial: boolean } | undefined
-  >,
+  previousSeller: PreviousSeller,
   excluded: ReadonlySet<string>,
   current: AbortSignal,
   pick: (
@@ -103,4 +108,31 @@ export async function selectForChannel<Winner>(
       ? { ...selectionRoute, previousSeller: previous?.nodeId }
       : selectionRoute,
   );
+}
+
+export function channelSelector(
+  prepared: PreparedSelection,
+  options: FreeSelectionOptions,
+  excluded: ReadonlySet<string>,
+  signal: AbortSignal,
+  previousSeller: PreviousSeller,
+  select: typeof selectWinner,
+) {
+  const pick = (
+    request: PreparedSelection['config']['request'],
+    route?: SelectionRoute,
+  ) => select(prepared, options, excluded, signal, request, route);
+  return (
+    request: PreparedSelection['config']['request'],
+    route?: SelectionRoute,
+  ) =>
+    selectForChannel(
+      prepared.config,
+      request,
+      route,
+      previousSeller,
+      excluded,
+      signal,
+      pick,
+    );
 }
