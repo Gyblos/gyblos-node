@@ -17,7 +17,6 @@ import * as catalog from '../lib/model-catalog';
 import { modelHref } from '../lib/offers';
 import { sortHref, type ExplorerQuery, type SortedTable } from '../lib/paging';
 import type { RangeDays, RangeSection } from '../lib/range';
-import { cx } from './board/cx';
 import { SURFACE } from './board/styles';
 import { ModelLogo } from './model-logo';
 import { RangeControl } from './range-control';
@@ -78,7 +77,7 @@ export function Loading({
           ))}
         </div>
       ) : null}
-      <div className={cx('overflow-hidden', SURFACE.panel)}>
+      <div className={`overflow-hidden ${SURFACE.panel}`}>
         <Skeleton shape="rect" className="h-11 rounded-none" />
         {LOADING_ROWS.map((row) => (
           <div
@@ -143,7 +142,7 @@ export function Unavailable({
         <span key={anchor} id={anchor} className="block scroll-mt-4" />
       ))}
       <SectionTitle id={first} title={title} />
-      <div className={cx(SURFACE.panel, 'p-5 text-sm text-muted')}>
+      <div className={`${SURFACE.panel} p-5 text-sm text-muted`}>
         Source unavailable.
       </div>
     </>
