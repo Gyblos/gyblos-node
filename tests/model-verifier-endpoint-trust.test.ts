@@ -16,11 +16,7 @@ async function withHome<T>(run: (home: string) => Promise<T>) {
   }
 }
 
-async function verifyError(
-  t: TestContext,
-  home: string,
-  extra: string[],
-) {
+async function verifyError(t: TestContext, home: string, extra: string[]) {
   const stderr = t.mock.method(console, 'error', () => {});
   const exit = await main([
     'verify',
