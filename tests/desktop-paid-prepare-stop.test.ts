@@ -7,8 +7,11 @@ import test from 'node:test';
 import { startFreeBuyerHttp } from '@gyblos/buyer/free-http';
 import { sessionMeter } from '@gyblos/buyer/session-requirements';
 import { DEVNET, DEVNET_USDC } from '@gyblos/config';
+import { CHAT_FAILURE } from '@gyblos/desktop/chat-archive-model';
 import { X402Budget } from '@gyblos/desktop/x402-budget';
 import { X402Client } from '@gyblos/desktop/x402-client';
+import { createX402Handlers } from '@gyblos/desktop/x402-handlers';
+import { parseX402Result, X402_ACTION } from '@gyblos/desktop/x402-model';
 import { createBuyerApiKeys } from '@gyblos/node/buyer-api-keys';
 import { BUYER_API } from '@gyblos/protocol/buyer-api';
 import { MODEL_IDS } from '@gyblos/protocol/constants';
@@ -237,6 +240,13 @@ for (const dropResponse of [false, true])
           payer: '11111111111111111111111111111111',
           maxAtomic: '100',
           paidAuto: true,
+          autoRoutes: [
+            {
+              id: selection.modelId,
+              modelId: selection.modelId,
+              maxTokens: 10,
+            },
+          ],
           depositAtomic: '10000',
           lifetimeMs: 3600000,
         },
@@ -294,12 +304,28 @@ for (const dropResponse of [false, true])
       }),
     });
     await active.promise;
-    const stopped = assert.rejects(
-      client.send('queued', 'queued', undefined, BUYER_API.AUTO),
+    const frame = {};
+    const handler = createX402Handlers(
+      client,
+      budget,
+      { contents: frame, mainFrame: () => frame, destroyed: () => false },
+      async () => {},
     );
+    const stopped = handler({ sender: frame, senderFrame: frame }, [
+      {
+        action: X402_ACTION.SEND,
+        id: 'queued',
+        prompt: 'queued',
+        auto: true,
+        model: selection.modelId,
+        policyId: client.policy()?.policyId,
+      },
+    ]);
     await received.promise;
     assert.equal(client.stop('queued'), true);
-    await stopped;
+    const state = parseX402Result(await stopped);
+    assert.equal(state.failureReason, CHAT_FAILURE.NOT_SENT);
+    assert.equal(state.error, undefined);
     assert.equal((await budget.summary()).blocked, false);
     release.resolve();
     await (await other).body?.cancel();
