@@ -77,6 +77,13 @@ Do not invent one-off combinations for these roles in new product code. If an
 existing component needs a different emphasis, adjust the named surface role or
 document the exception here.
 
+Radius follows the same role scale everywhere: surfaces are `rounded-xl`,
+interactive controls are `rounded-lg`, elements nested inside a control (the
+options of a segmented control) and non-interactive tokens (chips) are
+`rounded-md`. A button never drops below the control radius no matter how
+small it is; off-scale values such as `rounded-sm` or `rounded-2lg` do not
+appear in product controls.
+
 ## Interaction states
 
 Hover color transitions use `transition-colors` and about 150 ms. Pressed
@@ -97,9 +104,14 @@ every utility and double the indicator. Never combine `outline-none` with
 `focus-visible:outline-*` utilities in one class string: in Tailwind v4 the
 outline style variable stays `none` and the focus outline never paints.
 
-Controls that look compact on precise pointers still need touch-sized hit areas
-on coarse pointers. Preserve the existing `sm:pointer-fine:` pattern unless a
-component has a better accessible target.
+Controls split into two target-size roles. Primary wayfinding and form
+controls (navigation, search, selects) keep touch-sized hit areas on coarse
+pointers through the existing `sm:pointer-fine:` pattern. Dense query controls
+that repeat inside evidence surfaces (pagination cells and steps, segmented
+range options, month chevrons) compact to 32 px on coarse pointers and 24 px
+on precise ones: they are secondary, frequent-shaped controls where oversized
+targets read as chrome bulk rather than affordance, and 32 px stays well above
+the WCAG 24 px minimum.
 
 React Aria keyboard, focus and screen-reader behavior is part of the design.
 Do not replace it with native-only shortcuts or hand-built popups.

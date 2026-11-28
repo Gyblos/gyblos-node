@@ -33,7 +33,7 @@ function paginationRange(
   return [1, DOTS, current, DOTS, total];
 }
 const PAGE_CELL =
-  'flex size-11 sm:pointer-fine:size-6 shrink-0 items-center justify-center rounded-md text-caption-1-medium';
+  'flex size-8 sm:pointer-fine:size-6 shrink-0 items-center justify-center rounded-lg text-caption-1-medium';
 
 function Step({
   href,
@@ -52,7 +52,7 @@ function Step({
       variant="secondary"
       size="xs"
       iconOnly
-      className="size-11 sm:pointer-fine:size-6"
+      className="size-8 rounded-lg sm:pointer-fine:size-6"
       aria-label={label}
       leadingIcon={Icon}
     />
@@ -61,7 +61,7 @@ function Step({
       variant="secondary"
       size="xs"
       iconOnly
-      className="size-11 sm:pointer-fine:size-6"
+      className="size-8 rounded-lg sm:pointer-fine:size-6"
       aria-label={label}
       disabled
       leadingIcon={Icon}

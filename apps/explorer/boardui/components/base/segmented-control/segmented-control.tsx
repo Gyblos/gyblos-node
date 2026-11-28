@@ -96,7 +96,7 @@ export function SegmentedControl({
       {...props}
       className={(state) =>
         cx(
-          'relative inline-flex items-start gap-0.5 rounded-2lg',
+          'relative inline-flex items-start gap-0.5 rounded-lg',
           variant === 'solid' && 'bg-segmented-control-background p-1',
           typeof className === 'function' ? className(state) : className,
         )

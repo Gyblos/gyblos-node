@@ -87,7 +87,7 @@ function MonthControl({
             type="button"
             aria-label="Previous month"
             disabled={index <= 0}
-            className="grid size-11 place-items-center rounded-md outline-none transition-colors hover:bg-raised focus-visible:ring-2 focus-visible:ring-signal disabled:cursor-not-allowed disabled:text-text-tertiary disabled:opacity-40"
+            className="grid size-8 sm:pointer-fine:size-6 place-items-center rounded-lg outline-none transition-colors hover:bg-raised focus-visible:ring-2 focus-visible:ring-signal disabled:cursor-not-allowed disabled:text-text-tertiary disabled:opacity-40"
             onClick={() => select(months[index - 1]!)}
           >
             <ChevronLeft size={16} />
@@ -96,7 +96,7 @@ function MonthControl({
             type="button"
             aria-label="Next month"
             disabled={index >= months.length - 1}
-            className="grid size-11 place-items-center rounded-md outline-none transition-colors hover:bg-raised focus-visible:ring-2 focus-visible:ring-signal disabled:cursor-not-allowed disabled:text-text-tertiary disabled:opacity-40"
+            className="grid size-8 sm:pointer-fine:size-6 place-items-center rounded-lg outline-none transition-colors hover:bg-raised focus-visible:ring-2 focus-visible:ring-signal disabled:cursor-not-allowed disabled:text-text-tertiary disabled:opacity-40"
             onClick={() => select(months[index + 1]!)}
           >
             <ChevronRight size={16} />

@@ -55,3 +55,66 @@ void test('plain stat cards adapt to narrow containers without breaking the subg
     'the label does not shrink below 7rem containers',
   );
 });
+
+void test('dense query controls stay compact on coarse pointers', () => {
+  const pagination = readFileSync(
+    join(ROOT, 'boardui/components/base/pagination/pagination.tsx'),
+    'utf8',
+  );
+  assert.ok(
+    !/(^|[^\w-])size-11/.test(pagination),
+    'pagination cells and steps must not use primary-touch sizing',
+  );
+  const chart = readFileSync(
+    join(ROOT, 'components/overview-chart.tsx'),
+    'utf8',
+  );
+  assert.ok(
+    !/size-11/.test(chart),
+    'month chevrons must not use primary-touch sizing',
+  );
+  const segmented = readFileSync(
+    join(ROOT, 'components/board/segmented-control.tsx'),
+    'utf8',
+  );
+  assert.ok(
+    !/min-h-11|min-w-11/.test(segmented),
+    'segmented options must not use primary-touch sizing',
+  );
+});
+
+void test('interactive controls share the rounded-lg control radius', () => {
+  const pagination = readFileSync(
+    join(ROOT, 'boardui/components/base/pagination/pagination.tsx'),
+    'utf8',
+  );
+  const radii = pagination.match(/rounded-(sm|md|2lg)/g) ?? [];
+  assert.deepEqual(
+    radii,
+    [],
+    `pagination keeps off-scale radii: ${radii.join(', ')}`,
+  );
+  const chart = readFileSync(
+    join(ROOT, 'components/overview-chart.tsx'),
+    'utf8',
+  );
+  const chevron = chart.match(
+    /className="(grid size-[^"]*place-items-center[^"]*)"/,
+  );
+  assert.ok(chevron, 'the month chevron class list is missing');
+  assert.ok(
+    chevron[1]!.includes('rounded-lg'),
+    'month chevrons do not use the control radius',
+  );
+  const segmented = readFileSync(
+    join(
+      ROOT,
+      'boardui/components/base/segmented-control/segmented-control.tsx',
+    ),
+    'utf8',
+  );
+  assert.ok(
+    !segmented.includes('rounded-2lg'),
+    'the segmented control wrapper keeps the off-scale radius',
+  );
+});
