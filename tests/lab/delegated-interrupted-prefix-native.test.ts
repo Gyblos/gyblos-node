@@ -167,8 +167,13 @@ for (const scenario of ['restart', 'live', 'desktop'])
             await owner(new URL(BUYER_API.STATUS_PATH, host.buyer().url))
           ).json(),
         );
-        const submit = (explicit: boolean) =>
-          owner(new URL(BUYER_API.CHANNEL_CHAT_PATH, host.buyer().url), {
+        const submit = (
+          explicit: boolean,
+          path:
+            | typeof BUYER_API.CHAT_PATH
+            | typeof BUYER_API.CHANNEL_CHAT_PATH = BUYER_API.CHANNEL_CHAT_PATH,
+        ) =>
+          owner(new URL(path, host.buyer().url), {
             method: 'POST',
             headers: {
               'content-type': 'application/json',
@@ -178,12 +183,21 @@ for (const scenario of ['restart', 'live', 'desktop'])
               }),
             },
             body: JSON.stringify({
-              [BUYER_API.FREE_ONLY_FIELD]: true,
+              ...(path === BUYER_API.CHANNEL_CHAT_PATH && {
+                [BUYER_API.FREE_ONLY_FIELD]: true,
+              }),
               model: policy.model,
               messages: [{ role: FREE_CHAT_ROLES.USER, content: 'synthetic' }],
               stream: true,
             }),
           });
+        const ordinary = await submit(true, BUYER_API.CHAT_PATH);
+        assert.equal(ordinary.ok, false);
+        assert.match(
+          await ordinary.text(),
+          new RegExp(SESSION_CODES.STATUS_UNKNOWN),
+        );
+        assert.equal(dispatches, 1);
         const automatic = await submit(false);
         assert.match(
           await automatic.text(),
