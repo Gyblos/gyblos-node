@@ -8,7 +8,11 @@ import { BUYER_SELECTION } from '@gyblos/buyer/constants';
 import { batchSessionPathsIn } from '@gyblos/config';
 import { SELLER_SELECTION_CODES } from '@gyblos/core/constants';
 import { inspectBatchSession } from '@gyblos/payments-upto/batch-session';
-import { BUYER_API, parseBuyerApiPolicy } from '@gyblos/protocol/buyer-api';
+import {
+  BUYER_API,
+  parseBuyerApiPolicy,
+  parsePaidChannelEligibility,
+} from '@gyblos/protocol/buyer-api';
 import {
   BUYER_API_KEYS,
   parseBuyerApiKeysReply,
@@ -25,179 +29,205 @@ import {
 import { buyerClient } from '../support/session-product-client';
 import { sessionProductHost } from '../support/session-product-host';
 
-void test(
-  'restarting a delegated buyer charges exactly the finalized signed prefix after a visible cut',
-  { skip: NATIVE_CAPABILITY.transportSkip, timeout: 150000 },
-  async (t) => {
-    const request = globalThis.fetch;
-    const cut = new AbortController();
-    let sellerStopped: Promise<unknown> | undefined;
-    let dispatches = 0;
-    const host = await sessionProductHost(
-      undefined,
-      undefined,
-      {
-        meter: { ...blockTestMeter, output: blockTestMeter.count },
-        contextTokens: 64000,
-        maxTokens: 160,
-        observe: () => {},
-        generate: async (input) => {
-          dispatches++;
-          if (dispatches > 1) {
-            await input.onText?.('done');
-            return {
-              text: 'done',
-              finishReason: ENGINE_DONE_REASONS.STOP,
-              usage: {
-                inputTokens: 2,
-                outputTokens: 4,
-                inputDurationNs: 0,
-                outputDurationNs: 0,
-                totalDurationNs: 0,
-                loadDurationNs: 0,
-              },
-            };
-          }
-          assert.ok(input.signal);
-          sellerStopped = once(input.signal, 'abort', {
-            signal: AbortSignal.timeout(8000),
-          });
-          void sellerStopped.catch(() => undefined);
-          return interruptedGeneration(input.onText, input.signal);
+for (const restart of [true, false])
+  void test(
+    restart
+      ? 'restarting a delegated buyer charges exactly the finalized signed prefix after a visible cut'
+      : 'a live delegated fetch recovers automatically across a finalized visible cut',
+    { skip: NATIVE_CAPABILITY.transportSkip, timeout: 150000 },
+    async (t) => {
+      const request = globalThis.fetch;
+      const cut = new AbortController();
+      let sellerStopped: Promise<unknown> | undefined;
+      let dispatches = 0;
+      const host = await sessionProductHost(
+        undefined,
+        undefined,
+        {
+          meter: { ...blockTestMeter, output: blockTestMeter.count },
+          contextTokens: 64000,
+          maxTokens: 160,
+          observe: () => {},
+          generate: async (input) => {
+            dispatches++;
+            if (dispatches > 1) {
+              await input.onText?.('done');
+              return {
+                text: 'done',
+                finishReason: ENGINE_DONE_REASONS.STOP,
+                usage: {
+                  inputTokens: 2,
+                  outputTokens: 4,
+                  inputDurationNs: 0,
+                  outputDurationNs: 0,
+                  totalDurationNs: 0,
+                  loadDurationNs: 0,
+                },
+              };
+            }
+            assert.ok(input.signal);
+            sellerStopped = once(input.signal, 'abort', {
+              signal: AbortSignal.timeout(8000),
+            });
+            void sellerStopped.catch(() => undefined);
+            return interruptedGeneration(input.onText, input.signal);
+          },
         },
-      },
-      undefined,
-      { depositAtomic: '10000', renewalBudgetAtomic: '30000' },
-    );
-    t.after(async () => {
-      cut.abort();
-      await host.close();
-    });
-    const { delegated, owner } = await buyerClient(host, request, '10000');
-    const url = host.buyer().url;
-    const policy = parseBuyerApiPolicy(
-      await (await owner(new URL(BUYER_API.STATUS_PATH, url))).json(),
-    );
-    const status = async () =>
-      parseBuyerApiKeysReply(
-        await (
-          await owner(new URL(BUYER_API_KEYS.PATH, host.buyer().url))
-        ).json(),
-      ).snapshot;
-    const response = await request(url, {
-      method: 'POST',
-      signal: AbortSignal.any([cut.signal, AbortSignal.timeout(30000)]),
-      headers: {
-        authorization: 'Bearer ' + delegated,
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: policy.model,
-        messages: [{ role: 'user', content: 'synthetic' }],
-        max_completion_tokens: 128,
-        stream: true,
-      }),
-    });
-    if (!response.ok) assert.fail(await response.text());
-    assert.ok(response.body);
-    let bytes = '';
-    const reader = response.body.getReader();
-    while (!cut.signal.aborted) {
-      const chunk = await reader.read();
-      assert.ok(!chunk.done);
-      bytes += Buffer.from(chunk.value).toString();
-      if (bytes.includes(interruptedFragment.trim())) {
+        undefined,
+        { depositAtomic: '10000', renewalBudgetAtomic: '30000' },
+      );
+      t.after(async () => {
         cut.abort();
-        break;
-      }
-    }
-    assert.ok(cut.signal.aborted);
-    assert.ok(sellerStopped);
-    await sellerStopped;
-    await host.restartBuyer();
-    assert.equal((await status()).blocked, true);
-    const stored = await inspectBatchSession(
-      batchSessionPathsIn(process.env, P2P_ROLES.SELLER),
-    );
-    assert.ok(stored?.snapshot.channelId);
-    const { channelId, cumulativeAtomic } = stored.snapshot;
-    assert.equal(cumulativeAtomic, '136');
-    host.finance.settled.set(channelId, {
-      channelId,
-      chargedAtomic: cumulativeAtomic,
-      refundedAtomic: String(
-        BigInt(stored.terms.depositAtomic) - BigInt(cumulativeAtomic),
-      ),
-      transaction: 'syntheticConfirmedClose',
-    });
-    await host.restartBuyer();
-    const after = await status();
-    assert.equal(after.blocked, false);
-    assert.equal(after.keys[0]?.spentAtomic, '136');
-    assert.equal(after.keys[0]?.reservedAtomic, '0');
-    assert.equal(host.finance.approvals(), 1);
-    assert.deepEqual(host.finance.calls, ['deposit']);
-    const eligibility = await paidChannelEligibility(
-      process.env,
-      {
-        payer: stored.terms.buyer,
-        network: stored.terms.network,
-        mint: stored.terms.mint,
-        nodeId: stored.terms.sellerNodeId,
-        owner: stored.terms.owner,
-        renewalPolicy: { depositAtomic: '10000', renewalBudgetAtomic: '30000' },
-      },
-      () => stored.terms.expiresAt + 1,
-      host.finance.observeChannel,
-      AbortSignal.timeout(2000),
-    );
-    assert.equal(eligibility.blocker, null);
-    const follow = (content: string, token = delegated) =>
-      request(host.buyer().url, {
+        await host.close();
+      });
+      const { delegated, owner } = await buyerClient(host, request, '10000');
+      const url = host.buyer().url;
+      const policy = parseBuyerApiPolicy(
+        await (await owner(new URL(BUYER_API.STATUS_PATH, url))).json(),
+      );
+      const status = async () =>
+        parseBuyerApiKeysReply(
+          await (
+            await owner(new URL(BUYER_API_KEYS.PATH, host.buyer().url))
+          ).json(),
+        ).snapshot;
+      const response = await request(url, {
         method: 'POST',
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.any([cut.signal, AbortSignal.timeout(30000)]),
         headers: {
-          authorization: 'Bearer ' + token,
+          authorization: 'Bearer ' + delegated,
           'content-type': 'application/json',
         },
         body: JSON.stringify({
           model: policy.model,
-          messages: [{ role: 'user', content }],
+          messages: [{ role: 'user', content: 'synthetic' }],
           max_completion_tokens: 128,
           stream: true,
         }),
       });
-    const afterCooldown = async (question: string, token = delegated) => {
-      const initial = await follow(question, token);
-      if (
-        initial.status === 503 &&
-        (await initial.clone().text()).includes(
-          SELLER_SELECTION_CODES.NO_CANDIDATES,
-        )
-      ) {
-        await delay(BUYER_SELECTION.cooldownMs + 100);
-        return follow(question, token);
+      if (!response.ok) assert.fail(await response.text());
+      assert.ok(response.body);
+      let bytes = '';
+      const reader = response.body.getReader();
+      while (!cut.signal.aborted) {
+        const chunk = await reader.read();
+        assert.ok(!chunk.done);
+        bytes += Buffer.from(chunk.value).toString();
+        if (bytes.includes(interruptedFragment.trim())) {
+          cut.abort();
+          break;
+        }
       }
-      return initial;
-    };
-    const next = await afterCooldown('new question');
-    const nextText = await next.text();
-    assert.equal(next.status, 200, nextText);
-    assert.match(nextText, /done/);
-    assert.equal(dispatches, 2);
-    await host.restartBuyer();
-    const replay = await afterCooldown('synthetic');
-    assert.equal(replay.ok, false);
-    assert.match(await replay.text(), new RegExp(SESSION_CODES.STATUS_UNKNOWN));
-    assert.equal(dispatches, 2);
-    const other = await buyerClient(host, request, '1000');
-    const independent = await afterCooldown('synthetic', other.delegated);
-    assert.equal(independent.status, 200, await independent.clone().text());
-    assert.match(await independent.text(), /done/);
-    assert.equal(dispatches, 3);
-    assert.equal(
-      host.finance.calls.filter((call) => call === 'deposit').length,
-      2,
-    );
-  },
-);
+      assert.ok(cut.signal.aborted);
+      assert.ok(sellerStopped);
+      await sellerStopped;
+      if (restart) await host.restartBuyer();
+      assert.equal((await status()).blocked, true);
+      const stored = await inspectBatchSession(
+        batchSessionPathsIn(process.env, P2P_ROLES.SELLER),
+      );
+      assert.ok(stored?.snapshot.channelId);
+      const { channelId, cumulativeAtomic } = stored.snapshot;
+      assert.equal(cumulativeAtomic, '136');
+      host.finance.settled.set(channelId, {
+        channelId,
+        chargedAtomic: cumulativeAtomic,
+        refundedAtomic: String(
+          BigInt(stored.terms.depositAtomic) - BigInt(cumulativeAtomic),
+        ),
+        transaction: 'syntheticConfirmedClose',
+      });
+      if (restart) {
+        await host.restartBuyer();
+        const after = await status();
+        assert.equal(after.blocked, false);
+        assert.equal(after.keys[0]?.spentAtomic, '136');
+        assert.equal(after.keys[0]?.reservedAtomic, '0');
+        assert.equal(host.finance.approvals(), 1);
+        assert.deepEqual(host.finance.calls, ['deposit']);
+        const eligibility = await paidChannelEligibility(
+          process.env,
+          {
+            payer: stored.terms.buyer,
+            network: stored.terms.network,
+            mint: stored.terms.mint,
+            nodeId: stored.terms.sellerNodeId,
+            owner: stored.terms.owner,
+            renewalPolicy: {
+              depositAtomic: '10000',
+              renewalBudgetAtomic: '30000',
+            },
+          },
+          () => stored.terms.expiresAt + 1,
+          host.finance.observeChannel,
+          AbortSignal.timeout(2000),
+        );
+        assert.equal(eligibility.blocker, null);
+        assert.equal(
+          parsePaidChannelEligibility(eligibility).channelId,
+          channelId,
+        );
+      }
+      const follow = (content: string, token = delegated) =>
+        request(host.buyer().url, {
+          method: 'POST',
+          signal: AbortSignal.timeout(15000),
+          headers: {
+            authorization: 'Bearer ' + token,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: policy.model,
+            messages: [{ role: 'user', content }],
+            max_completion_tokens: 128,
+            stream: true,
+          }),
+        });
+      const afterCooldown = async (question: string, token = delegated) => {
+        const initial = await follow(question, token);
+        if (
+          initial.status === 503 &&
+          (await initial.clone().text()).includes(
+            SELLER_SELECTION_CODES.NO_CANDIDATES,
+          )
+        ) {
+          await delay(BUYER_SELECTION.cooldownMs + 100);
+          return follow(question, token);
+        }
+        return initial;
+      };
+      const next = await afterCooldown('new question');
+      const nextText = await next.text();
+      assert.equal(next.status, 200, nextText);
+      assert.match(nextText, /done/);
+      assert.equal(dispatches, 2);
+      if (!restart) {
+        const snapshot = await status();
+        assert.equal(snapshot.blocked, false);
+        assert.equal(snapshot.keys[0]?.settledAtomic, cumulativeAtomic);
+        assert.equal(snapshot.keys[0]?.reservedAtomic, '0');
+        assert.equal(
+          host.finance.calls.filter((call) => call === 'deposit').length,
+          2,
+        );
+        return;
+      }
+      await host.restartBuyer();
+      const replay = await afterCooldown('synthetic');
+      assert.equal(replay.ok, false);
+      assert.match(
+        await replay.text(),
+        new RegExp(SESSION_CODES.STATUS_UNKNOWN),
+      );
+      assert.equal(dispatches, 2);
+      const other = await buyerClient(host, request, '1000');
+      const independent = await afterCooldown('synthetic', other.delegated);
+      assert.equal(independent.status, 200, await independent.clone().text());
+      assert.match(await independent.text(), /done/);
+      assert.equal(dispatches, 3);
+      assert.equal(
+        host.finance.calls.filter((call) => call === 'deposit').length,
+        2,
+      );
+    },
+  );

@@ -7,6 +7,7 @@ import { FreeSelectionFailure } from '@gyblos/buyer/free-execution';
 import {
   automaticPoolRoute,
   selectConfiguredThenOpen,
+  selectForSettledPartial,
 } from '@gyblos/buyer/quote-selection';
 import {
   parseBuyerSelectionConfig,
@@ -314,4 +315,34 @@ void test('Auto discovers the same busy indexed seller again while waiting', () 
     automaticPoolRoute({ discovery, pinnedNodeId: sellerNodeId }, route),
     route,
   );
+});
+
+void test('a finalized partial restricts paid Auto to its original seller, even with another sticky seller', async () => {
+  const route = { open: true as const, previousSeller: 'other' };
+  const result = await selectForSettledPartial(
+    request,
+    route,
+    sellerNodeId,
+    new Set(),
+    new AbortController().signal,
+    async (_candidate, choice) => choice?.pinnedNodeId ?? 'other',
+  );
+  assert.equal(result, sellerNodeId);
+});
+void test('when the renewal seller is unavailable, Auto can select a different verified free listing', async () => {
+  const route = { open: true as const, previousSeller: 'other' };
+  const result = await selectForSettledPartial(
+    request,
+    route,
+    sellerNodeId,
+    new Set(),
+    new AbortController().signal,
+    async (candidate, choice) => {
+      if (choice?.pinnedNodeId === sellerNodeId) throw unavailable();
+      assert.equal(candidate.maxAtomic, '0');
+      assert.deepEqual(candidate.priceCeilings, FREE.priceCeilings);
+      return 'free listing';
+    },
+  );
+  assert.equal(result, 'free listing');
 });

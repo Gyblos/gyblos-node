@@ -38,6 +38,10 @@ import {
   publishBuyerSessionReceipt,
   sessionReceiptPayment,
 } from './batch-receipts';
+import {
+  RefusedChannelPreparation,
+  remotePreparationBusy,
+} from './buyer-channel-prepare';
 import { verifyDecline } from './buyer-declined-request';
 import { recoverBuyerOpening } from './buyer-opening-retry';
 import { bounded } from './buyer-operation';
@@ -142,7 +146,19 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
   };
   await verify(signal);
   if (!options.preparation?.consume(quote, terms, blockMode)) {
-    const prepared = await rpc(BATCH_METHODS.PREPARE, { quote, terms }, signal);
+    const prepared = await rpc(
+      BATCH_METHODS.PREPARE,
+      { quote, terms },
+      signal,
+    ).catch((error: unknown) => {
+      if (
+        remotePreparationBusy(error) &&
+        !options.buyer.snapshot().channelId &&
+        !options.buyer.openingRecovery?.pending()
+      )
+        throw new RefusedChannelPreparation(error.code, true);
+      throw error;
+    });
     if (!('terms' in prepared)) return batchFail(SESSION_CODES.BINDING);
     matchBatchTerms(prepared.terms, terms);
   }

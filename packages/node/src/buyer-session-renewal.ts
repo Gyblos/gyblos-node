@@ -18,6 +18,7 @@ import type { BatchDestination } from '@gyblos/transport-iroh/batch-client';
 
 import { buyerQuestionDigest } from './batch-block-buyer';
 import {
+  RefusedChannelPreparation,
   UnsentChannelRequestError,
   UnsentSellerChoiceError,
   type StartChannelWork,
@@ -28,6 +29,16 @@ import { UnsentSellerBusyError } from './buyer-routing';
 import type { Current, State } from './buyer-session';
 import { newSessionTerms, replacementTerms } from './session-policy';
 
+export async function verifyPreparationRefusal(
+  error: unknown,
+  inspect: State<BatchDestination>['options']['inspect'],
+  sellerNodeId: string,
+) {
+  if (error instanceof RefusedChannelPreparation) {
+    const stored = await inspect();
+    if (!stored || stored.empty) throw new UnsentSellerBusyError(sellerNodeId);
+  }
+}
 export async function verifyQuestion<Remote extends BatchDestination>(
   state: State<Remote>,
   quote: SignedOfferV2,

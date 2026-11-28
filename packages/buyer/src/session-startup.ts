@@ -46,8 +46,8 @@ import {
 } from './session-requirements';
 import { pinnedBusy, routeScope, sessionRouter } from './session-routing';
 import {
-  preferChannel,
   prepareChosenSeller,
+  selectForChannel,
   verifyChosenOffer,
 } from './session-seller-choice';
 import { singleSessionExecutor } from './session-serial';
@@ -118,7 +118,7 @@ function sessionSelection(
   input: Parameters<Awaited<ReturnType<BuyerExecutionFactory>>['execute']>[0],
   permission: Parameters<typeof reserveApiKey>[0],
   router: ReturnType<typeof sessionRouter> | undefined,
-  previousSeller: () => Promise<string | undefined>,
+  previousSeller: ReturnType<typeof makeManager>['previousSeller'],
   choice?: BuyerSellerChoice,
 ): BuyerRoutePorts<ChatResult>['select'] {
   const { prepared, endpoint, relayOnly } = context;
@@ -138,25 +138,32 @@ function sessionSelection(
     const select = async (
       candidate: typeof request,
       selectionRoute?: SelectionRoute,
-    ) =>
-      selectWinner(
-        prepared,
-        {
-          endpoint,
-          buyer,
-          relayOnly,
-          onSellerFailure: options.onSellerFailure,
-          ...(router ? { onPinnedBusy: pinnedBusy } : {}),
-        },
+    ) => {
+      const pick = (proposal: typeof request, hint?: SelectionRoute) =>
+        selectWinner(
+          prepared,
+          {
+            endpoint,
+            buyer,
+            relayOnly,
+            onSellerFailure: options.onSellerFailure,
+            ...(router ? { onPinnedBusy: pinnedBusy } : {}),
+          },
+          excluded,
+          current,
+          proposal,
+          hint,
+        );
+      return selectForChannel(
+        prepared.config,
+        candidate,
+        selectionRoute,
+        previousSeller,
         excluded,
         current,
-        candidate,
-        await preferChannel(
-          selectionRoute,
-          prepared.config.discovery?.paidAuto,
-          previousSeller,
-        ),
+        pick,
       );
+    };
     if (choice) {
       if (permission) return sessionFail(SESSION_CODES.BINDING);
       const chosen = prepareChosenSeller(prepared, choice);

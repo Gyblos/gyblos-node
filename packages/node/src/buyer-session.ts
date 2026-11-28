@@ -38,7 +38,11 @@ import {
 } from './buyer-opening-state';
 import { bounded } from './buyer-operation';
 import { UnsentSellerBusyError } from './buyer-routing';
-import { prepareRenewal, verifyQuestion } from './buyer-session-renewal';
+import {
+  prepareRenewal,
+  verifyPreparationRefusal,
+  verifyQuestion,
+} from './buyer-session-renewal';
 import { sessionApproval } from './session-accounting';
 import type { BuyerSessionBackend } from './session-backend';
 import {
@@ -242,6 +246,7 @@ async function run<Remote extends BatchDestination>(
   const value = await start(() =>
     ready.host.execute(quote, input, signal, onDelta),
   ).catch(async (error: unknown) => {
+    await verifyPreparationRefusal(error, options.inspect, quote.offer.nodeId);
     if (
       error instanceof UnsentOpeningError &&
       error.code === SESSION_CODES.OPENING_ABSENT

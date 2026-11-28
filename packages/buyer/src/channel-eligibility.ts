@@ -138,6 +138,7 @@ function settledReplacement(
     stored.snapshot.cumulativeAtomic,
   );
   if (
+    !stored.snapshot.channelId ||
     stored.renewalLimitReached ||
     deposit < BigInt(BATCH_SESSION_DEFAULTS.minDepositAtomic)
   )
@@ -145,6 +146,7 @@ function settledReplacement(
   return {
     blocker: null,
     channelRemainingAtomic: '0',
+    channelId: stored.snapshot.channelId,
     renewalDepositAtomic: String(deposit),
   };
 }

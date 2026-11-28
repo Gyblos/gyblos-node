@@ -29,6 +29,17 @@ import {
 import { UnsentSellerBusyError } from './buyer-routing';
 import type { BuyerSessionOptions } from './buyer-session';
 
+export class RefusedChannelPreparation extends BatchChannelError {}
+export function remotePreparationBusy(
+  error: unknown,
+): error is BatchClientError {
+  return (
+    error instanceof BatchClientError &&
+    error.remote &&
+    (error.code === SESSION_CODES.BUSY ||
+      error.code === PAID_EXECUTION_CODES.BUSY)
+  );
+}
 export class UnsentSellerChoiceError extends PaymentSessionError {
   constructor(
     code: PaymentSessionError['code'],
@@ -181,11 +192,7 @@ export async function prepareNewChannel<Remote extends BatchDestination>(
     if (error instanceof BatchClientError) {
       if (error.code === PAID_EXECUTION_CODES.PEER)
         throw new UnsentChannelPeerError(terms.sellerNodeId);
-      if (
-        error.remote &&
-        (error.code === SESSION_CODES.BUSY ||
-          error.code === PAID_EXECUTION_CODES.BUSY)
-      )
+      if (remotePreparationBusy(error))
         throw new UnsentSellerBusyError(terms.sellerNodeId);
     }
     throw error;
