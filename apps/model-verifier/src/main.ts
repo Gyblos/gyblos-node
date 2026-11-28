@@ -9,10 +9,12 @@ import {
   rm,
   writeFile,
 } from 'node:fs/promises';
+import { isIPv4 } from 'node:net';
 import { basename, dirname, join } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { modelVerifierLayout } from '@gyblos/config/home-model-verifier';
+import { LOOPBACK_HOST_NAMES } from '@gyblos/config/hosts';
 import {
   verifyModelVerification,
   type SignedModelVerification,
@@ -43,10 +45,37 @@ const OPTIONS = {
   seller: { type: 'string' },
   model: { type: 'string' },
   ollama: { type: 'string' },
+  'allow-remote-ollama': { type: 'boolean' },
   out: { type: 'string' },
 } as const;
 
 const usage = () => new ModelVerifierError(MODEL_VERIFIER_CODES.USAGE);
+
+function loopbackHost(hostname: string) {
+  if (LOOPBACK_HOST_NAMES.some((name) => name === hostname)) return true;
+  return isIPv4(hostname) && hostname.startsWith('127.');
+}
+
+function validateReferenceEndpoint(value: string, allowRemote: boolean) {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw usage();
+  }
+  if (
+    (url.protocol !== 'http:' && url.protocol !== 'https:') ||
+    url.hostname === '' ||
+    url.username !== '' ||
+    url.password !== '' ||
+    url.pathname !== '/' ||
+    url.search !== '' ||
+    url.hash !== ''
+  )
+    throw usage();
+  if (!allowRemote && !loopbackHost(url.hostname))
+    throw new ModelVerifierError(MODEL_VERIFIER_CODES.REMOTE_REFERENCE);
+}
 
 async function readJson(path: string, code: ModelVerifierCode) {
   try {
@@ -171,8 +200,16 @@ async function publishOutput(
   );
 }
 
-async function verify(values: Record<string, string | undefined>) {
+async function verify(values: {
+  seller?: string;
+  model?: string;
+  ollama?: string;
+  'allow-remote-ollama'?: boolean;
+  out?: string;
+}) {
   if (!values.seller || !values.model || values.out === '') throw usage();
+  const ollama = values.ollama ?? MODEL_VERIFIER.defaultOllamaUrl;
+  validateReferenceEndpoint(ollama, values['allow-remote-ollama'] === true);
   const { openSeller, parseSellerTarget } = await import('./seller');
   const { bindEndpoint } = await import('@gyblos/transport-iroh/endpoint');
   const modelId = catalogModelId(values.model);
@@ -184,10 +221,7 @@ async function verify(values: Record<string, string | undefined>) {
   const outputTokens = await outputTokenCounter(process.env);
   const paths = modelVerifierLayout(process.env);
   const key = await loadVerifierKey(paths.key, true);
-  const reference = await openReference(
-    values.ollama ?? MODEL_VERIFIER.defaultOllamaUrl,
-    values.model,
-  );
+  const reference = await openReference(ollama, values.model);
   const endpoint = await bindEndpoint([...randomBytes(SECRET_BYTES)], {
     http: false,
   });
@@ -258,15 +292,27 @@ async function check(path: string | undefined) {
   return summary(signed);
 }
 
-export async function main(argv = process.argv.slice(2)): Promise<number> {
+function parseArguments(argv: string[]) {
   try {
-    const { positionals, values } = parseArgs({
+    return parseArgs({
       args: argv,
       options: OPTIONS,
       allowPositionals: true,
       strict: true,
     });
+  } catch {
+    throw usage();
+  }
+}
+
+export async function main(argv = process.argv.slice(2)): Promise<number> {
+  try {
+    const { positionals, values } = parseArguments(argv);
     const [command, file] = positionals;
+    if (
+      positionals.length > (command === MODEL_VERIFIER_COMMANDS.CHECK ? 2 : 1)
+    )
+      throw usage();
     let output: object;
     if (command === MODEL_VERIFIER_COMMANDS.VERIFY)
       output = await verify(values);

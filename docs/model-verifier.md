@@ -170,6 +170,12 @@ What that makes reproducible, and what it does not:
 - The digest pins the reference **weights**. It does not pin the runtime that
   scores with them: the Ollama version, hardware and numeric path can move a
   probability near the 0.1 % floor or a candidate near rank 20.
+- Neither does it pin the **endpoint**: the digest is reported by the endpoint
+  itself, so a hostile or simply wrong endpoint can name the expected digest
+  while serving anything. The reference endpoint is the oracle behind every
+  signed verdict, so the verifier only trusts a loopback endpoint by default and
+  treats any remote one as an explicit operator decision (see
+  [Run it](#run-it)).
 - From the evidence file anyone can **recompute** the verdict: count the stored
   checks, recompute `failAt` from the signed rule and compare. That trusts the
   stored checks.
@@ -258,15 +264,24 @@ pnpm model-verifier check RESULT_DIRECTORY/result.json
 ```
 
 `verify` requires those artifacts and stops with `TOKENIZER_UNAVAILABLE` when
-they are missing or fail their pinned hashes. It runs the challenge set against
-one seller, prints the verdict and publishes `result.json` (the signed result)
-and `evidence.json` (the prompts, the answers and every check, plus any reply
-that could not be scored and why) together in a new result directory.
-Publication is atomic for readers, but it does not fsync the files or
-directories, so an operating-system crash or power loss can still lose the new
-directory or leave incomplete artifacts. If you pass `--out`, choose a path that
-does not already exist. `check` verifies a result's signature and that its rule
-and evidence counts fit the published challenge set, and prints its verdict.
+they are missing or fail their pinned hashes. The reference endpoint is
+`http://127.0.0.1:11434` unless `--ollama` overrides it, and the override must
+be a loopback URL (`localhost`, `[::1]` or any `127.` address): the endpoint is
+the oracle behind the signed verdict, so the run stops with `REMOTE_REFERENCE`
+rather than silently trusting a third party. An operator who deliberately trusts
+a remote endpoint passes `--allow-remote-ollama` as well; the flag only records
+that the decision was explicit and adds no protection by itself. The value must
+be a plain HTTP or HTTPS origin in any case: an unparsable value, another
+scheme, credentials, a path, a query or a fragment stops the run with `USAGE`,
+with or without the opt-in. It runs the challenge set against one seller, prints
+the verdict and publishes `result.json` (the signed result) and `evidence.json`
+(the prompts, the answers and every check, plus any reply that could not be
+scored and why) together in a new result directory. Publication is atomic for
+readers, but it does not fsync the files or directories, so an operating-system
+crash or power loss can still lose the new directory or leave incomplete
+artifacts. If you pass `--out`, choose a path that does not already exist.
+`check` verifies a result's signature and that its rule and evidence counts fit
+the published challenge set, and prints its verdict.
 `pnpm model-verifier address` prints the verifier's public address. The verifier
 key is created on first use in `model-verifier/verifier.key` inside the Gyblos
 home directory. The docs site explains the results for sellers:
