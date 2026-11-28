@@ -142,8 +142,8 @@ wallet balance and settlement. An unknown balance or an uncertain payment stops
 the request before a replacement deposit.
 
 To enable, change or disable renewal from Desktop, wait for pending requests and
-finish any active paid Chat budget with **Finish session** in **Usage &
-payments** before opening **Limits**.
+open **Usage & payments → Limits**. If a paid Chat budget is active, choose
+**Manage chat budget → Finish session** before changing the renewal budget.
 
 With the buyer stopped, use the following contributor command with the same
 `GYBLOS_HOME` as the endpoint. The amount is in USDC. Pass `off` to disable
