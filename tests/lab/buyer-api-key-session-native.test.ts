@@ -19,6 +19,7 @@ import {
 } from '@gyblos/protocol/buyer-api-keys';
 import { P2P_ROLES } from '@gyblos/protocol/constants';
 
+import { blockTestMeter } from '../support/batch-block-product';
 import { NATIVE_CAPABILITY } from '../support/native-runtime';
 import { paidAcceptanceMeter } from '../support/paid-acceptance-engine';
 import { buyerClient } from '../support/session-product-client';
@@ -104,88 +105,93 @@ void test(
   },
 );
 
-void test(
-  'a restarted single-channel buyer releases only a finalized unsigned request from its delegated key',
-  {
-    skip: NATIVE_CAPABILITY.transportSkip,
-  },
-  async (t) => {
-    const request = globalThis.fetch;
-    const host = await sessionProductHost();
-    t.after(host.close);
-    const { ask, owner } = await buyerClient(host, request);
-    const status = async () =>
-      parseBuyerApiKeysReply(
-        await (
-          await owner(new URL(BUYER_API_KEYS.PATH, host.buyer().url))
-        ).json(),
-      ).snapshot;
-    const first = await ask(64);
-    assert.equal(first.status, 200, await first.clone().text());
-    const paid = (await first.json()).gyblos_payment.session;
-    host.engine.fail(true);
-    const broken = await ask(64);
-    assert.notEqual(broken.status, 200);
-    await host.restartBuyer();
-    const before = await status();
-    assert.equal(before.blocked, true);
-    assert.equal(
-      before.keys[0]?.reservedAtomic,
-      String(1000n - BigInt(paid.approvedAtomic)),
-    );
-    const existing = await inspectBatchSession(
-      batchSessionPathsIn(process.env, P2P_ROLES.BUYER),
-    );
-    assert.ok(existing?.snapshot.channelId);
-    const channelId = existing.snapshot.channelId;
-    const ledger: { pending: BuyerApiKeyQuote[] } = JSON.parse(
-      await readFile(buyerApiKeyPathsIn(process.env).state, 'utf8'),
-    );
-    const [binding] = ledger.pending;
-    assert.ok(binding);
-    let observations = 0;
-    const identity = {
-      payer: existing.terms.buyer,
-      mint: existing.terms.mint,
-      network: existing.terms.network,
-    };
-    const confirm = (candidate: BuyerApiKeyQuote) =>
-      finalizedKeyCharge(
-        batchSessionPathsIn(process.env, P2P_ROLES.BUYER),
-        candidate,
-        identity,
-        existing.terms.buyerNodeId,
-        async () => {
-          observations++;
-          return undefined;
-        },
+for (const meter of [paidAcceptanceMeter, blockTestMeter])
+  void test(
+    'a restarted single-channel buyer releases only a finalized unsigned request from its delegated key' +
+      (meter.stablePrefix ? ' with block delivery' : ''),
+    {
+      skip: NATIVE_CAPABILITY.transportSkip,
+    },
+    async (t) => {
+      const request = globalThis.fetch;
+      const host = await sessionProductHost(undefined, undefined, {
+        meter,
+        observe: () => {},
+      });
+      t.after(host.close);
+      const { ask, owner } = await buyerClient(host, request);
+      const status = async () =>
+        parseBuyerApiKeysReply(
+          await (
+            await owner(new URL(BUYER_API_KEYS.PATH, host.buyer().url))
+          ).json(),
+        ).snapshot;
+      const first = await ask(64);
+      assert.equal(first.status, 200, await first.clone().text());
+      const paid = (await first.json()).gyblos_payment.session;
+      host.engine.fail(true);
+      const broken = await ask(64);
+      assert.notEqual(broken.status, 200);
+      await host.restartBuyer();
+      const before = await status();
+      assert.equal(before.blocked, true);
+      assert.equal(
+        before.keys[0]?.reservedAtomic,
+        String(1000n - BigInt(paid.approvedAtomic)),
       );
-    assert.equal(
-      await confirm({ ...binding, sellerNodeId: '0'.repeat(64) }),
-      undefined,
-    );
-    assert.equal(
-      await confirm({ ...binding, requestId: '0'.repeat(32) }),
-      undefined,
-    );
-    assert.equal(await confirm({ ...binding, maxAtomic: '1' }), undefined);
-    assert.equal(observations, 0);
-    assert.equal(await confirm(binding), undefined);
-    assert.equal(observations, 1);
+      const existing = await inspectBatchSession(
+        batchSessionPathsIn(process.env, P2P_ROLES.BUYER),
+      );
+      assert.ok(existing?.snapshot.channelId);
+      const channelId = existing.snapshot.channelId;
+      const ledger: { pending: BuyerApiKeyQuote[] } = JSON.parse(
+        await readFile(buyerApiKeyPathsIn(process.env).state, 'utf8'),
+      );
+      const [binding] = ledger.pending;
+      assert.ok(binding);
+      let observations = 0;
+      const identity = {
+        payer: existing.terms.buyer,
+        mint: existing.terms.mint,
+        network: existing.terms.network,
+      };
+      const confirm = (candidate: BuyerApiKeyQuote) =>
+        finalizedKeyCharge(
+          batchSessionPathsIn(process.env, P2P_ROLES.BUYER),
+          candidate,
+          identity,
+          existing.terms.buyerNodeId,
+          async () => {
+            observations++;
+            return undefined;
+          },
+        );
+      assert.equal(
+        await confirm({ ...binding, sellerNodeId: '0'.repeat(64) }),
+        undefined,
+      );
+      assert.equal(
+        await confirm({ ...binding, requestId: '0'.repeat(32) }),
+        undefined,
+      );
+      assert.equal(await confirm({ ...binding, maxAtomic: '1' }), undefined);
+      assert.equal(observations, 0);
+      assert.equal(await confirm(binding), undefined);
+      assert.equal(observations, 1);
 
-    host.finance.settled.set(channelId, {
-      channelId,
-      chargedAtomic: paid.approvedAtomic,
-      refundedAtomic: String(100000n - BigInt(paid.approvedAtomic)),
-      transaction: 'syntheticConfirmedClose',
-    });
-    await host.restartBuyer();
-    const after = await status();
-    assert.equal(after.blocked, false);
-    assert.equal(after.keys[0]?.reservedAtomic, '0');
-    assert.equal(after.keys[0]?.spentAtomic, paid.approvedAtomic);
-  },
-);
+      host.finance.settled.set(channelId, {
+        channelId,
+        chargedAtomic: paid.approvedAtomic,
+        refundedAtomic: String(100000n - BigInt(paid.approvedAtomic)),
+        transaction: 'syntheticConfirmedClose',
+      });
+      await host.restartBuyer();
+      const after = await status();
+      assert.equal(after.blocked, false);
+      assert.equal(after.keys[0]?.reservedAtomic, '0');
+      assert.equal(after.keys[0]?.spentAtomic, paid.approvedAtomic);
+    },
+  );
 
 void test(
   'an overflowing or cancelled single-channel waiter never runs or holds delegated funds',
