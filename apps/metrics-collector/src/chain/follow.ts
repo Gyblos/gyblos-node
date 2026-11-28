@@ -11,13 +11,9 @@ import { CHAIN_CHANNEL_CLOSED, CHAIN_INDEX } from '../constants';
 import { chainChannels } from '../schema';
 import { channelState } from './channel-account';
 import type { ChainTransaction } from './decode';
+import { ownedBatch } from './owned';
 import { readTransaction, type ChainRun } from './run';
-import {
-  channelStateUpserts,
-  followUpdate,
-  ownedBatch,
-  transactionWrites,
-} from './writes';
+import { channelStateUpserts, followUpdate, transactionWrites } from './writes';
 
 const followed = {
   channel: chainChannels.channel,
@@ -71,7 +67,6 @@ async function followChannel(
   const page = await run.rpc.signatures(channel, until ? { until } : {});
   run.followed += 1;
   if (page.length >= CHAIN_INDEX.signaturesPerPage) {
-    run.flooded += 1;
     const owned = await ownedBatch(
       run.orm,
       [
@@ -85,7 +80,11 @@ async function followChannel(
       ],
       run.lease,
     );
-    if (!owned) run.leaseLost = true;
+    if (!owned) {
+      run.leaseLost = true;
+      return;
+    }
+    run.flooded += 1;
     return;
   }
   const read: ChainTransaction[] = [];
@@ -155,7 +154,7 @@ export async function refreshChannels(run: ChainRun) {
   let read = 0;
   for (
     let start = 0;
-    start < channels.length && run.rpc.remaining() > 0;
+    start < channels.length && run.rpc.remaining() > 0 && !run.leaseLost;
     start += CHAIN_INDEX.accountsPerRequest
   ) {
     const batch = channels.slice(start, start + CHAIN_INDEX.accountsPerRequest);

@@ -9,12 +9,12 @@ import { CHANNEL_PROGRAM } from '@gyblos/config/network';
 
 import { CHAIN_CURSOR_ID, CHAIN_INDEX } from '../constants';
 import type { ChainTransaction } from './decode';
+import { ownedBatch } from './owned';
 import { ChainRpcError, type ChainSignature } from './rpc';
 import { readTransaction, type ChainRun } from './run';
 import {
   cursorUpdate,
   listsGyblosMemo,
-  ownedBatch,
   programCounts,
   transactionWrites,
   type ChainCursorState,
@@ -58,10 +58,12 @@ async function storeListPage(
     );
     if (!owned) {
       run.leaseLost = true;
-      return 0;
+    } else {
+      run.cursor = cursor;
+      run.listed += stored.length;
     }
-    run.cursor = cursor;
-    run.listed += stored.length;
+    if (failure) throw failure;
+    return owned ? stored.length : 0;
   }
   if (failure) throw failure;
   return stored.length;
