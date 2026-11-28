@@ -30,7 +30,7 @@ import {
   httpMultiHttpObservation,
   httpMultiText,
 } from './http-multiseller-http';
-import { httpMultiPhase } from './http-multiseller-phase';
+import { cancelAfterBody, httpMultiPhase } from './http-multiseller-phase';
 import { PAID_ACCEPTANCE } from './paid-acceptance-constants';
 
 function cost(host: HttpMultisellerHost, seller: number) {
@@ -63,17 +63,13 @@ async function cancelQueuedRequest(host: HttpMultisellerHost) {
   const observation = httpMultiHttpObservation(host, marker);
   try {
     const request = httpMultiChat(host, abort.signal, marker);
-    const rejected = assert.rejects(request);
-    await httpMultiPhase(observation.bodyRead, request, host.signal);
-    abort.abort();
-    await rejected;
+    await cancelAfterBody(observation.bodyRead, request, abort, host.signal);
     await httpMultiPhase(
       observation.closed,
       new Promise(() => {}),
       host.signal,
     );
   } finally {
-    abort.abort();
     observation.dispose();
   }
 }

@@ -2,7 +2,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { httpMultiPhase } from '../support/http-multiseller-phase';
+import {
+  cancelAfterBody,
+  httpMultiPhase,
+} from '../support/http-multiseller-phase';
 import { within } from '../support/test-deadline';
 
 void test('an already cancelled acceptance phase cannot wait forever', async () => {
@@ -45,5 +48,32 @@ void test('a completed request cannot leave an unreachable acceptance phase pend
       30,
     ),
     { message: 'Synthetic execution did not reach expected phase' },
+  );
+});
+
+void test('an early queued refusal owns its single failure and cancels the request', async () => {
+  const controller = new AbortController();
+  await assert.rejects(
+    cancelAfterBody(
+      new Promise<void>(() => {}),
+      Promise.resolve(),
+      controller,
+      AbortSignal.timeout(1000),
+    ),
+    { message: 'Synthetic execution did not reach expected phase' },
+  );
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.ok(controller.signal.aborted);
+});
+void test('a socket failure is not evidence of the requested cancellation', async () => {
+  const controller = new AbortController();
+  await assert.rejects(
+    cancelAfterBody(
+      Promise.resolve(),
+      Promise.reject(new Error('private socket detail')),
+      controller,
+      AbortSignal.timeout(1000),
+    ),
+    { message: 'The queued request must stop through its cancellation signal' },
   );
 });

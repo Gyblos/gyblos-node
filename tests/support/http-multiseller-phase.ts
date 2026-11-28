@@ -1,4 +1,5 @@
 // Bounds acceptance phase barriers; request cancellation and early completion must reach cleanup.
+import assert from 'node:assert/strict';
 import { setTimeout as delay } from 'node:timers/promises';
 
 import { HTTP_MULTI } from './http-multiseller-constants';
@@ -26,4 +27,27 @@ export async function httpMultiPhase<T>(
   } finally {
     lifetime.abort();
   }
+}
+
+export async function cancelAfterBody(
+  bodyRead: Promise<void>,
+  request: Promise<unknown>,
+  abort: AbortController,
+  signal: AbortSignal,
+) {
+  const cancelled = request.then(
+    () => false,
+    (error: unknown) => abort.signal.aborted && error === abort.signal.reason,
+  );
+  let stoppedByAbort: boolean;
+  try {
+    await httpMultiPhase(bodyRead, cancelled, signal);
+  } finally {
+    abort.abort();
+    stoppedByAbort = await cancelled;
+  }
+  assert.ok(
+    stoppedByAbort,
+    'The queued request must stop through its cancellation signal',
+  );
 }
