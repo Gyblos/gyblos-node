@@ -3,6 +3,7 @@ import test from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
 
 import {
+  executeApiKey,
   executeApiKeySession,
   reserveApiKey,
 } from '@gyblos/buyer/api-key-execution';
@@ -86,6 +87,7 @@ for (const aborted of [false, true]) {
     let operation: BuyerApiKeyOperation | undefined;
     const f = await batchPrepareFixture(
       async () => {
+        if (controller.signal.aborted) return OPENING_STATUS.PRESENT;
         if (aborted) controller.abort();
         return OPENING_STATUS.ABSENT;
       },
@@ -109,18 +111,33 @@ for (const aborted of [false, true]) {
     });
     t.after(() => keys.close());
     const key = await keys.create('Synthetic cancellation', '1000');
-    operation = keys.operation(key.id);
-    const quote = await f.offers.quote(1);
-    await reserveApiKey(operation, quote);
-    await assert.rejects(
-      executeApiKeySession(operation, quote.offer.nodeId, () =>
-        f.buyer.execute(quote, f.offers.input, controller.signal),
-      ),
-    );
-    for (let attempt = 0; attempt < 20 && operation.reserved(); attempt++)
+    const send = (index: number, signal: AbortSignal) =>
+      executeApiKey(keys, key.id, signal, async (active, current) => {
+        assert.ok(current);
+        operation = current;
+        const quote = await f.offers.quote(index);
+        await reserveApiKey(current, quote);
+        const result = await executeApiKeySession(
+          current,
+          quote.offer.nodeId,
+          () => f.buyer.execute(quote, f.offers.input, active),
+        );
+        await current.complete(
+          f.rig.buyer.snapshot().cumulativeAtomic,
+          BUYER_KEY_CHARGE.APPROVED,
+        );
+        return result;
+      });
+    await assert.rejects(send(1, controller.signal));
+    for (let attempt = 0; attempt < 20 && operation?.reserved(); attempt++)
       await delay(10);
     assert.equal((await keys.snapshot()).keys[0]?.reservedAtomic, '0');
     assert.equal(f.offers.generations(), 0);
     assert.deepEqual(f.rig.calls, aborted ? ['deposit'] : []);
+    if (aborted) {
+      assert.equal((await send(2, AbortSignal.timeout(5000))).text, 'ok!');
+      assert.equal(f.offers.generations(), 1);
+      assert.deepEqual(f.rig.calls, ['deposit']);
+    }
   });
 }
