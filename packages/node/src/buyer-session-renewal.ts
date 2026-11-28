@@ -1,9 +1,6 @@
 // Prepares replacement terms and finishes the previous channel before replacement authority begins.
 import { recountSessionInput } from '@gyblos/core/session-input';
-import {
-  matchBatchTerms,
-  verifyBatchQuote,
-} from '@gyblos/protocol/batch-channel';
+import { matchBatchTerms } from '@gyblos/protocol/batch-channel';
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
 import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
 import {
@@ -21,6 +18,7 @@ import {
   RefusedChannelPreparation,
   UnsentChannelRequestError,
   UnsentSellerChoiceError,
+  verifyOpeningQuote,
   type StartChannelWork,
 } from './buyer-channel-prepare';
 import { checkPreviousOpening, disconnectChannel } from './buyer-opening-state';
@@ -157,12 +155,7 @@ async function verifyReplacementQuote<Remote extends BatchDestination>(
   terms: PaymentSessionTerms,
 ) {
   try {
-    await verifyBatchQuote(
-      quote,
-      terms,
-      state.options.endpoint.id().toString(),
-      state.options.now(),
-    );
+    await verifyOpeningQuote(state.options, quote, terms);
   } catch (error) {
     throw new UnsentChannelRequestError(quote.offer.nodeId, error);
   }

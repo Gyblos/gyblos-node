@@ -29,6 +29,7 @@ import { roleSigner, setupRole } from '@gyblos/node/roles';
 import { inspectBatchPool } from '@gyblos/payments-upto/batch-session';
 import { MODEL_IDS, P2P_ROLES } from '@gyblos/protocol/constants';
 
+import { blockTestMeter } from './batch-block-product';
 import { HTTP_MULTI, HTTP_MULTI_METHODS } from './http-multiseller-constants';
 import { httpMultiLedger } from './http-multiseller-finance';
 import { httpMultiIndex } from './http-multiseller-index';
@@ -43,6 +44,7 @@ import { paidAcceptanceMeter } from './paid-acceptance-engine';
 export async function httpMultisellerHost(
   onBusy: BuyerBusyPolicy = BUYER_BUSY_POLICIES.REROUTE,
   totalAtomic: string | null = HTTP_MULTI.totalAtomic,
+  partialFallback = false,
 ) {
   const workspace = await createAcceptanceWorkspace();
   const saved = new Map(
@@ -143,7 +145,7 @@ export async function httpMultisellerHost(
       );
       sellers.push(seller);
       index.allow(seller.role.nodeId);
-      addresses.set(seller.role.nodeId, await seller.start());
+      addresses.set(seller.role.nodeId, await seller.start(partialFallback));
       await registry.bind(
         {
           nodeId: seller.role.nodeId,
@@ -198,11 +200,13 @@ export async function httpMultisellerHost(
     });
     config.session = {
       depositAtomic: HTTP_MULTI.depositAtomic,
+      ...(partialFallback && { renewalBudgetAtomic: HTTP_MULTI.totalAtomic }),
       ...(totalAtomic !== null && { totalDepositAtomic: totalAtomic }),
       lifetimeMs: 3600000,
       withdrawDelaySeconds: 900,
     };
     if (totalAtomic === null) {
+      if (partialFallback) config.request.maxTokens = 160;
       delete config.pinnedNodeId;
       config.sellers = [];
       config.discovery.open = true;
@@ -215,7 +219,10 @@ export async function httpMultisellerHost(
       buyer = await startBuyer({
         port: 0,
         bind: wire.bind,
-        meter: async () => paidAcceptanceMeter,
+        meter: async () =>
+          partialFallback
+            ? { ...blockTestMeter, output: blockTestMeter.count }
+            : paidAcceptanceMeter,
         pool: ledger.pool,
         observeChannel: ledger.observeChannel,
         observeSettlement: ledger.observe,

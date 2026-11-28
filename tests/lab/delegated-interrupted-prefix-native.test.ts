@@ -35,13 +35,16 @@ import { paidSellerConfiguration } from '../support/paid-acceptance-config';
 import { buyerClient } from '../support/session-product-client';
 import { sessionProductHost } from '../support/session-product-host';
 
-for (const restart of [true, false])
+for (const scenario of ['restart', 'live', 'desktop'])
   void test(
-    restart
-      ? 'restarting a delegated buyer charges exactly the finalized signed prefix after a visible cut'
-      : 'a live delegated fetch recovers automatically across a finalized visible cut',
+    scenario === 'desktop'
+      ? 'an owner explicitly choosing Free can repeat an interrupted paid prompt'
+      : scenario === 'restart'
+        ? 'restarting a delegated buyer charges exactly the finalized signed prefix after a visible cut'
+        : 'a live delegated fetch recovers automatically across a finalized visible cut',
     { skip: NATIVE_CAPABILITY.transportSkip, timeout: 150000 },
     async (t) => {
+      const restart = scenario === 'restart';
       const request = globalThis.fetch;
       const cut = new AbortController();
       let sellerStopped: Promise<unknown> | undefined;
@@ -97,7 +100,8 @@ for (const restart of [true, false])
             await owner(new URL(BUYER_API_KEYS.PATH, host.buyer().url))
           ).json(),
         ).snapshot;
-      const response = await request(url, {
+      const caller = scenario === 'desktop' ? owner : request;
+      const response = await caller(new URL(url), {
         method: 'POST',
         signal: AbortSignal.any([cut.signal, AbortSignal.timeout(30000)]),
         headers: {
@@ -128,7 +132,7 @@ for (const restart of [true, false])
       assert.ok(sellerStopped);
       await sellerStopped;
       if (restart) await host.restartBuyer();
-      assert.equal((await status()).blocked, true);
+      if (scenario !== 'desktop') assert.equal((await status()).blocked, true);
       const stored = await inspectBatchSession(
         batchSessionPathsIn(process.env, P2P_ROLES.SELLER),
       );
@@ -143,6 +147,58 @@ for (const restart of [true, false])
         ),
         transaction: 'syntheticConfirmedClose',
       });
+      async function switchToFree() {
+        await paidSellerConfiguration(OFFER_PRICING_KINDS.FREE);
+        const configFile = process.env.GYBLOS_CONFIG!;
+        await writeFile(
+          configFile,
+          (await readFile(configFile, 'utf8')).replace(
+            'publish = true',
+            'publish = false',
+          ),
+        );
+        await host.restartBoth();
+      }
+      if (scenario === 'desktop') {
+        await switchToFree();
+        const currentPolicy = parseBuyerApiPolicy(
+          await (
+            await owner(new URL(BUYER_API.STATUS_PATH, host.buyer().url))
+          ).json(),
+        );
+        const submit = (explicit: boolean) =>
+          owner(
+            new URL(
+              explicit ? BUYER_API.CHANNEL_CHAT_PATH : BUYER_API.CHAT_PATH,
+              host.buyer().url,
+            ),
+            {
+              method: 'POST',
+              headers: {
+                'content-type': 'application/json',
+                'if-match': JSON.stringify(currentPolicy.policyId),
+              },
+              body: JSON.stringify({
+                ...(explicit && { [BUYER_API.FREE_ONLY_FIELD]: true }),
+                model: policy.model,
+                messages: [{ role: 'user', content: 'synthetic' }],
+                stream: true,
+              }),
+            },
+          );
+        const automatic = await submit(false);
+        assert.match(
+          await automatic.text(),
+          new RegExp(SESSION_CODES.STATUS_UNKNOWN),
+        );
+        assert.equal(dispatches, 1);
+        const chosen = await submit(true);
+        assert.equal(chosen.status, 200, await chosen.clone().text());
+        assert.match(await chosen.text(), /done/);
+        assert.equal(dispatches, 2);
+        assert.deepEqual(host.finance.calls, ['deposit']);
+        return;
+      }
       if (restart) {
         await host.restartBuyer();
         const after = await status();
@@ -231,16 +287,7 @@ for (const restart of [true, false])
       assert.equal(independent.status, 200, await independent.clone().text());
       assert.match(await independent.text(), /done/);
       assert.equal(dispatches, 3);
-      await paidSellerConfiguration(OFFER_PRICING_KINDS.FREE);
-      const configFile = process.env.GYBLOS_CONFIG!;
-      await writeFile(
-        configFile,
-        (await readFile(configFile, 'utf8')).replace(
-          'publish = true',
-          'publish = false',
-        ),
-      );
-      await host.restartBoth();
+      await switchToFree();
       const freeReplay = await afterCooldown('synthetic');
       assert.equal(freeReplay.ok, false);
       assert.match(

@@ -25,9 +25,10 @@ export function freeSessionExecution(
   onDelta: Parameters<Awaited<ReturnType<BuyerExecutionFactory>>['execute']>[2],
   onUnfit: () => void,
   retries: ReturnType<typeof delegatedFreeResends>,
+  explicitFree: boolean,
 ): BuyerRoutePorts<ChatResult>['free'] {
   return async (winner, current, sending) => {
-    if ('checkInterruptedQuestion' in manager)
+    if (!explicitFree && 'checkInterruptedQuestion' in manager)
       await manager.checkInterruptedQuestion(input, permission?.keyId, current);
     return executeApiKeyFree(permission, winner.quote, current, () =>
       executeSelectedBuyerFree(
