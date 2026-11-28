@@ -107,6 +107,37 @@ const body = JSON.stringify({
   messages: [{ role: 'user', content: 'synthetic' }],
   max_tokens: 128,
 });
+void test('a delegated key cannot read the owner policy status', async () => {
+  const f = await fixture();
+  const url = new URL(BUYER_API_KEYS.PATH, f.host.url);
+  try {
+    const created = parseBuyerApiKeysReply(
+      await (
+        await fetch(url, {
+          method: 'POST',
+          headers: {
+            ...f.owner,
+            'content-type': 'application/json',
+            'if-match': '"' + f.policy.policyId + '"',
+          },
+          body: JSON.stringify({
+            action: 'create',
+            name: 'Coding tools',
+            limitAtomic: '100',
+          }),
+        })
+      ).json(),
+    ).created;
+    assert.ok(created);
+    const delegated = await fetch(new URL(BUYER_API.STATUS_PATH, f.host.url), {
+      headers: { authorization: 'Bearer ' + created.secret },
+    });
+    assert.equal(delegated.status, 403);
+  } finally {
+    await f.host.close();
+  }
+});
+
 void test('app-created USDC keys share their cap across formats and cannot access owner management', async () => {
   const f = await fixture();
   const url = new URL(BUYER_API_KEYS.PATH, f.host.url);

@@ -110,12 +110,17 @@ function metadataRequest(
   response: ServerResponse,
   policy: BuyerApiPolicy | undefined,
   authenticated: boolean,
+  owner: boolean,
   preparePaidChat: boolean,
   reconcilePool: boolean,
 ) {
   if (!authenticated || request.headers.origin !== undefined) return false;
   const path = request.url?.split('?')[0];
   if (request.method === 'GET' && path === BUYER_API.STATUS_PATH && policy) {
+    if (!owner) {
+      response.writeHead(HTTP_STATUS.forbidden).end();
+      return true;
+    }
     response
       .writeHead(HTTP_STATUS.ok, {
         'content-type': 'application/json',
@@ -241,6 +246,7 @@ export function createDesktopApi(
         response,
         policy,
         authenticated,
+        owner,
         !!preparePaidChat && owner,
         !!reconcilePool && owner,
       );
