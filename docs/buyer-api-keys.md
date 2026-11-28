@@ -15,8 +15,10 @@ its local buyer running while a client uses a key.
 The endpoint admits up to four active or queued chat requests. A request waiting
 for an execution slot keeps its original deadline and cancellation signal, and
 acquires its delegated-key operation only when dispatched. After a possible free
-send, safe failover accepts only signed free quotes until the request completes
-and stops after the first visible output.
+send, safe failover can retry a lost connection or a local read timeout before
+the first visible output using only signed free quotes. A request that reaches
+its deadline waiting for an execution slot returns HTTP 504 with
+`gyblos_never_sent: true` and can safely be retried.
 
 ## Create a key
 
