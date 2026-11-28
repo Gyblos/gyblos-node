@@ -4,6 +4,7 @@ import { recountSessionInput } from '@gyblos/core/session-input';
 import { verifyInferenceUsage } from '@gyblos/inference/conversation';
 import {
   BATCH_METHODS,
+  batchError,
   batchExecutionDigest,
   batchFail,
   batchSessionRequest,
@@ -43,7 +44,11 @@ import {
   remotePreparationBusy,
 } from './buyer-channel-prepare';
 import { verifyDecline } from './buyer-declined-request';
-import { recoverBuyerOpening, UnsentOpeningError } from './buyer-opening-retry';
+import {
+  recoverBuyerOpening,
+  UnsentOpeningError,
+  UnsentSessionPreflightError,
+} from './buyer-opening-retry';
 import { bounded } from './buyer-operation';
 import { declaredCharge, verifyDeclaredUsage } from './declared-usage';
 
@@ -207,6 +212,9 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
   });
   await verify(signal).catch(async (error: unknown) => {
     await release?.().catch(() => undefined);
+    const { code } = batchError(error);
+    if (code === PAID_EXECUTION_CODES.EXPIRED || code === SESSION_CODES.EXPIRED)
+      throw new UnsentSessionPreflightError(code);
     throw error;
   });
   await options.beforeInference?.(

@@ -6,6 +6,7 @@ import {
   executeApiKeySession,
   reserveApiKey,
 } from '@gyblos/buyer/api-key-execution';
+import { classifyPaidError } from '@gyblos/buyer/session-errors';
 import {
   createBuyerApiKeys,
   type BuyerApiKeyOperation,
@@ -61,10 +62,14 @@ for (const expires of [false, true]) {
         return value;
       });
     };
-    await assert.rejects(
-      run(1),
-      expires ? /EXPIRED/ : { code: SESSION_CODES.OPENING_ABSENT },
-    );
+    await assert.rejects(run(1), (error: unknown) => {
+      const view = classifyPaidError(error);
+      assert.ok(view);
+      if (expires) assert.match(view.code, /EXPIRED/);
+      else assert.equal(view.code, SESSION_CODES.OPENING_ABSENT);
+      assert.equal(view.neverSent, true);
+      return true;
+    });
     assert.equal(f.offers.generations(), 0);
     assert.equal((await keys.snapshot()).keys[0]?.reservedAtomic, '0');
     if (expires) {

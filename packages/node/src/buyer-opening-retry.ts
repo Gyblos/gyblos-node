@@ -11,6 +11,8 @@ import {
 
 import { bounded } from './buyer-operation';
 
+export class UnsentSessionPreflightError extends BatchChannelError {}
+
 export class UnsentOpeningError extends BatchChannelError {
   constructor(
     code:
