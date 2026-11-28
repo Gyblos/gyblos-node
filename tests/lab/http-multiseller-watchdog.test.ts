@@ -2,12 +2,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import { batchDeferred } from '../support/batch-deferred';
 import { HTTP_MULTI } from '../support/http-multiseller-constants';
 import {
   cancelAfterBody,
   httpMultiPhase,
 } from '../support/http-multiseller-phase';
-import { within } from '../support/test-deadline';
+import { NativeTestDeadlineError, within } from '../support/test-deadline';
 
 void test('an already cancelled acceptance phase cannot wait forever', async () => {
   await assert.rejects(
@@ -116,20 +117,26 @@ void test('host cancellation during cleanup releases an already cancelled stalle
 void test('one deadline covers body observation and a request ignoring its abort', async (context) => {
   context.mock.timers.enable({ apis: ['setTimeout'] });
   const controller = new AbortController();
-  const body = Promise.withResolvers<void>();
-  const result = assert.rejects(
-    cancelAfterBody(
-      body.promise,
-      new Promise(() => {}),
-      controller,
-      new AbortController().signal,
-    ),
-    { name: 'NativeTestDeadlineError' },
+  const body = batchDeferred<void>();
+  const settled: unknown[] = [];
+  const request = cancelAfterBody(
+    body.promise,
+    new Promise(() => {}),
+    controller,
+    new AbortController().signal,
+  ).then(
+    () => settled.push('completed'),
+    (error: unknown) => settled.push(error),
   );
   context.mock.timers.tick(HTTP_MULTI.operationMs - 1);
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.equal(controller.signal.aborted, false);
   body.resolve();
   await new Promise<void>((resolve) => setImmediate(resolve));
   assert.ok(controller.signal.aborted);
+  assert.equal(settled.length, 0);
   context.mock.timers.tick(1);
-  await result;
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.deepEqual(settled, [new NativeTestDeadlineError()]);
+  await request;
 });
