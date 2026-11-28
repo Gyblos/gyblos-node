@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import { HTTP_MULTI } from '../support/http-multiseller-constants';
 import {
   cancelAfterBody,
   httpMultiPhase,
@@ -76,4 +77,59 @@ void test('a socket failure is not evidence of the requested cancellation', asyn
     ),
     { message: 'The queued request must stop through its cancellation signal' },
   );
+});
+void test('host cancellation before the body preserves its error when the request stalls', async () => {
+  const controller = new AbortController();
+  await assert.rejects(
+    within(
+      cancelAfterBody(
+        new Promise(() => {}),
+        new Promise(() => {}),
+        controller,
+        AbortSignal.abort(),
+      ),
+      250,
+    ),
+    { name: 'AbortError' },
+  );
+  assert.ok(controller.signal.aborted);
+});
+void test('host cancellation during cleanup releases an already cancelled stalled request', async () => {
+  const controller = new AbortController();
+  const host = new AbortController();
+  controller.signal.addEventListener('abort', () => host.abort(), {
+    once: true,
+  });
+  await assert.rejects(
+    within(
+      cancelAfterBody(
+        Promise.resolve(),
+        new Promise(() => {}),
+        controller,
+        host.signal,
+      ),
+      250,
+    ),
+    { name: 'AbortError' },
+  );
+});
+void test('one deadline covers body observation and a request ignoring its abort', async (context) => {
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+  const controller = new AbortController();
+  const body = Promise.withResolvers<void>();
+  const result = assert.rejects(
+    cancelAfterBody(
+      body.promise,
+      new Promise(() => {}),
+      controller,
+      new AbortController().signal,
+    ),
+    { name: 'NativeTestDeadlineError' },
+  );
+  context.mock.timers.tick(HTTP_MULTI.operationMs - 1);
+  body.resolve();
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.ok(controller.signal.aborted);
+  context.mock.timers.tick(1);
+  await result;
 });
