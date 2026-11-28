@@ -335,6 +335,7 @@ export function makeManager(
     unresolved: () => unresolvedPool(policy.totalDepositAtomic),
     checkReusableChannel: checkChannel,
     authorizeRequest: sessionAuthorization(state),
+    credentialId: (id) => state.selections.get(id)?.permission?.keyId,
     verify: trustedQuote(context, state),
     receipt: sessionReceipts(context, state),
   };

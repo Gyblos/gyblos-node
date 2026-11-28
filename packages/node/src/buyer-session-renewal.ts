@@ -155,7 +155,7 @@ function checkRenewalTerms(
       SESSION_CODES.STATUS_UNKNOWN,
       proposed.sellerNodeId,
     );
-  if (now >= previous.expiresAt)
+  if (!settledPartial && now >= previous.expiresAt)
     throw new UnsentSellerChoiceError(
       SESSION_CODES.EXPIRED,
       proposed.sellerNodeId,

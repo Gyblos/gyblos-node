@@ -301,6 +301,7 @@ export class BuyerApiKeys {
     let reserved = false;
     let maximum: string | undefined;
     return {
+      keyId,
       signal: controller.signal,
       reserved: () => reserved,
       completed: () => finished,

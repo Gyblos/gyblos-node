@@ -18,6 +18,7 @@ export interface BuyerBatchSessionOptions<Remote extends BatchDestination> {
   // The first quote declares usage: blocks need the model's tokenizer, so a channel it opens runs without
   // them. A channel that already checkpoints keeps doing so.
   declared?: boolean;
+  credentialId?(requestId: string): string | undefined;
   financialPermission?<T>(run: () => Promise<T>): Promise<T>;
   onDeclined?(): Promise<void>;
   beforeInference?(

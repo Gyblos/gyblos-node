@@ -169,9 +169,6 @@ async function operation(
       options.now(),
     );
     signal.throwIfAborted();
-    const checkedAt = options.now();
-    validateOfferV2Time(offer, checkedAt);
-    if (checkedAt >= terms.expiresAt) return batchFail(SESSION_CODES.LIMIT);
     const live = batchLiveOffer(offer, options.offers(), options.now());
     if (blockMode && !live.meter.stablePrefix)
       return batchFail(SESSION_CODES.UNAVAILABLE);
@@ -185,6 +182,13 @@ async function operation(
       replacing,
       request.method === BATCH_METHODS.OPEN,
     );
+    const check = () => {
+      signal.throwIfAborted();
+      const now = options.now();
+      validateOfferV2Time(offer, now);
+      if (now >= terms.expiresAt) return batchFail(SESSION_CODES.LIMIT);
+    };
+    check();
     if (request.method === BATCH_METHODS.PREPARE || !state.current || replacing)
       await options.admit?.();
     if (request.method === BATCH_METHODS.PREPARE) return { terms };
@@ -193,6 +197,7 @@ async function operation(
       const expected = state.current.session.snapshot().channelId;
       await state.current.session.dispose();
       state.current = undefined;
+      check();
       await options.backend.renew(expected, terms, request.params.payload);
     }
     if (!state.current) {

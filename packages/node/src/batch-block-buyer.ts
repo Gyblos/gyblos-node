@@ -94,14 +94,16 @@ function blockCallbacks<Remote extends BatchDestination>(
 }
 export function buyerQuestionDigest(
   messages: FreeExecutionBuildInput['messages'],
+  keyId: string | undefined,
 ) {
   return createHash('sha256')
     .update(
-      canonicalJson(
+      canonicalJson([
+        keyId ?? null,
         messages
           .filter((message) => message.role === FREE_CHAT_ROLES.USER)
           .map((message) => message.content),
-      ),
+      ]),
     )
     .digest('hex');
 }
@@ -129,7 +131,13 @@ export async function runBuyerBlocks<Remote extends BatchDestination>(
   };
   check();
   await bounded(
-    buyer.beginBlocks(pending, buyerQuestionDigest(request.input.messages)),
+    buyer.beginBlocks(
+      pending,
+      buyerQuestionDigest(
+        request.input.messages,
+        options.credentialId?.(request.requestId),
+      ),
+    ),
     signal,
   );
   check();

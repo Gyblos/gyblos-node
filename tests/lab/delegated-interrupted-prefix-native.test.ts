@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import test from 'node:test';
+import { setTimeout as delay } from 'node:timers/promises';
 
+import { paidChannelEligibility } from '@gyblos/buyer/channel-eligibility';
+import { BUYER_SELECTION } from '@gyblos/buyer/constants';
 import { batchSessionPathsIn } from '@gyblos/config';
+import { SELLER_SELECTION_CODES } from '@gyblos/core/constants';
 import { inspectBatchSession } from '@gyblos/payments-upto/batch-session';
 import { BUYER_API, parseBuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 import {
@@ -10,6 +14,7 @@ import {
   parseBuyerApiKeysReply,
 } from '@gyblos/protocol/buyer-api-keys';
 import { ENGINE_DONE_REASONS, P2P_ROLES } from '@gyblos/protocol/constants';
+import { SESSION_CODES } from '@gyblos/protocol/payment-session';
 
 import { blockTestMeter } from '../support/batch-block-product';
 import { NATIVE_CAPABILITY } from '../support/native-runtime';
@@ -22,7 +27,7 @@ import { sessionProductHost } from '../support/session-product-host';
 
 void test(
   'restarting a delegated buyer charges exactly the finalized signed prefix after a visible cut',
-  { skip: NATIVE_CAPABILITY.transportSkip, timeout: 90000 },
+  { skip: NATIVE_CAPABILITY.transportSkip, timeout: 150000 },
   async (t) => {
     const request = globalThis.fetch;
     const cut = new AbortController();
@@ -132,12 +137,27 @@ void test(
     assert.equal(after.keys[0]?.reservedAtomic, '0');
     assert.equal(host.finance.approvals(), 1);
     assert.deepEqual(host.finance.calls, ['deposit']);
-    const follow = (content: string) =>
+    const eligibility = await paidChannelEligibility(
+      process.env,
+      {
+        payer: stored.terms.buyer,
+        network: stored.terms.network,
+        mint: stored.terms.mint,
+        nodeId: stored.terms.sellerNodeId,
+        owner: stored.terms.owner,
+        renewalPolicy: { depositAtomic: '10000', renewalBudgetAtomic: '30000' },
+      },
+      () => stored.terms.expiresAt + 1,
+      host.finance.observeChannel,
+      AbortSignal.timeout(2000),
+    );
+    assert.equal(eligibility.blocker, null);
+    const follow = (content: string, token = delegated) =>
       request(host.buyer().url, {
         method: 'POST',
         signal: AbortSignal.timeout(15000),
         headers: {
-          authorization: 'Bearer ' + delegated,
+          authorization: 'Bearer ' + token,
           'content-type': 'application/json',
         },
         body: JSON.stringify({
@@ -147,29 +167,34 @@ void test(
           stream: true,
         }),
       });
-    const replay = await follow('synthetic');
-    assert.notEqual(replay.status, 200);
-    await replay.text();
-    assert.equal(dispatches, 1);
-    await host.restartBuyer();
-    const first = await follow('new question');
-    let next = first;
-    if (first.status === 503) {
-      const error = await first.clone().json();
-      if (error.error.code === 'NO_SELLER_CANDIDATES') {
-        await new Promise((resolve) =>
-          setTimeout(
-            resolve,
-            Math.max(0, error.error.cooldownUntil - Date.now()) + 100,
-          ),
-        );
-        next = await follow('new question');
+    const afterCooldown = async (question: string, token = delegated) => {
+      const initial = await follow(question, token);
+      if (
+        initial.status === 503 &&
+        (await initial.clone().text()).includes(
+          SELLER_SELECTION_CODES.NO_CANDIDATES,
+        )
+      ) {
+        await delay(BUYER_SELECTION.cooldownMs + 100);
+        return follow(question, token);
       }
-    }
+      return initial;
+    };
+    const next = await afterCooldown('new question');
     const nextText = await next.text();
     assert.equal(next.status, 200, nextText);
     assert.match(nextText, /done/);
     assert.equal(dispatches, 2);
+    await host.restartBuyer();
+    const replay = await afterCooldown('synthetic');
+    assert.equal(replay.ok, false);
+    assert.match(await replay.text(), new RegExp(SESSION_CODES.STATUS_UNKNOWN));
+    assert.equal(dispatches, 2);
+    const other = await buyerClient(host, request, '1000');
+    const independent = await afterCooldown('synthetic', other.delegated);
+    assert.equal(independent.status, 200, await independent.clone().text());
+    assert.match(await independent.text(), /done/);
+    assert.equal(dispatches, 3);
     assert.equal(
       host.finance.calls.filter((call) => call === 'deposit').length,
       2,

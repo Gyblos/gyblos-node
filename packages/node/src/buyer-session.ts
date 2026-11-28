@@ -66,6 +66,7 @@ export interface BuyerSessionOptions<Remote extends BatchDestination> {
     quote: SignedOfferV2,
     signal: AbortSignal,
   ) => Promise<(() => Promise<void>) | undefined>;
+  credentialId?: BuyerBatchSessionOptions<Remote>['credentialId'];
   onDeclined?: BuyerBatchSessionOptions<Remote>['onDeclined'];
   beforeInference?: BuyerBatchSessionOptions<Remote>['beforeInference'];
   checkReusableChannel?: BuyerSessionOptions<Remote>['verify'];
@@ -226,7 +227,12 @@ async function run<Remote extends BatchDestination>(
     return sessionFail(SESSION_CODES.UNVERIFIED);
   const stored = await bounded(options.inspect(), signal);
   if (
-    stored?.interruptedQuestions?.includes(buyerQuestionDigest(input.messages))
+    stored?.interruptedQuestions?.includes(
+      buyerQuestionDigest(
+        input.messages,
+        options.credentialId?.(quote.offer.requestId),
+      ),
+    )
   )
     throw new UnsentSellerChoiceError(
       SESSION_CODES.STATUS_UNKNOWN,

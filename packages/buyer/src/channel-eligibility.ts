@@ -128,6 +128,26 @@ function selectedChannel(
   }
   return result;
 }
+function settledReplacement(
+  stored: BatchStoredSession,
+  policy: NonNullable<Selection['renewalPolicy']>,
+): PaidChannelEligibility {
+  const deposit = remainingDepositAuthority(
+    policy,
+    stored.priorSpentAtomic,
+    stored.snapshot.cumulativeAtomic,
+  );
+  if (
+    stored.renewalLimitReached ||
+    deposit < BigInt(BATCH_SESSION_DEFAULTS.minDepositAtomic)
+  )
+    return unavailable(SESSION_CODES.REPLACEMENT_REQUIRED);
+  return {
+    blocker: null,
+    channelRemainingAtomic: '0',
+    renewalDepositAtomic: String(deposit),
+  };
+}
 export async function paidChannelEligibility(
   environment: HomeEnvironment,
   selection: Selection,
@@ -170,24 +190,11 @@ export async function paidChannelEligibility(
     if (!switching && terms.owner !== selection.owner)
       return unavailable(SESSION_CODES.BINDING);
     if (
-      stored.settledPartial &&
       !switching &&
-      selection.renewalPolicy?.renewalBudgetAtomic &&
-      !stored.renewalLimitReached &&
-      now() < terms.expiresAt
-    ) {
-      const deposit = remainingDepositAuthority(
-        selection.renewalPolicy,
-        stored.priorSpentAtomic,
-        snapshot.cumulativeAtomic,
-      );
-      if (deposit >= BigInt(BATCH_SESSION_DEFAULTS.minDepositAtomic))
-        return {
-          blocker: null,
-          channelRemainingAtomic: '0',
-          renewalDepositAtomic: String(deposit),
-        };
-    }
+      stored.settledPartial &&
+      selection.renewalPolicy?.renewalBudgetAtomic
+    )
+      return settledReplacement(stored, selection.renewalPolicy);
     if (stored.pending || stored.recoverable)
       return unavailable(SESSION_CODES.STATUS_UNKNOWN);
     if (snapshot.state === SESSION_STATES.CLOSED)
