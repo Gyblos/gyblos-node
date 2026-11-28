@@ -30,12 +30,12 @@ export async function recoverBuyerOpening<T>(
 ): Promise<T> {
   const evidence = buyer.openingRecovery;
   const first = await permit(async () => {
-    const fresh = !buyer.snapshot().channelId;
+    const awaitingFirstCharge = buyer.snapshot().cumulativeAtomic === '0';
     const open = await prepare();
     if (!evidence) return { value: await open() };
     if (await evidence.claim()) {
       try {
-        return { value: await open(), confirm: fresh };
+        return { value: await open(), confirm: awaitingFirstCharge };
       } catch {
         signal.throwIfAborted();
       }
