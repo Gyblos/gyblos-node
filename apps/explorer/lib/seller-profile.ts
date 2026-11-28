@@ -1,9 +1,10 @@
 import type { ModelStat, SellerDay, Totals } from './collector-shape';
-import { DISPLAY, NODE_STATE, SELLER_NAME, SELLER_STATUS } from './constants';
+import { DISPLAY, NODE_STATE, SELLER_STATUS } from './constants';
 import type { DiscoverySnapshot, OfferedModel } from './discovery';
 import { count } from './format';
 import type { GithubAccount, NodeState } from './network-status';
 import { modelKey, uptimeRatio } from './offers';
+import { sellerDisplayName } from './seller-identity';
 import { sideFigures } from './usage';
 
 export type SellerStatus = NodeState | typeof SELLER_STATUS.unknown;
@@ -52,7 +53,7 @@ export function sellerProfile(
       !!listed,
       snapshot.networkDatedAt !== null,
     ),
-    name: node?.name && !SELLER_NAME.unsafe.test(node.name) ? node.name : null,
+    name: sellerDisplayName(node?.name ?? null),
     github: node?.github ?? null,
     owner,
     ownerShared: snapshot.sellers.some(

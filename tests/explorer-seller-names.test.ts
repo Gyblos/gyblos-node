@@ -1,8 +1,14 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import test from 'node:test';
 
 import { parseNetworkStatus } from '@gyblos/explorer/network-status';
-import { namesByNode, sellerNameHint } from '@gyblos/explorer/seller-identity';
+import {
+  namesByNode,
+  sellerDisplayName,
+  sellerNameHint,
+} from '@gyblos/explorer/seller-identity';
 
 const NODE_A = 'a'.repeat(64);
 const NODE_B = 'b'.repeat(64);
@@ -60,4 +66,21 @@ void test('the name hint says the name is self-chosen and not verified', () => {
     sellerNameHint('Nodo Santiago'),
     'Nodo Santiago (self-chosen name, not verified)',
   );
+});
+
+void test('sellerDisplayName drops control characters and keeps safe names', () => {
+  assert.equal(sellerDisplayName('line\nbreak'), null);
+  assert.equal(sellerDisplayName('ta\tb'), null);
+  assert.equal(sellerDisplayName('Ada Lovelace'), 'Ada Lovelace');
+  assert.equal(sellerDisplayName(null), null);
+  assert.equal(sellerDisplayName(''), null);
+});
+
+void test('the not-online table renders only filtered seller names', () => {
+  const source = readFileSync(
+    resolve(import.meta.dirname, '../apps/explorer/components/not-online.tsx'),
+    'utf8',
+  );
+  assert.match(source, /sellerDisplayName\(node\.name\)/);
+  assert.doesNotMatch(source, /name=\{node\.name\}/);
 });
