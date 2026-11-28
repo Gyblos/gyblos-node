@@ -10,7 +10,8 @@ import { PAGE_LINKS } from '../lib/constants';
 import { currentPage, isCurrentPage } from '../lib/layout';
 import { cx } from './board/cx';
 
-const ITEM = 'block rounded-lg px-3 py-1.5 hover:bg-raised hover:text-ink';
+const ITEM =
+  'block rounded-lg px-3 py-1.5 transition-colors hover:bg-raised hover:text-ink';
 const STACKED = 'flex min-h-11 items-center py-2';
 const MENU_ID = 'explorer-menu';
 
@@ -99,7 +100,7 @@ export function NavLinks() {
           aria-expanded={open}
           aria-controls={MENU_ID}
           onClick={() => setOpen(!open)}
-          className="flex min-h-11 w-full items-center justify-between rounded-lg bg-raised px-3 py-2 text-sm text-ink"
+          className="flex min-h-11 w-full items-center justify-between rounded-lg bg-raised px-3 py-2 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-signal"
         >
           <span>
             <span className="sr-only">Pages, current: </span>

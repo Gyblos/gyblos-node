@@ -153,7 +153,7 @@ export function DayBars({
               type="button"
               key={row.day}
               className={cx(
-                'flex min-w-0 flex-1 cursor-crosshair flex-col items-center rounded-sm focus-visible:outline-signal',
+                'flex min-w-0 flex-1 cursor-crosshair flex-col items-center rounded-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-signal',
                 index === active && 'bg-raised',
                 row.outside && 'opacity-40',
               )}

@@ -3,7 +3,9 @@
 // Measures uncapped table overflow; server-rendered cells remain owned by the caller.
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 
+import { cx } from './board/cx';
 import { Select } from './board/select';
+import { SURFACE } from './board/styles';
 import { PagedSurface, QueryRegion } from './query-region';
 
 const ALL_COLUMNS = 'All columns';
@@ -162,7 +164,7 @@ export function TableScroll({
         </div>
       )}
       <section
-        className={`${heading ? '' : 'mt-4'} overflow-hidden rounded-xl border border-line bg-panel`}
+        className={cx(heading ? '' : 'mt-4', 'overflow-hidden', SURFACE.panel)}
       >
         <PagedSurface className="relative">
           <div

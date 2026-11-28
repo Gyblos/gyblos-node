@@ -14,6 +14,7 @@ interface Item {
   dependencies?: string[];
   registryDependencies?: string[];
   files?: { path: string; type: string; target: string }[];
+  cssVars?: Record<string, Record<string, string>>;
 }
 const registry = JSON.parse(
   readFileSync(resolve(ROOT, 'registry.json'), 'utf8'),
@@ -90,4 +91,20 @@ void test('every relative import of a published file ships in its item or the it
       }
     }
   }
+});
+
+void test('published font mappings carry in-variable fallbacks', () => {
+  const theme = registry.items.find((item) => item.name === 'gyblos-theme')
+    ?.cssVars?.theme;
+  assert.ok(theme);
+  const fonts = Object.entries(theme).filter(([name]) =>
+    name.startsWith('font-'),
+  );
+  assert.ok(fonts.length > 0);
+  for (const [name, value] of fonts)
+    for (const [, reference] of value.matchAll(/var\(([^)]*)\)/g))
+      assert.ok(
+        reference!.includes(','),
+        `${name}: var(${reference}) has no fallback`,
+      );
 });

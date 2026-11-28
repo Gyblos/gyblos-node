@@ -5,6 +5,8 @@ import { DISPLAY, PAGING } from '../lib/constants';
 import { getDiscovery } from '../lib/discovery-render';
 import { type ExplorerQuery } from '../lib/paging';
 import { sellerProfile } from '../lib/seller-profile';
+import { cx } from './board/cx';
+import { SURFACE } from './board/styles';
 import { TX_AMOUNT_HEAD, TxLine } from './channel-txs';
 import { Pager } from './pager';
 import {
@@ -30,7 +32,7 @@ function Note({ children }: { children: string }) {
   return (
     <>
       <SectionTitle id={PAGING.anchors.transactions} title={TITLE} />
-      <div className="rounded-xl border border-line bg-panel p-5 text-sm text-muted">
+      <div className={cx(SURFACE.panel, 'p-5 text-sm text-muted')}>
         {children}
       </div>
     </>

@@ -17,6 +17,7 @@ import * as catalog from '../lib/model-catalog';
 import { modelHref } from '../lib/offers';
 import { sortHref, type ExplorerQuery, type SortedTable } from '../lib/paging';
 import type { RangeDays, RangeSection } from '../lib/range';
+import { SURFACE } from './board/styles';
 import { ModelLogo } from './model-logo';
 import { RangeControl } from './range-control';
 import { SectionHelp } from './section-help';
@@ -26,7 +27,7 @@ import { isToken, TokenLogo } from './token-logo';
 
 export { EmptyRow, prefixedColumn, type Column } from './table-cells';
 
-export const th = 'px-3 py-2 text-xs font-medium text-muted';
+export const th = 'px-3 py-2 text-caption-1-medium text-muted';
 export const td = 'px-3 py-2';
 export const numberCell = `${td} text-right font-mono`;
 export const moneyCell = `${numberCell} text-money`;
@@ -76,7 +77,7 @@ export function Loading({
           ))}
         </div>
       ) : null}
-      <div className="overflow-hidden rounded-xl border border-line bg-panel">
+      <div className={`overflow-hidden ${SURFACE.panel}`}>
         <Skeleton shape="rect" className="h-11 rounded-none" />
         {LOADING_ROWS.map((row) => (
           <div
@@ -112,7 +113,7 @@ export function SectionTitle({
       className="mt-6 mb-3 flex scroll-mt-4 flex-wrap items-baseline justify-between gap-2"
     >
       <div className="flex items-center gap-2">
-        <h2 className="text-xl font-medium">{title}</h2>
+        <h2 className="text-title-3-medium">{title}</h2>
         {help ? <SectionHelp title={title} text={help} /> : null}
       </div>
       {meta || range ? (
@@ -141,7 +142,7 @@ export function Unavailable({
         <span key={anchor} id={anchor} className="block scroll-mt-4" />
       ))}
       <SectionTitle id={first} title={title} />
-      <div className="rounded-xl border border-line bg-panel p-5 text-sm text-muted">
+      <div className={`${SURFACE.panel} p-5 text-sm text-muted`}>
         Source unavailable.
       </div>
     </>

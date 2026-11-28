@@ -9,8 +9,10 @@ import {
   sellerProfile,
   type SellerProfile,
 } from '../lib/seller-profile';
+import { cx } from './board/cx';
 import { StatCard } from './board/stat-card';
 import { StatusDot } from './board/status-dot';
+import { SURFACE } from './board/styles';
 import { SellerCell } from './seller-cell';
 import { Addr, SectionTitle, Unavailable } from './ui';
 
@@ -68,7 +70,7 @@ function OwnerField({ profile }: { profile: SellerProfile }) {
 
 function ProfileFields({ profile }: { profile: SellerProfile }) {
   return (
-    <div className="rounded-xl border border-line bg-panel p-4 text-sm sm:p-5">
+    <div className={cx(SURFACE.panel, 'p-4 text-sm sm:p-5')}>
       <Identity profile={profile} />
       <dl className="mt-4 grid gap-3 sm:grid-cols-2">
         <Field label="NodeId">

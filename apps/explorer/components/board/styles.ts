@@ -1,5 +1,6 @@
 export const SURFACE = {
   card: 'rounded-xl bg-panel',
+  panel: 'rounded-xl border border-line bg-panel',
   // A tile or track inside a card: one tone lighter than the card.
   inset: 'bg-raised',
   control:

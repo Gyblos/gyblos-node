@@ -107,7 +107,12 @@ export function ModelHero({
   const link = cx('rounded-full', SURFACE.focus);
   return (
     <section aria-label="Model summary" className="mt-4 grid gap-3">
-      <div className="flex flex-col gap-4 rounded-xl border border-line bg-panel p-4 sm:flex-row sm:items-center sm:p-6">
+      <div
+        className={cx(
+          SURFACE.panel,
+          'flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-6',
+        )}
+      >
         <div className="min-w-0 flex-1">
           <p className="text-body-medium text-text-primary">
             {modelMaker(view)}

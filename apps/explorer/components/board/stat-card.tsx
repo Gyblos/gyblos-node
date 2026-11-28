@@ -128,14 +128,21 @@ function PlainCard({
     'row-span-3 grid min-w-0 grid-rows-subgrid gap-y-0 rounded-xl bg-background-secondary-default p-3';
   const content = (
     <>
-      <span className="flex items-center gap-2">
-        <span className="flex items-center rounded-md bg-stat-card-icon-background p-1.5">
+      <span className="@container flex items-center gap-2">
+        <span className="flex items-center rounded-md bg-stat-card-icon-background p-1.5 @max-[7rem]:hidden">
           <Icon
             aria-hidden
             className="size-4 shrink-0 text-foreground-icon-primary"
           />
         </span>
-        <span className={cx('min-w-0 flex-1', LABEL)}>{label}</span>
+        <span
+          className={cx(
+            'min-w-0 flex-1 @max-[7rem]:text-caption-1-medium',
+            LABEL,
+          )}
+        >
+          {label}
+        </span>
         {hint && !selection ? <StatHint label={label} hint={hint} /> : null}
       </span>
       <span
@@ -169,7 +176,7 @@ function PlainCard({
       onClick={selection.onPress}
       className={cx(
         frame,
-        'cursor-pointer text-left hover:bg-raised focus-visible:outline-2 focus-visible:outline-signal',
+        'cursor-pointer text-left transition-colors hover:bg-raised focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal',
         selection.pressed && 'ring-1 ring-inset ring-signal',
       )}
     >

@@ -21,7 +21,7 @@ export function SiteFooter() {
   return (
     <footer className="mt-16 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-t border-line py-6 text-xs text-dim">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <Link href="/" className="text-sm font-medium tracking-tight text-ink">
+        <Link href="/" className="text-body-medium tracking-tight text-ink">
           gyblos
         </Link>
         <span className="inline-flex items-center gap-1.5">

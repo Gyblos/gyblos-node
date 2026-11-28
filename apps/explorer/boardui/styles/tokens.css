@@ -21,7 +21,7 @@
 
   --color-background-primary-default: var(--bg);
   --color-background-primary-hover: var(--raised);
-  --color-background-primary-active: var(--raised);
+  --color-background-primary-active: var(--line);
   --color-background-primary-disabled: var(--panel);
   --color-background-secondary-default: var(--panel);
   --color-background-secondary-hover: var(--raised);
@@ -29,8 +29,8 @@
   --color-background-inner-default: var(--boardui-inner);
 
   --color-border-button-default: var(--line);
-  --color-border-button-hover: var(--line);
-  --color-border-button-active: var(--line);
+  --color-border-button-hover: var(--dim);
+  --color-border-button-active: var(--dim);
   --color-border-focus-ring: var(--signal);
   --color-border-table: var(--line);
   --color-separator-border: var(--line);

@@ -79,15 +79,15 @@ function MonthControl({
 }) {
   const index = months.indexOf(current);
   return (
-    <div className="sticky left-0 flex h-11 items-center gap-2 text-sm text-muted">
-      <span className="font-medium">{current}</span>
+    <div className="sticky left-0 flex h-11 items-center gap-2 text-body-regular text-muted">
+      <span className="text-body-medium">{current}</span>
       {months.length > 1 && (
         <div className="flex gap-1">
           <button
             type="button"
             aria-label="Previous month"
             disabled={index <= 0}
-            className="grid size-11 place-items-center rounded-md hover:bg-raised disabled:opacity-30"
+            className="grid size-8 sm:pointer-fine:size-6 place-items-center rounded-lg outline-none transition-colors hover:bg-raised focus-visible:ring-2 focus-visible:ring-signal disabled:cursor-not-allowed disabled:text-text-tertiary disabled:opacity-40"
             onClick={() => select(months[index - 1]!)}
           >
             <ChevronLeft size={16} />
@@ -96,7 +96,7 @@ function MonthControl({
             type="button"
             aria-label="Next month"
             disabled={index >= months.length - 1}
-            className="grid size-11 place-items-center rounded-md hover:bg-raised disabled:opacity-30"
+            className="grid size-8 sm:pointer-fine:size-6 place-items-center rounded-lg outline-none transition-colors hover:bg-raised focus-visible:ring-2 focus-visible:ring-signal disabled:cursor-not-allowed disabled:text-text-tertiary disabled:opacity-40"
             onClick={() => select(months[index + 1]!)}
           >
             <ChevronRight size={16} />
@@ -235,7 +235,7 @@ function ChartHeading({
 }) {
   return (
     <div className="flex flex-col items-start gap-2 min-[400px]:flex-row min-[400px]:items-baseline min-[400px]:justify-between">
-      <h3 className="text-base font-medium">
+      <h3 className="text-headline-medium">
         {label} by {frequency}
       </h3>
       <ChartRange
@@ -258,7 +258,7 @@ function MetricSelector({
 }) {
   return (
     <div
-      className="grid gap-2 sm:grid-cols-3"
+      className="grid grid-cols-2 gap-2 min-[420px]:grid-cols-3"
       role="group"
       aria-label="Activity metric"
     >

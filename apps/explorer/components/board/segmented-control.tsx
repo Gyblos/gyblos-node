@@ -30,7 +30,7 @@ export function SegmentedControl<Value extends string | number>({
         <SegmentedControlItem
           key={option.value}
           id={option.value}
-          className="min-h-11 min-w-11 font-mono text-xs sm:pointer-fine:min-h-0 sm:pointer-fine:min-w-0"
+          className="min-h-8 min-w-8 font-mono text-xs sm:pointer-fine:min-h-0 sm:pointer-fine:min-w-0"
         >
           {option.label}
         </SegmentedControlItem>

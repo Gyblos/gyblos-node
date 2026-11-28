@@ -80,11 +80,28 @@ void test('the registry theme has the CSS tokens colors, light and dark, and the
         `${scheme} ${name}`,
       );
   }
-  // Every color token the CSS maps for Tailwind is published, with the same mapping, and no other.
   const colors = Object.fromEntries(
     Object.entries(theme).filter(([name]) => name.startsWith('color-')),
   );
-  assert.deepEqual(vars.theme, colors);
+  const fonts = Object.fromEntries(
+    Object.entries(theme).filter(([name]) => name.startsWith('font-')),
+  );
+  assert.deepEqual(
+    Object.fromEntries(
+      Object.entries(vars.theme).filter(([name]) => name.startsWith('color-')),
+    ),
+    colors,
+  );
+  assert.deepEqual(
+    Object.fromEntries(
+      Object.entries(vars.theme).filter(([name]) => name.startsWith('font-')),
+    ),
+    fonts,
+  );
+  assert.deepEqual(
+    Object.keys(vars.theme).sort(),
+    [...Object.keys(colors), ...Object.keys(fonts)].sort(),
+  );
 });
 
 void test('llms.txt states the range presets, the buyer threshold, the longest range and the sources', () => {
