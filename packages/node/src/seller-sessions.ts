@@ -124,6 +124,11 @@ async function refuseBusyOrRebind(
   replacing: boolean,
   opening: boolean,
 ) {
+  if (
+    replacing &&
+    state.current?.session.snapshot().state === SESSION_STATES.OPEN
+  )
+    await state.current.session.observeSettlement?.();
   const snapshot = state.current?.session.snapshot();
   const preparing =
     snapshot?.state === SESSION_STATES.OPENING && snapshot.channelId === '';
@@ -172,11 +177,6 @@ async function operation(
     const live = batchLiveOffer(offer, options.offers(), options.now());
     if (blockMode && !live.meter.stablePrefix)
       return batchFail(SESSION_CODES.UNAVAILABLE);
-    if (
-      replacing &&
-      state.current?.session.snapshot().state === SESSION_STATES.OPEN
-    )
-      await state.current.session.observeSettlement?.();
     await refuseBusyOrRebind(
       state,
       replacing,
