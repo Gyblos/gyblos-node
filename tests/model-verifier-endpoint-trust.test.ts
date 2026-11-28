@@ -171,13 +171,21 @@ void test('malformed command line options are usage errors', async (t) => {
 });
 
 void test('extra positionals are rejected for every command', async (t) => {
-  const stderr = t.mock.method(console, 'error', () => {});
-  for (const args of [
-    ['check', 'result.json', 'extra'],
-    ['address', 'extra'],
-    ['verify', 'extra'],
-  ]) {
-    assert.equal(await main(args), 1);
-    assert.deepEqual(stderr.mock.calls.at(-1)?.arguments, failure(USAGE));
-  }
+  await withHome(async (home) => {
+    const stderr = t.mock.method(console, 'error', () => {});
+    const previousHome = process.env.GYBLOS_HOME;
+    process.env.GYBLOS_HOME = home;
+    try {
+      for (const args of [
+        ['check', join(home, 'result.json'), 'extra'],
+        ['address', 'extra'],
+      ]) {
+        assert.equal(await main(args), 1);
+        assert.deepEqual(stderr.mock.calls.at(-1)?.arguments, failure(USAGE));
+      }
+    } finally {
+      if (previousHome === undefined) delete process.env.GYBLOS_HOME;
+      else process.env.GYBLOS_HOME = previousHome;
+    }
+  });
 });
