@@ -169,3 +169,15 @@ void test('malformed command line options are usage errors', async (t) => {
       );
   });
 });
+
+void test('extra positionals are rejected for every command', async (t) => {
+  const stderr = t.mock.method(console, 'error', () => {});
+  for (const args of [
+    ['check', 'result.json', 'extra'],
+    ['address', 'extra'],
+    ['verify', 'extra'],
+  ]) {
+    assert.equal(await main(args), 1);
+    assert.deepEqual(stderr.mock.calls.at(-1)?.arguments, failure(USAGE));
+  }
+});
