@@ -2,7 +2,6 @@
 import {
   DeclinedChannelRequest,
   UnsentChannelPeerError,
-  UnsentInferenceError,
 } from '@gyblos/node/batch-buyer';
 import type {
   BuyerApiKeyOperation,
@@ -86,7 +85,6 @@ export async function executeApiKeySession<T>(
         error instanceof UnsentSellerBusyError ||
         error instanceof UnsentChannelRequestError ||
         error instanceof UnsentChannelLimitError ||
-        error instanceof UnsentInferenceError ||
         error instanceof UnsentChannelPeerError) &&
       error.nodeId === nodeId &&
       operation?.reserved()

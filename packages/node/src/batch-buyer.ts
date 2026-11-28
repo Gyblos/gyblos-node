@@ -40,10 +40,7 @@ import { bounded } from './buyer-operation';
 import { BUYER_CHANNEL_DIAGNOSTICS } from './constants';
 
 export { DeclinedChannelRequest } from './buyer-declined-request';
-export {
-  UnsentInferenceError,
-  UnsentOpeningError,
-} from './buyer-opening-retry';
+export { UnsentOpeningError } from './buyer-opening-retry';
 export { UnsentChannelPeerError } from './buyer-channel-prepare';
 export type { BuyerBatchSessionOptions } from './batch-buyer-types';
 type ChannelTransport<Remote extends BatchDestination> = Pick<

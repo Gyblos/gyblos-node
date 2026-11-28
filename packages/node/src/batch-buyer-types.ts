@@ -23,6 +23,7 @@ export interface BuyerBatchSessionOptions<Remote extends BatchDestination> {
   diagnostics?: DiagnosticSink;
   credentialId?(requestId: string): string | undefined;
   financialPermission?<T>(run: () => Promise<T>): Promise<T>;
+  unsentRelease?(requestId: string): (() => Promise<void>) | undefined;
   onDeclined?(): Promise<void>;
   beforeInference?(
     requestId: string,

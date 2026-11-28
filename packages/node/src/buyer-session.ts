@@ -70,6 +70,7 @@ export interface BuyerSessionOptions<Remote extends BatchDestination> {
   ) => Promise<(() => Promise<void>) | undefined>;
   diagnostics?: BuyerBatchSessionOptions<Remote>['diagnostics'];
   credentialId?: BuyerBatchSessionOptions<Remote>['credentialId'];
+  unsentRelease?: BuyerBatchSessionOptions<Remote>['unsentRelease'];
   onDeclined?: BuyerBatchSessionOptions<Remote>['onDeclined'];
   beforeInference?: BuyerBatchSessionOptions<Remote>['beforeInference'];
   checkReusableChannel?: BuyerSessionOptions<Remote>['verify'];

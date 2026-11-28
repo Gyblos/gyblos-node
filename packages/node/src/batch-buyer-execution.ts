@@ -4,7 +4,6 @@ import { recountSessionInput } from '@gyblos/core/session-input';
 import { verifyInferenceUsage } from '@gyblos/inference/conversation';
 import {
   BATCH_METHODS,
-  batchError,
   batchExecutionDigest,
   batchFail,
   batchSessionRequest,
@@ -44,10 +43,7 @@ import {
   remotePreparationBusy,
 } from './buyer-channel-prepare';
 import { verifyDecline } from './buyer-declined-request';
-import {
-  recoverBuyerOpening,
-  UnsentInferenceError,
-} from './buyer-opening-retry';
+import { recoverBuyerOpening, UnsentOpeningError } from './buyer-opening-retry';
 import { bounded } from './buyer-operation';
 import { declaredCharge, verifyDeclaredUsage } from './declared-usage';
 
@@ -137,6 +133,26 @@ async function verifyPreparation<Remote extends BatchDestination>(
   if (!('terms' in prepared)) return batchFail(SESSION_CODES.BINDING);
   matchBatchTerms(prepared.terms, terms);
 }
+async function verifyBuyerQuote<Remote extends BatchDestination>(
+  context: BuyerBatchContext<Remote>,
+  quote: SignedOfferV2,
+  signal: AbortSignal,
+) {
+  const { options, terms } = context;
+  signal.throwIfAborted();
+  if (await bounded(options.unresolved(), signal))
+    return batchFail(SESSION_CODES.UNVERIFIED);
+  await bounded(options.verify(quote, signal), signal);
+  await verifyBatchQuote(
+    quote,
+    terms,
+    options.endpoint.id().toString(),
+    options.now(),
+  );
+  verifyOpeningTime(quote, terms.expiresAt, options.now());
+  signal.throwIfAborted();
+}
+
 export async function runBuyerBatch<Remote extends BatchDestination>(
   channel: BuyerBatchContext<Remote>,
   value: SignedOfferV2,
@@ -156,28 +172,16 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
   if (blockMode && typeof options.meter.stablePrefix !== 'function')
     return batchFail(PAID_EXECUTION_CODES.UNSUPPORTED);
   const { input } = recountSessionInput(quote, data, context.options.meter);
-  const verify = async (current: AbortSignal) => {
-    current.throwIfAborted();
-    if (await bounded(options.unresolved(), current))
-      return batchFail(SESSION_CODES.UNVERIFIED);
-    await bounded(options.verify(quote, current), current);
-    await verifyBatchQuote(
-      quote,
-      terms,
-      options.endpoint.id().toString(),
-      options.now(),
-    );
-    verifyOpeningTime(quote, terms.expiresAt, options.now());
-    current.throwIfAborted();
-  };
+  const verify = (current: AbortSignal) =>
+    verifyBuyerQuote(context, quote, current);
   await verify(signal);
   if (!options.preparation?.consume(quote, terms, blockMode)) {
     await verifyPreparation(context, quote, signal);
   }
   await verify(signal);
+  const release = options.unsentRelease?.(quote.offer.requestId);
   const { request, started } = await recoverBuyerOpening(
     options.buyer,
-    quote.offer.nodeId,
     async () => {
       signal.throwIfAborted();
       const payload = await options.buyer.open(() => {
@@ -196,9 +200,14 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
     verify,
     signal,
     options.financialPermission,
-  );
-  await verify(signal).catch((error: unknown) => {
-    throw new UnsentInferenceError(batchError(error).code, quote.offer.nodeId);
+  ).catch(async (error: unknown) => {
+    if (error instanceof UnsentOpeningError || signal.aborted)
+      await release?.().catch(() => undefined);
+    throw error;
+  });
+  await verify(signal).catch(async (error: unknown) => {
+    await release?.().catch(() => undefined);
+    throw error;
   });
   await options.beforeInference?.(
     request.requestId,

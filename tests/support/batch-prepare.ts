@@ -13,6 +13,7 @@ export async function batchPrepareFixture(
     signal: AbortSignal,
   ) => Promise<'present' | 'absent' | 'unknown'>,
   financialPermission?: <T>(run: () => Promise<T>) => Promise<T>,
+  unsentRelease?: (requestId: string) => (() => Promise<void>) | undefined,
 ) {
   const rig = await sessionRig();
   const offers = await batchOfferFixture(rig.terms, rig.owner, rig.now);
@@ -42,6 +43,7 @@ export async function batchPrepareFixture(
   const buyer = createBuyerBatchSession({
     ...wire,
     financialPermission,
+    unsentRelease,
     terms: rig.terms,
     buyer: {
       ...rig.buyer,
