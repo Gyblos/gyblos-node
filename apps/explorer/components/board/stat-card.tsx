@@ -125,17 +125,24 @@ function PlainCard({
   changed,
 }: CardProps & { changed: (Delta | null)[] | null }) {
   const frame =
-    'row-span-3 grid min-w-0 grid-rows-subgrid gap-y-0 rounded-xl bg-background-secondary-default p-3';
+    '@container row-span-3 grid min-w-0 grid-rows-subgrid gap-y-0 rounded-xl bg-background-secondary-default p-3';
   const content = (
     <>
       <span className="flex items-center gap-2">
-        <span className="flex items-center rounded-md bg-stat-card-icon-background p-1.5">
+        <span className="flex items-center rounded-md bg-stat-card-icon-background p-1.5 @max-[8rem]:hidden">
           <Icon
             aria-hidden
             className="size-4 shrink-0 text-foreground-icon-primary"
           />
         </span>
-        <span className={cx('min-w-0 flex-1', LABEL)}>{label}</span>
+        <span
+          className={cx(
+            'min-w-0 flex-1 @max-[8rem]:text-caption-1-medium',
+            LABEL,
+          )}
+        >
+          {label}
+        </span>
         {hint && !selection ? <StatHint label={label} hint={hint} /> : null}
       </span>
       <span

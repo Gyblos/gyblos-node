@@ -154,6 +154,15 @@ preserve the public data contract.
 
 ## Responsive and review requirements
 
+Mobile keeps the desktop's compact density: grids stay multi-column instead of
+collapsing to loose full-width stacks, and card internals adapt to narrow
+containers rather than overflowing or wasting the row. The activity metric
+selector keeps three columns at every viewport width. Plain stat cards are
+container-query contexts: below an 8rem card width the icon tile drops and the
+label steps down to caption size, so the value and baseline evidence keep the
+limited width. Adaptation keys off the card's own width, never the viewport, so
+the same card reads correctly in any grid.
+
 The Explorer must fit without global horizontal scrolling at mobile widths;
 wide tables scroll inside their own containers and preserve their pinned
 identity columns. Touch targets, keyboard inspection of charts, Escape behavior
