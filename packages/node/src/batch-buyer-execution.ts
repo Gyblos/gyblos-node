@@ -4,6 +4,7 @@ import { recountSessionInput } from '@gyblos/core/session-input';
 import { verifyInferenceUsage } from '@gyblos/inference/conversation';
 import {
   BATCH_METHODS,
+  batchError,
   batchExecutionDigest,
   batchFail,
   batchSessionRequest,
@@ -43,7 +44,10 @@ import {
   remotePreparationBusy,
 } from './buyer-channel-prepare';
 import { verifyDecline } from './buyer-declined-request';
-import { recoverBuyerOpening } from './buyer-opening-retry';
+import {
+  recoverBuyerOpening,
+  UnsentInferenceError,
+} from './buyer-opening-retry';
 import { bounded } from './buyer-operation';
 import { declaredCharge, verifyDeclaredUsage } from './declared-usage';
 
@@ -173,6 +177,7 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
   await verify(signal);
   const { request, started } = await recoverBuyerOpening(
     options.buyer,
+    quote.offer.nodeId,
     async () => {
       signal.throwIfAborted();
       const payload = await options.buyer.open(() => {
@@ -192,7 +197,9 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
     signal,
     options.financialPermission,
   );
-  await verify(signal);
+  await verify(signal).catch((error: unknown) => {
+    throw new UnsentInferenceError(batchError(error).code, quote.offer.nodeId);
+  });
   await options.beforeInference?.(
     request.requestId,
     {

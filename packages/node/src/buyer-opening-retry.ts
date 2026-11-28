@@ -11,18 +11,28 @@ import {
 
 import { bounded } from './buyer-operation';
 
-export class UnsentOpeningError extends BatchChannelError {
+export class UnsentInferenceError extends BatchChannelError {
+  constructor(
+    code: BatchChannelError['code'],
+    readonly nodeId?: string,
+  ) {
+    super(code);
+  }
+}
+export class UnsentOpeningError extends UnsentInferenceError {
   constructor(
     code:
       | typeof SESSION_CODES.OPENING_ABSENT
       | typeof SESSION_CODES.OPENING_PENDING
       | typeof SESSION_CODES.OPENING_RETURNED,
+    nodeId?: string,
   ) {
-    super(code);
+    super(code, nodeId);
   }
 }
 export async function recoverBuyerOpening<T>(
   buyer: SessionBuyer,
+  nodeId: string,
   prepare: () => Promise<() => Promise<T>>,
   verify: (signal: AbortSignal) => Promise<void>,
   signal: AbortSignal,
@@ -55,12 +65,12 @@ export async function recoverBuyerOpening<T>(
         ).catch(() => OPENING_STATUS.UNKNOWN);
         if (status === OPENING_STATUS.PRESENT) return first.value;
         if (status === OPENING_STATUS.ABSENT)
-          throw new UnsentOpeningError(SESSION_CODES.OPENING_ABSENT);
+          throw new UnsentOpeningError(SESSION_CODES.OPENING_ABSENT, nodeId);
         await delay(BATCH_SESSION_DEFAULTS.openingConfirmPollMs, undefined, {
           signal: confirmation,
         }).catch(() => undefined);
       }
-      throw new UnsentOpeningError(SESSION_CODES.OPENING_PENDING);
+      throw new UnsentOpeningError(SESSION_CODES.OPENING_PENDING, nodeId);
     }
     return first.value;
   }
