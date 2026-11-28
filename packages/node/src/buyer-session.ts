@@ -1,6 +1,5 @@
 // One explicitly authorized reusable session for shared buyer hosts; no selection or prompt retry.
 import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
-import { recountSessionInput } from '@gyblos/core/session-input';
 import type { BatchStoredSession } from '@gyblos/payments-upto/batch-session';
 import { verifyBatchQuote } from '@gyblos/protocol/batch-channel';
 import { BuyerApiKeyError } from '@gyblos/protocol/buyer-api-keys';
@@ -21,14 +20,12 @@ import type {
   BatchEndpoint,
 } from '@gyblos/transport-iroh/batch-client';
 
-import { buyerQuestionDigest } from './batch-block-buyer';
 import { createBuyerBatchSession } from './batch-buyer';
 import type { BuyerBatchSessionOptions } from './batch-buyer-types';
 import {
   channelTurnAuthority,
   prepareNewChannel,
   UnsentChannelRequestError,
-  UnsentSellerChoiceError,
   type PreparedChannel,
   type StartChannelWork,
 } from './buyer-channel-prepare';
@@ -41,7 +38,7 @@ import {
 } from './buyer-opening-state';
 import { bounded } from './buyer-operation';
 import { UnsentSellerBusyError } from './buyer-routing';
-import { prepareRenewal } from './buyer-session-renewal';
+import { prepareRenewal, verifyQuestion } from './buyer-session-renewal';
 import { sessionApproval } from './session-accounting';
 import type { BuyerSessionBackend } from './session-backend';
 import {
@@ -221,23 +218,7 @@ async function run<Remote extends BatchDestination>(
   onDelta?: (text: string) => Promise<void>,
 ) {
   const { options } = state;
-  recountSessionInput(quote, input, options.meter);
-  await bounded(options.verify(quote, signal), signal);
-  if (await bounded(options.unresolved(), signal))
-    return sessionFail(SESSION_CODES.UNVERIFIED);
-  const stored = await bounded(options.inspect(), signal);
-  if (
-    stored?.interruptedQuestions?.includes(
-      buyerQuestionDigest(
-        input.messages,
-        options.credentialId?.(quote.offer.requestId),
-      ),
-    )
-  )
-    throw new UnsentSellerChoiceError(
-      SESSION_CODES.STATUS_UNKNOWN,
-      quote.offer.nodeId,
-    );
+  await verifyQuestion(state, quote, input, signal);
   const opened = await current(state, quote, signal, start);
   checkChannelAuthority(
     options.policy,

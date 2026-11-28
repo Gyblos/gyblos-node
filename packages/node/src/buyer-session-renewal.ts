@@ -1,9 +1,11 @@
 // Prepares replacement terms and finishes the previous channel before replacement authority begins.
+import { recountSessionInput } from '@gyblos/core/session-input';
 import {
   matchBatchTerms,
   verifyBatchQuote,
 } from '@gyblos/protocol/batch-channel';
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
+import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
 import {
   SESSION_CODES,
   SESSION_STATES,
@@ -14,6 +16,7 @@ import {
 } from '@gyblos/protocol/payment-session';
 import type { BatchDestination } from '@gyblos/transport-iroh/batch-client';
 
+import { buyerQuestionDigest } from './batch-block-buyer';
 import {
   UnsentChannelRequestError,
   UnsentSellerChoiceError,
@@ -25,6 +28,31 @@ import { UnsentSellerBusyError } from './buyer-routing';
 import type { Current, State } from './buyer-session';
 import { newSessionTerms, replacementTerms } from './session-policy';
 
+export async function verifyQuestion<Remote extends BatchDestination>(
+  state: State<Remote>,
+  quote: SignedOfferV2,
+  input: FreeExecutionBuildInput,
+  signal: AbortSignal,
+) {
+  const { options } = state;
+  recountSessionInput(quote, input, options.meter);
+  await bounded(options.verify(quote, signal), signal);
+  if (await bounded(options.unresolved(), signal))
+    return sessionFail(SESSION_CODES.UNVERIFIED);
+  const stored = await bounded(options.inspect(), signal);
+  if (
+    stored?.interruptedQuestions?.includes(
+      buyerQuestionDigest(
+        input.messages,
+        options.credentialId?.(quote.offer.requestId),
+      ),
+    )
+  )
+    throw new UnsentSellerChoiceError(
+      SESSION_CODES.STATUS_UNKNOWN,
+      quote.offer.nodeId,
+    );
+}
 export async function prepareRenewal<Remote extends BatchDestination>(
   state: State<Remote>,
   opened: Current<Remote>,
