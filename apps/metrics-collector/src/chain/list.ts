@@ -14,6 +14,7 @@ import { readTransaction, type ChainRun } from './run';
 import {
   cursorUpdate,
   listsGyblosMemo,
+  ownedBatch,
   programCounts,
   transactionWrites,
   type ChainCursorState,
@@ -28,6 +29,7 @@ async function storeListPage(
   lastPage: boolean,
   after: (stored: ChainSignature[], complete: boolean) => ChainCursorState,
 ) {
+  if (run.leaseLost) return 0;
   const read: ChainTransaction[] = [];
   let covered = 0;
   let failure: unknown;
@@ -45,11 +47,19 @@ async function storeListPage(
   const stored = page.slice(0, covered);
   if (stored.length) {
     const cursor = after(stored, lastPage && stored.length === page.length);
-    await run.orm.batch([
-      cursorUpdate(run.orm, CHAIN_CURSOR_ID, cursor, run.now, run.lease),
-      ...programCounts(run.orm, stored, run.now, run.lease),
-      ...transactionWrites(run.orm, read, run.now, run.lease),
-    ]);
+    const owned = await ownedBatch(
+      run.orm,
+      [
+        cursorUpdate(run.orm, cursor, run.now, run.lease),
+        ...programCounts(run.orm, stored, run.now, run.lease),
+        ...transactionWrites(run.orm, read, run.now, run.lease),
+      ],
+      run.lease,
+    );
+    if (!owned) {
+      run.leaseLost = true;
+      return 0;
+    }
     run.cursor = cursor;
     run.listed += stored.length;
   }
@@ -73,16 +83,24 @@ function refuseOlder(page: ChainSignature[], untilSlot: number | null) {
     throw new ChainRpcError('page older than its range');
 }
 async function saveCursor(run: ChainRun, cursor: ChainCursorState) {
+  if (run.leaseLost) return;
+  const owned = await ownedBatch(
+    run.orm,
+    [cursorUpdate(run.orm, cursor, run.now, run.lease)],
+    run.lease,
+  );
+  if (!owned) {
+    run.leaseLost = true;
+    return;
+  }
   run.cursor = cursor;
-  await run.orm.batch([
-    cursorUpdate(run.orm, CHAIN_CURSOR_ID, cursor, run.now, run.lease),
-  ]);
 }
 
 // (1) New signatures strictly between gapUntil and gapBefore, several pages per run.
 export async function fillGap(run: ChainRun) {
   let total = 0;
   for (let pages = 0; pages < CHAIN_INDEX.maxListPagesPerRun; pages += 1) {
+    if (run.leaseLost) break;
     const { gapUntil, gapBefore, gapUntilSlot } = run.cursor;
     if (!gapUntil || !gapBefore || run.rpc.remaining() <= 0) break;
     const page = await listPage(run, { until: gapUntil, before: gapBefore });
@@ -166,6 +184,7 @@ export async function readForward(run: ChainRun) {
 export async function readBackfill(run: ChainRun) {
   let total = 0;
   for (let pages = 0; pages < CHAIN_INDEX.maxListPagesPerRun; pages += 1) {
+    if (run.leaseLost) break;
     if (run.cursor.backfillDone || run.rpc.remaining() <= 0) break;
     const stored = await backfillPage(run);
     total += stored;

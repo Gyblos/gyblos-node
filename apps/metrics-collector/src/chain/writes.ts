@@ -2,7 +2,7 @@
 // chunked by the table's column count, so no statement passes D1's bound-parameter limit whatever the
 // rows hold. Amounts are exact decimal text. Channel rows merge: parties only from an open, a Gyblos
 // claim once made stays, the last signature only moves forward.
-import { getTableColumns, sql } from 'drizzle-orm';
+import { eq, getTableColumns, sql } from 'drizzle-orm';
 import type { SQLiteColumn, SQLiteTable } from 'drizzle-orm/sqlite-core';
 
 import { DEVNET_GYBLOS_TREASURY } from '@gyblos/config/network';
@@ -64,17 +64,26 @@ function chunksFor<T>(
 
 const owned = (lease: number | null) =>
   sql`exists (select 1 from ${chainCursor} where ${chainCursor.id} = ${CHAIN_CURSOR_ID} and ${chainCursor.leaseUntil} = ${lease})`;
-const tuples = (rows: readonly Record<string, unknown>[]) =>
-  sql.join(
-    rows.map(
-      (row) =>
-        sql`(${sql.join(
-          Object.values(row).map((value) => sql`${value}`),
-          sql`, `,
-        )})`,
-    ),
+const tuples = (
+  table: SQLiteTable,
+  rows: readonly Record<string, unknown>[],
+) => {
+  const keys = Object.keys(getTableColumns(table));
+  return sql.join(
+    rows.map((row) => {
+      if (
+        Object.keys(row).length !== keys.length ||
+        keys.some((key) => !(key in row))
+      )
+        throw new TypeError('write row does not match its table');
+      return sql`(${sql.join(
+        keys.map((key) => sql`${row[key]}`),
+        sql`, `,
+      )})`;
+    }),
     sql`, `,
   );
+};
 const ownedInsert = <T extends SQLiteTable>(
   orm: CollectorDatabase,
   table: T,
@@ -83,10 +92,30 @@ const ownedInsert = <T extends SQLiteTable>(
 ) =>
   orm
     .insert(table)
-    .select(sql`select * from (values ${tuples(chunk)}) where ${owned(lease)}`);
+    .select(
+      sql`select * from (values ${tuples(table, chunk)}) where ${owned(lease)}`,
+    );
+
+const leaseRead = (orm: CollectorDatabase) =>
+  orm
+    .select({ leaseUntil: chainCursor.leaseUntil })
+    .from(chainCursor)
+    .where(eq(chainCursor.id, CHAIN_CURSOR_ID));
+
+export async function ownedBatch(
+  orm: CollectorDatabase,
+  items: BatchItem[],
+  lease: number | null,
+): Promise<boolean> {
+  const results = await orm.batch([leaseRead(orm), ...items]);
+  const [first] = results as unknown as readonly [
+    readonly { leaseUntil: number | null }[],
+    ...unknown[],
+  ];
+  return first[0]?.leaseUntil === lease;
+}
 export function cursorUpdate(
   orm: CollectorDatabase,
-  id: number,
   cursor: ChainCursorState,
   now: number,
   lease: number | null,
@@ -106,7 +135,7 @@ export function cursorUpdate(
       updatedAt: now,
     })
     .where(
-      sql`${chainCursor.id} = ${id} and ${chainCursor.leaseUntil} = ${lease}`,
+      sql`${chainCursor.id} = ${CHAIN_CURSOR_ID} and ${chainCursor.leaseUntil} = ${lease}`,
     );
 }
 

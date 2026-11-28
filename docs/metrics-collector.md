@@ -796,15 +796,17 @@ lease (`lease_until`, 15 minutes) makes a run that overlaps another skip
 (`skipped=true` in its log line). The lease is taken before the cursor is read,
 and every write of the run carries its lease token: the cursor, the program
 counts, the follow positions, the transaction rows and the account states all
-apply only while the run still owns the lease. A run that loses the lease to
-another holder writes nothing at all: it cannot move the cursor over the newer
-holder's state, count a stretch the cursor will never cover, mark a dirty day,
-nor commit rows whose stale indexing time the aggregation scan would never pick
-up. A failed list phase does not stop the follow and account phases; the first
-failure is logged after them. After a full page, a gap answered empty is closed
-only when the signature right before `gap_before` is `gap_until` (one more
-call); otherwise it is a lagging RPC, retried next run. A transaction the RPC
-lists but cannot return (`null`), an empty page for a range known to hold
+apply only while the run still owns the lease. Every write batch reads the lease
+back inside its own transaction; when it no longer matches, the run drops its
+remaining work right there: it writes nothing at all, does not advance the
+cursor or counts it reports for what never landed, and cannot move the cursor
+over a newer holder's state, count a stretch the cursor will never cover, mark a
+dirty day, or commit rows whose stale indexing time the aggregation scan would
+never pick up. A failed list phase does not stop the follow and account phases;
+the first failure is logged after them. After a full page, a gap answered empty
+is closed only when the signature right before `gap_before` is `gap_until` (one
+more call); otherwise it is a lagging RPC, retried next run. A transaction the
+RPC lists but cannot return (`null`), an empty page for a range known to hold
 signatures, a spent call budget or any RPC error stops the run there. A failure
 logs `COLLECTOR_CHAIN_INDEX_FAILED` with the phase (`gap`, `forward`,
 `backfill`, `follow`, `accounts`, `release` or `start`), the error class, a

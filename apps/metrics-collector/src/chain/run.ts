@@ -10,6 +10,7 @@ export interface ChainRun {
   rpc: ChainEndpoints;
   now: number;
   lease: number | null;
+  leaseLost: boolean;
   cursor: ChainCursorState;
   // Channels a read transaction named: their accounts are read at the end.
   touched: Set<string>;

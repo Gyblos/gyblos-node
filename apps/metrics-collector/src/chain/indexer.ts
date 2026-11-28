@@ -153,6 +153,7 @@ export async function runChainIndex(
     rpc,
     now,
     lease: leaseUntil,
+    leaseLost: false,
     cursor: leaseUntil === null ? await readCursor(orm) : blank,
     touched: new Set(),
     listed: 0,
