@@ -4,6 +4,8 @@ import { HTTP_STATUS } from '@gyblos/config';
 import { BUYER_API, type BuyerApiPolicy } from '@gyblos/protocol/buyer-api';
 
 import type { buyerApiKeyExecutors } from './api-key-execution';
+import { FREE_BUYER_CODES } from './constants';
+import { FreeBuyerError } from './free-chat-error';
 import type { ChatExecutors } from './free-http';
 import type { executionSlots } from './session-serial';
 
@@ -13,7 +15,12 @@ export function queuedRequest(request: IncomingMessage, pending: Pending) {
   if (typeof id !== 'string' || !BUYER_API.POLICY_PATTERN.test(id)) return;
   return {
     id,
-    register: (cancel: () => boolean) => pending.set(id, cancel),
+    register: (entered: () => boolean, controller: AbortController) =>
+      pending.set(id, () => {
+        if (entered() || controller.signal.aborted) return false;
+        controller.abort(new FreeBuyerError(FREE_BUYER_CODES.CANCELLED));
+        return true;
+      }),
     close: () => pending.delete(id),
   };
 }
