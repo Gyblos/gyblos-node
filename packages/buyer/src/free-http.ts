@@ -357,26 +357,40 @@ export async function startFreeBuyerHttp(
     diagnostics?: DiagnosticSink;
   } & BuyerDesktopOptions = {},
 ) {
+  let inflight = 0;
+  let paused = false;
+  const handle = freeBuyerHandler(
+    execute,
+    settings,
+    options.requestMs,
+    options.stream,
+    options.classify,
+    options.token === undefined ? undefined : bearerAuthorizer(options.token),
+    desktopApiPolicy(options, settings),
+    options.apiKeys,
+    options.diagnostics,
+    options.preparePaidChat,
+    options.reconcilePool,
+    options.inspectChannel,
+  );
   const server = createServer(
     {
       maxHeaderSize: FREE_BUYER.headers,
       headersTimeout: FREE_BUYER.headerMs,
       requestTimeout: FREE_BUYER.requestMs,
     },
-    freeBuyerHandler(
-      execute,
-      settings,
-      options.requestMs,
-      options.stream,
-      options.classify,
-      options.token === undefined ? undefined : bearerAuthorizer(options.token),
-      desktopApiPolicy(options, settings),
-      options.apiKeys,
-      options.diagnostics,
-      options.preparePaidChat,
-      options.reconcilePool,
-      options.inspectChannel,
-    ),
+    async (request, response) => {
+      if (paused) {
+        response.writeHead(HTTP_STATUS.serviceUnavailable).end();
+        return;
+      }
+      inflight++;
+      try {
+        await handle(request, response);
+      } finally {
+        inflight--;
+      }
+    },
   );
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
@@ -390,6 +404,11 @@ export async function startFreeBuyerHttp(
     throw new FreeBuyerError(FREE_BUYER_CODES.INTERNAL);
   return {
     url: `http://${LOCALHOST}:${address.port}${ROUTES.inference}`,
+    pauseWhenIdle() {
+      if (inflight) return false;
+      paused = true;
+      return true;
+    },
     async close() {
       server.closeAllConnections();
       await new Promise<void>((resolve) => server.close(() => resolve()));

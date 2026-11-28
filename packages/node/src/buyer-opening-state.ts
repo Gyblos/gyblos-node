@@ -1,22 +1,51 @@
 // Resolves the previous OPEN before considering renewal or closing an expired channel.
+import type { BatchStoredSession } from '@gyblos/payments-upto/batch-session';
+import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
 import {
   OPENING_STATUS,
   SESSION_CODES,
+  sessionFail,
 } from '@gyblos/protocol/payment-session';
 import type { BatchDestination } from '@gyblos/transport-iroh/batch-client';
 
+import { UnsentSellerChoiceError } from './buyer-channel-prepare';
 import { UnsentOpeningError } from './buyer-opening-retry';
 import { bounded } from './buyer-operation';
 import type { Current, State } from './buyer-session';
+
+export function checkFundedChannel(
+  id: string | undefined,
+  stored: BatchStoredSession | undefined,
+  quote: SignedOfferV2 | undefined,
+) {
+  if (
+    !id ||
+    (stored?.snapshot.channelId === id &&
+      !stored.notCreated &&
+      !stored.openingReturned)
+  )
+    return;
+  if (quote)
+    throw new UnsentSellerChoiceError(
+      SESSION_CODES.REPLACEMENT_REQUIRED,
+      quote.offer.nodeId,
+    );
+  return sessionFail(SESSION_CODES.REPLACEMENT_REQUIRED);
+}
+export async function disconnectChannel<Remote extends BatchDestination>(
+  opened: Current<Remote>,
+) {
+  await opened.host.disconnect();
+  await opened.host.settled();
+  await opened.financial.dispose();
+}
 
 export async function disposeAbsent<Remote extends BatchDestination>(
   state: State<Remote>,
   opened: Current<Remote>,
 ) {
   try {
-    await opened.host.disconnect();
-    await opened.host.settled();
-    await opened.financial.dispose();
+    await disconnectChannel(opened);
     state.current = undefined;
   } catch {
     // Keep the owner on cleanup failure; the durable absence proof remains authoritative.

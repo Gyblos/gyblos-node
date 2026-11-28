@@ -145,3 +145,10 @@ void test('every root buyer script runs the one buyer executable with its own su
     'buyer:withdraw:paid': script(BUYER_COMMANDS.WITHDRAW),
   });
 });
+
+void test('buyer help documents the owner-only renewal budget and its off switch', async () => {
+  const out = capture();
+  const err = capture();
+  await run(['--help'], BUYER_ROUTES, { out: out.stream, err: err.stream });
+  assert.match(out.lines.join(''), /budget <total USDC> \| off/);
+});

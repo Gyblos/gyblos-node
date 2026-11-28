@@ -6,6 +6,7 @@ import { assertImportsInert } from '../support/inertness';
 
 void test('lab executable modules are inert when imported', async () => {
   await assertImportsInert(async () => {
+    await import('./opencode-renewal');
     for (const file of [
       '@gyblos/lab-harness/cli/node-discovery-acceptance',
       '@gyblos/lab-harness/cli/free-acceptance',

@@ -20,12 +20,13 @@ import { reserved } from './batch-session-common';
 import { withBatchState } from './batch-session-io';
 import { emptyPreparation } from './batch-session-opening-release';
 import type { BatchPaths, BatchRecord } from './batch-session-types';
-import { BATCH_BUYER_CHECKPOINTS } from './constants';
+import { BATCH_BUYER_CHECKPOINTS, BATCH_RENEWAL_STATE } from './constants';
 
 export interface BatchStoredSession {
   terms: PaymentSessionTerms;
   snapshot: SessionSnapshot;
   archivedProof?: true;
+  renewalLimitReached?: true;
   pending: boolean;
   recoverable: boolean;
   notCreated?: true;
@@ -37,7 +38,7 @@ export interface BatchStoredSession {
   empty?: true;
   priorSpentAtomic?: string;
 }
-async function readRecord(paths: BatchPaths): Promise<BatchRecord | undefined> {
+async function readRecord(paths: BatchPaths) {
   try {
     await lstat(paths.state);
   } catch (error) {
@@ -55,24 +56,36 @@ async function readRecord(paths: BatchPaths): Promise<BatchRecord | undefined> {
     const raw: unknown = JSON.parse(text);
     if (!raw || typeof raw !== 'object' || !('terms' in raw))
       return sessionFail();
-    return parseRecord(raw, termsFor(raw.terms));
+    return {
+      record: parseRecord(raw, termsFor(raw.terms)),
+      bytes: Buffer.byteLength(text),
+    };
   } catch {
     return sessionFail(SESSION_CODES.UNAVAILABLE);
   }
 }
-export async function readBatchRecord(paths: BatchPaths) {
+async function readState(paths: BatchPaths) {
   try {
     return await withBatchState(paths, () => readRecord(paths));
   } catch {
     return sessionFail(SESSION_CODES.UNAVAILABLE);
   }
 }
+export async function readBatchRecord(paths: BatchPaths) {
+  return (await readState(paths))?.record;
+}
 export async function inspectBatchSession(
   paths: BatchPaths,
 ): Promise<BatchStoredSession | undefined> {
-  const record = await readBatchRecord(paths);
-  if (!record) return undefined;
-  return storedBatchSession(record);
+  const read = await readState(paths);
+  if (!read) return undefined;
+  const stored = storedBatchSession(read.record);
+  if (
+    read.bytes + BATCH_RENEWAL_STATE.settlementAndPreparationBytes >
+    BATCH_SESSION_DEFAULTS.stateBytes
+  )
+    stored.renewalLimitReached = true;
+  return stored;
 }
 export function storedBatchSession(record: BatchRecord): BatchStoredSession {
   const pending = Object.values(record.requests).filter(
@@ -95,6 +108,9 @@ export function storedBatchSession(record: BatchRecord): BatchStoredSession {
     record.settlement.chargedAtomic === record.cumulativeAtomic &&
     !recoverable;
   return {
+    ...((record.history?.length ?? 0) >= BATCH_RENEWAL_STATE.maxHistory && {
+      renewalLimitReached: true as const,
+    }),
     ...(returnedOpening(record) && { openingReturned: true as const }),
     ...(record.pending[BATCH_BUYER_CHECKPOINTS.OPENING_SENT] && {
       openingPending: true as const,

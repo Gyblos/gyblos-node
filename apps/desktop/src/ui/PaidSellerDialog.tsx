@@ -145,7 +145,7 @@ export function PaidSellerDialog(
         deposit={funding?.poolLimited ? policy.depositAtomic : undefined}
       />
     );
-  if (remaining === '0')
+  if (remaining === '0' && !funding?.renewalDepositAtomic)
     return <UsedChannelNotice close={props.close} refresh={refresh} />;
   const hasEscrow =
     (remaining != null && BigInt(remaining) > 0n) || !!funding?.switchingAtomic;
@@ -159,6 +159,7 @@ export function PaidSellerDialog(
       />
     );
   const deposit =
+    funding?.renewalDepositAtomic ??
     funding?.replacementAtomic ??
     policy.depositAtomic ??
     BUYER_SESSION_DEFAULT_POLICY.depositAtomic;

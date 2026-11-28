@@ -12,6 +12,8 @@ interface Service {
     autoPrices?: TokenPricesV2 | null,
   ): Promise<{ url: string; token: string }>;
   stop(): Promise<void>;
+  stopWhenIdle?(): Promise<boolean>;
+  setRenewalBudget?(budget: string | null): Promise<void>;
   close(): Promise<void>;
 }
 async function reconcileFreePermission(
@@ -79,11 +81,14 @@ function assertConfigurableBudget(
       'Finish the current chat budget in Payments before changing the maximum.',
     );
 }
+interface ManagedPorts {
+  service: Service;
+  client: X402Client;
+  budget: X402Budget;
+  check: () => void;
+}
 async function connectManaged(
-  service: Service,
-  client: X402Client,
-  budget: X402Budget,
-  check: () => void,
+  { service, client, budget, check }: ManagedPorts,
   maxAtomic?: string,
   autoPrices?: TokenPricesV2 | null,
 ) {
@@ -122,6 +127,52 @@ async function connectManaged(
     throw error;
   }
 }
+export function canConfigureRenewal(client: X402Client) {
+  const policy = client.policy();
+  return (
+    client.managed() &&
+    !!policy?.depositAtomic &&
+    policy.totalDepositAtomic === undefined
+  );
+}
+async function changeRenewal(
+  { service, client, budget, check }: ManagedPorts,
+  owner: Awaited<ReturnType<Service['start']>> | undefined,
+  policyId: string,
+  amount: string | null,
+  reconnect: () => Promise<void>,
+) {
+  if (!owner || !service.stopWhenIdle || !service.setRenewalBudget)
+    throw new PaidSellerLimitError(
+      'Only an idle buyer managed by this app can change renewal settings.',
+    );
+  assertConfigurableBudget(await budget.summary());
+  check();
+  client.assertPolicyChange(owner, policyId);
+  if (!canConfigureRenewal(client))
+    throw new PaidSellerLimitError(
+      'Channel renewal requires a managed single-channel buyer.',
+    );
+  if (
+    amount !== null &&
+    BigInt(amount) < BigInt(client.policy()!.depositAtomic!)
+  )
+    throw new PaidSellerLimitError(
+      'The renewal budget must cover at least one channel deposit.',
+    );
+  if (!(await service.stopWhenIdle()))
+    throw new PaidSellerLimitError(
+      'Wait for the current buyer request to finish.',
+    );
+  check();
+  try {
+    await service.setRenewalBudget(amount);
+  } catch (error) {
+    await reconnect().catch(() => {});
+    throw error;
+  }
+  await reconnect();
+}
 export function automaticBuyer(
   service: Service,
   client: X402Client,
@@ -134,6 +185,26 @@ export function automaticBuyer(
   const check = () => {
     if (closed) throw new Error('Local buyer is stopping');
   };
+  const ports = { service, client, budget, check };
+  const reconnect = async (
+    maxAtomic?: string,
+    autoPrices?: TokenPricesV2 | null,
+  ) => {
+    check();
+    owned = await connectManaged(ports, maxAtomic, autoPrices);
+    ready = Promise.resolve();
+  };
+  const update = (operation: () => Promise<void>) => {
+    check();
+    if (change)
+      throw new PaidSellerLimitError(
+        'Wait for the buyer settings to finish updating.',
+      );
+    change = operation().finally(() => {
+      change = null;
+    });
+    return change;
+  };
   return {
     start(): Promise<void> {
       if (closed) return Promise.reject(new Error('Local buyer is stopping'));
@@ -142,28 +213,24 @@ export function automaticBuyer(
         ready = null;
         owned = undefined;
       }
-      ready ??= connectManaged(service, client, budget, check)
-        .then((connection) => {
-          owned = connection;
-        })
-        .catch((error: unknown) => {
-          ready = null;
-          throw error;
-        });
+      ready ??= reconnect().catch((error: unknown) => {
+        ready = null;
+        throw error;
+      });
       return ready;
     },
     changing: () => change !== null,
+    configureRenewal(amount: string | null, policyId: string) {
+      return update(() =>
+        changeRenewal(ports, owned, policyId, amount, reconnect),
+      );
+    },
     configure(
       maxAtomic: string,
       policyId?: string,
       autoPrices?: TokenPricesV2 | null,
     ) {
-      check();
-      if (change)
-        throw new PaidSellerLimitError(
-          'Wait for the buyer settings to finish updating.',
-        );
-      const update = async () => {
+      return update(async () => {
         await ready?.catch(() => {});
         check();
         assertConfigurableBudget(await budget.summary());
@@ -173,21 +240,8 @@ export function automaticBuyer(
         ready = null;
         owned = undefined;
         await service.stop();
-        check();
-        owned = await connectManaged(
-          service,
-          client,
-          budget,
-          check,
-          maxAtomic,
-          autoPrices,
-        );
-        ready = Promise.resolve();
-      };
-      change = update().finally(() => {
-        change = null;
+        await reconnect(maxAtomic, autoPrices);
       });
-      return change;
     },
     async close() {
       closed = true;

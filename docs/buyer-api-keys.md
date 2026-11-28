@@ -112,11 +112,13 @@ pnpm buyer:auto 0.052 0.208
 ```
 
 The buyer needs open discovery with no pinned or configured seller, a channel
-policy and a positive per-response limit. An owner request can switch sellers
-under this policy within the remaining deposit authority. A delegated key that
-needs a replacement receives a refusal so the owner can review it.
-`pnpm buyer:auto off` returns Auto to free offers only; restart the buyer
-afterwards.
+policy and a positive per-response limit. Under the default single-channel
+policy, an owner request can switch sellers under this policy within the
+remaining deposit authority. With single-channel renewal enabled by the owner, a
+delegated request can replace an exhausted healthy channel with the same seller,
+subject to the operator's total and per-deposit limits and the key's remaining
+allowance. Other replacements require owner review. `pnpm buyer:auto off`
+returns Auto to free offers only; restart the buyer afterwards.
 
 ## Errors a client sees
 

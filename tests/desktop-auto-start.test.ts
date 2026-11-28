@@ -317,3 +317,63 @@ void test('an externally connected buyer cannot rewrite the desktop profile', as
   assert.equal(r.starts(), 1);
   await r.buyer.close();
 });
+void test('changing renewal cannot strand an active chat budget by restarting the buyer', async () => {
+  const r = runtime('500');
+  let idleChecks = 0;
+  let budgetWrites = 0;
+  const buyer = automaticBuyer(
+    {
+      ...r.service,
+      stopWhenIdle: async () => {
+        idleChecks++;
+        return true;
+      },
+      setRenewalBudget: async () => {
+        budgetWrites++;
+      },
+    },
+    r.client,
+    r.budget,
+  );
+  await buyer.start();
+  await r.budget.authorize(r.checked, '1000');
+  const before = await r.budget.summary();
+  await assert.rejects(
+    async () => buyer.configureRenewal('2000000', r.checked.policyId),
+    /Finish the current chat budget/,
+  );
+  assert.deepEqual(await r.budget.summary(), before);
+  assert.equal(r.starts(), 1);
+  assert.equal(idleChecks, 0);
+  assert.equal(budgetWrites, 0);
+  await buyer.close();
+});
+void test('a pooled buyer refuses single-channel renewal before stopping its listener', async () => {
+  const r = runtime();
+  Object.assign(r.checked, {
+    depositAtomic: '1000000',
+    totalDepositAtomic: '3000000',
+    lifetimeMs: 3600000,
+  });
+  let stopped = false;
+  const buyer = automaticBuyer(
+    {
+      ...r.service,
+      stopWhenIdle: async () => {
+        stopped = true;
+        return true;
+      },
+      setRenewalBudget: async () => {},
+    },
+    r.client,
+    r.budget,
+  );
+  await buyer.start();
+  await assert.rejects(
+    async () => buyer.configureRenewal('2000000', r.checked.policyId),
+    /single-channel/,
+  );
+  assert.equal(stopped, false);
+  assert.equal(r.starts(), 1);
+  await buyer.close();
+});

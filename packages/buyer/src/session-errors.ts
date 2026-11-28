@@ -91,12 +91,17 @@ export function classifyPaidError(error: unknown): ChatErrorView | undefined {
       status: HTTP_STATUS.badRequest,
       detail: channelBlockerMessage(error.code),
     };
+  if (error instanceof UnsentChannelLimitError)
+    return {
+      ...unavailable(error.code, true),
+      detail:
+        'The available funds or spending limits cannot cover this request. Check the wallet balance, renewal budget and deposit cap before sending again.',
+    };
   if (
     error instanceof UnsentOpeningError ||
     error instanceof UnsentSessionPreflightError ||
     error instanceof UnsentSellerChoiceError ||
     error instanceof UnsentChannelRequestError ||
-    error instanceof UnsentChannelLimitError ||
     error instanceof UnsentChannelPeerError
   )
     return unavailable(error.code, true);

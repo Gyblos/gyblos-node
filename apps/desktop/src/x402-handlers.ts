@@ -24,6 +24,7 @@ import {
   type X402Progress,
   type X402Result,
 } from './x402-model';
+import { canConfigureRenewal } from './x402-startup';
 
 type Owner = { contents: unknown; mainFrame(): unknown; destroyed(): boolean };
 type Sender = { sender: unknown; senderFrame: unknown };
@@ -107,6 +108,7 @@ export interface ManagedBuyerPorts {
     autoPrices?: TokenPricesV2 | null,
   ): Promise<void>;
   changing?(): boolean;
+  configureRenewal?(amount: string | null, policyId: string): Promise<void>;
   review?: (
     ref: Parameters<Parameters<X402Budget['review']>[0]>[0],
     policy: BuyerApiPolicy,
@@ -231,6 +233,13 @@ function configureAction(
     throw new PaidSellerLimitError(
       'Wait for the buyer settings to finish updating.',
     );
+  if (input.action === X402_ACTION.CONFIGURE_RENEWAL) {
+    if (!managed?.configureRenewal || typeof input.policyId !== 'string')
+      throw new Error('Buyer unavailable');
+    const amount =
+      input.limitAtomic === null ? null : controlAtomic(input.limitAtomic);
+    return managed.configureRenewal(amount, input.policyId).then(() => true);
+  }
   if (input.action !== X402_ACTION.CONFIGURE_PAID || !managed?.configure)
     return false;
   if (input.policyId !== undefined && typeof input.policyId !== 'string')
@@ -270,6 +279,7 @@ async function checkPayment(
 }
 async function buyerStatus(client: X402Client, budget: X402Budget) {
   return {
+    ...(canConfigureRenewal(client) && { canConfigureRenewal: true as const }),
     ...(client.canCheckChannels() && { canCheckChannels: true as const }),
     summary: await budget.summary(),
     policy: client.policy(),
