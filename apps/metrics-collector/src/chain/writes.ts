@@ -314,26 +314,16 @@ export function programCounts(
     updatedAt: now,
   }));
   return [
-    ...chunksFor(chainProgramDaily, rows, 2).map((chunk) => {
-      const values = sql.join(
-        chunk.map(
-          (row) =>
-            sql`(${row.day}, ${row.transactions}, ${row.failed}, ${row.updatedAt})`,
-        ),
-        sql`, `,
-      );
-      return orm
-        .insert(chainProgramDaily)
-        .select(sql`select * from (values ${values}) where ${owned(lease)}`)
-        .onConflictDoUpdate({
-          target: chainProgramDaily.day,
-          set: {
-            transactions: sql`${chainProgramDaily.transactions} + excluded.transactions`,
-            failed: sql`${chainProgramDaily.failed} + excluded.failed`,
-            updatedAt: sql`excluded.updated_at`,
-          },
-        });
-    }),
+    ...chunksFor(chainProgramDaily, rows, 2).map((chunk) =>
+      ownedInsert(orm, chainProgramDaily, chunk, lease).onConflictDoUpdate({
+        target: chainProgramDaily.day,
+        set: {
+          transactions: sql`${chainProgramDaily.transactions} + excluded.transactions`,
+          failed: sql`${chainProgramDaily.failed} + excluded.failed`,
+          updatedAt: sql`excluded.updated_at`,
+        },
+      }),
+    ),
     ...chunksFor(aggChainDirtyDays, rows, 2).map((chunk) =>
       ownedInsert(
         orm,

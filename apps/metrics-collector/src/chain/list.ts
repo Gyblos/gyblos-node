@@ -7,7 +7,7 @@
 // lagging node that ignored `until`) is refused rather than counted twice.
 import { CHANNEL_PROGRAM } from '@gyblos/config/network';
 
-import { CHAIN_CURSOR_ID, CHAIN_INDEX } from '../constants';
+import { CHAIN_INDEX } from '../constants';
 import type { ChainTransaction } from './decode';
 import { ownedBatch } from './owned';
 import { ChainRpcError, type ChainSignature } from './rpc';

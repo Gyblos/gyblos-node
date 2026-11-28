@@ -51,13 +51,13 @@ const leaseRead = (orm: CollectorDatabase) =>
 
 export async function ownedBatch(
   orm: CollectorDatabase,
-  items: BatchItem[],
+  items: readonly BatchItem[],
   lease: number | null,
 ): Promise<boolean> {
-  const results = await orm.batch([leaseRead(orm), ...items]);
-  const [first] = results as unknown as readonly [
-    readonly { leaseUntil: number | null }[],
-    ...unknown[],
-  ];
-  return lease !== null && first[0]?.leaseUntil === lease;
+  const results: unknown = await orm.batch([leaseRead(orm), ...items]);
+  if (!Array.isArray(results) || !Array.isArray(results[0])) return false;
+  const row: unknown = results[0][0];
+  if (typeof row !== 'object' || row === null) return false;
+  const leaseUntil = (row as { leaseUntil?: unknown }).leaseUntil;
+  return lease !== null && leaseUntil === lease;
 }
