@@ -292,14 +292,22 @@ async function check(path: string | undefined) {
   return summary(signed);
 }
 
-export async function main(argv = process.argv.slice(2)): Promise<number> {
+function parseArguments(argv: string[]) {
   try {
-    const { positionals, values } = parseArgs({
+    return parseArgs({
       args: argv,
       options: OPTIONS,
       allowPositionals: true,
       strict: true,
     });
+  } catch {
+    throw usage();
+  }
+}
+
+export async function main(argv = process.argv.slice(2)): Promise<number> {
+  try {
+    const { positionals, values } = parseArguments(argv);
     const [command, file] = positionals;
     if (
       positionals.length > (command === MODEL_VERIFIER_COMMANDS.CHECK ? 2 : 1)

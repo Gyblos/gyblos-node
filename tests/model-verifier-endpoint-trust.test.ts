@@ -44,6 +44,7 @@ void test('a remote reference endpoint is rejected without explicit opt-in', asy
       'http://0xc0a80101:11434',
       'http://3232235521:11434',
       'http://example.com:11434',
+      'http://[2001:db8::1]:11434',
       'http://127.example.com:11434',
       'http://127.0.0.1.evil.com:11434',
       'http://[::ffff:127.0.0.1]:11434',
@@ -86,6 +87,7 @@ void test('endpoint shape validation applies even with explicit opt-in', async (
       'localhost:11434',
       'file://127.0.0.1',
       'http://127.0.0.1:11434/proxy',
+      'http://user:pass@127.0.0.1:11434',
     ])
       assert.deepEqual(
         await verifyError(t, home, [
@@ -106,6 +108,7 @@ void test('loopback reference endpoints are accepted', async (t) => {
       'http://127.0.0.1:11434/',
       'http://127.1:11434',
       'http://0x7f000001:11434',
+      'http://2130706433:11434',
       'http://localhost:11434',
       'http://[::1]:11434',
       'http://[0:0:0:0:0:0:0:1]:11434',
@@ -149,5 +152,20 @@ void test('a value after the boolean opt-in is not swallowed as a positional', a
       ]),
       failure(USAGE),
     );
+  });
+});
+
+void test('malformed command line options are usage errors', async (t) => {
+  await withHome(async (home) => {
+    for (const extra of [
+      ['--allow-remote-ollama=false'],
+      ['--bogus-option'],
+      ['--ollama'],
+    ])
+      assert.deepEqual(
+        await verifyError(t, home, extra),
+        failure(USAGE),
+        extra.join(' '),
+      );
   });
 });
