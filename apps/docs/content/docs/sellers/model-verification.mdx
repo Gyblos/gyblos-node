@@ -13,7 +13,8 @@ outside, as an ordinary buyer of your free offer. It does not read your machine,
    prompt and the run is inconclusive.
 2. It recounts each answer with the pinned Qwen3 tokenizer. An answer over the requested 200-token limit is
    not scored and counts as unanswered.
-3. It rereads each answer with the declared model, run on the verifier's own machine. At up to 24 points per
+3. It rereads each answer with the declared model, run on the verifier operator's own machine by default.
+   At up to 24 points per
    answer it checks that your next words are among the 20 the declared model finds most likely, with a
    probability of at least 0.1 %.
 4. It counts the answers with at least one point that fails that check and signs a result with its own key.
@@ -59,6 +60,8 @@ The verifier is open source, so anyone with [Ollama](https://ollama.com) and the
 same check against a seller and get a result they can compare. The first run also needs the pinned tokenizer
 artifacts; the design note explains how to prepare them. The steps to run it are in the
 [model verifier design note](https://github.com/Gyblos/gyblos-node/blob/develop/docs/model-verifier.md#run-it) in the repository.
+The reference endpoint is the oracle behind the signed verdict, so the verifier requires a loopback endpoint
+and treats trusting a remote one as an explicit operator decision; the design note documents both.
 
 A run writes the signed result and an evidence file together in a new directory. Publication is atomic for
 readers, but it does not fsync the files or directories, so an operating-system crash or power loss can still

@@ -14,7 +14,8 @@ configuración.
    por pedido; si no, rechaza todas las preguntas y la corrida queda inconclusive.
 2. Vuelve a contar cada respuesta con el tokenizador Qwen3 fijado. Una respuesta por encima del límite pedido de 200
    tokens no se puntúa y cuenta como no respondida.
-3. Relee cada respuesta con el modelo declarado, que corre en la máquina del verificador. En hasta 24 puntos de
+3. Relee cada respuesta con el modelo declarado, que por defecto corre en la máquina del operador del
+   verificador. En hasta 24 puntos de
    cada respuesta comprueba que tus siguientes palabras estén entre las 20 que el modelo declarado considera más
    probables, con una probabilidad de al menos 0,1 %.
 4. Cuenta las respuestas con al menos un punto que no pasa esa comprobación y firma un resultado con su propia
@@ -62,6 +63,8 @@ El verificador es de código abierto, así que cualquiera con [Ollama](https://o
 puede correr la misma verificación contra un vendedor y obtener un resultado comparable. La primera corrida
 también necesita los artefactos del tokenizador fijado; la nota de diseño explica cómo prepararlos. Los pasos para correrlo
 están en la [nota de diseño del verificador](https://github.com/Gyblos/gyblos-node/blob/develop/docs/model-verifier.md#run-it) del repositorio.
+El endpoint de referencia es el oráculo detrás del veredicto firmado, así que el verificador exige un endpoint
+de loopback y trata confiar en uno remoto como una decisión explícita del operador; la nota de diseño documenta ambas cosas.
 
 Cada corrida escribe el resultado firmado y el archivo de evidencia juntos en un directorio nuevo. La
 publicación es atómica para quien lee, pero no hace fsync de los archivos ni de los directorios, así que un fallo

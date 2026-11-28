@@ -57,13 +57,23 @@ function loopbackHost(hostname: string) {
 }
 
 function validateReferenceEndpoint(value: string, allowRemote: boolean) {
-  let hostname: string;
+  let url: URL;
   try {
-    hostname = new URL(value).hostname;
+    url = new URL(value);
   } catch {
     throw usage();
   }
-  if (!allowRemote && !loopbackHost(hostname))
+  if (
+    (url.protocol !== 'http:' && url.protocol !== 'https:') ||
+    url.hostname === '' ||
+    url.username !== '' ||
+    url.password !== '' ||
+    url.pathname !== '/' ||
+    url.search !== '' ||
+    url.hash !== ''
+  )
+    throw usage();
+  if (!allowRemote && !loopbackHost(url.hostname))
     throw new ModelVerifierError(MODEL_VERIFIER_CODES.REMOTE_REFERENCE);
 }
 
@@ -291,6 +301,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
       strict: true,
     });
     const [command, file] = positionals;
+    if (
+      positionals.length > (command === MODEL_VERIFIER_COMMANDS.CHECK ? 2 : 1)
+    )
+      throw usage();
     let output: object;
     if (command === MODEL_VERIFIER_COMMANDS.VERIFY)
       output = await verify(values);
