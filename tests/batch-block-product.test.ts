@@ -113,8 +113,26 @@ void test('engine failure after one ACK settles only the certified prefix and ne
   assert.equal((await f.buyer.reconcile())?.chargedAtomic, '32');
   assert.equal(f.offers.generations(), 1);
 });
+void test('automatic renewal settles a delivered partial reply before the next agent turn', async (t) => {
+  const f = await blockProduct({ settleInterrupted: true });
+  t.after(f.close);
+  f.offers.generate(async (input) => {
+    await input.onText?.('aa ');
+    throw new Error('Synthetic engine interruption');
+  });
+  await assert.rejects(
+    f.buyer.execute(await f.offers.quote(1), f.offers.input),
+    { code: PAID_EXECUTION_CODES.ENGINE },
+  );
+  const proof = await f.buyer.reconcile();
+  assert.equal(proof?.chargedAtomic, '32');
+  assert.equal(proof?.refundedAtomic, '968');
+  assert.deepEqual(f.f.calls, ['deposit', 'refund']);
+  assert.equal(f.offers.generations(), 1);
+});
+
 void test('a lost block ACK recovers the exact durable voucher and does not bill the same prefix twice', async (t) => {
-  const f = await blockProduct();
+  const f = await blockProduct({ settleInterrupted: true });
   t.after(f.close);
   const original = f.f.seller().acceptBlock.bind(f.f.seller());
   t.mock.method(
@@ -132,6 +150,7 @@ void test('a lost block ACK recovers the exact durable voucher and does not bill
   await f.wire.settled();
   assert.equal(f.f.buyer.snapshot().cumulativeAtomic, '32');
   assert.equal(f.f.seller().snapshot().cumulativeAtomic, '32');
+  assert.deepEqual(f.f.calls, ['deposit']);
   assert.equal(await f.buyer.recoverApproval(), true);
   const settled = await f.buyer.reconcile();
   assert.equal(settled?.chargedAtomic, '32');

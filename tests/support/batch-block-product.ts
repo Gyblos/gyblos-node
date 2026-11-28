@@ -56,6 +56,7 @@ export async function blockProduct(
     receipt?: (evidence: BuyerReceiptEvidence) => void | Promise<void>;
     // false runs the same paid session without blocks (no stable-prefix meter, no block transport).
     blocks?: boolean;
+    settleInterrupted?: boolean;
     route?: RouteProbe;
     // Adjusts the seller's live offer after the block engine is set, e.g. to declare usage.
     offer?: (offers: Awaited<ReturnType<typeof batchOfferFixture>>) => void;
@@ -104,6 +105,7 @@ export async function blockProduct(
     observe: f.sellerOptions.observe,
     receipt: options.receipt,
     declared: options.declared,
+    settleInterrupted: options.settleInterrupted,
   });
   return {
     f,

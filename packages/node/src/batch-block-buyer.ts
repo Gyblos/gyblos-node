@@ -43,9 +43,11 @@ function blockCallbacks<Remote extends BatchDestination>(
   buyer: SessionBlockBuyer,
   baseAtomic: string,
   check: () => void,
-): BatchBlockClient {
+): BatchBlockClient & { hasAcknowledgedPrefix(): boolean } {
   const { options } = context;
+  let partial = false;
   return {
+    hasAcknowledgedPrefix: () => partial,
     verification: {
       binding: {
         channelId: request.channelId,
@@ -84,12 +86,17 @@ function blockCallbacks<Remote extends BatchDestination>(
         };
       },
     },
-    approve: (intent, transportCheck) =>
-      buyer.approveBlock(intent, intent.bill.chargedAtomic, () => {
+    approve: (intent, transportCheck) => {
+      partial = false;
+      return buyer.approveBlock(intent, intent.bill.chargedAtomic, () => {
         check();
         transportCheck();
-      }),
-    acknowledge: (intent) => buyer.acknowledgeBlock(intent),
+      });
+    },
+    acknowledge: async (intent) => {
+      await buyer.acknowledgeBlock(intent);
+      partial = !intent.terminal;
+    },
   };
 }
 export function buyerQuestionDigest(
@@ -160,9 +167,13 @@ export async function runBuyerBlocks<Remote extends BatchDestination>(
       },
       callbacks,
     )
-    .catch((error: unknown) =>
-      verifyDecline(context, pending, request.channelId, signal, error),
-    );
+    .catch(async (error: unknown) => {
+      if (options.settleInterrupted && callbacks.hasAcknowledgedPrefix()) {
+        await context.closeInterrupted();
+        throw error;
+      }
+      return verifyDecline(context, pending, request.channelId, signal, error);
+    });
   check();
   if (
     !('bill' in result) ||
