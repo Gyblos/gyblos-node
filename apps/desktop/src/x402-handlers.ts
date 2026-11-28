@@ -61,8 +61,6 @@ function actionFailure(action: unknown, blocked: boolean, error: unknown) {
         : CHAT_FAILURE.KEY_REVIEW,
     };
   if (blocked) return failure;
-  if (error.neverSent && error.code === CHAT_FAILURE.NOT_SENT)
-    return { failureReason: error.code };
   if (
     error.code === CHAT_FAILURE.DECLINED ||
     error.code === CHAT_FAILURE.FREE_LIMIT
@@ -70,7 +68,7 @@ function actionFailure(action: unknown, blocked: boolean, error: unknown) {
     return { ...failure, failureReason: error.code };
   if (error.neverSent)
     return {
-      ...failure,
+      ...(error.code !== CHAT_FAILURE.NOT_SENT && failure),
       failureReason: chatFailureReason(error.code) ?? CHAT_FAILURE.NOT_SENT,
     };
   return failure;
