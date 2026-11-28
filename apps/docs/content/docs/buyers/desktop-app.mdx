@@ -71,6 +71,8 @@ checks the seller's identity, and only then sends your message. The default mode
 needs to reach the discovery index, the Solana devnet RPC and the network; if no seller is available, you
 get an error, never a made-up reply.
 
+When you stop a paid question while it is waiting behind another request, Chat keeps your draft, including any newer edits. If the buyer confirms cancellation before dispatch, you can send your next question immediately.
+
 While an answer is running, the send button becomes **Stop response**; you can also press **Esc**.
 Stopping keeps the partial text and doesn't resend your message. An interrupted answer is not marked as
 complete.

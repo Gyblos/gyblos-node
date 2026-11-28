@@ -136,6 +136,7 @@ void test('desktop controller retains stopped partials and rejects late or cross
   chat.appendBuyer('first', 'turn-one', 'Hello');
   assert.equal(chat.getSnapshot().sessions[0]?.messages.at(-1)?.text, 'Hello');
   chat.stopBuyer('first', 'turn-one');
+  assert.equal(chat.getSnapshot().sessions[0]?.draft, 'Synthetic question');
   chat.newChat('second');
   chat.startPaypal(
     'Another question',
@@ -228,7 +229,9 @@ void test('live activity follows the first nonempty delta and terminal for its o
   chat.appendBuyer('first', 'one', 'Hello');
   clock = 24;
   chat.appendBuyer('first', 'one', ' world');
+  chat.setDraft('Newer draft');
   chat.stopBuyer('first', 'one');
+  assert.equal(chat.getSnapshot().sessions[0]?.draft, 'Newer draft');
   clock = 99;
   chat.failPaypal('first', 'one', 'late');
   assert.deepEqual(answer()?.activity, { started: 10, first: 20, ended: 24 });

@@ -110,6 +110,7 @@ function metadataRequest(
   response: ServerResponse,
   policy: BuyerApiPolicy | undefined,
   authenticated: boolean,
+  ownerCancellation: boolean,
   preparePaidChat: boolean,
   reconcilePool: boolean,
 ) {
@@ -120,6 +121,9 @@ function metadataRequest(
       .writeHead(HTTP_STATUS.ok, {
         'content-type': 'application/json',
         'cache-control': 'no-store',
+        ...(ownerCancellation && {
+          [BUYER_API.CANCEL_QUEUED_HEADER]: BUYER_API.CANCEL_QUEUED_PATH,
+        }),
         ...(reconcilePool && {
           [BUYER_API.RECONCILE_POOL_HEADER]: BUYER_API.RECONCILE_POOL_PATH,
         }),
@@ -241,6 +245,7 @@ export function createDesktopApi(
         response,
         policy,
         authenticated,
+        owner,
         !!preparePaidChat && owner,
         !!reconcilePool && owner,
       );

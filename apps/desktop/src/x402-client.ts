@@ -24,6 +24,7 @@ import {
   assertFreeBudget,
   buyerConnection,
   buyerEndpoint,
+  cancelQueuedChat,
   chatHeaders,
   policyForRoute,
   policyForSeller,
@@ -51,6 +52,8 @@ export class X402Client {
   private closed = false;
   private controller: AbortController | null = null;
   private requestId: string | null = null;
+  private cancelQueued: (() => Promise<boolean>) | null = null;
+  private stopping = false;
   private pending: Promise<unknown> | null = null;
   private readonly keyRequests = new Map<Promise<unknown>, AbortController>();
   constructor(
@@ -192,12 +195,22 @@ export class X402Client {
   }
   stop(id: string) {
     if (
+      this.stopping ||
       this.requestId !== id ||
       !this.controller ||
       this.controller.signal.aborted
     )
       return false;
-    this.controller.abort();
+    this.stopping = true;
+    const controller = this.controller;
+    if (this.cancelQueued) {
+      void this.cancelQueued().then(
+        (stopped) => {
+          if (!stopped) controller.abort();
+        },
+        () => controller.abort(),
+      );
+    } else controller.abort();
     return true;
   }
   send(
@@ -231,6 +244,8 @@ export class X402Client {
       this.controller = null;
       this.requestId = null;
       this.pending = null;
+      this.stopping = false;
+      this.cancelQueued = null;
     });
   }
   private async execute(
@@ -327,6 +342,18 @@ export class X402Client {
       AbortSignal.timeout(DESKTOP_X402.REQUEST_MS),
     ]);
     signal.throwIfAborted();
+    const queueId =
+      connection.cancelsQueued && choice && choice !== OFFER_PRICING_KINDS.FREE
+        ? randomUUID()
+        : undefined;
+    const headers = chatHeaders(
+      connection.token,
+      policy.policyId,
+      explicitFree,
+    );
+    if (queueId)
+      this.cancelQueued = () =>
+        cancelQueuedChat(connection, this.request, queueId);
     const response = await this.request(
       new URL(
         choice ? BUYER_API.CHANNEL_CHAT_PATH : BUYER_API.CHAT_PATH,
@@ -336,7 +363,10 @@ export class X402Client {
         method: 'POST',
         redirect: 'error',
         signal,
-        headers: chatHeaders(connection.token, policy.policyId, explicitFree),
+        headers: {
+          ...headers,
+          ...(queueId && { [BUYER_API.QUEUE_ID_HEADER]: queueId }),
+        },
         body: JSON.stringify({
           ...sellerFields(choice),
           ...(intent && { [BUYER_API.OPENING_INTENT_FIELD]: intent }),

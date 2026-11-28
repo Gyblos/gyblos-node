@@ -40,6 +40,11 @@ import {
 } from './chat-api';
 import { readBody } from './chat-body';
 import { replyError, replyJson, type ChatErrorClassifier } from './chat-errors';
+import {
+  cancelQueuedRequest,
+  queuedRequest,
+  scheduledExecutors,
+} from './chat-queue';
 import { routedInput, type ChatSettings } from './chat-route-input';
 import { stoppedResult, stoppingStream } from './chat-stop';
 import {
@@ -78,32 +83,10 @@ type FreeChatExecutor = (
   model?: RoutedModel,
   permission?: BuyerApiKeyOperation,
 ) => Promise<ChatResult>;
-type ChatExecutors = {
+export type ChatExecutors = {
   execute: FreeChatExecutor;
   stream?: FreeChatStreamExecutor;
 };
-function scheduledExecutors(
-  schedule: ReturnType<typeof executionSlots>,
-  { execute, stream }: ReturnType<typeof buyerApiKeyExecutors>,
-) {
-  let queued = false;
-  const enter = <T>(signal: AbortSignal, run: () => Promise<T>) => {
-    queued = true;
-    return schedule(signal, () => {
-      queued = false;
-      return run();
-    });
-  };
-  return {
-    queued: () => queued,
-    execute: (input, signal, delta, model) =>
-      enter(signal, () => execute(input, signal, delta, model)),
-    stream:
-      stream &&
-      ((input, signal, delta, model) =>
-        enter(signal, () => stream(input, signal, delta, model))),
-  } satisfies ChatExecutors & { queued(): boolean };
-}
 function isJson(request: IncomingMessage) {
   const type = request.headers['content-type']?.split(';')[0]?.trim();
   return type?.toLowerCase() === FREE_BUYER.contentType;
@@ -203,6 +186,7 @@ async function serveChat(
   diagnostic: ReturnType<ReturnType<typeof httpDiagnostics>>,
   selectedSellerAllowed: boolean,
   classify?: ChatErrorClassifier,
+  cancellation?: ReturnType<typeof queuedRequest>,
 ) {
   let format: ChatStreamFormat | undefined;
   const lifecycle = httpRequestLifecycle(
@@ -223,6 +207,11 @@ async function serveChat(
       ),
   );
   const controller = lifecycle.controller;
+  cancellation?.register(() => {
+    if (scoped.entered() || controller.signal.aborted) return false;
+    controller.abort(new FreeBuyerError(FREE_BUYER_CODES.CANCELLED));
+    return true;
+  });
   try {
     const { input, payload, route, model } = routedInput(
       api,
@@ -269,6 +258,7 @@ async function serveChat(
     diagnostic.failure(error);
     replyError(response, error, classify, api, format);
   } finally {
+    cancellation?.close();
     lifecycle.close();
   }
 }
@@ -293,6 +283,7 @@ export function freeBuyerHandler(
   });
   const accept = buyerApiCaller(authorize, apiKeys, desktopPolicy);
   const observe = httpDiagnostics(diagnostics);
+  const pending = new Map<string, () => boolean>();
   let active = 0;
   const schedule = executionSlots(
     settings.parallel ?? TRANSPORT_LIMITS.maxConcurrent,
@@ -302,6 +293,18 @@ export function freeBuyerHandler(
     const caller = await accept(request, response);
     if (!caller) {
       diagnostic.refused();
+      return;
+    }
+    if (
+      cancelQueuedRequest(
+        request,
+        response,
+        caller.owner && !!authorize,
+        desktopPolicy,
+        pending,
+      )
+    ) {
+      if (response.statusCode >= HTTP_STATUS.badRequest) diagnostic.refused();
       return;
     }
     if (await desktop.handled(request, response, caller.owner)) {
@@ -319,6 +322,13 @@ export function freeBuyerHandler(
     const ownsChat = authorize && settings.sellerChoice && caller.owner;
     const selectedSellerAllowed = Boolean(ownsChat && localApi && channelRoute);
     if (channelRoute && !selectedSellerAllowed) {
+      replyError(response, new FreeBuyerError(FREE_BUYER_CODES.INVALID));
+      return;
+    }
+    const cancellation = selectedSellerAllowed
+      ? queuedRequest(request, pending)
+      : undefined;
+    if (cancellation && pending.has(cancellation.id)) {
       replyError(response, new FreeBuyerError(FREE_BUYER_CODES.INVALID));
       return;
     }
@@ -344,6 +354,7 @@ export function freeBuyerHandler(
         diagnostic,
         selectedSellerAllowed,
         classify,
+        cancellation,
       );
     } finally {
       active--;
