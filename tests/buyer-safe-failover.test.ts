@@ -5,13 +5,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { FREE_BUYER_CODES } from '@gyblos/buyer/constants';
+import { FREE_BUYER_CODES, PAID_BUYER_CODES } from '@gyblos/buyer/constants';
 import { FreeBuyerError } from '@gyblos/buyer/free-chat';
 import {
   executeBuyerFree,
+  executeSelectedBuyerFree,
   type FreeBuyerDependencies,
 } from '@gyblos/buyer/free-execution';
+import { delegatedFreeResends } from '@gyblos/buyer/quote-selection';
 import { parseBuyerSelectionConfig } from '@gyblos/buyer/selection-config';
+import { PaidBuyerError } from '@gyblos/node/buyer-paid-error';
 import {
   ENGINE_DONE_REASONS,
   FREE_EXECUTION_CODES,
@@ -217,4 +220,57 @@ void test('after a resend, every other seller busy with other requests is busy, 
   await assert.rejects(executeBuyerFree(INPUT, busy), {
     code: FREE_BUYER_CODES.BUSY,
   });
+});
+
+void test('a delegated selected free quote permits one more selection only before visible output', async () => {
+  for (const visible of [false, true]) {
+    const { dependencies } = rig({
+      a: {
+        text: visible ? ['visible'] : [],
+        error: sent(FREE_EXECUTION_CODES.TIMEOUT),
+      },
+    });
+    let retried = false;
+    const attempt = executeSelectedBuyerFree(
+      INPUT,
+      dependencies,
+      { nodeId: 'a', quote: QUOTE },
+      new AbortController().signal,
+      stream,
+      undefined,
+      undefined,
+      () => {
+        retried = true;
+      },
+    );
+    if (visible)
+      await assert.rejects(attempt, { code: FREE_EXECUTION_CODES.TIMEOUT });
+    else assert.equal(await attempt, undefined);
+    assert.equal(retried, !visible);
+  }
+});
+
+void test('delegated failover preserves a possible send and permits only two free reselections', async () => {
+  const fixture = await selectionFixture();
+  try {
+    const policy = delegatedFreeResends(true);
+    const request = fixture.config.request;
+    assert.equal(policy.request(request), request);
+    const failed = sent(FREE_EXECUTION_CODES.TIMEOUT);
+    policy.onResend?.(failed);
+    assert.equal(policy.request(request).maxAtomic, '0');
+    assert.deepEqual(policy.request(request).priceCeilings, {
+      inputAtomicPerMtok: '0',
+      outputAtomicPerMtok: '0',
+    });
+    assert.equal(
+      policy.selectionError(new PaidBuyerError(PAID_BUYER_CODES.UNAVAILABLE)),
+      failed,
+    );
+    policy.onResend?.(failed);
+    assert.equal(policy.onResend, undefined);
+    assert.equal(delegatedFreeResends(false).onResend, undefined);
+  } finally {
+    await fixture.wire.close();
+  }
 });

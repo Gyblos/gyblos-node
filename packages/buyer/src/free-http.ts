@@ -51,6 +51,7 @@ import {
   type BuyerDesktopOptions,
 } from './desktop-api';
 import { FreeBuyerError } from './free-chat';
+import { UnsentAdmissionTimeout } from './free-chat-error';
 import {
   executeFreeSse,
   type ChatResult,
@@ -61,6 +62,7 @@ import { httpDiagnostics, httpRequestLifecycle } from './http-diagnostics';
 import { listModels } from './model-list';
 import { type RoutedModel } from './model-routes';
 import { bearerAuthorizer } from './paid-token';
+import { executionSlots } from './session-serial';
 
 export type { ChatErrorClassifier, ChatErrorView } from './chat-errors';
 
@@ -73,6 +75,32 @@ type FreeChatExecutor = (
   model?: RoutedModel,
   permission?: BuyerApiKeyOperation,
 ) => Promise<ChatResult>;
+type ChatExecutors = {
+  execute: FreeChatExecutor;
+  stream?: FreeChatStreamExecutor;
+};
+function scheduledExecutors(
+  schedule: ReturnType<typeof executionSlots>,
+  { execute, stream }: ReturnType<typeof buyerApiKeyExecutors>,
+) {
+  let queued = false;
+  const enter = <T>(signal: AbortSignal, run: () => Promise<T>) => {
+    queued = true;
+    return schedule(signal, () => {
+      queued = false;
+      return run();
+    });
+  };
+  return {
+    queued: () => queued,
+    execute: (input, signal, delta, model) =>
+      enter(signal, () => execute(input, signal, delta, model)),
+    stream:
+      stream &&
+      ((input, signal, delta, model) =>
+        enter(signal, () => stream(input, signal, delta, model))),
+  } satisfies ChatExecutors & { queued(): boolean };
+}
 function isJson(request: IncomingMessage) {
   const type = request.headers['content-type']?.split(';')[0]?.trim();
   return type?.toLowerCase() === FREE_BUYER.contentType;
@@ -80,17 +108,6 @@ function isJson(request: IncomingMessage) {
 function declaredTooLarge(request: IncomingMessage) {
   const length = Number(request.headers['content-length']);
   return Number.isFinite(length) && length > FREE_EXECUTION.requestBytes;
-}
-function atCapacity(
-  settings: ChatSettings,
-  keyId: string | undefined,
-  active: number,
-) {
-  const limit =
-    settings.singlePaidChannel && keyId
-      ? PAID_BUYER.singleChannelApiRequests
-      : TRANSPORT_LIMITS.maxConcurrent;
-  return active >= limit;
 }
 // The route's format for a request this endpoint can take now; anything else is answered here: the model
 // list, or a refusal before the body is read, so a stalled oversize body holds no slot.
@@ -111,6 +128,8 @@ function admit(
           ? FREE_BUYER_CODES.BUSY
           : undefined;
   if (code === undefined) return api;
+  if (code === FREE_BUYER_CODES.BUSY)
+    response.setHeader(FREE_BUYER.retryAfterHeader, '1');
   replyError(response, new FreeBuyerError(code), undefined, api);
   return undefined;
 }
@@ -140,10 +159,7 @@ async function countTokens(
   }
 }
 // The executors with the request's stop sequences honored on what the client sees (see chat-stop.ts).
-function stopping(
-  scoped: { execute: FreeChatExecutor; stream?: FreeChatStreamExecutor },
-  stops: string[] | undefined,
-) {
+function stopping(scoped: ChatExecutors, stops: string[] | undefined) {
   if (!stops) return scoped;
   const { execute, stream } = scoped;
   return {
@@ -178,7 +194,7 @@ async function serveChat(
   request: IncomingMessage,
   response: ServerResponse,
   settings: ChatSettings,
-  scoped: { execute: FreeChatExecutor; stream?: FreeChatStreamExecutor },
+  scoped: ReturnType<typeof scheduledExecutors>,
   api: ChatApi,
   requestMs: number,
   diagnostic: ReturnType<ReturnType<typeof httpDiagnostics>>,
@@ -194,7 +210,9 @@ async function serveChat(
       expireRequest(request, response, cancel, () =>
         replyError(
           response,
-          new FreeBuyerError(FREE_BUYER_CODES.TIMEOUT),
+          scoped.queued()
+            ? new UnsentAdmissionTimeout()
+            : new FreeBuyerError(FREE_BUYER_CODES.TIMEOUT),
           classify,
           api,
           format,
@@ -271,6 +289,9 @@ export function freeBuyerHandler(
   const accept = buyerApiCaller(authorize, apiKeys, desktopPolicy);
   const observe = httpDiagnostics(diagnostics);
   let active = 0;
+  const schedule = executionSlots(
+    settings.parallel ?? TRANSPORT_LIMITS.maxConcurrent,
+  );
   return async (request: IncomingMessage, response: ServerResponse) => {
     const diagnostic = observe();
     const caller = await accept(request, response);
@@ -290,14 +311,13 @@ export function freeBuyerHandler(
     const localApi = desktop.accepts(request, isJson(request))
       ? defaultChatApi
       : undefined;
-    if (
-      channelRoute &&
-      !(caller.owner && authorize && settings.sellerChoice && localApi)
-    ) {
+    const ownsChat = authorize && settings.sellerChoice && caller.owner;
+    const selectedSellerAllowed = Boolean(ownsChat && localApi && channelRoute);
+    if (channelRoute && !selectedSellerAllowed) {
       replyError(response, new FreeBuyerError(FREE_BUYER_CODES.INVALID));
       return;
     }
-    const full = atCapacity(settings, caller.keyId, active);
+    const full = active >= FREE_BUYER.maxHttpRequests;
     const api = admit(request, response, full, localApi);
     if (!api) {
       if (response.statusCode >= HTTP_STATUS.badRequest) diagnostic.refused();
@@ -310,17 +330,14 @@ export function freeBuyerHandler(
         request,
         response,
         settings,
-        buyerApiKeyExecutors(apiKeys, caller.keyId, execute, stream),
+        scheduledExecutors(
+          schedule,
+          buyerApiKeyExecutors(apiKeys, caller.keyId, execute, stream),
+        ),
         api,
         requestMs,
         diagnostic,
-        Boolean(
-          settings.sellerChoice &&
-          authorize &&
-          caller.owner &&
-          channelRoute &&
-          localApi,
-        ),
+        selectedSellerAllowed,
         classify,
       );
     } finally {

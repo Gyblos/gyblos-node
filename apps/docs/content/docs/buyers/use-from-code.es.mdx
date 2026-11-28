@@ -245,6 +245,10 @@ Lo que pasa cuando un vendedor falla depende de cuánto avanzó la respuesta:
 | Después de que llegó texto a tu herramienta                                        | La solicitud termina con un error; la respuesta no se reinicia en otro lado                                   |
 | El propio vendedor responde con un error (ocupado, límite diario, falla del motor) | La solicitud termina con ese error                                                                            |
 
+Cuando tu agente envía varias solicitudes juntas, el comprador puede admitir hasta cuatro a la vez. Cada solicitud espera un turno dentro de su plazo original. Al cancelar una solicitud en cola, se retira antes de contactar al vendedor. Una cola llena devuelve HTTP 429. Si el vendedor está renovando su catálogo, el comprador puede esperar la renovación dentro de la misma solicitud.
+
+Con una clave de API, el reenvío automático tras un corte de conexión o al agotarse la espera local por la primera respuesta se limita a ofertas gratuitas verificadas y termina en cuanto tu herramienta recibe contenido. Un posible envío pagado termina los reintentos automáticos.
+
 Una conexión cortada puede no entregar ninguna cabecera de respuesta, así que desactiva los reintentos
 HTTP y de stream en tu herramienta. Si reenvías una solicitud tú mismo, empieza una nueva selección de
 vendedor.
@@ -283,7 +287,9 @@ se cierra solo cuando el vendedor termina, y `usage` cuenta todo lo que generó.
 | 404                                                                                  | La app no puede usar ese modelo; el mensaje lista los que sí puede                                |
 | 503                                                                                  | No hay vendedores disponibles. `Retry-After` sugiere cuándo reintentar; reintentar es tu decisión |
 | 503 (Chat Completions, Anthropic Messages), 400 (Responses) `BUYER_KEY_NEEDS_REVIEW` | El registro de API keys requiere revisión. Consulta su estado en **Connections**.                 |
-| 504                                                                                  | El vendedor no respondió a tiempo                                                                 |
+| 504                                                                                  | Venció el plazo en la cola local o el vendedor tardó demasiado                                    |
+
+Si el plazo vence en la cola local, el error 504 incluye `gyblos_never_sent: true`. Puedes reintentar con seguridad.
 
 La tabla indica el estado HTTP antes de enviar las cabeceras de respuesta. Cuando el registro requiere revisión, el comprador envía `x-should-retry: false`. Configura el cliente para detener los reintentos automáticos mientras dure la revisión. En el cuerpo JSON de un rechazo por revisión de claves en Responses, el código de Gyblos aparece en `error.code` si se verificó que la solicitud no se envió, o en `error.gyblos_code` si pudo haberse enviado.
 

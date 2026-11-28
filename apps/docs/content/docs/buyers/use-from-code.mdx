@@ -239,6 +239,10 @@ What happens when a seller fails depends on how far the answer got:
 | After text reached your tool                                                | The request ends with an error; the answer is not restarted elsewhere                                    |
 | The seller itself answers with an error (busy, daily limit, engine failure) | The request ends with that error                                                                         |
 
+When your agent sends several requests together, the buyer can hold four at a time. Requests wait for an execution slot within their original deadline. Cancelling a queued request removes it before the buyer contacts a seller. A full queue returns HTTP 429. If a seller is renewing its catalog, the buyer can wait for the renewal during the same request.
+
+With an API key, automatic resending after a lost connection or a local timeout while waiting for the first output is limited to verified free offers and stops as soon as your tool receives any output. A possible paid dispatch ends automatic resending.
+
 A broken connection may deliver no response headers at all, so turn off HTTP and stream retries in your
 tool. Resending a request yourself starts a new seller selection.
 
@@ -275,7 +279,9 @@ finishes, and `usage` counts everything it generated.
 | 404                                                                                  | The app can't use that model; the message lists the ones it can                             |
 | 503                                                                                  | No seller is available. `Retry-After` suggests when to try again; retrying is your decision |
 | 503 (Chat Completions, Anthropic Messages), 400 (Responses) `BUYER_KEY_NEEDS_REVIEW` | The API key ledger requires review. Check its status in **Connections**.                    |
-| 504                                                                                  | The seller didn't answer in time                                                            |
+| 504                                                                                  | The local queue deadline expired or the seller timed out                                    |
+
+If the deadline expires in the local queue, the 504 error includes `gyblos_never_sent: true`. You can retry safely.
 
 The table gives the HTTP status before the response headers are sent. For a key review, the buyer sends `x-should-retry: false`. Configure your client to stop automatic retries while the ledger requires review. For a key review in a Responses JSON body, the Gyblos code appears in `error.code` for a verified unsent request or `error.gyblos_code` after possible dispatch.
 

@@ -1,5 +1,6 @@
 // Verified seller snapshots for one selection: each configured seller's signed catalog and presence,
 // fetched in parallel within the snapshot deadline, and the local stats a failure updates.
+
 import { SELLER_BADGES } from '@gyblos/core/constants';
 import type { KnownSeller } from '@gyblos/core/seller-selection';
 import { PUBLIC_RECORD_KINDS } from '@gyblos/protocol/constants';
@@ -13,6 +14,7 @@ import {
   SELLER_FAILURES,
   type SellerFailurePhase,
 } from './constants';
+import { staleSellerCatalog } from './control';
 import type {
   BuyerControlClient,
   VerifiedSelectionDependencies,
@@ -176,9 +178,13 @@ function connectFailed(
   return recordQuote(stats, seller.nodeId, false, 0, now, backoff);
 }
 
+type SnapshotDependencies = VerifiedSelectionDependencies & {
+  renewing?: Set<string>;
+};
+
 export async function refreshSnapshots(
   config: BuyerSelectionConfig,
-  dependencies: VerifiedSelectionDependencies,
+  dependencies: SnapshotDependencies,
   clients: Map<string, BuyerControlClient>,
   // Remembered signed catalogs used by this selection, by NodeId, for its quotes.
   recalled: Map<string, SignedPublicV2>,
@@ -188,17 +194,23 @@ export async function refreshSnapshots(
   signal?: AbortSignal,
 ) {
   const skipped = new Set<StaticControlSeller>();
-  const snapshots = await snapshotBatch(
-    config,
-    dependencies,
-    clients,
-    recalled,
-    now,
-    deadline,
-    settling,
-    skipped,
-    signal,
-  );
+  const batch = (
+    sellers: StaticControlSeller[],
+    end: AbortSignal,
+    skippedSellers: Set<StaticControlSeller>,
+  ) =>
+    snapshotBatch(
+      { ...config, sellers },
+      dependencies,
+      clients,
+      recalled,
+      now,
+      end,
+      settling,
+      skippedSellers,
+      signal,
+    );
+  const snapshots = await batch(config.sellers, deadline, skipped);
   // Identity and durable discovery work may settle after the nominal snapshot deadline. A seller
   // skipped earlier must still be considered if its cooldown ended before selection actually runs.
   while (!signal?.aborted) {
@@ -214,19 +226,7 @@ export async function refreshSnapshots(
       ),
       ...(signal ? [signal] : []),
     ]);
-    snapshots.push(
-      ...(await snapshotBatch(
-        { ...config, sellers: recovered },
-        dependencies,
-        clients,
-        recalled,
-        now,
-        nextDeadline,
-        settling,
-        new Set<StaticControlSeller>(),
-        signal,
-      )),
-    );
+    snapshots.push(...(await batch(recovered, nextDeadline, new Set())));
   }
   return snapshots;
 }
@@ -239,13 +239,13 @@ async function beforeSnapshot(
   now: () => number,
   deadline: AbortSignal,
   recalled: Map<string, SignedPublicV2>,
-  refusedIdentity: () => void,
+  failed: ReturnType<typeof failureReporter>,
 ): Promise<{ complete: boolean; known?: KnownSeller }> {
   if (
     dependencies.verifyIdentity &&
     !(await dependencies.verifyIdentity(seller, deadline))
   ) {
-    refusedIdentity();
+    failed(SELLER_FAILURE_PHASES.IDENTITY, SELLER_FAILURES.IDENTITY);
     return { complete: true };
   }
   if (dependencies.snapshots?.retiring(seller.nodeId))
@@ -266,31 +266,32 @@ async function beforeSnapshot(
 async function freshSnapshot(
   client: BuyerControlClient,
   seller: StaticControlSeller,
-  dependencies: VerifiedSelectionDependencies,
+  dependencies: SnapshotDependencies,
   now: () => number,
   deadline: AbortSignal,
-  refusedDiscovery: () => void,
+  failed: ReturnType<typeof failureReporter>,
 ) {
-  const { known, signed } = await verifiedSnapshot(
-    client,
-    seller,
-    now,
-    deadline,
-  );
+  const snapshot = await verifiedSnapshot(client, seller, now, deadline);
+  const { known, signed } = snapshot;
   if (
     dependencies.observeVerified &&
     !(await dependencies.observeVerified(known))
   ) {
-    refusedDiscovery();
+    failed(SELLER_FAILURE_PHASES.DISCOVERY, SELLER_FAILURES.DISCOVERY);
     return undefined;
   }
   dependencies.snapshots?.set(seller, known, signed);
   return known;
 }
 
+function forgetStale(dependencies: SnapshotDependencies, nodeId: string) {
+  dependencies.renewing?.add(nodeId);
+  dependencies.snapshots?.drop(nodeId);
+  return null;
+}
 async function snapshotBatch(
   config: BuyerSelectionConfig,
-  dependencies: VerifiedSelectionDependencies,
+  dependencies: SnapshotDependencies,
   clients: Map<string, BuyerControlClient>,
   recalled: Map<string, SignedPublicV2>,
   now: () => number,
@@ -316,8 +317,7 @@ async function snapshotBatch(
             now,
             deadline,
             recalled,
-            () =>
-              failed(SELLER_FAILURE_PHASES.IDENTITY, SELLER_FAILURES.IDENTITY),
+            failed,
           );
           if (remembered.complete) return remembered.known;
           deadline.throwIfAborted();
@@ -335,11 +335,7 @@ async function snapshotBatch(
             dependencies,
             now,
             deadline,
-            () =>
-              failed(
-                SELLER_FAILURE_PHASES.DISCOVERY,
-                SELLER_FAILURES.DISCOVERY,
-              ),
+            failed,
           );
         } catch (error) {
           if (
@@ -350,16 +346,19 @@ async function snapshotBatch(
             ].some((code) => error.code === code)
           )
             throw error;
-          const retryAt = connectFailed(
-            seller,
-            clients,
-            settling,
-            dependencies,
-            now(),
-            pinned,
-            signal,
-          );
-          failed(SELLER_FAILURE_PHASES.CONNECT, failureCode(error), retryAt);
+          const code = failureCode(error);
+          const retryAt = staleSellerCatalog(error)
+            ? forgetStale(dependencies, seller.nodeId)
+            : connectFailed(
+                seller,
+                clients,
+                settling,
+                dependencies,
+                now(),
+                pinned,
+                signal,
+              );
+          failed(SELLER_FAILURE_PHASES.CONNECT, code, retryAt);
           return undefined;
         }
       }),

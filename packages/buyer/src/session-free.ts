@@ -12,6 +12,7 @@ import { executeSelectedBuyerFree } from './free-execution';
 import type { ChatResult } from './free-sse';
 import type { BuyerExecutionFactory } from './free-startup';
 import { fittedAnswer } from './input-size';
+import type { delegatedFreeResends } from './quote-selection';
 import type { makeManager } from './session-manager';
 
 type Context = Parameters<BuyerExecutionFactory>[0];
@@ -23,6 +24,7 @@ export function freeSessionExecution(
   permission: Parameters<typeof reserveApiKey>[0],
   onDelta: Parameters<Awaited<ReturnType<BuyerExecutionFactory>>['execute']>[2],
   onUnfit: () => void,
+  retries: ReturnType<typeof delegatedFreeResends>,
 ): BuyerRoutePorts<ChatResult>['free'] {
   return (winner, current, sending) =>
     executeApiKeyFree(permission, winner.quote, current, () =>
@@ -38,6 +40,7 @@ export function freeSessionExecution(
           sending?.();
         },
         onUnfit,
+        retries.onResend,
       ),
     );
 }

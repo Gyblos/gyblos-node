@@ -50,7 +50,7 @@
   "packages/buyer/src/free-chat-error.ts": 3,
   "packages/buyer/src/free-chat.ts": 11,
   "packages/buyer/src/free-context.ts": 12,
-  "packages/buyer/src/free-execution.ts": 34,
+  "packages/buyer/src/free-execution.ts": 33,
   "packages/buyer/src/free-http.ts": 8,
   "apps/buyer/src/free-main.ts": 6,
   "packages/buyer/src/free-memory.ts": 13,

@@ -1075,13 +1075,13 @@ details matter when you change or debug the endpoint:
   compact the conversation instead of stopping. A network where every fitting
   seller is cooling down still answers 503 with `Retry-After`.
 - **Status codes.** 400 for an invalid request or one beyond the quote's limits,
-  413 for an oversized body, 429 when the endpoint already runs as many requests
-  as it can (safe to retry), 503 when no seller could take the request, 504 when
-  the 180-second deadline expires, and 500 for an unexpected failure. Whenever
-  the prompt may already have reached a seller, or the request is the caller's
-  fault, the error carries `x-should-retry: false`. Clients that retry 5xx on
-  their own must check it: a retry would resend the prompt, possibly to another
-  seller.
+  413 for an oversized body, 429 when the local admission queue is full (safe to
+  retry), 503 when no seller could take the request, 504 when the deadline
+  expires. Expiry in the local queue sets `gyblos_never_sent: true` and is safe
+  to retry. An unexpected failure returns 500. Whenever the prompt may already
+  have reached a seller, or the request is the caller's fault, the error carries
+  `x-should-retry: false`. Clients that retry 5xx on their own must check it: a
+  retry would resend the prompt, possibly to another seller.
 - **Refusals.** `FREE_BUYER_INVALID_REQUEST` (400) names the field in
   `error.param` and says why in `error.message`, using fixed text or the
   operator's own limits, never the prompt. In the Anthropic format errors take

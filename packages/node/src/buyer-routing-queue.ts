@@ -82,3 +82,20 @@ export function createBuyerQueue(owners: Map<string, symbol>) {
     },
   };
 }
+
+export function createQuoteQueue() {
+  const selections = new Map<string | undefined, Promise<unknown>>();
+  return {
+    run<T>(scope: string | undefined, select: () => Promise<T>) {
+      const previous = selections.get(scope) ?? Promise.resolve();
+      const running = previous.then(select, select);
+      selections.set(scope, running);
+      const clear = () => {
+        if (selections.get(scope) === running) selections.delete(scope);
+      };
+      void running.then(clear, clear);
+      return running;
+    },
+    drain: () => Promise.allSettled(selections.values()),
+  };
+}

@@ -47,6 +47,7 @@ import {
 } from './constants';
 import { errorDiagnostic } from './diagnostics';
 import { FreeBuyerError } from './free-chat';
+import { AfterFreeDispatch } from './free-chat-error';
 
 const CODES = [
   ...Object.values(PROTOCOL_ERROR_CODES),
@@ -127,7 +128,9 @@ export function httpDiagnostics(sink?: DiagnosticSink) {
       failure: (error: unknown) =>
         report({
           phase,
-          code: failureCode(error),
+          code: failureCode(
+            error instanceof AfterFreeDispatch ? error.subsequent : error,
+          ),
           cause: diagnosticCause(error),
         }),
       timeout: () =>

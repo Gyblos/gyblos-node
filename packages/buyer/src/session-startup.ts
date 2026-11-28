@@ -21,7 +21,6 @@ import {
 import { ownedChat } from './chat-owned';
 import { PAID_BUYER_HTTP_MS } from './constants';
 import { observeBuyerExecution } from './execution-observation';
-import { unfitOutcome } from './free-execution';
 import type { SelectionRoute } from './free-route';
 import { selectWinner } from './free-selection';
 import type { ChatPayment, ChatResult } from './free-sse';
@@ -31,6 +30,7 @@ import { requireBuyerIdentity } from './identity';
 import { routedRequest } from './model-routes';
 import {
   automaticPoolRoute,
+  delegatedFreeResends,
   openDiscoveryRequest,
   selectAffordableAutoQuote,
   selectConfiguredThenOpen,
@@ -114,7 +114,7 @@ function sessionSelection(
   context: Context,
   options: BuyerStartupOptions,
   buyer: string,
-  request: Context['prepared']['config']['request'],
+  getRequest: () => Context['prepared']['config']['request'],
   input: Parameters<Awaited<ReturnType<BuyerExecutionFactory>>['execute']>[0],
   permission: Parameters<typeof reserveApiKey>[0],
   router: ReturnType<typeof sessionRouter> | undefined,
@@ -127,6 +127,7 @@ function sessionSelection(
     current: AbortSignal,
     route: Parameters<BuyerRoutePorts<ChatResult>['select']>[2],
   ) => {
+    const request = getRequest();
     const policy = {
       ...request,
       maxAtomic: permission?.ceiling(request.maxAtomic) ?? request.maxAtomic,
@@ -235,11 +236,14 @@ function sessionExecutor(
     const request = routedRequest(config.request, model);
     if (model?.sellerChoice && !permission && request.maxAtomic !== '0')
       await manager.prepareChoice(model.sellerChoice.expiresAt, signal);
+    const retries = delegatedFreeResends(
+      Boolean(permission && context.dependencies.resendAfterSend),
+    );
     const select = sessionSelection(
       context,
       options,
       buyer,
-      request,
+      () => retries.request(request),
       input,
       permission,
       router,
@@ -247,8 +251,12 @@ function sessionExecutor(
       model?.sellerChoice,
     );
     let unfit = false;
+    const onUnfit = () => {
+      unfit = true;
+    };
     const paidInput = withBatchOutputLimit(input);
     const ports: BuyerRoutePorts<ChatResult> = {
+      takeFreeResend: retries.takeFreeResend,
       select: fittingSelect(
         config.discovery?.paidAuto && !model?.sellerChoice
           ? (excluded, current, route) =>
@@ -260,9 +268,7 @@ function sessionExecutor(
               )
           : select,
         input,
-        () => {
-          unfit = true;
-        },
+        onUnfit,
         parseBuyerRoutingPolicy(config.routing),
       ),
       free: freeSessionExecution(
@@ -271,11 +277,11 @@ function sessionExecutor(
         input,
         permission,
         onDelta,
-        () => {
-          unfit = true;
-        },
+        onUnfit,
+        retries,
       ),
       paid: (winner, current, sending) => {
+        if (retries.failure()) throw retries.failure();
         if (model?.freeOnly) return sessionFail(SESSION_CODES.LIMIT);
         return observeBuyerExecution(
           context.dependencies,
@@ -314,7 +320,7 @@ function sessionExecutor(
             signal,
           )
     ).catch((error: unknown) => {
-      throw unfit ? unfitOutcome(error) : error;
+      throw retries.selectionError(error, unfit);
     });
     return { ...routed.result, execution: routed.kind };
   };
@@ -329,10 +335,7 @@ export async function startSessionQuoteRuntime(
     return sessionFail();
   requireBuyerIdentity(prepared.config, prepared.identity);
   const token = await endpointToken();
-  const state: SessionState = {
-    selections: new Map(),
-    sending: new Map(),
-  };
+  const state: SessionState = { selections: new Map(), sending: new Map() };
   const manager = makeManager(context, options, policy, state);
   const router =
     policy.totalDepositAtomic === undefined
@@ -355,7 +358,6 @@ export async function startSessionQuoteRuntime(
     confirmKeyCharge: manager.confirmKeyCharge,
     inspectChannel: manager.inspectChannel,
     sellerChoice: true,
-    singlePaidChannel: !router && prepared.config.request.maxAtomic !== '0',
     reconcilePool: router
       ? () => checkDesktopPool(manager, () => router.activeRequests() > 0)
       : undefined,

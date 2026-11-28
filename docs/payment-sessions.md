@@ -321,9 +321,11 @@ Rerouting rules:
   valid. An expired or missing reference returns busy instead of rerouting.
 - Every alternative passes fresh identity, replay, model, reasoning, network,
   asset and quote checks.
-- Rerouting ends before the first possible prompt write. A failed or partial
-  write, a remote refusal or a lost response never sends the prompt elsewhere. A
-  busy reply after the prompt was written is final.
+- A possible paid dispatch ends rerouting. A remote refusal or any visible
+  output also ends the request. Under safe failover, a delegated request to a
+  verified free offer can move to another verified free seller after a lost
+  connection or local read timeout before output, up to two resends within its
+  deadline.
 
 A healthy request on seller A doesn't block seller B. If A becomes uncertain,
 new requests stop; B finishes if its prompt was already sent and is cancelled
@@ -331,7 +333,8 @@ otherwise. Settlement and reconciliation refuse while requests are active.
 
 ### Waiting for the selected seller
 
-`onBusy: "wait"` never reroutes:
+`onBusy: "wait"` keeps a request with its selected seller while that seller is
+busy:
 
 - It admits at most one waiter per seller, within the buyer's two-request total.
   Two running calls leave no queue slot; one running call on A can have one
@@ -346,8 +349,10 @@ otherwise. Settlement and reconciliation refuse while requests are active.
   prices still bound it unless higher prices are allowed. No deposit or request
   authorization starts while the request is queued.
 - If the seller stays busy, control-only polls share the original wait deadline.
-  A failure other than busy ends the call; it never changes sellers or retries a
-  prompt.
+  A possible paid send ends the call. For a delegated request sent to a verified
+  free offer, safe failover can retry a lost connection or a local read timeout
+  before any visible output. A seller explicitly pinned by the operator remains
+  pinned.
 
 ## Lifecycle
 

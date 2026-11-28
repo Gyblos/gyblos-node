@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { BUYER_SELECTION } from '@gyblos/buyer/constants';
-import { createBuyerControlClient } from '@gyblos/buyer/control';
+import { createBuyerControlClient, SellerRefusal } from '@gyblos/buyer/control';
 import { selectVerifiedBuyerQuote } from '@gyblos/buyer/selection';
 import { createSnapshotCache } from '@gyblos/buyer/selection-cache';
 import { CONTROL_CODES } from '@gyblos/protocol/constants';
@@ -19,6 +19,7 @@ async function rig(t: test.TestContext) {
   const snapshots = createSnapshotCache();
   let failNext = false;
   let staleNext = false;
+  let staleCatalogs = 0;
   let connects = 0;
   const dependencies = {
     ...run.dependencies,
@@ -31,7 +32,15 @@ async function rig(t: test.TestContext) {
         { ...run.trust(), now: run.context.now },
       );
       const original = client.requestOffer.bind(client);
+      const catalog = client.getCatalog.bind(client);
       return Object.assign(client, {
+        getCatalog: (...args: Parameters<typeof catalog>) => {
+          if (staleCatalogs > 0) {
+            staleCatalogs--;
+            throw new SellerRefusal(CONTROL_CODES.STALE);
+          }
+          return catalog(...args);
+        },
         requestOffer: async (
           ...args: Parameters<typeof client.requestOffer>
         ) => {
@@ -58,6 +67,9 @@ async function rig(t: test.TestContext) {
     select,
     failOnce: () => {
       failNext = true;
+    },
+    staleCatalogs: (count: number) => {
+      staleCatalogs = count;
     },
     staleOnce: () => {
       staleNext = true;
@@ -167,3 +179,17 @@ void test('a full memory forgets expired sellers before the current ones', () =>
   assert.ok(cache.get(seller('current'), Date.now()));
   assert.ok(cache.get(seller('new'), Date.now()));
 });
+
+for (const failures of [1, 2])
+  void test(`fresh catalog stale ${failures} times retries once without cooling the seller`, async (t) => {
+    const host = await rig(t);
+    host.staleCatalogs(failures);
+    const result = await host.select();
+    assert.equal(result.ok, failures === 1);
+    assert.equal(host.connects(), 2);
+    assert.equal(
+      host.dependencies.stats.get(host.run.config.sellers[0]!.nodeId)
+        ?.failures ?? 0,
+      0,
+    );
+  });

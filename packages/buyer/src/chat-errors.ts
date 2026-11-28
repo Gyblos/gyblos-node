@@ -18,6 +18,7 @@ import { defaultChatApi, type ChatApi } from './chat-api';
 import { FREE_BUYER, FREE_BUYER_CODES, FREE_CHAT_DETAILS } from './constants';
 import { sellerContextFull } from './context-full';
 import { FreeBuyerError } from './free-chat';
+import { UnsentAdmissionTimeout } from './free-chat-error';
 import { FreeSelectionFailure } from './free-execution';
 import {
   replyFreeSseError,
@@ -43,6 +44,7 @@ export interface ChatErrorView {
 export type ChatErrorClassifier = (error: unknown) => ChatErrorView | undefined;
 // True only when the prompt certainly never left this process; anything else may have been sent.
 function neverSent(error: unknown) {
+  if (error instanceof UnsentAdmissionTimeout) return true;
   if (error instanceof FreeClientError) return !error.sent && !error.remote;
   if (error instanceof FreeExecutionError) return !error.remote;
   if (error instanceof FreeBuyerError)
@@ -65,7 +67,7 @@ function errorStatus(error: unknown, code: string) {
     return HTTP_STATUS.serviceUnavailable;
   return HTTP_STATUS.internalServerError;
 }
-function freeErrorView(error: unknown): ChatErrorView {
+export function freeErrorView(error: unknown): ChatErrorView {
   const keyError = buyerApiKeyErrorView(error);
   if (keyError) return keyError;
   const known =

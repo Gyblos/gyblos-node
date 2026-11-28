@@ -1,8 +1,15 @@
 // Only an active request's independently verified quote may bound fallback while its transport is occupied.
 // This is price authority for the same listing only, never trust or execution authorization for a new request.
+import {
+  fallbackPriceCeilings,
+  type BuyerRoutingPolicy,
+} from '@gyblos/core/buyer-routing';
+import { BUYER_BUSY_POLICIES } from '@gyblos/core/constants';
 import type { TokenPricesV2 } from '@gyblos/protocol/control-types';
 
+import { PaidBuyerError } from './buyer-paid-error';
 import type { BuyerQuoteWinner } from './buyer-quote-execution';
+import { PAID_BUYER_CODES } from './constants';
 
 // The exact listing one request prices (its selection, reasoning, network and asset), as an opaque key.
 // A busy seller's price reference bounds another request's fallback only when both keys match.
@@ -54,4 +61,16 @@ export function createRoutingReferences(now: () => number = Date.now) {
       if (entries.get(nodeId)?.owner === owner) entries.delete(nodeId);
     },
   };
+}
+
+export function nextQuoteCeilings(
+  policy: BuyerRoutingPolicy,
+  prices: TokenPricesV2,
+  current: TokenPricesV2,
+  freeResend: boolean,
+) {
+  if (freeResend) return prices;
+  if (policy.onBusy === BUYER_BUSY_POLICIES.WAIT)
+    throw new PaidBuyerError(PAID_BUYER_CODES.UNAVAILABLE);
+  return fallbackPriceCeilings(policy, prices, current)!;
 }
