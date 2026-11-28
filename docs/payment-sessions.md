@@ -147,8 +147,8 @@ renewal enabled, a fresh user question can open one same-seller replacement
 after the charge and refund are verified. Replaying the interrupted user
 conversation cannot authorize another execution on a paid route or its automatic
 free fallback. The owner can explicitly select Free in Desktop to send the same
-question as a new free request. Older journals without a matching question fingerprint remain
-under review.
+question as a new free request. Older journals without a matching question
+fingerprint remain under review.
 
 To enable, change or disable renewal from Desktop, wait for pending requests and
 open **Usage & payments → Limits**. If a paid Chat budget is active, choose
