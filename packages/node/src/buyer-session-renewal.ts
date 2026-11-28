@@ -111,9 +111,10 @@ export async function prepareRenewal<Remote extends BatchDestination>(
     quote,
     stored.priorSpentAtomic,
   );
-  if (options.policy.renewalBudgetAtomic !== undefined) {
+  if (snapshot.state !== SESSION_STATES.CLOSED || stored.settledPartial) {
     const expected = replacement(snapshot.cumulativeAtomic);
-    await checkWallet(state, opened, expected, signal);
+    if (options.policy.renewalBudgetAtomic !== undefined)
+      await checkWallet(state, opened, expected, signal);
   }
   const settlement = snapshot.channelId
     ? ((await opened.host.reconcile(signal)) ??
