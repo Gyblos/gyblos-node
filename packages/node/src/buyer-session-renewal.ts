@@ -60,6 +60,7 @@ export async function prepareRenewal<Remote extends BatchDestination>(
       quote.offer.nodeId,
     );
   const proposed = newSessionTerms(quote, options.policy, options.now());
+  const stored = await options.inspect();
   if (options.policy.renewalBudgetAtomic !== undefined)
     checkRenewalTerms(
       opened.terms,
@@ -68,11 +69,11 @@ export async function prepareRenewal<Remote extends BatchDestination>(
       options.now(),
       switching,
       canRenew,
+      stored?.settledPartial === true,
     );
   const verify = (terms: PaymentSessionTerms) =>
     verifyReplacementQuote(state, quote, terms);
   await verify(proposed);
-  const stored = await options.inspect();
   if (!stored || stored.pending) return sessionFail(SESSION_CODES.UNVERIFIED);
   if (stored.renewalLimitReached)
     throw new UnsentChannelLimitError(quote.offer.nodeId);
@@ -82,10 +83,9 @@ export async function prepareRenewal<Remote extends BatchDestination>(
     quote,
     stored.priorSpentAtomic,
   );
-  if (snapshot.state !== SESSION_STATES.CLOSED) {
+  if (options.policy.renewalBudgetAtomic !== undefined) {
     const expected = replacement(snapshot.cumulativeAtomic);
-    if (options.policy.renewalBudgetAtomic !== undefined)
-      await checkWallet(state, opened, expected, signal);
+    await checkWallet(state, opened, expected, signal);
   }
   const settlement = snapshot.channelId
     ? ((await opened.host.reconcile(signal)) ??
@@ -142,11 +142,13 @@ function checkRenewalTerms(
   now: number,
   switching: boolean,
   canRenew: boolean,
+  settledPartial: boolean,
 ) {
   if (
     !canRenew ||
     switching ||
-    snapshot.state !== SESSION_STATES.OPEN ||
+    (snapshot.state !== SESSION_STATES.OPEN &&
+      !(settledPartial && snapshot.state === SESSION_STATES.CLOSED)) ||
     snapshot.reservedAtomic !== '0'
   )
     throw new UnsentSellerChoiceError(
@@ -179,7 +181,7 @@ async function checkWallet<Remote extends BatchDestination>(
   signal: AbortSignal,
 ) {
   const previous = opened.terms;
-  const spent = opened.financial.snapshot().cumulativeAtomic;
+  const snapshot = opened.financial.snapshot();
   const backend = await state.backend;
   const available = await bounded(
     backend?.availableBalance?.(previous, signal) ?? Promise.resolve(null),
@@ -191,7 +193,10 @@ async function checkWallet<Remote extends BatchDestination>(
       SESSION_CODES.STATUS_UNKNOWN,
       next.sellerNodeId,
     );
-  const refundable = BigInt(previous.depositAtomic) - BigInt(spent);
+  const refundable =
+    snapshot.state === SESSION_STATES.CLOSED
+      ? 0n
+      : BigInt(previous.depositAtomic) - BigInt(snapshot.cumulativeAtomic);
   if (BigInt(available) + refundable < BigInt(next.depositAtomic))
     throw new UnsentChannelLimitError(next.sellerNodeId);
 }

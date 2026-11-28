@@ -54,6 +54,7 @@ export type ConfirmKeyCharge = (
   signal: AbortSignal,
 ) => Promise<string | undefined>;
 export class BuyerApiKeys {
+  private nextReviewAt = 0;
   private proof?: Promise<void>;
   private readonly checked = new Set<string>();
   private failed = false;
@@ -66,6 +67,7 @@ export class BuyerApiKeys {
     private readonly files: BuyerApiKeyFiles,
     private readonly confirmCharge?: ConfirmKeyCharge,
     sink?: DiagnosticSink,
+    private readonly reviewOnRequest = false,
   ) {
     const catalog = BUYER_KEY_LEDGER_DIAGNOSTICS;
     this.diagnostics = createDiagnostics({
@@ -259,8 +261,12 @@ export class BuyerApiKeys {
       this.state.pending,
       this.active,
       this.checked,
-      manual,
+      manual ||
+        (this.reviewOnRequest && performance.now() >= this.nextReviewAt),
     );
+    if (queue.length && this.reviewOnRequest)
+      this.nextReviewAt =
+        performance.now() + BUYER_PAYMENT_REVIEW.offsetsMs.at(-1)!;
     const deadline = AbortSignal.timeout(BUYER_PAYMENT_REVIEW.deadlineMs);
     const review = async () => {
       while (!deadline.aborted && !this.closed) {
@@ -388,6 +394,7 @@ export async function createBuyerApiKeys(options: {
   scope: BuyerKeyScope;
   confirmCharge?: ConfirmKeyCharge;
   diagnostics?: DiagnosticSink;
+  reviewOnRequest?: boolean;
 }) {
   const scope = parseBuyerKeyScope(options.scope);
   return new BuyerApiKeys(
@@ -395,5 +402,6 @@ export async function createBuyerApiKeys(options: {
     options.files,
     options.confirmCharge,
     options.diagnostics,
+    options.reviewOnRequest,
   );
 }

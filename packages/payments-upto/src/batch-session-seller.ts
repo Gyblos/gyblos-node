@@ -29,7 +29,11 @@ import {
   termsFor,
   voucherFor,
 } from './batch-session-checks';
-import { closeBatch, tickBatch } from './batch-session-close';
+import {
+  closeBatch,
+  observeBatchSettlement,
+  tickBatch,
+} from './batch-session-close';
 import {
   active,
   initialRecord,
@@ -131,6 +135,7 @@ export async function createBatchSeller(
       exclusive(() => finishSeller(context, requestId, chargedAtomic)),
     accept: (bill, voucher, peer) =>
       exclusive(() => acceptSeller(context, bill, voucher, peer)),
+    observeSettlement: () => exclusive(() => observeBatchSettlement(context)),
     close: () => exclusive(() => closeBatch(context)),
     tick: () => exclusive(() => tickBatch(context)),
     snapshot: () => snapshot(store),

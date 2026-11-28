@@ -359,7 +359,13 @@ export function makeManager(
     ...manager,
     checkChannel,
     inspectChannel: pickerChannel(context, options, state),
-    confirmKeyCharge: keyProof(context, options),
+    confirmKeyCharge: keyProof(
+      context,
+      options,
+      policy.renewalBudgetAtomic && 'reconcile' in manager
+        ? manager.reconcile
+        : undefined,
+    ),
     previousSeller: () =>
       previousSeller(policy.totalDepositAtomic, common.inspect),
     preparePaidChat: async () => {

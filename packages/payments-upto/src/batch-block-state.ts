@@ -43,12 +43,22 @@ export function parseBlocks(
   for (const [key, raw] of Object.entries(value)) {
     controlHex(key, PAYMENT_SESSION.requestIdBytes);
     if (!Object.hasOwn(requests, key)) return sessionFail();
-    const row = controlObject(raw, ['baseAtomic', 'accepted', 'pending']);
+    const row = controlObject(raw, [
+      'baseAtomic',
+      'accepted',
+      'pending',
+      ...(raw && typeof raw === 'object' && Object.hasOwn(raw, 'questionDigest')
+        ? ['questionDigest']
+        : []),
+    ]);
     const pending =
       row.pending === null
         ? null
         : controlObject(row.pending, ['intent', 'voucher']);
     blocks[key] = {
+      ...(row.questionDigest !== undefined && {
+        questionDigest: controlHex(row.questionDigest),
+      }),
       baseAtomic: controlAtomic(row.baseAtomic),
       accepted:
         row.accepted === null ? null : parseSessionBlockIntent(row.accepted),

@@ -162,11 +162,6 @@ async function operation(
       state.current !== undefined &&
       canonicalJson(state.current.terms) !== canonicalJson(proposed);
     const terms = ownTerms(proposed, options, !state.current || replacing);
-    await refuseBusyOrRebind(
-      state,
-      replacing,
-      request.method === BATCH_METHODS.OPEN,
-    );
     const offer = await verifyBatchQuote(
       request.params.quote,
       terms,
@@ -180,6 +175,16 @@ async function operation(
     const live = batchLiveOffer(offer, options.offers(), options.now());
     if (blockMode && !live.meter.stablePrefix)
       return batchFail(SESSION_CODES.UNAVAILABLE);
+    if (
+      replacing &&
+      state.current?.session.snapshot().state === SESSION_STATES.OPEN
+    )
+      await state.current.session.observeSettlement?.();
+    await refuseBusyOrRebind(
+      state,
+      replacing,
+      request.method === BATCH_METHODS.OPEN,
+    );
     if (request.method === BATCH_METHODS.PREPARE || !state.current || replacing)
       await options.admit?.();
     if (request.method === BATCH_METHODS.PREPARE) return { terms };

@@ -141,6 +141,13 @@ can renew between requests after verification of the seller, payment roles,
 wallet balance and settlement. An unknown balance or an uncertain payment stops
 the request before a replacement deposit.
 
+If a streamed reply ends after a signed output block, the buyer keeps the
+partial delivery and checks for final settlement on subsequent requests. With
+renewal enabled, a fresh user question can open one same-seller replacement
+after the charge and refund are verified. Replaying the interrupted user
+conversation cannot authorize another paid execution. Older journals without a
+matching question fingerprint remain under review.
+
 To enable, change or disable renewal from Desktop, wait for pending requests and
 open **Usage & payments → Limits**. If a paid Chat budget is active, choose
 **Manage chat budget → Finish session** before changing the renewal budget.

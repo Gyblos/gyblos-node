@@ -21,12 +21,14 @@ import type {
   BatchEndpoint,
 } from '@gyblos/transport-iroh/batch-client';
 
+import { buyerQuestionDigest } from './batch-block-buyer';
 import { createBuyerBatchSession } from './batch-buyer';
 import type { BuyerBatchSessionOptions } from './batch-buyer-types';
 import {
   channelTurnAuthority,
   prepareNewChannel,
   UnsentChannelRequestError,
+  UnsentSellerChoiceError,
   type PreparedChannel,
   type StartChannelWork,
 } from './buyer-channel-prepare';
@@ -222,6 +224,14 @@ async function run<Remote extends BatchDestination>(
   await bounded(options.verify(quote, signal), signal);
   if (await bounded(options.unresolved(), signal))
     return sessionFail(SESSION_CODES.UNVERIFIED);
+  const stored = await bounded(options.inspect(), signal);
+  if (
+    stored?.interruptedQuestions?.includes(buyerQuestionDigest(input.messages))
+  )
+    throw new UnsentSellerChoiceError(
+      SESSION_CODES.STATUS_UNKNOWN,
+      quote.offer.nodeId,
+    );
   const opened = await current(state, quote, signal, start);
   checkChannelAuthority(
     options.policy,

@@ -169,6 +169,25 @@ export async function paidChannelEligibility(
     const switching = terms.sellerNodeId !== selection.nodeId;
     if (!switching && terms.owner !== selection.owner)
       return unavailable(SESSION_CODES.BINDING);
+    if (
+      stored.settledPartial &&
+      !switching &&
+      selection.renewalPolicy?.renewalBudgetAtomic &&
+      !stored.renewalLimitReached &&
+      now() < terms.expiresAt
+    ) {
+      const deposit = remainingDepositAuthority(
+        selection.renewalPolicy,
+        stored.priorSpentAtomic,
+        snapshot.cumulativeAtomic,
+      );
+      if (deposit >= BigInt(BATCH_SESSION_DEFAULTS.minDepositAtomic))
+        return {
+          blocker: null,
+          channelRemainingAtomic: '0',
+          renewalDepositAtomic: String(deposit),
+        };
+    }
     if (stored.pending || stored.recoverable)
       return unavailable(SESSION_CODES.STATUS_UNKNOWN);
     if (snapshot.state === SESSION_STATES.CLOSED)
