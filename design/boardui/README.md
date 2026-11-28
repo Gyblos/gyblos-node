@@ -1,7 +1,9 @@
 # BoardUI catalog for the Explorer
 
-This workspace holds the official component sources for design review. From the
-repository root, run `pnpm install --frozen-lockfile`, then
+The shipped Explorer's operative design contract is
+[apps/explorer/DESIGN.md](../../apps/explorer/DESIGN.md). This workspace holds
+the official component sources for design review. From the repository root, run
+`pnpm install --frozen-lockfile`, then
 `pnpm --filter @gyblos/boardui-catalog sync` and
 `pnpm --filter @gyblos/boardui-catalog typecheck`. The CLI version and npm
 dependencies are locked. The CLI fetches the current public registry, so
