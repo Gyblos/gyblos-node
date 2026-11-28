@@ -32,6 +32,7 @@ import {
   buyerKeyReviewQueue,
   buyerKeyState,
   keyReservation,
+  parseCompletedKey,
   type BuyerKeyReservation,
   type BuyerKeyState,
 } from './buyer-api-key-state';
@@ -54,6 +55,7 @@ export type ConfirmKeyCharge = (
   signal: AbortSignal,
 ) => Promise<string | undefined>;
 export class BuyerApiKeys {
+  private nextReviewAt = 0;
   private proof?: Promise<void>;
   private readonly checked = new Set<string>();
   private failed = false;
@@ -66,6 +68,7 @@ export class BuyerApiKeys {
     private readonly files: BuyerApiKeyFiles,
     private readonly confirmCharge?: ConfirmKeyCharge,
     sink?: DiagnosticSink,
+    private readonly reviewOnRequest = false,
   ) {
     const catalog = BUYER_KEY_LEDGER_DIAGNOSTICS;
     this.diagnostics = createDiagnostics({
@@ -259,8 +262,12 @@ export class BuyerApiKeys {
       this.state.pending,
       this.active,
       this.checked,
-      manual,
+      manual ||
+        (this.reviewOnRequest && performance.now() >= this.nextReviewAt),
     );
+    if (queue.length && this.reviewOnRequest)
+      this.nextReviewAt =
+        performance.now() + BUYER_PAYMENT_REVIEW.offsetsMs.at(-1)!;
     const deadline = AbortSignal.timeout(BUYER_PAYMENT_REVIEW.deadlineMs);
     const review = async () => {
       while (!deadline.aborted && !this.closed) {
@@ -295,6 +302,7 @@ export class BuyerApiKeys {
     let reserved = false;
     let maximum: string | undefined;
     return {
+      keyId,
       signal: controller.signal,
       reserved: () => reserved,
       completed: () => finished,
@@ -358,36 +366,13 @@ export class BuyerApiKeys {
     await this.files.close?.();
   }
 }
-function parseCompletedKey(
-  key: BuyerKeyState['keys'][number],
-  reserved: string,
-  charge: string,
-  kind: BuyerKeyCharge,
-) {
-  const { digest: secretDigest, ...summary } = key;
-  return {
-    ...parseBuyerApiKeySummary({
-      ...summary,
-      reservedAtomic: String(BigInt(key.reservedAtomic) - BigInt(reserved)),
-      spentAtomic: String(BigInt(key.spentAtomic) + BigInt(charge)),
-      settledAtomic: String(
-        BigInt(key.settledAtomic) +
-          (kind === BUYER_KEY_CHARGE.SETTLED ? BigInt(charge) : 0n),
-      ),
-      approvedAtomic: String(
-        BigInt(key.approvedAtomic) +
-          (kind === BUYER_KEY_CHARGE.APPROVED ? BigInt(charge) : 0n),
-      ),
-    }),
-    digest: secretDigest,
-  };
-}
 export type BuyerApiKeyOperation = ReturnType<BuyerApiKeys['operation']>;
 export async function createBuyerApiKeys(options: {
   files: BuyerApiKeyFiles;
   scope: BuyerKeyScope;
   confirmCharge?: ConfirmKeyCharge;
   diagnostics?: DiagnosticSink;
+  reviewOnRequest?: boolean;
 }) {
   const scope = parseBuyerKeyScope(options.scope);
   return new BuyerApiKeys(
@@ -395,5 +380,6 @@ export async function createBuyerApiKeys(options: {
     options.files,
     options.confirmCharge,
     options.diagnostics,
+    options.reviewOnRequest,
   );
 }

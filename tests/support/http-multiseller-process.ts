@@ -118,10 +118,11 @@ export async function httpMultiSeller(
             64,
           ).map((value) => controlInteger(value, 0, 255)),
         ),
-      async start() {
-        const row = controlObject(await ipc.call(HTTP_MULTI_METHODS.START), [
-          'directAddresses',
-        ]);
+      async start(partialFallback: boolean) {
+        const row = controlObject(
+          await ipc.call(HTTP_MULTI_METHODS.START, partialFallback),
+          ['directAddresses'],
+        );
         return controlArray(row.directAddresses, 8).map((value) =>
           controlText(value),
         );

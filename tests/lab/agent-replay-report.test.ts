@@ -23,6 +23,7 @@ const base: ReplayRecord = {
   code: null,
   sellerCount: 1,
   traced: true,
+  admissionMs: 2,
   sellers: [1],
   waitsMs: [5],
 };
@@ -35,6 +36,7 @@ void test('a stream that emits text and then an error is a failure, not a served
   assert.equal(summary.served, 1);
   assert.deepEqual(summary.failures, { '200:SELLER_FAILED': 1 });
   assert.equal(summary.totalMs.p95, 30);
+  assert.equal(summary.admissionMs.p95, 2);
   assert.equal(summary.failedTotalMs.p95, 900);
 });
 

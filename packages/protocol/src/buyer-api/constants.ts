@@ -8,6 +8,7 @@ export const BUYER_API = {
   PAID_PREPARATION_HEADER: 'gyblos-paid-preparation',
   CHANNEL_CHAT_PATH: '/v1/gyblos/channel-chat',
   AUTO: 'auto',
+  EXPLICIT_FREE_HEADER: 'gyblos-explicit-free',
   AUTO_FIELD: 'gyblos_auto',
   FREE_ONLY_FIELD: 'gyblos_free_only',
   OPENING_INTENT_FIELD: 'gyblos_opening_intent',
@@ -29,6 +30,10 @@ export const BUYER_API = {
   ADDRESS_PATTERN: /^[1-9A-HJ-NP-Za-km-z]{32,44}$/,
 } as const;
 export const BUYER_SIDECAR = {
+  SET_RENEWAL: 'set-renewal',
+  STOP_IF_IDLE: 'stop-if-idle',
+  IDLE: 'buyer-idle',
+  BUSY: 'buyer-busy',
   READY: 'buyer-ready',
   ERROR: 'buyer-error',
   DEPOSIT_MINIMUM: 'BUYER_SESSION_DEPOSIT_BELOW_MINIMUM',

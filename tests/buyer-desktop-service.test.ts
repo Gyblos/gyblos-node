@@ -113,3 +113,37 @@ for (const reason of [
     );
     assert.deepEqual(messages, [{ kind: reason }]);
   });
+
+void test('changing the renewal policy waits for an idle buyer before closing its listener', async () => {
+  const messages: unknown[] = [];
+  let receive = (_event: { data: unknown }) => {};
+  let idle = false;
+  const finished = runBuyerSidecar(
+    {
+      on: (_event, listener) => {
+        receive = listener;
+      },
+      postMessage: (message) => {
+        messages.push(message);
+      },
+    },
+    async () => ({
+      url: 'synthetic',
+      pauseWhenIdle: () => idle,
+      close: async () => {},
+    }),
+    async () => 'synthetic',
+    () => {},
+  );
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  try {
+    receive({ data: BUYER_SIDECAR.STOP_IF_IDLE });
+    assert.deepEqual(messages.at(-1), { kind: BUYER_SIDECAR.BUSY });
+    idle = true;
+    receive({ data: BUYER_SIDECAR.STOP_IF_IDLE });
+    assert.deepEqual(messages.at(-1), { kind: BUYER_SIDECAR.IDLE });
+  } finally {
+    receive({ data: BUYER_SIDECAR.STOP });
+    await finished;
+  }
+});

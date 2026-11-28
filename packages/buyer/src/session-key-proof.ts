@@ -16,6 +16,7 @@ import type { BuyerStartupOptions } from './session-requirements';
 export function keyProof(
   context: Parameters<BuyerExecutionFactory>[0],
   options: BuyerStartupOptions,
+  reconcile?: (signal: AbortSignal) => Promise<unknown>,
 ): ConfirmKeyCharge {
   return async (ref, scope, deadline) => {
     const pool = batchPoolPathsIn(process.env);
@@ -28,23 +29,23 @@ export function keyProof(
       slot && !slot.legacy
         ? batchPoolChannelPaths(pool, ref.sellerNodeId)
         : pool.legacy;
-    return reviewPayment(
-      (signal) =>
-        finalizedKeyCharge(
-          paths,
-          ref,
-          scope,
-          context.endpoint.id().toString(),
-          (terms, channelId) =>
-            options.observeSettlement
-              ? options.observeSettlement(channelId)
-              : batchSessionObserver({
-                  paths,
-                  terms,
-                  rpcUrl: context.role.rpcUrl,
-                }).settlement(channelId, signal),
-        ),
-      deadline,
-    );
+    return reviewPayment(async (signal) => {
+      const charge = await finalizedKeyCharge(
+        paths,
+        ref,
+        scope,
+        context.endpoint.id().toString(),
+        (terms, channelId) =>
+          options.observeSettlement
+            ? options.observeSettlement(channelId)
+            : batchSessionObserver({
+                paths,
+                terms,
+                rpcUrl: context.role.rpcUrl,
+              }).settlement(channelId, signal),
+      );
+      if (charge !== undefined) await reconcile?.(signal);
+      return charge;
+    }, deadline);
   };
 }

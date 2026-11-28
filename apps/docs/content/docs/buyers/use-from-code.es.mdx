@@ -11,6 +11,10 @@ Tu prompt llega al vendedor que lo responde. La máquina de ese vendedor ejecuta
 prompt. No envíes contraseñas, llaves ni otros secretos. Consulta
 [Datos y privacidad](/es/reference/data-and-privacy).
 
+Si se corta una respuesta pagada, conserva el texto parcial y envía una pregunta nueva. Con la renovación autorizada, el comprador comprueba el cargo y el reembolso y puede abrir un reemplazo con el mismo vendedor. Mientras el pago siga pendiente de confirmación, las peticiones pagadas siguen bloqueadas.
+
+Si tu herramienta reintenta la pregunta interrumpida con la misma API key, la selección automática también bloquea ese reintento cuando encuentra un vendedor gratuito. Envía una pregunta nueva para continuar. En Desktop puedes elegir Gratis explícitamente para volver a hacer la pregunta original.
+
 ## Selección automática de vendedor
 
 Auto deja que tu comprador elija un vendedor por ti. Por defecto usa solo ofertas gratis. Para que use ofertas
@@ -30,7 +34,7 @@ Estos límites se aplican al chat y a todas las claves API de este comprador, as
 también los respetan. El máximo por respuesta es el límite del comprador para toda respuesta pagada, no solo
 para Auto, y se mantiene cuando desactivas las ofertas pagadas. Auto pide ofertas firmadas a vendedores
 verificados. Se sigue respetando el saldo de cada clave API, y una clave con límite `0` solo puede usar ofertas
-gratis. Si una herramienta necesita reemplazar un canal existente, revisa el vendedor y el depósito en Desktop. Un cambio de Auto autorizado por el titular puede liquidar el canal anterior y usar el depósito autorizado restante. Para que
+gratis. Antes de activar, cambiar o desactivar la renovación, deja que terminen las peticiones del comprador administrado por la app y abre **Usage & payments → Limits**. Si tienes un presupuesto activo de Chat de pago, elige **Manage chat budget → Finish session**. Para activar la renovación, elige **Set budget**. Ingresa el presupuesto total y elige **Authorize renewal**. En **Manage budget** puedes cambiarlo o elegir **Turn off renewal**. Al desactivarlo, las herramientas pueden seguir usando el saldo del canal ya financiado. Con la renovación activada, OpenCode y tus clientes API pueden seguir con el mismo vendedor cuando el canal se queda sin saldo para la próxima respuesta. El comprador verifica la liquidación y abre un solo reemplazo dentro del límite por depósito, el presupuesto total compartido y el límite de la clave. Las tarifas por token pueden cambiar dentro de los máximos de entrada y salida que aprobaste. Si no alcanza el presupuesto o el pago requiere revisión, la herramienta recibe un error. Con la política de canal predeterminada, un cambio de vendedor en Auto autorizado por el titular puede liquidar el canal anterior y usar el depósito autorizado restante. Para que
 Auto vuelva a usar solo ofertas gratis, desmarca **Allow paid offers in Auto** y elige **Save Auto settings**.
 
 ## Requisitos previos [#antes-de-empezar]
@@ -245,6 +249,10 @@ Lo que pasa cuando un vendedor falla depende de cuánto avanzó la respuesta:
 | Después de que llegó texto a tu herramienta                                        | La solicitud termina con un error; la respuesta no se reinicia en otro lado                                   |
 | El propio vendedor responde con un error (ocupado, límite diario, falla del motor) | La solicitud termina con ese error                                                                            |
 
+Cuando tu agente envía varias solicitudes juntas, el comprador puede admitir hasta cuatro a la vez. Cada solicitud espera un turno dentro de su plazo original. Al cancelar una solicitud en cola, se retira antes de contactar al vendedor. Una cola llena devuelve HTTP 429. Si el vendedor está renovando su catálogo, el comprador puede esperar la renovación dentro de la misma solicitud.
+
+Con una clave de API, el reenvío automático tras un corte de conexión o al agotarse la espera local por la primera respuesta se limita a ofertas gratuitas verificadas y termina en cuanto tu herramienta recibe contenido. Un posible envío pagado termina los reintentos automáticos.
+
 Una conexión cortada puede no entregar ninguna cabecera de respuesta, así que desactiva los reintentos
 HTTP y de stream en tu herramienta. Si reenvías una solicitud tú mismo, empieza una nueva selección de
 vendedor.
@@ -283,7 +291,9 @@ se cierra solo cuando el vendedor termina, y `usage` cuenta todo lo que generó.
 | 404                                                                                  | La app no puede usar ese modelo; el mensaje lista los que sí puede                                |
 | 503                                                                                  | No hay vendedores disponibles. `Retry-After` sugiere cuándo reintentar; reintentar es tu decisión |
 | 503 (Chat Completions, Anthropic Messages), 400 (Responses) `BUYER_KEY_NEEDS_REVIEW` | El registro de API keys requiere revisión. Consulta su estado en **Connections**.                 |
-| 504                                                                                  | El vendedor no respondió a tiempo                                                                 |
+| 504                                                                                  | Venció el plazo en la cola local o el vendedor tardó demasiado                                    |
+
+Si el plazo vence en la cola local, el error 504 incluye `gyblos_never_sent: true`. Puedes reintentar con seguridad.
 
 La tabla indica el estado HTTP antes de enviar las cabeceras de respuesta. Cuando el registro requiere revisión, el comprador envía `x-should-retry: false`. Configura el cliente para detener los reintentos automáticos mientras dure la revisión. En el cuerpo JSON de un rechazo por revisión de claves en Responses, el código de Gyblos aparece en `error.code` si se verificó que la solicitud no se envió, o en `error.gyblos_code` si pudo haberse enviado.
 

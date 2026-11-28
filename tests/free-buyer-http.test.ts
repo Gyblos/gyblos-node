@@ -80,6 +80,11 @@ void test('free HTTP cancellation reaches execution and admission rejects excess
   const { FREE_EXECUTION_CODES } = await import('@gyblos/protocol/constants');
   let calls = 0;
   let cancellations = 0;
+  const { BUYER_HTTP_DIAGNOSTICS } = await import('@gyblos/buyer/constants');
+  let notifyDisconnect = () => {};
+  const disconnected = new Promise<void>((resolve) => {
+    notifyDisconnect = resolve;
+  });
   const server = await api.startFreeBuyerHttp(
     async (_input, signal) => {
       calls++;
@@ -99,7 +104,13 @@ void test('free HTTP cancellation reaches execution and admission rejects excess
       selection: { modelId: 'synthetic', variant: null, quantization: null },
       maxTokens: 10,
     },
-    { port: 0 },
+    {
+      port: 0,
+      diagnostics: (record) => {
+        if (record.code === BUYER_HTTP_DIAGNOSTICS.codes.CLOSED)
+          notifyDisconnect();
+      },
+    },
   );
   const controllers = Array.from(
     { length: TRANSPORT_LIMITS.maxConcurrent },
@@ -121,20 +132,93 @@ void test('free HTTP cancellation reaches execution and admission rejects excess
     for (let tick = 0; calls < controllers.length && tick < 100; tick++)
       await new Promise((resolve) => setTimeout(resolve, 5));
     assert.equal(calls, controllers.length);
+    const waiters = Array.from({ length: 2 }, () => new AbortController());
+    const queued = waiters.map((controller) =>
+      fetch(server.url, {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body,
+        signal: controller.signal,
+      }).catch(() => undefined),
+    );
     const refused = await fetch(server.url, {
       method: 'POST',
       headers: JSON_HEADERS,
       body,
     });
     assert.equal(refused.status, 429);
+    assert.equal(refused.headers.get('retry-after'), '1');
     assert.equal(calls, controllers.length);
-    for (const controller of controllers) controller.abort();
-    await Promise.all(pending);
-    for (let tick = 0; cancellations < controllers.length && tick < 100; tick++)
+    waiters[0]!.abort();
+    await disconnected;
+    controllers[0]!.abort();
+    for (let tick = 0; calls < controllers.length + 1 && tick < 100; tick++)
       await new Promise((resolve) => setTimeout(resolve, 5));
-    assert.equal(cancellations, controllers.length);
+    assert.equal(calls, controllers.length + 1);
+    waiters[1]!.abort();
+    for (const controller of controllers) controller.abort();
+    await Promise.all([...pending, ...queued]);
+    for (
+      let tick = 0;
+      cancellations < controllers.length + 1 && tick < 100;
+      tick++
+    )
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    assert.equal(cancellations, controllers.length + 1);
   } finally {
     for (const controller of controllers) controller.abort();
     await server.close();
   }
+});
+
+void test('an authenticated Responses call expiring in the admission queue is a retryable unsent 504', async (t) => {
+  const { startFreeBuyerHttp } = await import('@gyblos/buyer/free-http');
+  const { FREE_BUYER, PAID_BUYER } = await import('@gyblos/buyer/constants');
+  const { BUYER_API } = await import('@gyblos/protocol/buyer-api');
+  const { batchDeferred } = await import('./support/batch-deferred');
+  const started = batchDeferred<void>();
+  const finish = batchDeferred<void>();
+  let calls = 0;
+  const token = 'T'.repeat(PAID_BUYER.tokenChars);
+  const host = await startFreeBuyerHttp(
+    async () => {
+      calls++;
+      started.resolve();
+      await finish.promise;
+      return {
+        text: 'done',
+        usage: { inputTokens: 1, outputTokens: 1 },
+        finishReason: ENGINE_DONE_REASONS.STOP,
+      };
+    },
+    {
+      selection: { modelId: 'synthetic', variant: null, quantization: null },
+      maxTokens: 10,
+      parallel: 1,
+    },
+    { port: 0, requestMs: 250, token },
+  );
+  t.after(async () => {
+    finish.resolve();
+    await host.close();
+  });
+  const send = () =>
+    fetch(new URL('/v1/responses', host.url), {
+      method: 'POST',
+      headers: { ...JSON_HEADERS, authorization: 'Bearer ' + token },
+      body: JSON.stringify({
+        model: 'synthetic',
+        input: 'hello',
+        max_output_tokens: 5,
+      }),
+    });
+  const running = send();
+  await started.promise;
+  const queued = await send();
+  assert.equal(queued.status, 504);
+  assert.equal((await queued.json()).error[BUYER_API.NEVER_SENT_FIELD], true);
+  assert.equal(queued.headers.get(FREE_BUYER.noRetryHeader), null);
+  assert.equal(calls, 1);
+  const active = await running;
+  assert.equal(active.status, 400);
 });

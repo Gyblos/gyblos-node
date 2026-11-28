@@ -123,12 +123,49 @@ closing the old channel. It then verifies the final charge and refund. Missing
 or uncertain proof blocks renewal. Renewal never replays a failed inference or
 changes the seller or payment roles.
 
-`depositAtomic` is the total spending authority across renewals: earlier actual
-charges plus the next deposit can't exceed it, so a replacement deposit shrinks
-by those charges. There is no automatic top-up. A question whose ceiling exceeds
-the remaining authority is refused before any channel opens. The journal keeps
-at most 16 closed generations within its 512 KiB bound; at that limit renewal is
-refused.
+Without an explicit renewal budget, `depositAtomic` is the total spending
+authority across renewals: earlier actual charges plus the next deposit can't
+exceed it, so a replacement deposit shrinks by those charges. There is no
+automatic top-up. A question whose ceiling exceeds the remaining authority is
+refused before any channel opens. The journal keeps at most 16 closed
+generations within its 512 KiB bound; at that limit renewal is refused.
+
+For automatic replacement with the same seller, the owner can set a
+single-channel `session.renewalBudgetAtomic`. This lifetime total includes
+earlier finalized charges plus the full deposit for the next generation. Each
+deposit stays at or below `depositAtomic`. Chat and all delegated keys share the
+total across restarts. Each key's own remaining limit, price ceilings and the
+maximum per response still apply. The signed per-token rates may change between
+turns within the approved input and output ceilings. An exhausted, open channel
+can renew between requests after verification of the seller, payment roles,
+wallet balance and settlement. An unknown balance or an uncertain payment stops
+the request before a replacement deposit.
+
+If a streamed reply ends after a signed output block, the buyer keeps the
+partial delivery and checks for final settlement on subsequent requests. With
+renewal enabled, a fresh user question can open one same-seller replacement
+after the charge and refund are verified. Replaying the interrupted user
+conversation cannot authorize another execution on a paid route or its automatic
+free fallback. The owner can explicitly select Free in Desktop to send the same
+question as a new free request. Older journals without a matching question
+fingerprint remain under review. The Desktop host marks an explicit free
+selection with the `gyblos-explicit-free: free` request header on its
+owner-authenticated free-only channel-chat route. Automatic and legacy clients
+omit the header.
+
+To enable, change or disable renewal from Desktop, wait for pending requests and
+open **Usage & payments → Limits**. If a paid Chat budget is active, choose
+**Manage chat budget → Finish session** before changing the renewal budget.
+
+With the buyer stopped, use the following contributor command with the same
+`GYBLOS_HOME` as the endpoint. The amount is in USDC. Pass `off` to disable
+automatic replacement. If an open generation was funded under the previous
+budget, disabling renewal pins the private policy to that channel so the
+remaining deposit can still be used. Start the buyer after saving the change.
+
+```sh
+node --import tsx apps/buyer/src/bin.ts budget 3
+```
 
 ### Multiple sellers and shared authority
 
@@ -321,9 +358,11 @@ Rerouting rules:
   valid. An expired or missing reference returns busy instead of rerouting.
 - Every alternative passes fresh identity, replay, model, reasoning, network,
   asset and quote checks.
-- Rerouting ends before the first possible prompt write. A failed or partial
-  write, a remote refusal or a lost response never sends the prompt elsewhere. A
-  busy reply after the prompt was written is final.
+- A possible paid dispatch ends rerouting. A remote refusal or any visible
+  output also ends the request. Under safe failover, a delegated request to a
+  verified free offer can move to another verified free seller after a lost
+  connection or local read timeout before output, up to two resends within its
+  deadline.
 
 A healthy request on seller A doesn't block seller B. If A becomes uncertain,
 new requests stop; B finishes if its prompt was already sent and is cancelled
@@ -331,7 +370,8 @@ otherwise. Settlement and reconciliation refuse while requests are active.
 
 ### Waiting for the selected seller
 
-`onBusy: "wait"` never reroutes:
+`onBusy: "wait"` keeps a request with its selected seller while that seller is
+busy:
 
 - It admits at most one waiter per seller, within the buyer's two-request total.
   Two running calls leave no queue slot; one running call on A can have one
@@ -346,8 +386,10 @@ otherwise. Settlement and reconciliation refuse while requests are active.
   prices still bound it unless higher prices are allowed. No deposit or request
   authorization starts while the request is queued.
 - If the seller stays busy, control-only polls share the original wait deadline.
-  A failure other than busy ends the call; it never changes sellers or retries a
-  prompt.
+  A possible paid send ends the call. For a delegated request sent to a verified
+  free offer, safe failover can retry a lost connection or a local read timeout
+  before any visible output. A seller explicitly pinned by the operator remains
+  pinned.
 
 ## Lifecycle
 

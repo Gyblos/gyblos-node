@@ -4,9 +4,11 @@ import {
   type BuyerQuoteWinner,
 } from '@gyblos/node/buyer-quote-execution';
 import { OFFER_PRICING_KINDS } from '@gyblos/protocol/constants';
+import type { FreeClientError } from '@gyblos/transport-iroh/free-client';
 
-import { BUYER_SELECTION } from './constants';
-import { FreeSelectionFailure } from './free-execution';
+import { BUYER_SELECTION, FREE_BUYER } from './constants';
+import { AfterFreeDispatch } from './free-chat-error';
+import { FreeSelectionFailure, unfitOutcome } from './free-execution';
 import type { SelectionRoute } from './free-route';
 import type { BuyerSelectionConfig } from './selection-config';
 import { unaffordableSessionQuote } from './session-errors';
@@ -36,6 +38,28 @@ export function automaticPoolRoute(
     : route;
 }
 
+export async function selectForSettledPartial<Winner>(
+  request: Request,
+  route: SelectionRoute | undefined,
+  seller: string,
+  excluded: ReadonlySet<string>,
+  signal: AbortSignal,
+  select: (request: Request, route?: SelectionRoute) => Promise<Winner>,
+): Promise<Winner> {
+  signal.throwIfAborted();
+  if (
+    (!route?.pinnedNodeId || route.pinnedNodeId === seller) &&
+    !excluded.has(seller)
+  ) {
+    try {
+      return await select(request, { ...route, pinnedNodeId: seller });
+    } catch (error) {
+      signal.throwIfAborted();
+      if (!(error instanceof FreeSelectionFailure)) throw error;
+    }
+  }
+  return select(openDiscoveryRequest(request), route);
+}
 export async function selectConfiguredThenOpen<Winner>(
   config: Pick<BuyerSelectionConfig, 'sellers' | 'discovery'>,
   request: Request,
@@ -105,4 +129,33 @@ export async function selectAffordableAutoQuote<
       budgetFailure = error;
     }
   }
+}
+
+export function delegatedFreeResends(enabled: boolean) {
+  let retries = 0;
+  let pending = false;
+  let failure: FreeClientError | undefined;
+  return {
+    request: (request: Request) =>
+      failure ? openDiscoveryRequest(request) : request,
+    failure: () => failure,
+    takeFreeResend() {
+      const allowed = pending;
+      pending = false;
+      return allowed;
+    },
+    selectionError(error: unknown, unfit = false) {
+      if (!failure) return unfit ? unfitOutcome(error) : error;
+      const outcome = unfitOutcome(error, failure);
+      return outcome === failure ? failure : new AfterFreeDispatch(outcome);
+    },
+    get onResend() {
+      if (!enabled || retries >= FREE_BUYER.maxResends) return undefined;
+      return (error: FreeClientError) => {
+        failure = error;
+        pending = true;
+        retries++;
+      };
+    },
+  };
 }

@@ -32,6 +32,10 @@ import type { BatchStoredSession } from './batch-session-state';
 import type { BATCH_BLOCK_STATE, BATCH_RENEWAL_STATE } from './constants';
 
 export interface BatchBuyerBackend {
+  availableBalance?(
+    terms: PaymentSessionTerms,
+    signal: AbortSignal,
+  ): Promise<string | null>;
   inspect(): Promise<BatchStoredSession | undefined>;
   create(terms: PaymentSessionTerms): Promise<SessionBuyer>;
   observe(channelId: string): Promise<SessionSettlement | undefined>;
@@ -53,6 +57,7 @@ export interface BatchSellerBackend {
 }
 
 export interface BatchRequestBlocks {
+  questionDigest?: string;
   baseAtomic: string;
   accepted: SessionBlockIntent | null;
   pending: {

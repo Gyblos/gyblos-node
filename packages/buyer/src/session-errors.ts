@@ -23,7 +23,9 @@ import { PaymentError } from '@gyblos/protocol/payment';
 import { PaymentSessionError } from '@gyblos/protocol/payment-session';
 
 import { buyerApiKeyErrorView } from './api-key-http';
+import { freeErrorView } from './chat-errors';
 import { FREE_BUYER_CODES, PAID_BUYER_CODES } from './constants';
+import { AfterFreeDispatch } from './free-chat-error';
 import type { ChatErrorView } from './free-http';
 
 const unavailable = (
@@ -71,18 +73,35 @@ export async function unsentSessionPreflight<T>(
 
 // Paid errors only; anything else is left to the free answer.
 export function classifyPaidError(error: unknown): ChatErrorView | undefined {
+  if (error instanceof AfterFreeDispatch) {
+    const view =
+      classifyPaidError(error.subsequent) ?? freeErrorView(error.subsequent);
+    return {
+      ...view,
+      neverSent: false,
+      status:
+        view.status === HTTP_STATUS.tooManyRequests
+          ? HTTP_STATUS.serviceUnavailable
+          : view.status,
+    };
+  }
   if (error instanceof UnsentSellerChoiceError && isChannelBlocker(error.code))
     return {
       ...unavailable(error.code, true),
       status: HTTP_STATUS.badRequest,
       detail: channelBlockerMessage(error.code),
     };
+  if (error instanceof UnsentChannelLimitError)
+    return {
+      ...unavailable(error.code, true),
+      detail:
+        'The available funds or spending limits cannot cover this request. Check the wallet balance, renewal budget and deposit cap before sending again.',
+    };
   if (
     error instanceof UnsentOpeningError ||
     error instanceof UnsentSessionPreflightError ||
     error instanceof UnsentSellerChoiceError ||
     error instanceof UnsentChannelRequestError ||
-    error instanceof UnsentChannelLimitError ||
     error instanceof UnsentChannelPeerError
   )
     return unavailable(error.code, true);

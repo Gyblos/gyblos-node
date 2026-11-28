@@ -78,6 +78,7 @@ export interface SessionSettlement {
   transaction: string;
 }
 export interface SessionSeller {
+  observeSettlement?(): Promise<SessionSettlement | undefined>;
   open(payload: string): Promise<SessionSnapshot>;
   reserve(request: SessionRequest, peer: string): Promise<void>;
   finish(requestId: string, chargedAtomic: string): Promise<SessionBill>;

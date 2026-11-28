@@ -1,9 +1,6 @@
 // One explicitly authorized reusable session for shared buyer hosts; no selection or prompt retry.
-import { PROTOCOL_FEE } from '@gyblos/config';
 import { BATCH_SESSION_DEFAULTS } from '@gyblos/config/batch-session';
-import { recountSessionInput } from '@gyblos/core/session-input';
 import type { BatchStoredSession } from '@gyblos/payments-upto/batch-session';
-import { verifyBatchQuote } from '@gyblos/protocol/batch-channel';
 import { BuyerApiKeyError } from '@gyblos/protocol/buyer-api-keys';
 import { CONTROL_METERING_MODES } from '@gyblos/protocol/constants';
 import type { SignedOfferV2 } from '@gyblos/protocol/control-types';
@@ -28,20 +25,33 @@ import {
   channelTurnAuthority,
   prepareNewChannel,
   UnsentChannelRequestError,
+  verifyOpeningQuote,
   type PreparedChannel,
   type StartChannelWork,
 } from './buyer-channel-prepare';
 import { UnsentOpeningError } from './buyer-opening-retry';
-import { checkPreviousOpening, disposeAbsent } from './buyer-opening-state';
+import {
+  checkFundedChannel,
+  checkPreviousOpening,
+  disconnectChannel,
+  disposeAbsent,
+} from './buyer-opening-state';
 import { bounded } from './buyer-operation';
 import { UnsentSellerBusyError } from './buyer-routing';
-import { prepareRenewal } from './buyer-session-renewal';
+import {
+  checkInterruptedQuestion,
+  prepareRenewal,
+  verifyPreparationRefusal,
+  verifyQuestion,
+} from './buyer-session-renewal';
 import { sessionApproval } from './session-accounting';
 import type { BuyerSessionBackend } from './session-backend';
 import {
+  checkChannelAuthority,
   newSessionTerms,
   parseBuyerSessionPolicy,
   replacementTerms,
+  spendingAuthority,
   UnsentChannelLimitError,
   type BuyerSessionPolicy,
 } from './session-policy';
@@ -58,6 +68,7 @@ export interface BuyerSessionOptions<Remote extends BatchDestination> {
     quote: SignedOfferV2,
     signal: AbortSignal,
   ) => Promise<(() => Promise<void>) | undefined>;
+  credentialId?: BuyerBatchSessionOptions<Remote>['credentialId'];
   onDeclined?: BuyerBatchSessionOptions<Remote>['onDeclined'];
   beforeInference?: BuyerBatchSessionOptions<Remote>['beforeInference'];
   checkReusableChannel?: BuyerSessionOptions<Remote>['verify'];
@@ -103,18 +114,6 @@ function getBackend<Remote extends BatchDestination>(
   }
   return bounded(state.backend, signal);
 }
-function verifyOpeningQuote<Remote extends BatchDestination>(
-  options: BuyerSessionOptions<Remote>,
-  quote: SignedOfferV2,
-  terms: PaymentSessionTerms,
-) {
-  return verifyBatchQuote(
-    quote,
-    terms,
-    options.endpoint.id().toString(),
-    options.now(),
-  );
-}
 async function openCurrent<Remote extends BatchDestination>(
   state: State<Remote>,
   quote: SignedOfferV2 | undefined,
@@ -123,6 +122,7 @@ async function openCurrent<Remote extends BatchDestination>(
 ): Promise<Current<Remote>> {
   const options = state.options;
   const stored = await bounded(options.inspect(), signal);
+  checkFundedChannel(options.policy.fundedChannelId, stored, quote);
   if (stored?.notCreated || stored?.openingReturned) {
     if (!quote) return sessionFail(SESSION_CODES.CLOSED);
     const replacement = replacementTerms(
@@ -142,7 +142,7 @@ async function openCurrent<Remote extends BatchDestination>(
       renew(
         stored.snapshot.channelId,
         replacement,
-        options.policy.depositAtomic,
+        spendingAuthority(options.policy),
         switching,
       ),
     );
@@ -211,20 +211,15 @@ async function run<Remote extends BatchDestination>(
   onDelta?: (text: string) => Promise<void>,
 ) {
   const { options } = state;
-  recountSessionInput(quote, input, options.meter);
-  await bounded(options.verify(quote, signal), signal);
-  if (await bounded(options.unresolved(), signal))
-    return sessionFail(SESSION_CODES.UNVERIFIED);
+  await verifyQuestion(state, quote, input, signal);
   const opened = await current(state, quote, signal, start);
-  if (
-    BigInt(opened.priorSpentAtomic) + BigInt(opened.terms.depositAtomic) >
-      BigInt(options.policy.depositAtomic) ||
-    opened.terms.withdrawDelaySeconds > options.policy.withdrawDelaySeconds ||
-    opened.terms.protocolFeeBps !== PROTOCOL_FEE.bps ||
-    opened.terms.treasury !== PROTOCOL_FEE.treasury ||
-    opened.terms.expiresAt - options.now() > options.policy.lifetimeMs
-  )
-    return sessionFail(SESSION_CODES.LIMIT);
+  checkChannelAuthority(
+    options.policy,
+    opened.terms,
+    opened.priorSpentAtomic,
+    options.now(),
+    quote.offer.nodeId,
+  );
   const switching =
     opened.terms.sellerNodeId !== quote.offer.nodeId ||
     opened.terms.owner !== quote.offer.owner;
@@ -240,6 +235,7 @@ async function run<Remote extends BatchDestination>(
   const value = await start(() =>
     ready.host.execute(quote, input, signal, onDelta),
   ).catch(async (error: unknown) => {
+    await verifyPreparationRefusal(error, options.inspect, quote.offer.nodeId);
     if (
       error instanceof UnsentOpeningError &&
       error.code === SESSION_CODES.OPENING_ABSENT
@@ -260,7 +256,6 @@ async function run<Remote extends BatchDestination>(
     }),
   };
 }
-
 async function renewable<Remote extends BatchDestination>(
   state: State<Remote>,
   opened: Current<Remote>,
@@ -295,11 +290,12 @@ async function renewable<Remote extends BatchDestination>(
     backend.renew!(
       plan.channelId,
       plan.terms,
-      state.options.policy.depositAtomic,
+      spendingAuthority(state.options.policy),
       switching,
     ),
   );
   signal.throwIfAborted();
+  await plan.verify();
   return current(state, quote, signal, start);
 }
 
@@ -342,6 +338,11 @@ export function createBuyerSessionManager<Remote extends BatchDestination>(
     active: false,
   };
   return {
+    checkInterruptedQuestion: (
+      input: FreeExecutionBuildInput,
+      keyId: string | undefined,
+      signal: AbortSignal,
+    ) => checkInterruptedQuestion(options.inspect, input, keyId, signal),
     unresolved: () => unresolved(state),
     async execute(
       quote: SignedOfferV2,
@@ -389,11 +390,7 @@ export function createBuyerSessionManager<Remote extends BatchDestination>(
     async close() {
       state.lifetime.abort();
       const opened = await state.current?.catch(() => undefined);
-      if (opened) {
-        await opened.host.disconnect();
-        await opened.host.settled();
-        await opened.financial.dispose();
-      }
+      if (opened) await disconnectChannel(opened);
     },
   };
 }

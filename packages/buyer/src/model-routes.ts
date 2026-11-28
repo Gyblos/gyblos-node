@@ -34,6 +34,7 @@ export interface ModelRoute {
 export type RoutedModel = Pick<ModelRoute, 'selection' | 'maxTokens'> & {
   openingIntent?: string;
   freeOnly?: boolean;
+  explicitFree?: boolean;
   sellerChoice?: import('@gyblos/protocol/buyer-api').BuyerSellerChoice;
 };
 

@@ -2,13 +2,12 @@ import type { BuyerExecutionFactory } from './free-startup';
 
 type Execute = Awaited<ReturnType<BuyerExecutionFactory>>['execute'];
 
-export function singleSessionExecutor(execute: Execute): Execute {
-  let active = false;
+export function executionSlots(limit: number) {
+  let active = 0;
   const waiting = new Set<() => void>();
-  return async (...args) => {
-    const signal = args[1];
+  return async <T>(signal: AbortSignal, run: () => Promise<T>) => {
     signal.throwIfAborted();
-    if (active) {
+    if (active >= limit) {
       await new Promise<void>((resolve, reject) => {
         const resume = () => {
           waiting.delete(resume);
@@ -22,15 +21,19 @@ export function singleSessionExecutor(execute: Execute): Execute {
         waiting.add(resume);
         signal.addEventListener('abort', abort, { once: true });
       });
-    }
-    active = true;
+    } else active++;
     try {
       signal.throwIfAborted();
-      return await execute(...args);
+      return await run();
     } finally {
       const next = waiting.values().next().value;
       if (next) next();
-      else active = false;
+      else active--;
     }
   };
+}
+
+export function singleSessionExecutor(execute: Execute): Execute {
+  const schedule = executionSlots(1);
+  return (...args) => schedule(args[1], () => execute(...args));
 }

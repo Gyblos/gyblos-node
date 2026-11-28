@@ -229,7 +229,7 @@ function resendable(error: FreeClientError) {
 }
 
 // Caller owns the request admission, deadline and exclusion set; this never selects another seller.
-// Undefined: the prompt was never sent, so another seller may take it.
+
 export async function executeSelectedBuyerFree(
   input: FreeExecutionBuildInput,
   dependencies: FreeBuyerDependencies,
@@ -238,6 +238,7 @@ export async function executeSelectedBuyerFree(
   onDelta?: (text: string) => Promise<void>,
   beforeExecute?: () => void,
   onUnfit?: () => void,
+  onResend?: (error: FreeClientError) => void,
 ): Promise<FreeExecutionResult | undefined> {
   const result = await attemptSelectedFree(
     input,
@@ -246,13 +247,17 @@ export async function executeSelectedBuyerFree(
     signal,
     onDelta,
     beforeExecute,
-    false,
+    onResend !== undefined,
   );
   if (result instanceof Unfit) {
     onUnfit?.();
     return undefined;
   }
-  return result instanceof Resent ? undefined : result;
+  if (result instanceof Resent) {
+    onResend?.(result.error);
+    return undefined;
+  }
+  return result;
 }
 
 // As executeSelectedBuyerFree; with `resend`, a Resent also means the prompt was sent but the seller
@@ -313,12 +318,13 @@ async function attemptSelectedFree(
   }
 }
 
-export function unfitOutcome(error: unknown) {
+export function unfitOutcome(error: unknown, failedSend?: FreeClientError) {
   const exhausted =
-    (error instanceof FreeSelectionFailure && error.retryAt === undefined) ||
+    (error instanceof FreeSelectionFailure &&
+      (failedSend !== undefined || error.retryAt === undefined)) ||
     (error instanceof FreeBuyerError &&
       error.code === FREE_BUYER_CODES.UNAVAILABLE) ||
     (error instanceof PaidBuyerError &&
       error.code === PAID_BUYER_CODES.UNAVAILABLE);
-  return exhausted ? contextFull() : error;
+  return exhausted ? (failedSend ?? contextFull()) : error;
 }

@@ -18,7 +18,7 @@ export interface ChatSettings {
   selection: ModelSelection;
   maxTokens: number;
   sellerChoice?: boolean;
-  singlePaidChannel?: boolean;
+  parallel?: number;
   paidAuto?: true;
   tools?: boolean; // true only where every request runs on the free channel
   // The models served by name; absent, `selection` is the one model.
@@ -78,6 +78,7 @@ export function routedInput(
   settings: ChatSettings,
   streaming: boolean,
   selectedSellerAllowed: boolean,
+  explicitFree = false,
 ) {
   const mode = parseDesktopMode(body, settings, selectedSellerAllowed);
   body = mode.body;
@@ -136,7 +137,7 @@ export function routedInput(
     payload: withoutStop(rest),
     route: {
       ...route,
-      ...(freeOnly && { freeOnly: true }),
+      ...(freeOnly && { freeOnly: true, explicitFree }),
       ...(openingIntent && { openingIntent }),
     },
     model,

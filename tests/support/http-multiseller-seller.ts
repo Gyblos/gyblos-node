@@ -14,10 +14,12 @@ import {
 } from '@gyblos/protocol/control-validation';
 import { isMain } from '@gyblos/runtime';
 
+import { blockTestMeter } from './batch-block-product';
 import { HTTP_MULTI_METHODS } from './http-multiseller-constants';
 import { httpMultiSellerPayments } from './http-multiseller-finance';
 import { httpMultiText } from './http-multiseller-http';
 import { httpMultiIpc } from './http-multiseller-ipc';
+import { interruptedFragment } from './opencode-interruption';
 import { paidSellerConfiguration } from './paid-acceptance-config';
 import { PAID_ACCEPTANCE } from './paid-acceptance-constants';
 import { paidAcceptanceEngine } from './paid-acceptance-engine';
@@ -68,7 +70,17 @@ async function main() {
       }
       case HTTP_MULTI_METHODS.START: {
         assert.ok(role);
-        await paidSellerConfiguration(OFFER_PRICING_KINDS.PAID);
+        assert.equal(typeof params, 'boolean');
+        const partialFallback = params === true;
+        const sellerText =
+          partialFallback && label === 0
+            ? interruptedFragment
+            : httpMultiText(label);
+        await paidSellerConfiguration(
+          partialFallback && label === 1
+            ? OFFER_PRICING_KINDS.FREE
+            : OFFER_PRICING_KINDS.PAID,
+        );
         const { readFile, writeFile } = await import('node:fs/promises');
         const path = process.env.GYBLOS_CONFIG!;
         const config = await readFile(path, 'utf8');
@@ -80,8 +92,23 @@ async function main() {
             const generate = prepared.engine.generate;
             return {
               ...prepared,
+              ...(partialFallback && {
+                metering: {
+                  ...prepared.metering,
+                  tokenizer: async () => ({
+                    ...blockTestMeter,
+                    output: blockTestMeter.count,
+                  }),
+                },
+              }),
               engine: {
                 ...prepared.engine,
+                ...(partialFallback && {
+                  describe: async () => ({
+                    ...(await prepared.engine.describe()),
+                    contextTokens: 64000,
+                  }),
+                }),
                 generate: async (input) => {
                   // The synthetic seller label belongs in both live text and the final answer.
                   const deliver = input.onText;
@@ -90,9 +117,7 @@ async function main() {
                     onText: deliver
                       ? (text) =>
                           deliver(
-                            text === PAID_ACCEPTANCE.text
-                              ? httpMultiText(label)
-                              : text,
+                            text === PAID_ACCEPTANCE.text ? sellerText : text,
                           )
                       : undefined,
                   });

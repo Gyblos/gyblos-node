@@ -8,10 +8,14 @@ import {
   BUYER_BUSY_POLICIES,
   BUYER_ROUTING_CODES,
 } from '@gyblos/core/constants';
-import { UnsentSellerBusyError } from '@gyblos/node/buyer-routing';
+import {
+  createBuyerRouter,
+  UnsentSellerBusyError,
+} from '@gyblos/node/buyer-routing';
 
 import { batchDeferred } from './support/batch-deferred';
 import { routingQueueFixture as fixture } from './support/buyer-routing-queue';
+import { freeSellerFixture } from './support/free-seller';
 
 void test('queue policy validates a bounded wait and defaults to thirty seconds', () => {
   assert.equal(
@@ -240,5 +244,112 @@ void test('remote busy retains FIFO ownership while refreshing rather than letti
     assert.deepEqual(order, ['busy', 'first', 'second']);
   } finally {
     await first;
+  }
+});
+
+void test('a free failover before text may try the next signed free quote with the wait-on-busy policy', async (t) => {
+  const sellers = await Promise.all([freeSellerFixture(), freeSellerFixture()]);
+  const quotes = await Promise.all(
+    sellers.map(async (seller) => (await seller.request()).quote),
+  );
+  const ceilings = quotes[0]!.offer.prices;
+  const router = createBuyerRouter({
+    now: Date.now,
+    policy: parseBuyerRoutingPolicy({ onBusy: BUYER_BUSY_POLICIES.WAIT }),
+    priceCeilings: ceilings,
+    unresolved: async () => false,
+    reference: async () => undefined,
+  });
+  t.after(() => router.close());
+  let sends = 0;
+  const result = await router.execute(
+    {
+      select: async (excluded) => {
+        const quote = quotes[excluded.size]!;
+        return { nodeId: quote.offer.nodeId, quote };
+      },
+      free: async () => (++sends === 1 ? undefined : 'answer'),
+      takeFreeResend: () => sends === 1,
+      paid: async () => assert.fail('paid fallback'),
+    },
+    AbortSignal.timeout(1500),
+  );
+  assert.equal(result.result, 'answer');
+  assert.equal(sends, 2);
+});
+
+void test('after waiting for a busy free seller, its temporary pin does not survive a free failover', async (t) => {
+  const sellers = await Promise.all([freeSellerFixture(), freeSellerFixture()]);
+  const quotes = await Promise.all(
+    sellers.map(async (seller) => (await seller.request()).quote),
+  );
+  const ceilings = quotes[0]!.offer.prices;
+  const router = createBuyerRouter({
+    now: Date.now,
+    policy: parseBuyerRoutingPolicy({ onBusy: BUYER_BUSY_POLICIES.WAIT }),
+    priceCeilings: ceilings,
+    unresolved: async () => false,
+    reference: async () => undefined,
+  });
+  t.after(() => router.close());
+  let sends = 0;
+  const result = await router.execute(
+    {
+      select: async (excluded, _signal, route) => {
+        if (excluded.size) assert.equal(route.pinnedNodeId, undefined);
+        const quote = quotes[excluded.size]!;
+        return { nodeId: quote.offer.nodeId, quote };
+      },
+      free: async (winner, _signal, sending) => {
+        if (++sends === 1) throw new UnsentSellerBusyError(winner.nodeId);
+        sending?.();
+        return sends === 2 ? undefined : 'answer';
+      },
+      takeFreeResend: () => sends === 2,
+      paid: async () => assert.fail('paid fallback'),
+    },
+    AbortSignal.timeout(5000),
+  );
+  assert.equal(result.result, 'answer');
+  assert.equal(sends, 3);
+});
+
+void test('a pooled quote waiting on catalog renewal leaves another listing available', async () => {
+  const host = await fixture();
+  const waiting = batchDeferred<void>();
+  const renewed = batchDeferred<void>();
+  let otherSelected = false;
+  const signal = AbortSignal.timeout(5000);
+  const first = host.router.execute(
+    {
+      ...host.ports,
+      select: async (...args) => {
+        waiting.resolve();
+        await renewed.promise;
+        return host.ports.select(...args);
+      },
+    },
+    signal,
+    { key: 'renewing-model' },
+  );
+  await waiting.promise;
+  const second = host.router.execute(
+    {
+      ...host.ports,
+      select: async (...args) => {
+        otherSelected = true;
+        return host.ports.select(...args);
+      },
+    },
+    signal,
+    { key: 'healthy-model' },
+  );
+  try {
+    await setImmediate();
+    assert.equal(otherSelected, true);
+  } finally {
+    renewed.resolve();
+    await Promise.allSettled([first, second]);
+    await host.close();
   }
 });

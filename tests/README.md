@@ -169,6 +169,33 @@ to an owned `/tmp/gyb-paid-chat-tokenizer-*` (or `/private/tmp/...`) home
 prepared with `prepareModelTokenizer`. The test re-checks both artifact hashes
 and refuses any other location. Without the variable it is skipped.
 
+### Delegated channel renewal with OpenCode and fetch
+
+The driver uses the actual local buyer HTTP endpoint, a synthetic funded seller
+and an isolated spending key. On macOS with native Iroh and the OpenCode CLI,
+run all three scenarios:
+
+```sh
+OPENCODE_BIN="$HOME/.opencode/bin/opencode" node --import tsx tests/lab/opencode-renewal.ts
+```
+
+To run only the direct HTTP scenario on a supported native platform:
+
+```sh
+node --import tsx tests/lab/opencode-renewal.ts --fetch-only
+```
+
+Each scenario starts with fresh homes and spends through normal paid requests
+until the remaining escrow is below the next quote. The direct fetch and
+OpenCode scenarios verify a complete paid answer on the replacement. The mixed
+scenario additionally holds the opening while two fetch requests reach the buyer
+alongside the active OpenCode turn. Assertions count seller dispatches, accepted
+approvals and deposits, match the original charge and refund, and check the
+shared key balance. The client reports cold and warm first visible text, first
+text during renewal, and the synthetic hold time in milliseconds. OpenCode CLI
+timings include process startup. Each CLI invocation is bounded at 55 seconds.
+Each scenario allows 180 seconds including setup and conditioning.
+
 ### Agent tool loop
 
 `tools-acceptance.test.ts` runs the product seller and `buyer:free` with a
@@ -179,3 +206,34 @@ support, malformed provider output, interrupted terminals and disconnect
 cancellation without retry. Financial factories fail if called, and a fetch
 allowlist rejects any other I/O. It doesn't prove live agents, provider behavior
 or tokenizer billing.
+
+### Interrupted OpenCode generation on a paid channel
+
+On macOS with native Iroh available, run the installed OpenCode executable in an
+isolated temporary home. The command was exercised with OpenCode 2.3.2 and Node
+24.22.1. It uses a synthetic seller, an instrumented payment backend and a
+loopback-only network sandbox for the client.
+
+```sh
+OPENCODE_BIN="$HOME/.opencode/bin/opencode" node --import tsx tests/lab/opencode-interruption.ts
+```
+
+The driver starts a conversation, then cuts the OpenCode-to-buyer HTTP stream
+after delivering an approved 65-character prefix. The generator waits for the
+buyer to forward the HTTP disconnect to the seller before stopping. The proxy
+records unexpected input, upstream or stream failures with the local diagnostic
+envelope and forwards the buyer's retry headers. Each OpenCode invocation has a
+55-second timeout. Timestamps are milliseconds from the start of the experiment
+and include CLI startup for each submitted turn.
+
+The interrupted question must produce a visible partial answer and one client
+retry, with one seller generation and one accepted checkpoint for that turn. The
+key stays blocked until attributable settlement evidence arrives. The driver
+supplies a synthetic finalized settlement of 240 atomic units. The next paid
+question triggers automatic verification of the 136 units due for the
+interrupted turn and completes with the original key and one replacement.
+Another paid turn succeeds after restarting the buyer. The final free control
+uses the same conversation and key after the fixture republishes the model. The
+driver checks six generations, five paid approvals, two deposits including the
+initial one, and no remaining reservation. Finality and offer availability are
+controlled.

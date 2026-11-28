@@ -84,3 +84,64 @@ void test('a released opening asks for capacity again before the same buyer reop
   assert.equal(creations, created, 'refused before binding the session again');
   assert.equal(opened, 0, 'the session never opened');
 });
+
+for (const outcome of ['cancelled', 'expired'] as const) {
+  void test(
+    'replacement preparation stops when the settlement observation is ' +
+      outcome,
+    async (t) => {
+      const rig = await sessionRig({ depositAtomic: '10000' });
+      t.after(rig.dispose);
+      await rig.open();
+      const session = rig.seller();
+      const offers = await batchOfferFixture(rig.terms, rig.owner, rig.now);
+      const quote = await offers.quote(1);
+      const controller = new AbortController();
+      let admissions = 0;
+      const hosted = await startSellerSessions({
+        buyerNodeId: rig.terms.buyerNodeId,
+        owner: rig.terms.owner,
+        nodeId: rig.terms.sellerNodeId,
+        description: rig.terms,
+        backend: {
+          inspect: async () => ({
+            terms: rig.terms,
+            snapshot: session.snapshot(),
+            pending: false,
+            recoverable: false,
+          }),
+          create: async () => ({
+            ...session,
+            observeSettlement: async () => {
+              const settlement = await session.close();
+              if (outcome === 'cancelled') controller.abort();
+              else rig.time(quote.offer.expiresAt + 1);
+              return settlement;
+            },
+          }),
+        },
+        offers: () => [offers.live],
+        now: rig.now,
+        admit: async () => {
+          admissions++;
+        },
+      });
+      t.after(hosted.close);
+      const result = hosted.service.exchange(
+        parseBatchChannelRequest({
+          version: BATCH_CHANNEL.version,
+          requestId: '12'.repeat(16),
+          method: BATCH_METHODS.PREPARE,
+          params: {
+            quote,
+            terms: { ...rig.terms, expiresAt: rig.terms.expiresAt + 1 },
+          },
+        }),
+        rig.terms.buyerNodeId,
+        controller.signal,
+      );
+      await assert.rejects(result);
+      assert.equal(admissions, 0);
+    },
+  );
+}

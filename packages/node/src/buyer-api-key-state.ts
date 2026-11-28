@@ -2,12 +2,14 @@
 import { BUYER_API, buyerAtomic } from '@gyblos/protocol/buyer-api';
 import {
   BUYER_API_KEYS,
+  BUYER_KEY_CHARGE,
   BUYER_KEY_CODES,
   buyerKeyFail,
   keyObject,
   parseBuyerApiKeySummary,
   parseBuyerKeyScope,
   type BuyerApiKeySummary,
+  type BuyerKeyCharge,
   type BuyerKeyScope,
 } from '@gyblos/protocol/buyer-api-keys';
 
@@ -181,4 +183,29 @@ export function bindKeyExecution(
     return buyerKeyFail(BUYER_KEY_CODES.REVIEW);
   const bound = keyReservation({ ...current, executionDigest }, id, keyId);
   return pending.map((item) => (item.id === id ? bound : item));
+}
+
+export function parseCompletedKey(
+  key: BuyerKeyState['keys'][number],
+  reserved: string,
+  charge: string,
+  kind: BuyerKeyCharge,
+) {
+  const { digest: secretDigest, ...summary } = key;
+  return {
+    ...parseBuyerApiKeySummary({
+      ...summary,
+      reservedAtomic: String(BigInt(key.reservedAtomic) - BigInt(reserved)),
+      spentAtomic: String(BigInt(key.spentAtomic) + BigInt(charge)),
+      settledAtomic: String(
+        BigInt(key.settledAtomic) +
+          (kind === BUYER_KEY_CHARGE.SETTLED ? BigInt(charge) : 0n),
+      ),
+      approvedAtomic: String(
+        BigInt(key.approvedAtomic) +
+          (kind === BUYER_KEY_CHARGE.APPROVED ? BigInt(charge) : 0n),
+      ),
+    }),
+    digest: secretDigest,
+  };
 }

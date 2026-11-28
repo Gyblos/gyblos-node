@@ -23,6 +23,7 @@ export async function withBuyerApiKeys(
       },
       runtime.confirmKeyCharge,
       context.diagnostics,
+      !!prepared.config.session?.renewalBudgetAtomic,
     );
     try {
       await apiKeys.reconcileAbandoned();

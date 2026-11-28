@@ -43,6 +43,7 @@ export const X402_ACTION = {
   STOP: 'stop',
   FINISH: 'finish',
   EXPLORER: 'explorer',
+  CONFIGURE_RENEWAL: 'configure-renewal',
   CONFIGURE_PAID: 'configure-paid',
   START_BUYER: 'start-buyer',
   COPY_PAYER: 'copy-payer',

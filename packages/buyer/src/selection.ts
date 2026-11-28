@@ -1,6 +1,8 @@
 // Selects a seller from verified snapshots and signed quotes.
 import { randomInt } from 'node:crypto';
+import { setTimeout as delay } from 'node:timers/promises';
 
+import { SELLER_READINESS } from '@gyblos/config';
 import {
   selectSellers,
   type KnownSeller,
@@ -90,11 +92,16 @@ export async function selectVerifiedBuyerQuote(
   const settling: Promise<unknown>[] = [];
   try {
     const stale = new Set<string>();
-    const first = await selectOnce(config, active, stale, settling, signal);
-    const result =
-      first.ok || !stale.size || signal?.aborted
-        ? first
-        : await selectOnce(config, active, new Set(), settling, signal);
+    const renewing = new Set<string>();
+    const once = () =>
+      selectOnce(config, active, stale, settling, signal, renewing);
+    let result = await once();
+    if (!result.ok && stale.size && !renewing.size && !signal?.aborted)
+      result = await once();
+    if (!result.ok && renewing.size && !signal?.aborted) {
+      await delay(SELLER_READINESS.tickMs, undefined, { signal });
+      result = await once();
+    }
     if (result.ok) alternativeNodeId = result.winner.candidate.nodeId;
     return result;
   } finally {
@@ -109,6 +116,7 @@ async function selectOnce(
   stale: Set<string>,
   settling: Promise<unknown>[],
   signal?: AbortSignal,
+  renewing?: Set<string>,
 ): Promise<SelectionDecision> {
   if (config.identity && !dependencies.verifyIdentity)
     throw new BuyerSelectionError(BUYER_SELECTION_CODES.IDENTITY);
@@ -122,7 +130,7 @@ async function selectOnce(
     const recalled = new Map<string, SignedPublicV2>();
     const snapshots = await refreshSnapshots(
       config,
-      dependencies,
+      { ...dependencies, renewing },
       clients,
       recalled,
       now,

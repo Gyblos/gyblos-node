@@ -28,6 +28,7 @@ import {
   SESSION_CODES,
   type SessionBill,
 } from '@gyblos/protocol/payment-session';
+import { sessionBlockRequestDigest as blockDigest } from '@gyblos/protocol/session-blocks';
 import type { BatchDestination } from '@gyblos/transport-iroh/batch-client';
 
 import { runBuyerBlocks } from './batch-block-buyer';
@@ -37,6 +38,10 @@ import {
   publishBuyerSessionReceipt,
   sessionReceiptPayment,
 } from './batch-receipts';
+import {
+  RefusedChannelPreparation,
+  remotePreparationBusy,
+} from './buyer-channel-prepare';
 import { verifyDecline } from './buyer-declined-request';
 import { recoverBuyerOpening } from './buyer-opening-retry';
 import { bounded } from './buyer-operation';
@@ -106,6 +111,28 @@ function verifyOpeningTime(
   validateOfferV2Time(quote.offer, now);
   if (now >= expiresAt) return batchFail(SESSION_CODES.LIMIT);
 }
+async function verifyPreparation<Remote extends BatchDestination>(
+  context: BuyerBatchContext<Remote>,
+  quote: SignedOfferV2,
+  signal: AbortSignal,
+) {
+  const { rpc, options, terms } = context;
+  const prepared = await rpc(
+    BATCH_METHODS.PREPARE,
+    { quote, terms },
+    signal,
+  ).catch((error: unknown) => {
+    if (
+      remotePreparationBusy(error) &&
+      !options.buyer.snapshot().channelId &&
+      !options.buyer.openingRecovery?.pending()
+    )
+      throw new RefusedChannelPreparation(error.code, true);
+    throw error;
+  });
+  if (!('terms' in prepared)) return batchFail(SESSION_CODES.BINDING);
+  matchBatchTerms(prepared.terms, terms);
+}
 export async function runBuyerBatch<Remote extends BatchDestination>(
   channel: BuyerBatchContext<Remote>,
   value: SignedOfferV2,
@@ -121,7 +148,7 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
   // the whole-response protocol even on a channel that checkpoints other requests.
   const declared = quote.offer.meteringMode === CONTROL_METERING_MODES.DECLARED;
   const context = declared ? channel.wholeResponse() : channel;
-  const { options, terms, rpc, blockMode } = context;
+  const { options, terms, blockMode } = context;
   if (blockMode && typeof options.meter.stablePrefix !== 'function')
     return batchFail(PAID_EXECUTION_CODES.UNSUPPORTED);
   const { input } = recountSessionInput(quote, data, context.options.meter);
@@ -141,9 +168,7 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
   };
   await verify(signal);
   if (!options.preparation?.consume(quote, terms, blockMode)) {
-    const prepared = await rpc(BATCH_METHODS.PREPARE, { quote, terms }, signal);
-    if (!('terms' in prepared)) return batchFail(SESSION_CODES.BINDING);
-    matchBatchTerms(prepared.terms, terms);
+    await verifyPreparation(context, quote, signal);
   }
   await verify(signal);
   const { request, started } = await recoverBuyerOpening(
@@ -176,7 +201,7 @@ export async function runBuyerBatch<Remote extends BatchDestination>(
       sellerNodeId: terms.sellerNodeId,
       baseAtomic: options.buyer.snapshot().cumulativeAtomic,
     },
-    await batchExecutionDigest(request),
+    await (blockMode ? blockDigest : batchExecutionDigest)(request),
   );
   signal.throwIfAborted();
   if (blockMode) return runBuyerBlocks(context, request, signal, onDelta);

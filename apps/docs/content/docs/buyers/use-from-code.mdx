@@ -10,6 +10,10 @@ give them the app's **Base URL** and an **API key**. You don't install anything 
 Your prompt reaches the seller that answers it. That seller's machine runs the model and can read your
 prompt. Don't send passwords, keys or other secrets. See [Data and privacy](/en/reference/data-and-privacy).
 
+If a paid reply is interrupted, keep the partial text and send a new question. With renewal authorized, the buyer checks the charge and refund and can open one replacement with the same seller. While payment is uncertain, paid calls stay blocked.
+
+If your tool retries the interrupted question with the same API key, automatic routing also blocks that retry when it finds a free seller. Send a new question to continue. In Desktop you can explicitly select Free to ask the original question again.
+
 ## Automatic seller selection
 
 Auto lets your buyer pick a seller for you. By default it uses free offers only. To let it use paid offers, open
@@ -28,7 +32,7 @@ If a later page fails, the desktop app can write a local diagnostic code without
 These limits apply to chat and to every API key on this buyer, so your coding tools follow them too. The maximum
 per response is the buyer's limit for every paid answer, not only Auto's, and it stays when you turn paid offers
 off. Auto asks verified sellers for signed offers. The remaining budget of each API key still applies, and a key
-with a limit of `0` can only use free offers. If a coding tool needs to replace an existing channel, review the seller and deposit in Desktop. An owner-authorized Auto switch can settle the previous channel and use the remaining deposit authority. To return Auto to free offers only, clear **Allow paid offers in Auto**
+with a limit of `0` can only use free offers. Before enabling, changing or disabling renewal, let the app-managed buyer finish its current requests and open **Usage & payments → Limits**. If a paid Chat budget is active, choose **Manage chat budget → Finish session**. To enable renewal, choose **Set budget**, enter a total, and choose **Authorize renewal**. Under **Manage budget**, you can change the total or choose **Turn off renewal**. After disabling renewal your tools can still use the funded channel’s available balance. With renewal enabled, OpenCode and API clients can keep using the same seller when a channel has too little escrow for the next response. The buyer verifies settlement and opens one replacement within the per-deposit cap, the shared total budget and the key’s limit. Token prices may change within your approved input and output ceilings. If the budget runs out or a payment needs review, the tool receives an error. Under the default channel policy, an owner-authorized Auto seller switch can settle the previous channel and use the remaining deposit authority. To return Auto to free offers only, clear **Allow paid offers in Auto**
 and choose **Save Auto settings**.
 
 ## Prerequisites [#before-you-start]
@@ -239,6 +243,10 @@ What happens when a seller fails depends on how far the answer got:
 | After text reached your tool                                                | The request ends with an error; the answer is not restarted elsewhere                                    |
 | The seller itself answers with an error (busy, daily limit, engine failure) | The request ends with that error                                                                         |
 
+When your agent sends several requests together, the buyer can hold four at a time. Requests wait for an execution slot within their original deadline. Cancelling a queued request removes it before the buyer contacts a seller. A full queue returns HTTP 429. If a seller is renewing its catalog, the buyer can wait for the renewal during the same request.
+
+With an API key, automatic resending after a lost connection or a local timeout while waiting for the first output is limited to verified free offers and stops as soon as your tool receives any output. A possible paid dispatch ends automatic resending.
+
 A broken connection may deliver no response headers at all, so turn off HTTP and stream retries in your
 tool. Resending a request yourself starts a new seller selection.
 
@@ -275,7 +283,9 @@ finishes, and `usage` counts everything it generated.
 | 404                                                                                  | The app can't use that model; the message lists the ones it can                             |
 | 503                                                                                  | No seller is available. `Retry-After` suggests when to try again; retrying is your decision |
 | 503 (Chat Completions, Anthropic Messages), 400 (Responses) `BUYER_KEY_NEEDS_REVIEW` | The API key ledger requires review. Check its status in **Connections**.                    |
-| 504                                                                                  | The seller didn't answer in time                                                            |
+| 504                                                                                  | The local queue deadline expired or the seller timed out                                    |
+
+If the deadline expires in the local queue, the 504 error includes `gyblos_never_sent: true`. You can retry safely.
 
 The table gives the HTTP status before the response headers are sent. For a key review, the buyer sends `x-should-retry: false`. Configure your client to stop automatic retries while the ledger requires review. For a key review in a Responses JSON body, the Gyblos code appears in `error.code` for a verified unsent request or `error.gyblos_code` after possible dispatch.
 

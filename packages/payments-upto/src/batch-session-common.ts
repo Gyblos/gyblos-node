@@ -81,6 +81,7 @@ export async function reserve(
   input: unknown,
   now: number,
   blocks = false,
+  questionDigest?: string,
 ) {
   const request = requestFor(input);
   await store.update((state) => {
@@ -118,6 +119,7 @@ export async function reserve(
         state.version = BATCH_BLOCK_STATE.version;
       state.blocks ??= {};
       state.blocks[request.requestId] = {
+        ...(questionDigest && { questionDigest }),
         baseAtomic: state.cumulativeAtomic,
         accepted: null,
         pending: null,

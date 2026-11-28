@@ -44,6 +44,9 @@ export interface ControlSellerTrust {
 }
 // A refusal the seller itself sent, as opposed to one this buyer raised while checking its answer.
 export class SellerRefusal extends ControlError {}
+export function staleSellerCatalog(error: unknown) {
+  return error instanceof SellerRefusal && error.code === CONTROL_CODES.STALE;
+}
 function requestId() {
   return randomBytes(CONTROL_LIMITS.requestIdBytes).toString('hex');
 }

@@ -63,7 +63,6 @@ export type BuyerExecutionFactory = (context: {
     permission?: BuyerApiKeyOperation,
   ): Promise<ChatResult>;
   sellerChoice?: boolean;
-  singlePaidChannel?: boolean;
   preparePaidChat?: () => Promise<void>;
   inspectChannel?: import('./channel-eligibility-http').InspectBuyerChannel;
   reconcilePool?: () => Promise<void>;
@@ -211,7 +210,10 @@ function buyerHttp(
         run(input, signal, undefined, model, permission),
       {
         sellerChoice: execution?.sellerChoice,
-        singlePaidChannel: execution?.singlePaidChannel,
+        parallel:
+          execution && !session?.totalDepositAtomic
+            ? 1
+            : TRANSPORT_LIMITS.maxConcurrent,
         paidAuto: discovery?.paidAuto,
         selection: request.selection,
         maxTokens: request.maxTokens,
@@ -252,6 +254,7 @@ function buyerHost(
 ) {
   return {
     url: host.url,
+    pauseWhenIdle: host.pauseWhenIdle,
     chat: execution?.chat(host.url) ?? freeChat(request, host.url),
     receipts: receipts.health,
     telemetry: telemetry.health,
