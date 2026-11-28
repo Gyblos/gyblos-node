@@ -299,7 +299,7 @@ export class X402Client {
         (await this.budget.summary()).blocked
       )
         await this.budget.releaseFree(id);
-      throw error;
+      throw confirmed ? external.unsentFailure() : error;
     }
   }
   private async executeReserved(

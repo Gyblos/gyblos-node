@@ -6,6 +6,8 @@ import {
   OFFER_PRICING_KINDS,
 } from '@gyblos/protocol/constants';
 
+import { DesktopBuyerFailure } from './buyer-error';
+import { CHAT_FAILURE } from './constants';
 import {
   cancelQueuedChat,
   chatHeaders,
@@ -24,6 +26,13 @@ export class DesktopChatRequest extends AbortController {
       void this.confirmed.then(() => this.abort());
     } else this.abort();
     return true;
+  }
+  unsentFailure() {
+    return new DesktopBuyerFailure(
+      CHAT_FAILURE.NOT_SENT,
+      'The buyer cancelled the queued question before sending it.',
+      true,
+    );
   }
   async post(
     connection: Awaited<ReturnType<typeof buyerConnection>>,

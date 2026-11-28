@@ -1,5 +1,8 @@
 // One bounded in-memory waiter per seller; waiting never opens channels or stores request content.
+import { setTimeout as delay } from 'node:timers/promises';
+
 import { TRANSPORT_LIMITS } from '@gyblos/config';
+import { BUYER_ROUTING_DEFAULTS } from '@gyblos/config/buyer-routing';
 import { BuyerRoutingError } from '@gyblos/core/buyer-routing';
 import { BUYER_ROUTING_CODES } from '@gyblos/core/constants';
 
@@ -98,4 +101,12 @@ export function createQuoteQueue() {
     },
     drain: () => Promise.allSettled(selections.values()),
   };
+}
+
+export async function waitForRemoteSeller(signal: AbortSignal) {
+  try {
+    await delay(BUYER_ROUTING_DEFAULTS.queuePollMs, undefined, { signal });
+  } catch {
+    signal.throwIfAborted();
+  }
 }

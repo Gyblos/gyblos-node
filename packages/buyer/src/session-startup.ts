@@ -247,6 +247,7 @@ function sessionExecutor(
     };
     const paidInput = withBatchOutputLimit(input);
     const ports: BuyerRoutePorts<ChatResult> = {
+      sellerWait: model?.sellerWait,
       takeFreeResend: retries.takeFreeResend,
       select: fittingSelect(
         config.discovery?.paidAuto && !model?.sellerChoice

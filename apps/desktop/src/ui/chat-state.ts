@@ -200,6 +200,10 @@ export function toggleToolSelection(
     : [...enabled, id];
 }
 
+export function endActivity({ activity }: ChatMessage, now: () => number) {
+  return activity ? { activity: { ...activity, ended: now() } } : {};
+}
+
 export function failPaidRun(
   session: ChatSession,
   id: string,
@@ -207,6 +211,23 @@ export function failPaidRun(
   failureReason: ChatFailureReason | undefined,
   now: () => number,
 ): ChatSession {
+  if (session.paypalRun?.id !== id) {
+    if (failureReason !== CHAT_FAILURE.NOT_SENT) return session;
+    const stopped = session.messages.find(
+      (message) =>
+        message.id === id + '-assistant' &&
+        message.paymentMethod === PAYMENT_METHOD.USDC &&
+        message.state === MESSAGE_STATE.STOPPED &&
+        !message.text,
+    );
+    if (!stopped) return session;
+    return {
+      ...session,
+      messages: session.messages.map((message) =>
+        message === stopped ? { ...message, failureReason } : message,
+      ),
+    };
+  }
   return {
     ...session,
     draft:
@@ -222,9 +243,7 @@ export function failPaidRun(
             ...message,
             state: MESSAGE_STATE.FAILED,
             failureReason: failureReason ?? CHAT_FAILURE.INTERRUPTED,
-            ...(message.activity && {
-              activity: { ...message.activity, ended: now() },
-            }),
+            ...endActivity(message, now),
           }
         : message,
     ),

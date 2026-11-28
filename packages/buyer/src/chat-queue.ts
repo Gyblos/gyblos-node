@@ -13,11 +13,16 @@ type Pending = Map<string, () => boolean>;
 export function queuedRequest(request: IncomingMessage, pending: Pending) {
   const id = request.headers[BUYER_API.QUEUE_ID_HEADER];
   if (typeof id !== 'string' || !BUYER_API.POLICY_PATTERN.test(id)) return;
+  let waitingForSeller = false;
   return {
     id,
+    sellerWait: (waiting: boolean) => {
+      waitingForSeller = waiting;
+    },
     register: (entered: () => boolean, controller: AbortController) =>
       pending.set(id, () => {
-        if (entered() || controller.signal.aborted) return false;
+        if ((entered() && !waitingForSeller) || controller.signal.aborted)
+          return false;
         controller.abort(new FreeBuyerError(FREE_BUYER_CODES.CANCELLED));
         return true;
       }),

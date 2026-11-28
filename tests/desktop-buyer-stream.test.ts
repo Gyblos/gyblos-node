@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  CHAT_FAILURE,
   projectChatArchive,
   restoreChatArchive,
 } from '@gyblos/desktop/chat-archive-model';
@@ -255,6 +256,16 @@ void test('live activity follows the first nonempty delta and terminal for its o
   chat.startPaypal('Question', model, 'two');
   chat.completePaypal('first', 'two', 'Answer', model);
   assert.deepEqual(answer()?.activity, { started: 99, ended: 99 });
+  chat.startPaypal('Queued', model, 'queue', undefined, PAYMENT_METHOD.USDC);
+  chat.stopBuyer('first', 'queue');
+  chat.failPaypal(
+    'first',
+    'queue',
+    'Confirmed before dispatch',
+    CHAT_FAILURE.NOT_SENT,
+  );
+  assert.equal(answer()?.failureReason, CHAT_FAILURE.NOT_SENT);
+  assert.equal(chat.getSnapshot().sessions[0]?.draft, 'Queued');
   chat.startPaypal('Question', model, 'three');
   clock = 101;
   chat.failPaypal('first', 'three', 'Unavailable');

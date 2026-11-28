@@ -214,6 +214,7 @@ async function serveChat(
       selectedSellerAllowed,
       request.headers[BUYER_API.EXPLICIT_FREE_HEADER] ===
         OFFER_PRICING_KINDS.FREE,
+      cancellation?.sellerWait,
     );
     if (
       route.openingIntent &&

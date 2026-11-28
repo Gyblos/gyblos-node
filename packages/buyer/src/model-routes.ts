@@ -32,6 +32,7 @@ export interface ModelRoute {
 
 // What a request needs to find and quote a seller for one model.
 export type RoutedModel = Pick<ModelRoute, 'selection' | 'maxTokens'> & {
+  sellerWait?(waiting: boolean): void;
   openingIntent?: string;
   freeOnly?: boolean;
   explicitFree?: boolean;
