@@ -194,10 +194,9 @@ for (const scenario of ['restart', 'live', 'desktop'])
           });
         const invalid = await submit(true, BUYER_API.CHAT_PATH, true);
         assert.equal(invalid.status, 400);
-        assert.equal(
-          (await invalid.json()).error.code,
-          FREE_BUYER_CODES.INVALID,
-        );
+        assert.partialDeepStrictEqual(await invalid.json(), {
+          error: { code: FREE_BUYER_CODES.INVALID },
+        });
         assert.equal(dispatches, 1);
         const ordinary = await submit(true, BUYER_API.CHAT_PATH);
         assert.equal(ordinary.ok, false);
