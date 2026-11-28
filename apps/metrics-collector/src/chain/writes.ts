@@ -27,9 +27,9 @@ import {
 } from '../schema';
 import type { ChannelState } from './channel-account';
 import type { ChainTransaction } from './decode';
+import { owned, ownedInsert, type BatchItem } from './owned';
 import type { ChainSignature } from './rpc';
 
-type BatchItem = Parameters<CollectorDatabase['batch']>[0][number];
 export interface ChainCursorState {
   newest: string | null;
   newestSlot: number | null;
@@ -62,31 +62,8 @@ function chunksFor<T>(
   return result;
 }
 
-const owned = (lease: number | null) =>
-  sql`exists (select 1 from ${chainCursor} where ${chainCursor.id} = ${CHAIN_CURSOR_ID} and ${chainCursor.leaseUntil} = ${lease})`;
-const tuples = (rows: readonly Record<string, unknown>[]) =>
-  sql.join(
-    rows.map(
-      (row) =>
-        sql`(${sql.join(
-          Object.values(row).map((value) => sql`${value}`),
-          sql`, `,
-        )})`,
-    ),
-    sql`, `,
-  );
-const ownedInsert = <T extends SQLiteTable>(
-  orm: CollectorDatabase,
-  table: T,
-  chunk: Record<string, unknown>[],
-  lease: number | null,
-) =>
-  orm
-    .insert(table)
-    .select(sql`select * from (values ${tuples(chunk)}) where ${owned(lease)}`);
 export function cursorUpdate(
   orm: CollectorDatabase,
-  id: number,
   cursor: ChainCursorState,
   now: number,
   lease: number | null,
@@ -106,7 +83,7 @@ export function cursorUpdate(
       updatedAt: now,
     })
     .where(
-      sql`${chainCursor.id} = ${id} and ${chainCursor.leaseUntil} = ${lease}`,
+      sql`${chainCursor.id} = ${CHAIN_CURSOR_ID} and ${chainCursor.leaseUntil} = ${lease}`,
     );
 }
 
@@ -337,26 +314,16 @@ export function programCounts(
     updatedAt: now,
   }));
   return [
-    ...chunksFor(chainProgramDaily, rows, 2).map((chunk) => {
-      const values = sql.join(
-        chunk.map(
-          (row) =>
-            sql`(${row.day}, ${row.transactions}, ${row.failed}, ${row.updatedAt})`,
-        ),
-        sql`, `,
-      );
-      return orm
-        .insert(chainProgramDaily)
-        .select(sql`select * from (values ${values}) where ${owned(lease)}`)
-        .onConflictDoUpdate({
-          target: chainProgramDaily.day,
-          set: {
-            transactions: sql`${chainProgramDaily.transactions} + excluded.transactions`,
-            failed: sql`${chainProgramDaily.failed} + excluded.failed`,
-            updatedAt: sql`excluded.updated_at`,
-          },
-        });
-    }),
+    ...chunksFor(chainProgramDaily, rows, 2).map((chunk) =>
+      ownedInsert(orm, chainProgramDaily, chunk, lease).onConflictDoUpdate({
+        target: chainProgramDaily.day,
+        set: {
+          transactions: sql`${chainProgramDaily.transactions} + excluded.transactions`,
+          failed: sql`${chainProgramDaily.failed} + excluded.failed`,
+          updatedAt: sql`excluded.updated_at`,
+        },
+      }),
+    ),
     ...chunksFor(aggChainDirtyDays, rows, 2).map((chunk) =>
       ownedInsert(
         orm,

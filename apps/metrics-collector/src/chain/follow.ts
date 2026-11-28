@@ -11,6 +11,7 @@ import { CHAIN_CHANNEL_CLOSED, CHAIN_INDEX } from '../constants';
 import { chainChannels } from '../schema';
 import { channelState } from './channel-account';
 import type { ChainTransaction } from './decode';
+import { ownedBatch } from './owned';
 import { readTransaction, type ChainRun } from './run';
 import { channelStateUpserts, followUpdate, transactionWrites } from './writes';
 
@@ -52,7 +53,7 @@ async function dueChannels(run: ChainRun) {
 
 export async function followChannels(run: ChainRun) {
   for (const { channel, until } of await dueChannels(run)) {
-    if (run.rpc.remaining() <= 0) break;
+    if (run.rpc.remaining() <= 0 || run.leaseLost) break;
     await followChannel(run, channel, until);
   }
   return run.followed;
@@ -66,16 +67,24 @@ async function followChannel(
   const page = await run.rpc.signatures(channel, until ? { until } : {});
   run.followed += 1;
   if (page.length >= CHAIN_INDEX.signaturesPerPage) {
+    const owned = await ownedBatch(
+      run.orm,
+      [
+        followUpdate(
+          run.orm,
+          channel,
+          { until, following: false },
+          run.now,
+          run.lease,
+        ),
+      ],
+      run.lease,
+    );
+    if (!owned) {
+      run.leaseLost = true;
+      return;
+    }
     run.flooded += 1;
-    await run.orm.batch([
-      followUpdate(
-        run.orm,
-        channel,
-        { until, following: false },
-        run.now,
-        run.lease,
-      ),
-    ]);
     return;
   }
   const read: ChainTransaction[] = [];
@@ -96,16 +105,23 @@ async function followChannel(
   } catch (error) {
     failure = error;
   }
-  await run.orm.batch([
-    followUpdate(
+  if (!run.leaseLost) {
+    const owned = await ownedBatch(
       run.orm,
-      channel,
-      { until: newest, following: true },
-      run.now,
+      [
+        followUpdate(
+          run.orm,
+          channel,
+          { until: newest, following: true },
+          run.now,
+          run.lease,
+        ),
+        ...transactionWrites(run.orm, read, run.now, run.lease),
+      ],
       run.lease,
-    ),
-    ...transactionWrites(run.orm, read, run.now, run.lease),
-  ]);
+    );
+    if (!owned) run.leaseLost = true;
+  }
   if (failure) throw failure;
 }
 
@@ -138,7 +154,7 @@ export async function refreshChannels(run: ChainRun) {
   let read = 0;
   for (
     let start = 0;
-    start < channels.length && run.rpc.remaining() > 0;
+    start < channels.length && run.rpc.remaining() > 0 && !run.leaseLost;
     start += CHAIN_INDEX.accountsPerRequest
   ) {
     const batch = channels.slice(start, start + CHAIN_INDEX.accountsPerRequest);
@@ -152,7 +168,10 @@ export async function refreshChannels(run: ChainRun) {
       run.now,
       run.lease,
     );
-    if (first) await run.orm.batch([first, ...rest]);
+    if (first && !run.leaseLost) {
+      const owned = await ownedBatch(run.orm, [first, ...rest], run.lease);
+      if (!owned) run.leaseLost = true;
+    }
     read += batch.length;
   }
   return read;

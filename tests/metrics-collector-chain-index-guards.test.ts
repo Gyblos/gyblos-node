@@ -484,3 +484,61 @@ void test('a run that lost its lease writes no transaction or channel rows', asy
     [{ c: 0 }],
   );
 });
+
+void test('a run that lost its lease reports only what it persisted', async () => {
+  const database = createCollectorD1();
+  const { rpc } = fakeChainRpc(plain(3, 'p'));
+  const takeover: ChainRpc = {
+    ...rpc,
+    signatures(address, range) {
+      database.raw
+        .prepare(
+          'UPDATE collector_chain_cursor SET lease_until = ? WHERE id = ?',
+        )
+        .run(2000, CHAIN_CURSOR_ID);
+      return rpc.signatures(address, range);
+    },
+  };
+  const run = await runChainIndex(database, endpoints(takeover), 1000);
+  assert.equal(run.listed, 0);
+  assert.equal(run.cursor.newest, null);
+  assert.equal(run.backlog, true);
+});
+
+void test('a lease-lost run stops account reads and completes normally', async () => {
+  const database = createCollectorD1();
+  const history = lifecycle();
+  const { rpc, calls } = fakeChainRpc(history, { [CHANNEL]: null });
+  const takeover: ChainRpc = {
+    ...rpc,
+    signatures(address, range) {
+      database.raw
+        .prepare(
+          'UPDATE collector_chain_cursor SET lease_until = ? WHERE id = ?',
+        )
+        .run(9_999_999, CHAIN_CURSOR_ID);
+      return rpc.signatures(address, range);
+    },
+  };
+  await runChainIndex(database, endpoints(takeover), 1000);
+  assert.equal(calls.accounts, 0);
+});
+
+void test('a lease-lost run still throws its primary read failure', async () => {
+  const database = createCollectorD1();
+  const history = lifecycle();
+  const { rpc } = fakeChainRpc(history, { [CHANNEL]: null });
+  const takeover: ChainRpc = {
+    ...rpc,
+    signatures(address, range) {
+      database.raw
+        .prepare(
+          'UPDATE collector_chain_cursor SET lease_until = ? WHERE id = ?',
+        )
+        .run(9_999_999, CHAIN_CURSOR_ID);
+      return rpc.signatures(address, range);
+    },
+    transaction: () => Promise.reject(new ChainRpcError('boom')),
+  };
+  await assert.rejects(runChainIndex(database, endpoints(takeover), 1000));
+});
