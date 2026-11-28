@@ -8,7 +8,11 @@ import {
   type NetworkStatus,
 } from '../lib/network-status';
 import { tablePager, type ExplorerQuery } from '../lib/paging';
-import { notOnlineMeta, sellerHref } from '../lib/seller-identity';
+import {
+  notOnlineMeta,
+  sellerDisplayName,
+  sellerHref,
+} from '../lib/seller-identity';
 import { SELLER_STATUS_LABELS } from '../lib/seller-profile';
 import { Chip } from './board/chip';
 import { pagedRows, Pager } from './pager';
@@ -100,7 +104,7 @@ function NotOnlineTable({
               <SellerCell
                 nodeId={node.nodeId}
                 github={node.github}
-                name={node.name}
+                name={sellerDisplayName(node.name)}
                 href={sellerHref(node.nodeId, query)}
               >
                 {node.github ? (

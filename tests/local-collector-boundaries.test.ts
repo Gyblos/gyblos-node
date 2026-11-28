@@ -118,6 +118,29 @@ void test('local collector applies buyer quotas and resets the window while reta
     f.entry.receipt,
   );
 });
+void test('local collector admission survives the clock jumping backwards', async (context) => {
+  const f = await managedReceiptFixture(context);
+  let now = 10_000_000;
+  const server = f.manage(
+    await startLocalCollector({
+      ...options(f.path, f.entry.receipt.seller.record.buyerNodeId),
+      now: () => now,
+    }),
+  );
+  for (let index = 0; index < 10; index++)
+    assert.equal(
+      (await raw(server.url, receiptBytes(f.entry.receipt), {})).status,
+      200,
+    );
+  assert.equal(
+    (await raw(server.url, receiptBytes(f.entry.receipt), {})).status,
+    429,
+  );
+  now -= 30000;
+  const result = await raw(server.url, receiptBytes(f.entry.receipt), {});
+  assert.equal(result.status, 200);
+});
+
 void test('local collector cuts off a slow body and releases its buyer admission', async (context) => {
   const f = await managedReceiptFixture(context);
   const server = f.manage(

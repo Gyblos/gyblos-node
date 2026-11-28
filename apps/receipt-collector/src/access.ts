@@ -45,7 +45,7 @@ export function collectorAccess(settings: CollectorSettings) {
   return {
     admit(request: IncomingMessage) {
       const now = settings.now();
-      if (now >= window + LOCAL_COLLECTOR.windowMs) {
+      if (now >= window + LOCAL_COLLECTOR.windowMs || now < window) {
         window = now;
         global = 0;
         for (const principal of principals) principal.count = 0;

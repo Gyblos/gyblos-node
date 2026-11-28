@@ -193,6 +193,7 @@ const snapshot = (
   sellers: Seller[],
   nodes:
     { nodeId: string; state: 'online' | 'offline' | 'unpublished' }[] | null,
+  name = 'Ada Lovelace',
 ): DiscoverySnapshot => ({
   generatedAt: 5000,
   sellers,
@@ -203,7 +204,7 @@ const snapshot = (
       firstSeenAt: 900,
       lastSeenAt: 4000,
       models: [],
-      name: node.nodeId === NODE ? '‮evil name' : null,
+      name: node.nodeId === NODE ? name : null,
       github: node.nodeId === NODE ? { account: 'octo', gist: 'abc' } : null,
     })),
     truncated: false,
@@ -213,6 +214,20 @@ const snapshot = (
   networkDatedAt: null,
   models: {},
   error: null,
+});
+
+void test('a seller profile drops a name shaped like an account, a badge or hidden characters', () => {
+  for (const evil of ['@gyblos', 'alice ✓', 'ali​ce', '‮evil']) {
+    const profile = sellerProfile(
+      NODE,
+      snapshot(
+        [listed(NODE, OWNER)],
+        [{ nodeId: NODE, state: 'online' }],
+        evil,
+      ),
+    );
+    assert.equal(profile.name, null, evil);
+  }
 });
 
 void test('a seller profile joins the listed offer, the network status and the identity', () => {
@@ -228,7 +243,7 @@ void test('a seller profile joins the listed offer, the network status and the i
       online.owner,
       online.ownerShared,
     ],
-    ['online', '‮evil name', { account: 'octo', gist: 'abc' }, OWNER, false],
+    ['online', 'Ada Lovelace', { account: 'octo', gist: 'abc' }, OWNER, false],
   );
   assert.deepEqual(
     [

@@ -153,7 +153,7 @@ void test('only the owner can prepare paid chat, with the current policy and an 
   const delegated = await fetch(new URL(BUYER_API.STATUS_PATH, host.url), {
     headers: { authorization: 'Bearer ' + key.secret },
   });
-  assert.equal(delegated.headers.get(BUYER_API.RECONCILE_POOL_HEADER), null);
+  assert.equal(delegated.status, 403);
   await delegated.body?.cancel();
   const { policyId } = await metadata.json();
   const url = new URL(BUYER_API.PAID_PREPARATION_PATH, host.url);

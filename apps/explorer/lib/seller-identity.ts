@@ -5,13 +5,17 @@ import type { GithubAccount, NetworkStatus } from './network-status';
 import { uptimeRatio } from './offers';
 import { queryHref, type ExplorerQuery } from './paging';
 
+export const sellerDisplayName = (name: string | null): string | null =>
+  name && !SELLER_NAME.unsafe.test(name) ? name : null;
+
 export function namesByNode(
   network: NetworkStatus | null,
 ): Map<string, string> {
   const names = new Map<string, string>();
-  for (const node of network?.nodes ?? [])
-    if (node.name && !SELLER_NAME.unsafe.test(node.name))
-      names.set(node.nodeId, node.name);
+  for (const node of network?.nodes ?? []) {
+    const name = sellerDisplayName(node.name);
+    if (name) names.set(node.nodeId, name);
+  }
   return names;
 }
 
