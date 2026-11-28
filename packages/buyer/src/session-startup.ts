@@ -21,7 +21,6 @@ import {
 import { ownedChat } from './chat-owned';
 import { PAID_BUYER_HTTP_MS } from './constants';
 import { observeBuyerExecution } from './execution-observation';
-import type { SelectionRoute } from './free-route';
 import { selectWinner } from './free-selection';
 import type { ChatPayment, ChatResult } from './free-sse';
 import type { BuyerExecutionFactory } from './free-startup';
@@ -46,7 +45,7 @@ import {
 } from './session-requirements';
 import { pinnedBusy, routeScope, sessionRouter } from './session-routing';
 import {
-  preferChannel,
+  channelSelector,
   prepareChosenSeller,
   verifyChosenOffer,
 } from './session-seller-choice';
@@ -118,7 +117,7 @@ function sessionSelection(
   input: Parameters<Awaited<ReturnType<BuyerExecutionFactory>>['execute']>[0],
   permission: Parameters<typeof reserveApiKey>[0],
   router: ReturnType<typeof sessionRouter> | undefined,
-  previousSeller: () => Promise<string | undefined>,
+  previousSeller: ReturnType<typeof makeManager>['previousSeller'],
   choice?: BuyerSellerChoice,
 ): BuyerRoutePorts<ChatResult>['select'] {
   const { prepared, endpoint, relayOnly } = context;
@@ -135,28 +134,20 @@ function sessionSelection(
         request.maxAtomic === '0' ? request.priceCeilings : route.priceCeilings,
       ...(inferenceNeedsTools(input) ? { tools: true as const } : {}),
     };
-    const select = async (
-      candidate: typeof request,
-      selectionRoute?: SelectionRoute,
-    ) =>
-      selectWinner(
-        prepared,
-        {
-          endpoint,
-          buyer,
-          relayOnly,
-          onSellerFailure: options.onSellerFailure,
-          ...(router ? { onPinnedBusy: pinnedBusy } : {}),
-        },
-        excluded,
-        current,
-        candidate,
-        await preferChannel(
-          selectionRoute,
-          prepared.config.discovery?.paidAuto,
-          previousSeller,
-        ),
-      );
+    const select = channelSelector(
+      prepared,
+      {
+        endpoint,
+        buyer,
+        relayOnly,
+        onSellerFailure: options.onSellerFailure,
+        ...(router ? { onPinnedBusy: pinnedBusy } : {}),
+      },
+      excluded,
+      current,
+      previousSeller,
+      selectWinner,
+    );
     if (choice) {
       if (permission) return sessionFail(SESSION_CODES.BINDING);
       const chosen = prepareChosenSeller(prepared, choice);
@@ -279,6 +270,7 @@ function sessionExecutor(
         onDelta,
         onUnfit,
         retries,
+        model?.explicitFree === true,
       ),
       paid: (winner, current, sending) => {
         if (retries.failure()) throw retries.failure();

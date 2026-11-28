@@ -16,6 +16,7 @@ export async function openBuyerApiKeys(
   scope: BuyerKeyScope,
   confirmCharge?: ConfirmKeyCharge,
   diagnostics?: DiagnosticSink,
+  reviewOnRequest = false,
 ) {
   const paths = buyerApiKeyPathsIn(environment);
   const lock = await acquireProcessLock(paths.lock);
@@ -24,6 +25,7 @@ export async function openBuyerApiKeys(
       scope,
       confirmCharge,
       diagnostics,
+      reviewOnRequest,
       files: {
         read: () =>
           readPrivateFile(paths.state, BUYER_API_KEY_STORAGE.MAX_BYTES),

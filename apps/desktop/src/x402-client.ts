@@ -24,6 +24,7 @@ import {
   assertFreeBudget,
   buyerConnection,
   buyerEndpoint,
+  chatHeaders,
   policyForRoute,
   policyForSeller,
   readJson,
@@ -253,6 +254,7 @@ export class X402Client {
         external,
         onDelta,
         choice,
+        { explicitFree: route === undefined },
       );
     }
     if (
@@ -296,7 +298,7 @@ export class X402Client {
         external,
         onDelta,
         choice,
-        intent,
+        { intent },
       );
     } catch (error) {
       if (intent) await this.budget.recoverOpening();
@@ -317,7 +319,7 @@ export class X402Client {
     external: AbortSignal,
     onDelta?: (text: string) => void,
     choice?: DesktopSellerChoice,
-    intent?: string,
+    { intent, explicitFree }: { intent?: string; explicitFree?: boolean } = {},
   ) {
     const started = performance.now();
     const signal = AbortSignal.any([
@@ -334,11 +336,7 @@ export class X402Client {
         method: 'POST',
         redirect: 'error',
         signal,
-        headers: {
-          authorization: 'Bearer ' + connection.token,
-          'content-type': 'application/json',
-          'if-match': '"' + policy.policyId + '"',
-        },
+        headers: chatHeaders(connection.token, policy.policyId, explicitFree),
         body: JSON.stringify({
           ...sellerFields(choice),
           ...(intent && { [BUYER_API.OPENING_INTENT_FIELD]: intent }),

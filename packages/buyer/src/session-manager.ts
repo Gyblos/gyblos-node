@@ -186,13 +186,16 @@ function desktopPermissions(
   };
 }
 async function previousSeller(
-  total: string | undefined,
+  policy: NonNullable<Context['prepared']['config']['session']>,
   inspect: typeof inspectSingle,
 ) {
-  if (total !== undefined) return undefined;
+  if (policy.totalDepositAtomic !== undefined) return undefined;
   const stored = await inspect();
-  return stored && !batchSessionTerminal(stored)
-    ? stored.terms.sellerNodeId
+  if (!stored) return undefined;
+  const partial =
+    !!policy.renewalBudgetAtomic && stored.settledPartial === true;
+  return partial || !batchSessionTerminal(stored)
+    ? { nodeId: stored.terms.sellerNodeId, partial }
     : undefined;
 }
 function inspectSingle() {
@@ -335,6 +338,7 @@ export function makeManager(
     unresolved: () => unresolvedPool(policy.totalDepositAtomic),
     checkReusableChannel: checkChannel,
     authorizeRequest: sessionAuthorization(state),
+    credentialId: (id) => state.selections.get(id)?.permission?.keyId,
     verify: trustedQuote(context, state),
     receipt: sessionReceipts(context, state),
   };
@@ -359,9 +363,14 @@ export function makeManager(
     ...manager,
     checkChannel,
     inspectChannel: pickerChannel(context, options, state),
-    confirmKeyCharge: keyProof(context, options),
-    previousSeller: () =>
-      previousSeller(policy.totalDepositAtomic, common.inspect),
+    confirmKeyCharge: keyProof(
+      context,
+      options,
+      policy.renewalBudgetAtomic && 'reconcile' in manager
+        ? manager.reconcile
+        : undefined,
+    ),
+    previousSeller: () => previousSeller(policy, common.inspect),
     preparePaidChat: async () => {
       await loadMeter();
     },

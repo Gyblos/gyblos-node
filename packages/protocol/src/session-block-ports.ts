@@ -31,7 +31,7 @@ export interface SessionBlockIntent {
 export interface SessionBlockBuyer extends SessionBuyer {
   usesBlocks(): boolean;
   pendingBlockRequest(): SessionRequest | undefined;
-  beginBlocks(request: SessionRequest): Promise<void>;
+  beginBlocks(request: SessionRequest, questionDigest?: string): Promise<void>;
   approveBlock(
     intent: SessionBlockIntent,
     verifiedAtomic: string,

@@ -63,6 +63,16 @@ async function prepareClose(context: BatchSellerContext) {
         };
   });
 }
+export async function observeBatchSettlement(context: BatchSellerContext) {
+  const record = context.store.read();
+  if (record.settlement) return record.settlement;
+  if (!record.channelId) return undefined;
+  const proof = await waitBatch(
+    context.options.observe(record.channelId),
+    context.options.operationMs,
+  );
+  return proof ? acceptSettlement(context, proof) : undefined;
+}
 export async function closeBatch(context: BatchSellerContext) {
   const { options, store, facilitator, requirements } = context;
   const previous = store.read();

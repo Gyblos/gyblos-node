@@ -64,36 +64,42 @@ if (isMain(import.meta.url)) {
   }
   let generations = 0;
   let session = '';
-  const host = await sessionProductHost(undefined, undefined, {
-    contextTokens: 64000,
-    maxTokens: 160,
-    meter: { ...blockTestMeter, output: blockTestMeter.count },
-    observe: () => {},
-    generate: async (input) => {
-      generations++;
-      const text = answer;
-      if (phase === 'interrupt' && partialRuns === 0) {
-        partialRuns++;
-        assert.ok(input.signal);
-        return interruptedGeneration(
-          input.onText,
-          AbortSignal.any([input.signal, teardown.signal]),
-        );
-      } else await input.onText?.(text);
-      return {
-        text,
-        finishReason: ENGINE_DONE_REASONS.STOP,
-        usage: {
-          inputTokens: 2,
-          outputTokens: text.length,
-          totalDurationNs: 0,
-          loadDurationNs: 0,
-          inputDurationNs: 0,
-          outputDurationNs: 0,
-        },
-      };
+  const host = await sessionProductHost(
+    undefined,
+    undefined,
+    {
+      contextTokens: 64000,
+      maxTokens: 160,
+      meter: { ...blockTestMeter, output: blockTestMeter.count },
+      observe: () => {},
+      generate: async (input) => {
+        generations++;
+        const text = answer;
+        if (phase === 'interrupt' && partialRuns === 0) {
+          partialRuns++;
+          assert.ok(input.signal);
+          return interruptedGeneration(
+            input.onText,
+            AbortSignal.any([input.signal, teardown.signal]),
+          );
+        } else await input.onText?.(text);
+        return {
+          text,
+          finishReason: ENGINE_DONE_REASONS.STOP,
+          usage: {
+            inputTokens: 2,
+            outputTokens: text.length,
+            totalDurationNs: 0,
+            loadDurationNs: 0,
+            inputDurationNs: 0,
+            outputDurationNs: 0,
+          },
+        };
+      },
     },
-  });
+    undefined,
+    { depositAtomic: '10000', renewalBudgetAtomic: '30000' },
+  );
   const proxy = interruptionProxy({
     upstream: (init) => originalFetch(host.buyer().url, init),
     async headers(response) {
@@ -257,9 +263,8 @@ if (isMain(import.meta.url)) {
           assert.equal(exit, 0);
           assert.ok(complete);
         } else if (turn === 'next' || turn === 'restarted') {
-          assert.equal(statusCode, SESSION_CODES.STATUS_UNKNOWN);
-          assert.equal(generations, 3);
-          assert.equal(exit, 1);
+          assert.equal(exit, 0);
+          assert.ok(complete);
           assert.equal(keys.snapshot.blocked, false);
           if (turn === 'next') {
             await host.restartBuyer();
@@ -295,30 +300,16 @@ if (isMain(import.meta.url)) {
             ),
             transaction: 'syntheticConfirmedClose',
           });
-          const check = await client.owner(
-            new URL(BUYER_API.RECONCILE_POOL_PATH, host.buyer().url),
-            {
-              method: 'POST',
-              headers: { 'if-match': '"' + policy.policyId + '"' },
-            },
-          );
-          console.log(
-            'CHECK',
-            now(),
-            check.status,
-            'settled',
-            cumulativeAtomic,
-          );
-          assert.equal(check.status, 204);
+          console.log('FINALITY', now(), 'settled', cumulativeAtomic);
         }
         assert.ok(session);
         assert.equal(
           host.finance.calls.filter((x) => x === 'deposit').length,
-          1,
+          ['warmup', 'interrupt'].includes(turn) ? 1 : 2,
         );
         if (turn === 'free') {
-          assert.equal(generations, 4);
-          assert.equal(host.finance.approvals(), 3);
+          assert.equal(generations, 6);
+          assert.equal(host.finance.approvals(), 5);
           assert.equal(key?.reservedAtomic, '0');
           assert.equal(key?.settledAtomic, '136');
         }

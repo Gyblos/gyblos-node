@@ -38,6 +38,28 @@ export function automaticPoolRoute(
     : route;
 }
 
+export async function selectForSettledPartial<Winner>(
+  request: Request,
+  route: SelectionRoute | undefined,
+  seller: string,
+  excluded: ReadonlySet<string>,
+  signal: AbortSignal,
+  select: (request: Request, route?: SelectionRoute) => Promise<Winner>,
+): Promise<Winner> {
+  signal.throwIfAborted();
+  if (
+    (!route?.pinnedNodeId || route.pinnedNodeId === seller) &&
+    !excluded.has(seller)
+  ) {
+    try {
+      return await select(request, { ...route, pinnedNodeId: seller });
+    } catch (error) {
+      signal.throwIfAborted();
+      if (!(error instanceof FreeSelectionFailure)) throw error;
+    }
+  }
+  return select(openDiscoveryRequest(request), route);
+}
 export async function selectConfiguredThenOpen<Winner>(
   config: Pick<BuyerSelectionConfig, 'sellers' | 'discovery'>,
   request: Request,

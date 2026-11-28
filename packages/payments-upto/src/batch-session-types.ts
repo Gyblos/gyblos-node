@@ -57,6 +57,7 @@ export interface BatchSellerBackend {
 }
 
 export interface BatchRequestBlocks {
+  questionDigest?: string;
   baseAtomic: string;
   accepted: SessionBlockIntent | null;
   pending: {

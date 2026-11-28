@@ -173,7 +173,9 @@ export async function sessionProductPayments(
       };
     },
   };
+  const registry = singleBuyerRegistry(roles.buyer.nodeId, seller);
   return {
+    registry,
     observeSettlement: observe,
     walletBalance(value: string | null) {
       walletBalance = value;
@@ -205,7 +207,7 @@ export async function sessionProductPayments(
         protocolFeeBps: PROTOCOL_FEE.bps,
         treasury: PROTOCOL_FEE.treasury,
       },
-      sessions: { registry: singleBuyerRegistry(roles.buyer.nodeId, seller) },
+      sessions: { registry },
       close: async () => {},
     }),
     calls,

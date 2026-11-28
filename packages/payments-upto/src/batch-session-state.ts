@@ -26,6 +26,8 @@ export interface BatchStoredSession {
   terms: PaymentSessionTerms;
   snapshot: SessionSnapshot;
   archivedProof?: true;
+  settledPartial?: true;
+  interruptedQuestions?: string[];
   renewalLimitReached?: true;
   pending: boolean;
   recoverable: boolean;
@@ -87,7 +89,39 @@ export async function inspectBatchSession(
     stored.renewalLimitReached = true;
   return stored;
 }
+function settledPartial(
+  record: BatchRecord | NonNullable<BatchRecord['history']>[number],
+) {
+  if (
+    record.state !== SESSION_STATES.CLOSED ||
+    !record.settlement?.transaction ||
+    record.settlement.chargedAtomic !== record.cumulativeAtomic ||
+    !record.voucher ||
+    record.voucher.maxClaimableAmount !== record.cumulativeAtomic
+  )
+    return undefined;
+  const pending = Object.values(record.requests).filter(
+    (request) => !request.accepted,
+  );
+  if (pending.length !== 1) return undefined;
+  const progress = record.blocks?.[pending[0]!.requestId];
+  if (
+    !progress?.questionDigest ||
+    progress.pending ||
+    !progress.accepted ||
+    progress.accepted.terminal ||
+    progress.accepted.bill.cumulativeAtomic !== record.cumulativeAtomic ||
+    BigInt(progress.accepted.bill.chargedAtomic) === 0n
+  )
+    return undefined;
+  return progress.questionDigest;
+}
 export function storedBatchSession(record: BatchRecord): BatchStoredSession {
+  const partial = settledPartial(record);
+  const interruptedQuestions = (record.history ?? []).flatMap(
+    (entry) => settledPartial(entry) ?? [],
+  );
+  if (partial) interruptedQuestions.push(partial);
   const pending = Object.values(record.requests).filter(
     (request) => !request.accepted,
   );
@@ -111,6 +145,8 @@ export function storedBatchSession(record: BatchRecord): BatchStoredSession {
     ...((record.history?.length ?? 0) >= BATCH_RENEWAL_STATE.maxHistory && {
       renewalLimitReached: true as const,
     }),
+    ...(partial && { settledPartial: true as const }),
+    ...(interruptedQuestions.length && { interruptedQuestions }),
     ...(returnedOpening(record) && { openingReturned: true as const }),
     ...(record.pending[BATCH_BUYER_CHECKPOINTS.OPENING_SENT] && {
       openingPending: true as const,

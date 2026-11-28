@@ -51,8 +51,10 @@ export async function createBatchBuyer(
     openingRecovery: openingRecovery(options, store, exclusive),
     usesBlocks: () => store.read().blocks !== undefined,
     pendingBlockRequest: () => pendingBlockRequest(store),
-    beginBlocks: (request) =>
-      exclusive(() => reserve(store, request, options.now(), true)),
+    beginBlocks: (request, questionDigest) =>
+      exclusive(() =>
+        reserve(store, request, options.now(), true, questionDigest),
+      ),
     approveBlock: (intent, verified, check) =>
       exclusive(() =>
         approveBuyerBlock(options, store, intent, verified, check),

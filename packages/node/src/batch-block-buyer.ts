@@ -1,14 +1,19 @@
 // Incremental verification uses the shared inference pipeline; approval is durable before transport sends it.
+import { createHash } from 'node:crypto';
+
 import { chargeV2 } from '@gyblos/core/pricing-v2';
 import {
   verifyInferencePrefix,
   verifyInferenceUsage,
 } from '@gyblos/inference/conversation';
+import { canonicalJson } from '@gyblos/protocol';
 import {
   BATCH_METHODS,
   batchFail,
   type BatchExecutionRequest,
 } from '@gyblos/protocol/batch-channel';
+import { FREE_CHAT_ROLES } from '@gyblos/protocol/constants';
+import type { FreeExecutionBuildInput } from '@gyblos/protocol/free-execution';
 import {
   SESSION_CODES,
   type SessionRequest,
@@ -87,6 +92,21 @@ function blockCallbacks<Remote extends BatchDestination>(
     acknowledge: (intent) => buyer.acknowledgeBlock(intent),
   };
 }
+export function buyerQuestionDigest(
+  messages: FreeExecutionBuildInput['messages'],
+  keyId: string | undefined,
+) {
+  return createHash('sha256')
+    .update(
+      canonicalJson([
+        keyId ?? null,
+        messages
+          .filter((message) => message.role === FREE_CHAT_ROLES.USER)
+          .map((message) => message.content),
+      ]),
+    )
+    .digest('hex');
+}
 export async function runBuyerBlocks<Remote extends BatchDestination>(
   context: BuyerBatchContext<Remote>,
   request: BatchExecutionRequest,
@@ -110,7 +130,16 @@ export async function runBuyerBlocks<Remote extends BatchDestination>(
       return batchFail(SESSION_CODES.CLOSED);
   };
   check();
-  await bounded(buyer.beginBlocks(pending), signal);
+  await bounded(
+    buyer.beginBlocks(
+      pending,
+      buyerQuestionDigest(
+        request.input.messages,
+        options.credentialId?.(request.requestId),
+      ),
+    ),
+    signal,
+  );
   check();
   const callbacks = blockCallbacks(
     context,

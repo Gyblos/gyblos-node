@@ -229,12 +229,11 @@ and include CLI startup for each submitted turn.
 The interrupted question must produce a visible partial answer and one client
 retry, with one seller generation and one accepted checkpoint for that turn. The
 key stays blocked until attributable settlement evidence arrives. The driver
-supplies a synthetic finalized settlement of 240 atomic units, invokes the
-Payments status-check endpoint and verifies that the key accounts for 136
-settled units from the interrupted turn. A new question on the original paid
-route still receives a channel-status refusal, including after a buyer restart.
-To exercise a working alternative, the fixture republishes the same model as
-free and restarts the local roles. It resubmits the new question in the same
-OpenCode session with the same delegated key and verifies a complete answer,
-zero remaining reservation and one deposit across all turns. The
-evidence-arrival and offer change times are controlled by the driver.
+supplies a synthetic finalized settlement of 240 atomic units. The next paid
+question triggers automatic verification of the 136 units due for the
+interrupted turn and completes with the original key and one replacement.
+Another paid turn succeeds after restarting the buyer. The final free control
+uses the same conversation and key after the fixture republishes the model. The
+driver checks six generations, five paid approvals, two deposits including the
+initial one, and no remaining reservation. Finality and offer availability are
+controlled.
